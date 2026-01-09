@@ -1,0 +1,637 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <!-- Meta Tags -->
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="{% static 'dist/img/logoNembo.jpg' %}">
+    
+    <!-- Title -->
+    <title>{% block title %}Matimbwa | Dashboard{% endblock title %}</title>
+
+    <!-- ===================== EXTERNAL CSS ===================== -->
+    <!-- Bootstrap 5 -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    
+    <!-- DataTables -->
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.4/css/dataTables.bootstrap5.min.css">
+    <link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.3.6/css/buttons.bootstrap5.min.css">
+    <link rel="stylesheet" href="https://cdn.datatables.net/responsive/2.4.1/css/responsive.bootstrap5.min.css">
+    
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css?family=Source+Sans+Pro:300,400,400i,700" rel="stylesheet">
+    
+    <!-- ===================== INTERNAL CSS ===================== -->
+    <!-- AdminLTE & Plugins -->
+    <link rel="stylesheet" href="{% static 'plugins/fontawesome-free/css/all.min.css' %}">
+    <link rel="stylesheet" href="{% static 'dist/css/adminlte.min.css' %}">
+    
+    <!-- Plugin Styles -->
+    <link rel="stylesheet" href="{% static 'plugins/select2/css/select2.min.css' %}">
+    <link rel="stylesheet" href="{% static 'plugins/select2-bootstrap4-theme/select2-bootstrap4.min.css' %}">
+    <link rel="stylesheet" href="{% static 'plugins/tempusdominus-bootstrap-4/css/tempusdominus-bootstrap-4.min.css' %}">
+    <link rel="stylesheet" href="{% static 'plugins/icheck-bootstrap/icheck-bootstrap.min.css' %}">
+    <link rel="stylesheet" href="{% static 'plugins/jqvmap/jqvmap.min.css' %}">
+    <link rel="stylesheet" href="{% static 'plugins/overlayScrollbars/css/OverlayScrollbars.min.css' %}">
+    <link rel="stylesheet" href="{% static 'plugins/daterangepicker/daterangepicker.css' %}">
+    <link rel="stylesheet" href="{% static 'plugins/summernote/summernote-bs4.css' %}">
+    
+    <!-- Additional Libraries -->
+    <link href="https://cdn.jsdelivr.net/gh/gitbrent/bootstrap-switch-button@1.1.0/css/bootstrap-switch-button.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/chosen/1.4.2/chosen.min.css" />
+    <link rel="stylesheet" href="{% static 'assets/DataTables/datatables.min.css' %}">
+    
+    <!-- ===================== CUSTOM CSS ===================== -->
+    <style>
+        :root {
+            --sidebar-width: 260px;
+            --topbar-height: 70px;
+            --gap: 1.5rem;
+            --bg: #f8f9fa;
+            --card-bg: #ffffff;
+            --border: #e9ecef;
+        }
+
+        /* Base Styles */
+        body {
+            background: var(--bg);
+            min-height: 100vh;
+            margin: 0;
+            padding-top: var(--topbar-height);
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: var(--sidebar-width);
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 100vh;
+            z-index: 2000;
+            transition: transform 0.3s ease;
+        }
+
+        /* Main Layout */
+        .main-wrapper {
+            margin-left: var(--sidebar-width);
+            display: flex;
+            flex-direction: column;
+            min-height: calc(100vh - var(--topbar-height));
+            transition: margin-left 0.3s ease;
+        }
+
+        /* Topbar */
+        .topbar {
+            position: fixed;
+            top: 0;
+            left: var(--sidebar-width);
+            right: 0;
+            height: var(--topbar-height);
+            background: #fff;
+            z-index: 1500;
+            transition: left 0.3s ease;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        }
+
+        /* Page Content */
+        .page-wrapper {
+            flex: 1;
+            padding: var(--gap);
+            display: flex;
+            flex-direction: column;
+            gap: var(--gap);
+        }
+
+        /* Content Card */
+        .content-card {
+            background: var(--card-bg);
+            border-radius: 12px;
+            padding: 2rem;
+            border: 1px solid var(--border);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+            flex: 1;
+        }
+
+        /* Footer */
+        .footer-wrapper {
+            padding: var(--gap);
+            padding-top: 0;
+        }
+
+        .footer-card {
+            background: var(--card-bg);
+            border-radius: 12px;
+            padding: 1.5rem;
+            border: 1px solid var(--border);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+        }
+
+        /* Page Header */
+        .content-header {
+            margin-bottom: 1rem;
+        }
+
+        .page-title {
+            color: #2c3e50;
+            font-weight: 600;
+            margin: 0;
+        }
+
+        .breadcrumb {
+            background: transparent;
+            padding: 0;
+            margin: 0;
+        }
+
+        /* Sidebar Overlay */
+        .sidebar-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 1999;
+            display: none;
+        }
+
+        .sidebar-overlay.active {
+            display: block;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 992px) {
+            .sidebar {
+                transform: translateX(-100%);
+            }
+            
+            .sidebar.active {
+                transform: translateX(0);
+            }
+            
+            .main-wrapper {
+                margin-left: 0;
+            }
+
+            .topbar {
+                left: 0;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .content-card {
+                padding: 1.5rem;
+            }
+            
+            .page-title {
+                font-size: 1.5rem;
+            }
+        }
+
+        /* Utility Classes */
+        .text-truncate-2 {
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+        
+        .cursor-pointer {
+            cursor: pointer;
+        }
+    </style>
+    
+    <!-- Page-specific CSS -->
+    {% block extra_css %}{% endblock extra_css %}
+</head>
+
+<body class="hold-transition sidebar-mini layout-fixed">
+    <!-- Main Container -->
+    <div class="wrapper">
+
+        <!-- Mobile Overlay -->
+        <div class="sidebar-overlay"></div>
+
+        <!-- ===================== SIDEBAR ===================== -->
+        {% include "admin/sidebar.html" %}
+
+        <!-- ===================== TOPBAR ===================== -->
+        {% include "admin/topbar.html" %}
+
+        <!-- ===================== MAIN CONTENT ===================== -->
+        <div class="main-wrapper">
+
+            <!-- Page Content -->
+            <main class="page-wrapper">
+
+                <!-- Page Header -->
+                <header class="content-header">
+                    <div class="row align-items-center">
+                        <div class="col-md-8">
+                            <h1 class="page-title">
+                                {% block page_title %}{% endblock %}
+                            </h1>
+                        </div>
+                        <div class="col-md-4">
+                            <nav aria-label="breadcrumb">
+                                <ol class="breadcrumb justify-content-end mb-0">
+                                    {% block breadcrumb %}{% endblock %}
+                                </ol>
+                            </nav>
+                        </div>
+                    </div>
+                </header>
+
+                <!-- Main Content -->
+                <article class="content-card">
+                    {% block content %}{% endblock %}
+                </article>
+
+            </main>
+
+            <!-- ===================== FOOTER ===================== -->
+            <footer class="footer-wrapper">
+                <div class="footer-card">
+                    {% include "admin/footer.html" %}
+                </div>
+            </footer>
+
+        </div>
+        <!-- End Main Wrapper -->
+
+    </div>
+    <!-- End Main Container -->
+
+    <!-- ===================== JAVASCRIPT LIBRARIES ===================== -->
+    <!-- Core Libraries -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+    <!-- AdminLTE & Plugins -->
+    <script src="{% static 'plugins/jquery-ui/jquery-ui.min.js' %}"></script>
+    <script src="{% static 'plugins/bootstrap/js/bootstrap.bundle.min.js' %}"></script>
+    <script src="{% static 'plugins/select2/js/select2.full.min.js' %}"></script>
+    <script src="{% static 'plugins/chart.js/Chart.min.js' %}"></script>
+    <script src="{% static 'plugins/sparklines/sparkline.js' %}"></script>
+    <script src="{% static 'plugins/jqvmap/jquery.vmap.min.js' %}"></script>
+    <script src="{% static 'plugins/jqvmap/maps/jquery.vmap.usa.js' %}"></script>
+    <script src="{% static 'plugins/jquery-knob/jquery.knob.min.js' %}"></script>
+    <script src="{% static 'plugins/moment/moment.min.js' %}"></script>
+    <script src="{% static 'plugins/daterangepicker/daterangepicker.js' %}"></script>
+    <script src="{% static 'plugins/tempusdominus-bootstrap-4/js/tempusdominus-bootstrap-4.min.js' %}"></script>
+    <script src="{% static 'plugins/summernote/summernote-bs4.min.js' %}"></script>
+    <script src="{% static 'plugins/overlayScrollbars/js/jquery.overlayScrollbars.min.js' %}"></script>
+    
+    <!-- DataTables -->
+    <script src="{% static 'datatables/js/jquery.dataTables.min.js' %}"></script>
+    <script src="{% static 'datatables/js/dataTables.bootstrap5.min.js' %}"></script>
+    <script src="{% static 'datatables/js/dataTables.buttons.min.js' %}"></script>
+    <script src="{% static 'datatables/js/jszip.min.js' %}"></script>
+    <script src="{% static 'datatables/js/pdfmake.min.js' %}"></script>
+    <script src="{% static 'datatables/js/vfs_fonts.js' %}"></script>
+    <script src="{% static 'datatables/js/buttons.html5.min.js' %}"></script>
+    <script src="{% static 'datatables/js/buttons.print.min.js' %}"></script>
+    
+    <!-- Additional Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/chosen/1.8.7/chosen.jquery.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/gitbrent/bootstrap-switch-button@1.1.0/dist/bootstrap-switch-button.min.js"></script>
+    
+    <!-- AdminLTE JS -->
+    <script src="{% static 'dist/js/adminlte.js' %}"></script>
+    <script src="{% static 'dist/js/pages/dashboard.js' %}"></script>
+    <script src="{% static 'dist/js/demo.js' %}"></script>
+    
+    <!-- Initialize jQuery UI Bridge -->
+    <script>
+        $.widget.bridge('uibutton', $.ui.button);
+    </script>
+
+    <!-- ===================== MAIN APPLICATION JS ===================== -->
+    <script>
+        /**
+         * Main Application Initialization
+         */
+        document.addEventListener('DOMContentLoaded', function() {
+            // Initialize components
+            initializeSidebar();
+            initializePlugins();
+            initializeNavigation();
+            initializeAlerts();
+            initializeTooltips();
+            
+            // Set up global event listeners
+            setupEventListeners();
+        });
+
+        // ===================== INITIALIZATION FUNCTIONS =====================
+        
+        /**
+         * Initialize sidebar functionality
+         */
+        function initializeSidebar() {
+            const sidebar = document.querySelector('.sidebar');
+            const overlay = document.querySelector('.sidebar-overlay');
+            const toggleBtn = document.getElementById('sidebarToggle');
+            
+            if (!toggleBtn || !sidebar || !overlay) return;
+            
+            // Toggle sidebar
+            toggleBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                sidebar.classList.toggle('active');
+                overlay.classList.toggle('active');
+                document.body.classList.toggle('sidebar-open');
+            });
+            
+            // Close sidebar on overlay click
+            overlay.addEventListener('click', function() {
+                sidebar.classList.remove('active');
+                overlay.classList.remove('active');
+                document.body.classList.remove('sidebar-open');
+            });
+            
+            // Close sidebar on window resize (mobile)
+            window.addEventListener('resize', function() {
+                if (window.innerWidth > 992) {
+                    sidebar.classList.remove('active');
+                    overlay.classList.remove('active');
+                    document.body.classList.remove('sidebar-open');
+                }
+            });
+        }
+        
+        /**
+         * Initialize all plugins
+         */
+        function initializePlugins() {
+            // Select2
+            $('.select2').select2({
+                width: '100%',
+                theme: 'bootstrap4'
+            });
+            
+            $('.select2bs4').select2({
+                theme: 'bootstrap4'
+            });
+            
+            // DataTables
+            if ($.fn.DataTable) {
+                $('.data-table').DataTable({
+                    responsive: true,
+                    pageLength: 25,
+                    language: {
+                        search: "_INPUT_",
+                        searchPlaceholder: "Search..."
+                    }
+                });
+            }
+        }
+        
+        /**
+         * Initialize navigation highlighting
+         */
+        function initializeNavigation() {
+            const currentPath = window.location.pathname;
+            const navLinks = document.querySelectorAll('.sidebar .nav-link');
+            
+            navLinks.forEach(link => {
+                const href = link.getAttribute('href');
+                if (href && currentPath.includes(href)) {
+                    link.classList.add('active');
+                    
+                    // Expand parent menu if exists
+                    const parentCollapse = link.closest('.collapse');
+                    if (parentCollapse) {
+                        const toggleButton = document.querySelector(`[data-bs-target="#${parentCollapse.id}"]`);
+                        if (toggleButton) {
+                            toggleButton.classList.remove('collapsed');
+                            parentCollapse.classList.add('show');
+                        }
+                    }
+                }
+            });
+        }
+        
+        /**
+         * Initialize auto-dismiss alerts
+         */
+        function initializeAlerts() {
+            const alerts = document.querySelectorAll('.alert:not(.alert-persistent)');
+            
+            alerts.forEach(alert => {
+                setTimeout(() => {
+                    if (bootstrap && bootstrap.Alert) {
+                        const bsAlert = bootstrap.Alert.getInstance(alert) || new bootstrap.Alert(alert);
+                        bsAlert.close();
+                    } else {
+                        alert.style.opacity = '0';
+                        setTimeout(() => alert.remove(), 300);
+                    }
+                }, 5000);
+            });
+        }
+        
+        /**
+         * Initialize Bootstrap tooltips and popovers
+         */
+        function initializeTooltips() {
+            // Tooltips
+            const tooltipElements = document.querySelectorAll('[data-bs-toggle="tooltip"]');
+            tooltipElements.forEach(el => {
+                new bootstrap.Tooltip(el);
+            });
+            
+            // Popovers
+            const popoverElements = document.querySelectorAll('[data-bs-toggle="popover"]');
+            popoverElements.forEach(el => {
+                new bootstrap.Popover(el);
+            });
+        }
+        
+        /**
+         * Set up global event listeners
+         */
+        function setupEventListeners() {
+            // Prevent empty form submissions
+            document.addEventListener('submit', function(e) {
+                const form = e.target;
+                if (form.tagName === 'FORM' && !form.checkValidity()) {
+                    e.preventDefault();
+                    form.classList.add('was-validated');
+                }
+            });
+            
+            // Confirm before deleting
+            document.addEventListener('click', function(e) {
+                if (e.target.matches('[data-confirm]')) {
+                    e.preventDefault();
+                    const message = e.target.getAttribute('data-confirm-message') || 'Are you sure you want to proceed?';
+                    
+                    showConfirmDialog('Confirm Action', message).then((result) => {
+                        if (result.isConfirmed) {
+                            if (e.target.tagName === 'A') {
+                                window.location.href = e.target.href;
+                            } else if (e.target.tagName === 'BUTTON' && e.target.type === 'submit') {
+                                e.target.closest('form').submit();
+                            }
+                        }
+                    });
+                }
+            });
+        }
+
+        // ===================== UTILITY FUNCTIONS =====================
+        
+        /**
+         * Show toast notification
+         */
+        window.showToast = function(message, type = 'success', duration = 5000) {
+            const toastId = 'toast-' + Date.now();
+            const toastHtml = `
+                <div id="${toastId}" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
+                    <div class="toast-header bg-${type} text-white">
+                        <strong class="me-auto">${type.charAt(0).toUpperCase() + type.slice(1)}</strong>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast"></button>
+                    </div>
+                    <div class="toast-body">${message}</div>
+                </div>
+            `;
+            
+            // Create toast container if it doesn't exist
+            let container = document.querySelector('.toast-container');
+            if (!container) {
+                container = document.createElement('div');
+                container.className = 'toast-container position-fixed top-0 end-0 p-3';
+                document.body.appendChild(container);
+            }
+            
+            container.insertAdjacentHTML('beforeend', toastHtml);
+            const toastElement = document.getElementById(toastId);
+            const toast = new bootstrap.Toast(toastElement, { delay: duration });
+            
+            toast.show();
+            
+            // Remove toast after it's hidden
+            toastElement.addEventListener('hidden.bs.toast', function() {
+                this.remove();
+            });
+        };
+        
+        /**
+         * Show confirmation dialog
+         */
+        window.showConfirmDialog = function(title, text, confirmText = 'Confirm', cancelText = 'Cancel') {
+            return Swal.fire({
+                title: title,
+                text: text,
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonColor: '#3085d6',
+                cancelButtonColor: '#6c757d',
+                confirmButtonText: confirmText,
+                cancelButtonText: cancelText,
+                reverseButtons: true
+            });
+        };
+        
+        /**
+         * Show success message
+         */
+        window.showSuccess = function(message, title = 'Success') {
+            Swal.fire({
+                icon: 'success',
+                title: title,
+                text: message,
+                timer: 3000,
+                showConfirmButton: false
+            });
+        };
+        
+        /**
+         * Show error message
+         */
+        window.showError = function(message, title = 'Error') {
+            Swal.fire({
+                icon: 'error',
+                title: title,
+                text: message,
+                confirmButtonText: 'OK'
+            });
+        };
+        
+        /**
+         * Toggle button loading state
+         */
+        window.toggleButtonLoading = function(button, isLoading) {
+            if (isLoading) {
+                button.disabled = true;
+                const originalContent = button.innerHTML;
+                button.setAttribute('data-original-content', originalContent);
+                button.innerHTML = `
+                    <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                    Loading...
+                `;
+            } else {
+                button.disabled = false;
+                const originalContent = button.getAttribute('data-original-content');
+                if (originalContent) {
+                    button.innerHTML = originalContent;
+                }
+            }
+        };
+        
+        /**
+         * Validate form fields
+         */
+        window.validateForm = function(formId) {
+            const form = document.getElementById(formId);
+            if (!form) return false;
+            
+            let isValid = true;
+            const requiredFields = form.querySelectorAll('[required]');
+            
+            requiredFields.forEach(field => {
+                if (!field.value.trim()) {
+                    isValid = false;
+                    field.classList.add('is-invalid');
+                    
+                    // Add error message if not exists
+                    if (!field.nextElementSibling || !field.nextElementSibling.classList.contains('invalid-feedback')) {
+                        const errorDiv = document.createElement('div');
+                        errorDiv.className = 'invalid-feedback';
+                        errorDiv.textContent = 'This field is required';
+                        field.parentNode.insertBefore(errorDiv, field.nextSibling);
+                    }
+                } else {
+                    field.classList.remove('is-invalid');
+                    field.classList.add('is-valid');
+                }
+            });
+            
+            return isValid;
+        };
+        
+        /**
+         * Format date to local string
+         */
+        window.formatDate = function(dateString) {
+            if (!dateString) return '';
+            const date = new Date(dateString);
+            return date.toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric'
+            });
+        };
+    </script>
+
+    <!-- Page-specific JavaScript -->
+    {% block extra_js %}{% endblock extra_js %}
+</body>
+</html>

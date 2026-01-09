@@ -1,0 +1,1090 @@
+{% extends 'public/base.html' %}
+
+{% block extra_css %}
+<style>
+    .register-container {
+        max-width: 800px;
+        margin: 2rem auto;
+        animation: fadeInUp 0.6s ease-out;
+    }
+    
+    @keyframes fadeInUp {
+        from {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+    
+    .register-card {
+        background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+        padding: 2.5rem;
+        border-radius: 15px;
+        box-shadow: 0 15px 40px rgba(30, 60, 114, 0.15);
+        margin-bottom: 2rem;
+        border: 1px solid rgba(30, 60, 114, 0.1);
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .register-card:before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 5px;
+        height: 100%;
+        background: linear-gradient(180deg, var(--accent-gold), var(--light-gold));
+    }
+    
+    .register-title {
+        text-align: center;
+        color: var(--primary-blue);
+        margin-bottom: 1rem;
+        font-family: 'Montserrat', sans-serif;
+        font-size: 2.2rem;
+        position: relative;
+        padding-bottom: 1rem;
+    }
+    
+    .register-title:after {
+        content: '';
+        position: absolute;
+        bottom: 0;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 120px;
+        height: 3px;
+        background: linear-gradient(90deg, var(--primary-blue), var(--secondary-blue));
+        border-radius: 2px;
+    }
+    
+    .register-subtitle {
+        text-align: center;
+        color: #666;
+        margin-bottom: 2rem;
+        font-size: 1.1rem;
+    }
+    
+    .register-icon {
+        text-align: center;
+        margin-bottom: 1.5rem;
+    }
+    
+    .register-icon i {
+        font-size: 3rem;
+        background: linear-gradient(135deg, var(--primary-blue), var(--secondary-blue));
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        display: inline-block;
+        padding: 1rem;
+        border-radius: 50%;
+        background-color: rgba(30, 60, 114, 0.05);
+        animation: pulse 2s infinite;
+    }
+    
+    @keyframes pulse {
+        0% { transform: scale(1); }
+        50% { transform: scale(1.05); }
+        100% { transform: scale(1); }
+    }
+    
+    .form-section {
+        margin-bottom: 2.5rem;
+        padding-bottom: 2rem;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+    }
+    
+    .form-section-title {
+        color: var(--primary-blue);
+        font-size: 1.2rem;
+        margin-bottom: 1.5rem;
+        padding-left: 1rem;
+        border-left: 4px solid var(--secondary-blue);
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    
+    .form-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 1.5rem;
+    }
+    
+    .form-group {
+        position: relative;
+    }
+    
+    .form-group.full-width {
+        grid-column: 1 / -1;
+    }
+    
+    .form-label {
+        display: block;
+        margin-bottom: 0.5rem;
+        color: var(--primary-blue);
+        font-weight: 600;
+        font-size: 0.95rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    .form-label.required:after {
+        content: ' *';
+        color: #e74c3c;
+    }
+    
+    .form-input {
+        width: 100%;
+        padding: 0.9rem 1rem;
+        border: 2px solid #e1e5eb;
+        border-radius: 8px;
+        font-size: 1rem;
+        transition: all 0.3s ease;
+        background-color: white;
+        font-family: inherit;
+    }
+    
+    .form-input:focus {
+        border-color: var(--secondary-blue);
+        box-shadow: 0 0 0 3px rgba(42, 82, 152, 0.15);
+        outline: none;
+        transform: translateY(-1px);
+    }
+    
+    .form-input.error {
+        border-color: #e74c3c;
+        background-color: rgba(231, 76, 60, 0.02);
+    }
+    
+    .form-input.success {
+        border-color: #27ae60;
+    }
+    
+    .password-strength {
+        height: 4px;
+        background: #e1e5eb;
+        border-radius: 2px;
+        margin-top: 0.5rem;
+        overflow: hidden;
+    }
+    
+    .password-strength-fill {
+        height: 100%;
+        width: 0%;
+        background: #e74c3c;
+        transition: width 0.3s ease, background 0.3s ease;
+    }
+    
+    .password-strength-text {
+        font-size: 0.8rem;
+        color: #666;
+        margin-top: 0.25rem;
+        text-align: right;
+    }
+    
+    .form-feedback {
+        font-size: 0.85rem;
+        margin-top: 0.5rem;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        min-height: 20px;
+    }
+    
+    .form-feedback.error {
+        color: #e74c3c;
+    }
+    
+    .form-feedback.success {
+        color: #27ae60;
+    }
+    
+    .password-toggle {
+        position: absolute;
+        right: 12px;
+        top: 50%;
+        transform: translateY(-50%);
+        background: none;
+        border: none;
+        color: #666;
+        cursor: pointer;
+        padding: 0.25rem;
+        transition: color 0.3s ease;
+        z-index: 10;
+    }
+    
+    .password-toggle:hover {
+        color: var(--secondary-blue);
+    }
+    
+    .register-btn {
+        width: 100%;
+        padding: 1rem;
+        background: linear-gradient(135deg, var(--primary-blue), var(--secondary-blue));
+        color: white;
+        border: none;
+        border-radius: 8px;
+        font-size: 1.1rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .register-btn:before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+        transition: left 0.7s;
+    }
+    
+    .register-btn:hover:before {
+        left: 100%;
+    }
+    
+    .register-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(42, 82, 152, 0.3);
+    }
+    
+    .register-btn:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+        transform: none !important;
+    }
+    
+    .register-btn:disabled:hover:before {
+        left: -100%;
+    }
+    
+    .loading-spinner {
+        display: none;
+        width: 20px;
+        height: 20px;
+        border: 2px solid rgba(255, 255, 255, 0.3);
+        border-radius: 50%;
+        border-top-color: white;
+        animation: spin 1s ease-in-out infinite;
+    }
+    
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+    
+    .form-messages {
+        padding: 1rem;
+        border-radius: 8px;
+        margin-bottom: 1.5rem;
+        display: none;
+        animation: slideInDown 0.5s ease-out;
+    }
+    
+    @keyframes slideInDown {
+        from {
+            opacity: 0;
+            transform: translateY(-20px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+    
+    .form-messages.success {
+        background: linear-gradient(135deg, #d4edda, #c3e6cb);
+        color: #155724;
+        border-left: 4px solid #28a745;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    
+    .form-messages.error {
+        background: linear-gradient(135deg, #f8d7da, #f5c6cb);
+        color: #721c24;
+        border-left: 4px solid #dc3545;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    
+    .register-info {
+        background: linear-gradient(135deg, #d1ecf1, #bee5eb);
+        padding: 1.5rem;
+        border-radius: 10px;
+        border-left: 4px solid #17a2b8;
+        margin-top: 2rem;
+        animation: slideInLeft 0.6s ease-out;
+    }
+    
+    @keyframes slideInLeft {
+        from {
+            opacity: 0;
+            transform: translateX(-20px);
+        }
+        to {
+            opacity: 1;
+            transform: translateX(0);
+        }
+    }
+    
+    .register-info h4 {
+        color: var(--primary-blue);
+        margin-bottom: 0.8rem;
+        font-size: 1.1rem;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    
+    .register-info p {
+        color: #0c5460;
+        font-size: 0.95rem;
+        line-height: 1.6;
+        margin-bottom: 0;
+    }
+    
+    .login-link {
+        text-align: center;
+        margin-top: 2rem;
+        padding-top: 1.5rem;
+        border-top: 1px solid #e1e5eb;
+        color: #666;
+    }
+    
+    .login-link a {
+        color: var(--secondary-blue);
+        text-decoration: none;
+        font-weight: 600;
+        margin-left: 5px;
+        position: relative;
+    }
+    
+    .login-link a:after {
+        content: '';
+        position: absolute;
+        bottom: -2px;
+        left: 0;
+        width: 0;
+        height: 1px;
+        background-color: var(--secondary-blue);
+        transition: width 0.3s ease;
+    }
+    
+    .login-link a:hover:after {
+        width: 100%;
+    }
+    
+    .home-link {
+        text-align: center;
+        margin-top: 1rem;
+    }
+    
+    .home-link a {
+        color: #666;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        transition: color 0.3s ease;
+    }
+    
+    .home-link a:hover {
+        color: var(--secondary-blue);
+    }
+    
+    /* Responsive design */
+    @media (max-width: 768px) {
+        .register-container {
+            padding: 0 1rem;
+        }
+        
+        .register-card {
+            padding: 1.5rem;
+        }
+        
+        .register-title {
+            font-size: 1.8rem;
+        }
+        
+        .form-grid {
+            grid-template-columns: 1fr;
+            gap: 1rem;
+        }
+        
+        .form-section {
+            padding-bottom: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+    }
+    
+    /* Validation icons */
+    .validation-icon {
+        position: absolute;
+        right: 35px;
+        top: 50%;
+        transform: translateY(-50%);
+        font-size: 0.9rem;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+    }
+    
+    .validation-icon.show {
+        opacity: 1;
+    }
+    
+    .validation-icon.success {
+        color: #27ae60;
+    }
+    
+    .validation-icon.error {
+        color: #e74c3c;
+    }
+    
+    .input-with-icon {
+        position: relative;
+    }
+    
+    .input-with-icon input {
+        padding-right: 60px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="register-container">
+    <div class="register-card">
+        <div class="register-icon">
+            <i class="fas fa-user-plus"></i>
+        </div>
+        
+        <h1 class="register-title">Staff Registration</h1>
+        <p class="register-subtitle">Create your staff account. All fields are required unless specified.</p>
+
+        <div id="form-messages" class="form-messages" style="display: none;">
+            <i class="fas fa-info-circle"></i>
+            <div id="form-messages-text"></div>
+        </div>
+
+        <form id="register-form" method="post">
+            {% csrf_token %}
+            
+            <!-- Personal Information Section -->
+            <div class="form-section">
+                <h3 class="form-section-title">
+                    <i class="fas fa-user-circle"></i>
+                    Personal Information
+                </h3>
+                
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="first_name" class="form-label required">First Name</label>
+                        <div class="input-with-icon">
+                            <input type="text" 
+                                   id="first_name" 
+                                   name="first_name" 
+                                   class="form-input" 
+                                   required 
+                                   autofocus
+                                   placeholder="Enter first name"
+                                   autocomplete="given-name"
+                                   data-validation="name">
+                            <span class="validation-icon" id="first_name-icon">
+                                <i class="fas fa-check"></i>
+                            </span>
+                        </div>
+                        <div class="form-feedback" id="first_name-feedback"></div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="middle_name" class="form-label">Middle Name (Optional)</label>
+                        <div class="input-with-icon">
+                            <input type="text" 
+                                   id="middle_name" 
+                                   name="middle_name" 
+                                   class="form-input"
+                                   placeholder="Enter middle name"
+                                   autocomplete="additional-name"
+                                   data-validation="name">
+                            <span class="validation-icon" id="middle_name-icon">
+                                <i class="fas fa-check"></i>
+                            </span>
+                        </div>
+                        <div class="form-feedback" id="middle_name-feedback"></div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="last_name" class="form-label required">Last Name</label>
+                        <div class="input-with-icon">
+                            <input type="text" 
+                                   id="last_name" 
+                                   name="last_name" 
+                                   class="form-input" 
+                                   required
+                                   placeholder="Enter last name"
+                                   autocomplete="family-name"
+                                   data-validation="name">
+                            <span class="validation-icon" id="last_name-icon">
+                                <i class="fas fa-check"></i>
+                            </span>
+                        </div>
+                        <div class="form-feedback" id="last_name-feedback"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Account Information Section -->
+            <div class="form-section">
+                <h3 class="form-section-title">
+                    <i class="fas fa-key"></i>
+                    Account Information
+                </h3>
+                
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="username" class="form-label required">Username</label>
+                        <div class="input-with-icon">
+                            <input type="text" 
+                                   id="username" 
+                                   name="username" 
+                                   class="form-input" 
+                                   required
+                                   placeholder="Choose a username"
+                                   autocomplete="username"
+                                   data-validation="username"
+                                   minlength="3"
+                                   maxlength="30">
+                            <span class="validation-icon" id="username-icon">
+                                <i class="fas fa-check"></i>
+                            </span>
+                        </div>
+                        <div class="form-feedback" id="username-feedback"></div>
+                        <small style="color: #666; font-size: 0.8rem;">3-30 characters, letters, numbers, and underscores only</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="email" class="form-label required">Email Address</label>
+                        <div class="input-with-icon">
+                            <input type="email" 
+                                   id="email" 
+                                   name="email" 
+                                   class="form-input" 
+                                   required
+                                   placeholder="Enter your email"
+                                   autocomplete="email"
+                                   data-validation="email">
+                            <span class="validation-icon" id="email-icon">
+                                <i class="fas fa-check"></i>
+                            </span>
+                        </div>
+                        <div class="form-feedback" id="email-feedback"></div>
+                        <small style="color: #666; font-size: 0.8rem;">Your school email address</small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Password Section -->
+            <div class="form-section">
+                <h3 class="form-section-title">
+                    <i class="fas fa-lock"></i>
+                    Security
+                </h3>
+                
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="password" class="form-label required">Password</label>
+                        <div class="input-with-icon">
+                            <input type="password" 
+                                   id="password" 
+                                   name="password" 
+                                   class="form-input" 
+                                   required
+                                   placeholder="Create a strong password"
+                                   autocomplete="new-password"
+                                   minlength="8"
+                                   data-validation="password">
+                            <button type="button" 
+                                    class="password-toggle" 
+                                    id="passwordToggle"
+                                    aria-label="Toggle password visibility">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                            <span class="validation-icon" id="password-icon">
+                                <i class="fas fa-check"></i>
+                            </span>
+                        </div>
+                        <div class="password-strength">
+                            <div class="password-strength-fill" id="password-strength-fill"></div>
+                        </div>
+                        <div class="password-strength-text" id="password-strength-text">Weak</div>
+                        <div class="form-feedback" id="password-feedback"></div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="password2" class="form-label required">Confirm Password</label>
+                        <div class="input-with-icon">
+                            <input type="password" 
+                                   id="password2" 
+                                   name="password2" 
+                                   class="form-input" 
+                                   required
+                                   placeholder="Confirm your password"
+                                   autocomplete="new-password"
+                                   data-validation="password">
+                            <button type="button" 
+                                    class="password-toggle" 
+                                    id="password2Toggle"
+                                    aria-label="Toggle password visibility">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                            <span class="validation-icon" id="password2-icon">
+                                <i class="fas fa-check"></i>
+                            </span>
+                        </div>
+                        <div class="form-feedback" id="password2-feedback"></div>
+                    </div>
+                </div>
+                
+                <div style="margin-top: 1rem; font-size: 0.9rem; color: #666;">
+                    <p><strong>Password Requirements:</strong></p>
+                    <ul style="margin-left: 1.5rem;">
+                        <li>Minimum 8 characters</li>
+                        <li>At least one uppercase letter</li>
+                        <li>At least one lowercase letter</li>
+                        <li>At least one number</li>
+                        <li>At least one special character (!@#$%^&*)</li>
+                    </ul>
+                </div>
+            </div>
+
+            <button type="submit" class="register-btn" id="register-btn">
+                <i class="fas fa-user-plus"></i>
+                <span>Create Staff Account</span>
+                <div class="loading-spinner" id="loadingSpinner"></div>
+            </button>
+        </form>
+    </div>
+
+    <div class="register-info">
+        <h4>
+            <i class="fas fa-info-circle"></i>
+            Important Information
+        </h4>
+        <p>
+            • This registration is for school staff only (Teachers, HODs, Administrators)<br>
+            • After registration, your account will be verified by school administration<br>
+            • You will receive a confirmation email upon successful verification<br>
+            • Use your school email address for registration<br>
+            • For assistance, contact the ICT department at +254 712 345 678
+        </p>
+    </div>
+
+    <div class="login-link">
+        Already have an account? 
+        <a href="{% url 'public_login' %}">Login here</a>
+    </div>
+    
+    <div class="home-link">
+        <a href="{% url 'public_home' %}">
+            <i class="fas fa-arrow-left"></i>
+            Return to Home
+        </a>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+        const checkUrl = "{% url 'public_register_check' %}";
+        const ajaxUrl = "{% url 'public_register_ajax' %}";
+        
+        // Elements
+        const registerForm = document.getElementById('register-form');
+        const registerBtn = document.getElementById('register-btn');
+        const loadingSpinner = document.getElementById('loadingSpinner');
+        const buttonText = registerBtn.querySelector('span');
+        const formMessages = document.getElementById('form-messages');
+        const formMessagesText = document.getElementById('form-messages-text');
+        
+        // Password visibility toggles
+        const passwordToggle = document.getElementById('passwordToggle');
+        const password2Toggle = document.getElementById('password2Toggle');
+        const passwordInput = document.getElementById('password');
+        const password2Input = document.getElementById('password2');
+        
+        passwordToggle.addEventListener('click', function() {
+            const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+            passwordInput.setAttribute('type', type);
+            this.querySelector('i').classList.toggle('fa-eye');
+            this.querySelector('i').classList.toggle('fa-eye-slash');
+        });
+        
+        password2Toggle.addEventListener('click', function() {
+            const type = password2Input.getAttribute('type') === 'password' ? 'text' : 'password';
+            password2Input.setAttribute('type', type);
+            this.querySelector('i').classList.toggle('fa-eye');
+            this.querySelector('i').classList.toggle('fa-eye-slash');
+        });
+        
+        // Password strength checker
+        function checkPasswordStrength(password) {
+            let strength = 0;
+            const fill = document.getElementById('password-strength-fill');
+            const text = document.getElementById('password-strength-text');
+            
+            if (password.length >= 8) strength++;
+            if (/[A-Z]/.test(password)) strength++;
+            if (/[a-z]/.test(password)) strength++;
+            if (/[0-9]/.test(password)) strength++;
+            if (/[!@#$%^&*]/.test(password)) strength++;
+            
+            let strengthText = '';
+            let strengthColor = '';
+            let percentage = 0;
+            
+            switch(strength) {
+                case 0:
+                case 1:
+                    strengthText = 'Very Weak';
+                    strengthColor = '#e74c3c';
+                    percentage = 20;
+                    break;
+                case 2:
+                    strengthText = 'Weak';
+                    strengthColor = '#e67e22';
+                    percentage = 40;
+                    break;
+                case 3:
+                    strengthText = 'Fair';
+                    strengthColor = '#f1c40f';
+                    percentage = 60;
+                    break;
+                case 4:
+                    strengthText = 'Strong';
+                    strengthColor = '#2ecc71';
+                    percentage = 80;
+                    break;
+                case 5:
+                    strengthText = 'Very Strong';
+                    strengthColor = '#27ae60';
+                    percentage = 100;
+                    break;
+            }
+            
+            fill.style.width = `${percentage}%`;
+            fill.style.background = strengthColor;
+            text.textContent = strengthText;
+            text.style.color = strengthColor;
+            
+            return strength >= 4; // Minimum strong password
+        }
+        
+        // Validation functions
+        function validateName(name) {
+            return /^[A-Za-z\s\-']{2,50}$/.test(name.trim());
+        }
+        
+        function validateUsername(username) {
+            return /^[a-zA-Z0-9_]{3,30}$/.test(username.trim());
+        }
+        
+        function validateEmail(email) {
+            return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+        }
+        
+        function validatePassword(password) {
+            return /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*])[A-Za-z\d!@#$%^&*]{8,}$/.test(password);
+        }
+        
+        function validatePasswordMatch(password, confirmPassword) {
+            return password === confirmPassword && password.length > 0;
+        }
+        
+        // Show validation feedback
+        function showFeedback(inputId, message, type = 'error') {
+            const feedbackEl = document.getElementById(`${inputId}-feedback`);
+            const iconEl = document.getElementById(`${inputId}-icon`);
+            const inputEl = document.getElementById(inputId);
+            
+            feedbackEl.textContent = message;
+            feedbackEl.className = `form-feedback ${type}`;
+            
+            inputEl.classList.remove('error', 'success');
+            iconEl.classList.remove('show', 'success', 'error');
+            
+            if (type === 'error') {
+                inputEl.classList.add('error');
+                iconEl.classList.add('show', 'error');
+                iconEl.querySelector('i').className = 'fas fa-times';
+            } else if (type === 'success') {
+                inputEl.classList.add('success');
+                iconEl.classList.add('show', 'success');
+                iconEl.querySelector('i').className = 'fas fa-check';
+            }
+        }
+        
+        function clearFeedback(inputId) {
+            const feedbackEl = document.getElementById(`${inputId}-feedback`);
+            const iconEl = document.getElementById(`${inputId}-icon`);
+            const inputEl = document.getElementById(inputId);
+            
+            feedbackEl.textContent = '';
+            feedbackEl.className = 'form-feedback';
+            inputEl.classList.remove('error', 'success');
+            iconEl.classList.remove('show', 'success', 'error');
+        }
+        
+        // Show form message
+        function showFormMessage(message, type = 'success') {
+            formMessages.className = `form-messages ${type}`;
+            formMessagesText.textContent = message;
+            formMessages.style.display = 'flex';
+            
+            const icon = formMessages.querySelector('i');
+            if (type === 'success') {
+                icon.className = 'fas fa-check-circle';
+            } else {
+                icon.className = 'fas fa-exclamation-circle';
+            }
+            
+            // Auto hide after 5 seconds for success messages
+            if (type === 'success') {
+                setTimeout(() => {
+                    formMessages.style.display = 'none';
+                }, 5000);
+            }
+        }
+        
+        // Hide form message
+        function hideFormMessage() {
+            formMessages.style.display = 'none';
+        }
+        
+        // Real-time validation on blur
+        const validationFields = ['first_name', 'middle_name', 'last_name', 'username', 'email', 'password', 'password2'];
+        
+        validationFields.forEach(fieldId => {
+            const field = document.getElementById(fieldId);
+            if (field) {
+                field.addEventListener('blur', function() {
+                    validateField(this.id);
+                });
+                
+                field.addEventListener('input', function() {
+                    if (this.id === 'password') {
+                        checkPasswordStrength(this.value);
+                    }
+                    clearFeedback(this.id);
+                    hideFormMessage();
+                });
+            }
+        });
+        
+        // Validate individual field
+        function validateField(fieldId) {
+            const field = document.getElementById(fieldId);
+            const value = field.value.trim();
+            
+            switch(fieldId) {
+                case 'first_name':
+                case 'last_name':
+                    if (!validateName(value)) {
+                        showFeedback(fieldId, 'Please enter a valid name (2-50 letters only)', 'error');
+                        return false;
+                    }
+                    showFeedback(fieldId, 'Valid name', 'success');
+                    return true;
+                    
+                case 'middle_name':
+                    if (value && !validateName(value)) {
+                        showFeedback(fieldId, 'Please enter a valid name (2-50 letters only)', 'error');
+                        return false;
+                    }
+                    if (value) showFeedback(fieldId, 'Valid name', 'success');
+                    return true;
+                    
+                case 'username':
+                    if (!validateUsername(value)) {
+                        showFeedback(fieldId, 'Username must be 3-30 characters (letters, numbers, underscores)', 'error');
+                        return false;
+                    }
+                    checkUsernameAvailability(value);
+                    return false; // Will be updated by AJAX
+                    
+                case 'email':
+                    if (!validateEmail(value)) {
+                        showFeedback(fieldId, 'Please enter a valid email address', 'error');
+                        return false;
+                    }
+                    checkEmailAvailability(value);
+                    return false; // Will be updated by AJAX
+                    
+                case 'password':
+                    if (!validatePassword(value)) {
+                        showFeedback(fieldId, 'Password must be at least 8 characters with uppercase, lowercase, number, and special character', 'error');
+                        return false;
+                    }
+                    showFeedback(fieldId, 'Strong password', 'success');
+                    return true;
+                    
+                case 'password2':
+                    const password = document.getElementById('password').value;
+                    if (!validatePasswordMatch(password, value)) {
+                        showFeedback(fieldId, 'Passwords do not match', 'error');
+                        return false;
+                    }
+                    showFeedback(fieldId, 'Passwords match', 'success');
+                    return true;
+            }
+            return true;
+        }
+        
+        // Check username availability via AJAX
+        function checkUsernameAvailability(username) {
+            if (!username) return;
+            
+            fetch(`${checkUrl}?username=${encodeURIComponent(username)}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.username_available) {
+                        showFeedback('username', 'Username available', 'success');
+                    } else {
+                        showFeedback('username', 'Username already taken', 'error');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error checking username:', error);
+                });
+        }
+        
+        // Check email availability via AJAX
+        function checkEmailAvailability(email) {
+            if (!email) return;
+            
+            fetch(`${checkUrl}?email=${encodeURIComponent(email)}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.email_available) {
+                        showFeedback('email', 'Email available', 'success');
+                    } else {
+                        showFeedback('email', 'Email already registered', 'error');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error checking email:', error);
+                });
+        }
+        
+        // Check staff name availability
+        function checkStaffNameAvailability() {
+            const firstName = document.getElementById('first_name').value.trim();
+            const middleName = document.getElementById('middle_name').value.trim();
+            const lastName = document.getElementById('last_name').value.trim();
+            
+            if (!firstName || !lastName) return;
+            
+            let url = `${checkUrl}?first_name=${encodeURIComponent(firstName)}&last_name=${encodeURIComponent(lastName)}`;
+            if (middleName) {
+                url += `&middle_name=${encodeURIComponent(middleName)}`;
+            }
+            
+            fetch(url)
+                .then(response => response.json())
+                .then(data => {
+                    if (!data.staff_name_available) {
+                        showFormMessage('A staff with this full name already exists. Please contact administration.', 'error');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error checking staff name:', error);
+                });
+        }
+        
+        // Validate all fields
+        function validateAllFields() {
+            let isValid = true;
+            
+            validationFields.forEach(fieldId => {
+                if (!validateField(fieldId)) {
+                    isValid = false;
+                }
+            });
+            
+            // Additional check for staff name
+            checkStaffNameAvailability();
+            
+            return isValid;
+        }
+        
+        // Form submission
+        registerForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            hideFormMessage();
+            
+            if (!validateAllFields()) {
+                showFormMessage('Please fix the errors in the form before submitting.', 'error');
+                return;
+            }
+            
+            // Show loading state
+            buttonText.textContent = 'Creating Account...';
+            loadingSpinner.style.display = 'block';
+            registerBtn.disabled = true;
+            
+            try {
+                const formData = new FormData(registerForm);
+                
+                const response = await fetch(ajaxUrl, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': csrfToken,
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    showFormMessage(data.message, 'success');
+                    // Redirect to login after 2 seconds
+                    setTimeout(() => {
+                        window.location.href = "{% url 'public_login' %}";
+                    }, 2000);
+                } else {
+                    showFormMessage(data.message, 'error');
+                    // Reset button state
+                    buttonText.textContent = 'Create Staff Account';
+                    loadingSpinner.style.display = 'none';
+                    registerBtn.disabled = false;
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                showFormMessage('Network error. Please try again.', 'error');
+                buttonText.textContent = 'Create Staff Account';
+                loadingSpinner.style.display = 'none';
+                registerBtn.disabled = false;
+            }
+        });
+        
+        // Initial setup
+        document.getElementById('first_name').focus();
+    });
+</script>
+{% endblock %}

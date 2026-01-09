@@ -1,0 +1,13 @@
+{% extends 'admin/base.html' %}
+{% block title %}{{ page_title|default:'Delete Account' }}{% endblock %}
+{% block content %}
+<div class="container">
+  <h1>{{ page_title|default:'Delete Account' }}</h1>
+  <form method="post">{% csrf_token %}
+    <p>Type "DELETE MY ACCOUNT" to confirm.</p>
+    <input type="text" name="confirmation" class="form-control mb-2">
+    <input type="password" name="password" class="form-control mb-2" placeholder="Current password">
+    <button class="btn btn-danger" type="submit">Submit Request</button>
+  </form>
+</div>
+{% endblock %}

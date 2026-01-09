@@ -1,0 +1,12 @@
+{% extends 'admin/base.html' %}
+{% block title %}{{ page_title|default:'Add Staff' }}{% endblock %}
+{% block content %}
+<div class="container">
+  <h1>{{ page_title|default:'Add Staff' }}</h1>
+  <form method="post">{% csrf_token %}
+    <input name="username" class="form-control mb-2" placeholder="Username">
+    <input name="email" class="form-control mb-2" placeholder="Email">
+    <button class="btn btn-primary" type="submit">Create</button>
+  </form>
+</div>
+{% endblock %}

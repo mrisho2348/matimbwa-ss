@@ -1,0 +1,12 @@
+{% extends 'admin/base.html' %}
+{% block title %}{{ page_title|default:'Preferences' }}{% endblock %}
+{% block content %}
+<div class="container">
+  <h1>{{ page_title|default:'Preferences' }}</h1>
+  {% if form %}
+    <form method="post">{% csrf_token %}{{ form.as_p }}<button class="btn btn-primary" type="submit">Save</button></form>
+  {% else %}
+    <p>No preferences available.</p>
+  {% endif %}
+</div>
+{% endblock %}

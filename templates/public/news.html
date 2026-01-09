@@ -1,0 +1,108 @@
+{% extends 'public/base.html' %}
+
+{% block content %}
+<h1 class="page-title">News and Updates</h1>
+
+<div class="container-section">
+    <p style="font-size: 1.1rem; line-height: 1.8; margin-bottom: 2rem;">
+        Stay updated with the latest news, announcements, and developments from Matimbwa Secondary School. 
+        Discover what's happening in our school community!
+    </p>
+</div>
+
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 2rem;">
+    {% for news in news_items %}
+    <div style="background-color: white; border: 1px solid #ddd; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1); transition: transform 0.3s;">
+        <div style="background-color: {% cycle '#1e3c72' '#2a5298' '#17a2b8' '#28a745' '#ffc107' %}; color: white; padding: 1rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-weight: bold; font-size: 1.1rem;">{{ news.date }}</span>
+                <span style="background-color: rgba(255,255,255,0.3); padding: 0.3rem 0.8rem; border-radius: 20px; font-size: 0.85rem;">{{ news.category }}</span>
+            </div>
+        </div>
+        <div style="padding: 1.5rem;">
+            <h3 style="color: #1e3c72; margin-bottom: 0.5rem; font-size: 1.3rem;">{{ news.title }}</h3>
+            <p style="color: #666; line-height: 1.6; font-size: 1rem;">{{ news.content }}</p>
+            <a href="#" style="color: #2a5298; text-decoration: none; font-weight: bold; margin-top: 1rem; display: inline-block;">Read More →</a>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<div class="container-section" style="background-color: #f0f4f8; padding: 2rem; border-radius: 8px; margin-top: 3rem;">
+    <h2 style="color: #1e3c72; margin-bottom: 1rem;">📋 Recent Announcements</h2>
+    <ul style="font-size: 1.05rem; line-height: 2;">
+        <li>✓ Form 1 Intake 2025 - Applications now open. Deadline: March 31, 2025</li>
+        <li>✓ School Re-opening Date - January 20, 2025 (All students should be back by 18:00)</li>
+        <li>✓ KCSE Results Released - Congratulations to all students on excellent performance</li>
+        <li>✓ School Fees Payment - Installment plan available for needy students</li>
+        <li>✓ Holiday Program - Revision classes during school holidays for Form 3 & 4</li>
+        <li>✓ Staff Development - Staff undergoing professional development training</li>
+    </ul>
+</div>
+
+<div class="container-section" style="background-color: #f9f9f9; padding: 2rem; border-radius: 8px; margin-top: 2rem;">
+    <h2 style="color: #1e3c72; margin-bottom: 1rem;">📅 Upcoming Events</h2>
+    <div style="border-left: 4px solid #2a5298; padding-left: 1.5rem;">
+        <div style="margin-bottom: 1.5rem;">
+            <h4 style="color: #2a5298; margin-bottom: 0.3rem;">January 20, 2025</h4>
+            <p style="color: #666;">School Reopening Day - First Term Classes Begin</p>
+        </div>
+        <div style="margin-bottom: 1.5rem;">
+            <h4 style="color: #2a5298; margin-bottom: 0.3rem;">February 14, 2025</h4>
+            <p style="color: #666;">Inter-Class Competitions (Debate, Sports, Quizzes)</p>
+        </div>
+        <div style="margin-bottom: 1.5rem;">
+            <h4 style="color: #2a5298; margin-bottom: 0.3rem;">March 5, 2025</h4>
+            <p style="color: #666;">Science Fair Exhibition - Student Projects Display</p>
+        </div>
+        <div style="margin-bottom: 1.5rem;">
+            <h4 style="color: #2a5298; margin-bottom: 0.3rem;">March 28, 2025</h4>
+            <p style="color: #666;">First Term Ends - School Holiday Begins</p>
+        </div>
+        <div>
+            <h4 style="color: #2a5298; margin-bottom: 0.3rem;">April 21, 2025</h4>
+            <p style="color: #666;">Second Term Begins - New Classes and Schedules</p>
+        </div>
+    </div>
+</div>
+
+<div class="container-section" style="background-color: #fff3cd; padding: 2rem; border-radius: 8px; margin-top: 2rem;">
+    <h2 style="color: #1e3c72; margin-bottom: 1rem;">🎓 Academic Calendar 2025</h2>
+    <table style="width: 100%; border-collapse: collapse; margin-top: 1rem;">
+        <tr style="background-color: #1e3c72; color: white;">
+            <th style="padding: 0.8rem; text-align: left; border: 1px solid #ddd;">Term</th>
+            <th style="padding: 0.8rem; text-align: left; border: 1px solid #ddd;">Starts</th>
+            <th style="padding: 0.8rem; text-align: left; border: 1px solid #ddd;">Ends</th>
+            <th style="padding: 0.8rem; text-align: left; border: 1px solid #ddd;">Duration</th>
+        </tr>
+        <tr style="background-color: #f9f9f9;">
+            <td style="padding: 0.8rem; border: 1px solid #ddd;">First Term</td>
+            <td style="padding: 0.8rem; border: 1px solid #ddd;">January 20, 2025</td>
+            <td style="padding: 0.8rem; border: 1px solid #ddd;">March 28, 2025</td>
+            <td style="padding: 0.8rem; border: 1px solid #ddd;">9 Weeks</td>
+        </tr>
+        <tr>
+            <td style="padding: 0.8rem; border: 1px solid #ddd;">Second Term</td>
+            <td style="padding: 0.8rem; border: 1px solid #ddd;">April 21, 2025</td>
+            <td style="padding: 0.8rem; border: 1px solid #ddd;">June 27, 2025</td>
+            <td style="padding: 0.8rem; border: 1px solid #ddd;">9 Weeks</td>
+        </tr>
+        <tr style="background-color: #f9f9f9;">
+            <td style="padding: 0.8rem; border: 1px solid #ddd;">Third Term</td>
+            <td style="padding: 0.8rem; border: 1px solid #ddd;">July 28, 2025</td>
+            <td style="padding: 0.8rem; border: 1px solid #ddd;">October 10, 2025</td>
+            <td style="padding: 0.8rem; border: 1px solid #ddd;">10 Weeks</td>
+        </tr>
+    </table>
+</div>
+
+<div class="container-section" style="text-align: center; margin-top: 2rem;">
+    <h2 style="color: #1e3c72; margin-bottom: 1rem;">Stay Connected</h2>
+    <p style="margin-bottom: 1.5rem; font-size: 1.05rem;">Follow our social media for daily updates and announcements</p>
+    <div style="display: flex; justify-content: center; gap: 1rem; flex-wrap: wrap;">
+        <a href="#" class="btn" style="background-color: #1877f2; color: white;">Facebook</a>
+        <a href="#" class="btn" style="background-color: #1da1f2; color: white;">Twitter</a>
+        <a href="#" class="btn" style="background-color: #e1306c; color: white;">Instagram</a>
+    </div>
+</div>
+{% endblock %}

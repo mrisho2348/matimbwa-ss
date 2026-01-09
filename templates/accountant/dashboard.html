@@ -1,0 +1,90 @@
+{% extends 'accountant/base.html' %}
+
+{% block title %}Accountant Dashboard - MSMS{% endblock %}
+{% block page_title %}Accountant Dashboard{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card bg-primary text-white">
+            <div class="card-body">
+                <h5 class="card-title">Total Fee Collected</h5>
+                <h2>0</h2>
+                <p class="card-text"><small>Current Term</small></p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-success text-white">
+            <div class="card-body">
+                <h5 class="card-title">Outstanding Fees</h5>
+                <h2>0</h2>
+                <p class="card-text"><small>Pending Payment</small></p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-info text-white">
+            <div class="card-body">
+                <h5 class="card-title">Total Expenditure</h5>
+                <h2>0</h2>
+                <p class="card-text"><small>Current Period</small></p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-warning text-white">
+            <div class="card-body">
+                <h5 class="card-title">Budget Status</h5>
+                <h3><span class="badge bg-success">On Track</span></h3>
+                <p class="card-text"><small>Financial Health</small></p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="bi bi-list-check"></i> Financial Tasks</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <a href="/accountant/fees/" class="btn btn-outline-primary w-100">
+                            <i class="bi bi-cash-coin"></i> Manage Fees
+                        </a>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <a href="/accountant/payments/" class="btn btn-outline-primary w-100">
+                            <i class="bi bi-wallet2"></i> Record Payments
+                        </a>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <a href="/accountant/expenses/" class="btn btn-outline-primary w-100">
+                            <i class="bi bi-graph-down"></i> Manage Expenses
+                        </a>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <a href="/accountant/reports/" class="btn btn-outline-primary w-100">
+                            <i class="bi bi-file-earmark"></i> Financial Reports
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="bi bi-exclamation-circle"></i> Alerts</h5>
+            </div>
+            <div class="card-body">
+                <p class="text-muted">No critical alerts</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

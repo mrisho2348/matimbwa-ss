@@ -1,0 +1,97 @@
+{% extends 'public/base.html' %}
+
+{% block content %}
+<h1 class="page-title">Academic Programs</h1>
+
+<div class="container-section">
+    <p style="font-size: 1.1rem; line-height: 1.8; margin-bottom: 2rem;">
+        Matimbwa Secondary School offers three main academic streams designed to cater to diverse student interests and career aspirations. 
+        Students choose their stream based on their abilities, interests, and future career plans. All streams maintain high academic standards 
+        and provide comprehensive education.
+    </p>
+</div>
+
+{% for program in programs %}
+<div style="background-color: {% cycle '#f0f4f8' '#e8f4f8' '#f9f9f9' %}; padding: 2rem; border-radius: 8px; margin-bottom: 2rem; border-left: 5px solid #1e3c72;">
+    <h2 style="color: #1e3c72; margin-bottom: 1rem;">{{ program.name }}</h2>
+    <p style="font-size: 1.05rem; line-height: 1.8; margin-bottom: 1.5rem; color: #555;">{{ program.description }}</p>
+    
+    <h4 style="color: #2a5298; margin-bottom: 1rem;">Subjects Offered:</h4>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+        {% for subject in program.subjects %}
+        <div style="background-color: white; padding: 1rem; border-radius: 6px; border-left: 3px solid #ffd700;">
+            <p style="margin: 0; color: #333;">📚 {{ subject }}</p>
+        </div>
+        {% endfor %}
+    </div>
+
+    {% if program.name == "Science Stream" %}
+    <h4 style="color: #2a5298; margin-bottom: 0.5rem;">Career Pathways:</h4>
+    <p style="color: #666;">Medicine, Engineering, Veterinary Science, Dentistry, Nursing, Technology, Environmental Science</p>
+    {% elif program.name == "Arts Stream" %}
+    <h4 style="color: #2a5298; margin-bottom: 0.5rem;">Career Pathways:</h4>
+    <p style="color: #666;">Law, Teaching, Journalism, Public Administration, Social Work, Tourism, Economics</p>
+    {% elif program.name == "Technical Stream" %}
+    <h4 style="color: #2a5298; margin-bottom: 0.5rem;">Career Pathways:</h4>
+    <p style="color: #666;">Carpentry, Masonry, Plumbing, Electrical Installation, Construction Engineering, Mechanical Engineering</p>
+    {% endif %}
+</div>
+{% endfor %}
+
+<div class="container-section" style="background-color: #fff3cd; padding: 2rem; border-radius: 8px; margin-top: 2rem;">
+    <h2 style="color: #1e3c72; margin-bottom: 1rem;">🎓 Examination Structure</h2>
+    <p style="margin-bottom: 1rem;">Students sit for national examinations following the Kenya Certificate of Secondary Education (KCSE) curriculum:</p>
+    <ul style="font-size: 1rem; line-height: 2;">
+        <li><strong>Form 1 & 2:</strong> Continuous Assessment Tests (CATs) for all subjects</li>
+        <li><strong>Form 3:</strong> Mid-year and End-of-Year Examinations</li>
+        <li><strong>Form 4:</strong> Final KCSE National Examination</li>
+    </ul>
+</div>
+
+<div class="container-section" style="background-color: #d1ecf1; padding: 2rem; border-radius: 8px; margin-top: 2rem;">
+    <h2 style="color: #1e3c72; margin-bottom: 1rem;">🏆 Academic Support</h2>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem;">
+        <div>
+            <h4 style="color: #2a5298; margin-bottom: 0.5rem;">Tutoring Services</h4>
+            <p>Additional support in challenging subjects during afternoons and weekends</p>
+        </div>
+        <div>
+            <h4 style="color: #2a5298; margin-bottom: 0.5rem;">Study Materials</h4>
+            <p>Modern textbooks, reference materials, and online learning resources</p>
+        </div>
+        <div>
+            <h4 style="color: #2a5298; margin-bottom: 0.5rem;">Guidance & Counseling</h4>
+            <p>Subject selection guidance and career counseling services</p>
+        </div>
+        <div>
+            <h4 style="color: #2a5298; margin-bottom: 0.5rem;">Laboratory Practicals</h4>
+            <p>Regular hands-on experiments in fully equipped science labs</p>
+        </div>
+        <div>
+            <h4 style="color: #2a5298; margin-bottom: 0.5rem;">Computer Skills</h4>
+            <p>ICT training and digital literacy for all students</p>
+        </div>
+        <div>
+            <h4 style="color: #2a5298; margin-bottom: 0.5rem;">Library Services</h4>
+            <p>Access to extensive reading materials and reference resources</p>
+        </div>
+    </div>
+</div>
+
+<div class="container-section" style="background-color: #d4edda; padding: 2rem; border-radius: 8px; margin-top: 2rem;">
+    <h2 style="color: #1e3c72; margin-bottom: 1rem;">📊 Academic Achievement</h2>
+    <ul style="font-size: 1rem; line-height: 2;">
+        <li>✓ Consistent KCSE Mean Score above 7.5 (out of 12) in the last 5 years</li>
+        <li>✓ 95% pass rate in the 2024 KCSE examination</li>
+        <li>✓ 50+ students admitted to universities annually</li>
+        <li>✓ Multiple students achieving grade A in KCSE examinations</li>
+        <li>✓ Winners in national subject competitions (Mathematics, Science, Debate)</li>
+    </ul>
+</div>
+
+<div class="container-section" style="text-align: center; margin-top: 2rem;">
+    <h2 style="color: #1e3c72; margin-bottom: 1rem;">Interested in Our Academic Programs?</h2>
+    <p style="margin-bottom: 1.5rem; font-size: 1.05rem;">Contact us for more detailed information and admission guidelines</p>
+    <a href="{% url 'public_contact' %}" class="btn">Get More Information</a>
+</div>
+{% endblock %}

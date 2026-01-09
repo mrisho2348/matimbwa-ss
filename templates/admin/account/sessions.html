@@ -1,0 +1,14 @@
+{% extends 'admin/base.html' %}
+{% block title %}{{ page_title|default:'Sessions' }}{% endblock %}
+{% block content %}
+<div class="container">
+  <h1>{{ page_title|default:'Active Sessions' }}</h1>
+  <ul>
+    {% for s in active_sessions %}
+      <li>{{ s.device }} — {{ s.location }} — {{ s.last_active }}</li>
+    {% empty %}
+      <li>No active sessions.</li>
+    {% endfor %}
+  </ul>
+</div>
+{% endblock %}

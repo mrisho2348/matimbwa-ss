@@ -1,0 +1,1214 @@
+{% extends 'admin/base.html' %}
+
+{% load humanize %}
+
+{% block title %}Administrator Dashboard - MSMS{% endblock %}
+{% block page_title %}System Administration Dashboard{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* Premium Dashboard Styles */
+    .dashboard-section {
+        margin-bottom: 2rem;
+    }
+
+    .section-title {
+        font-size: 1.25rem;
+        font-weight: 600;
+        color: var(--primary-blue);
+        margin-bottom: 1.5rem;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+
+    .section-title i {
+        color: var(--secondary-blue);
+        font-size: 1.5rem;
+    }
+
+    /* Stats Cards */
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 1.5rem;
+        margin-bottom: 2rem;
+    }
+
+    .stat-card {
+        background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+        border-radius: 15px;
+        padding: 1.5rem;
+        border: 1px solid rgba(30, 60, 114, 0.1);
+        box-shadow: 0 5px 20px rgba(30, 60, 114, 0.08);
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        position: relative;
+        overflow: hidden;
+    }
+
+    .stat-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 15px 30px rgba(30, 60, 114, 0.15);
+        border-color: rgba(30, 60, 114, 0.2);
+    }
+
+    .stat-card:before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 5px;
+        height: 100%;
+    }
+
+    .stat-card.users:before {
+        background: linear-gradient(180deg, #3498db, #2980b9);
+    }
+
+    .stat-card.staff:before {
+        background: linear-gradient(180deg, #2ecc71, #27ae60);
+    }
+
+    .stat-card.students:before {
+        background: linear-gradient(180deg, #9b59b6, #8e44ad);
+    }
+
+    .stat-card.system:before {
+        background: linear-gradient(180deg, #e67e22, #d35400);
+    }
+
+    .stat-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 1rem;
+    }
+
+    .stat-icon {
+        width: 50px;
+        height: 50px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+        color: white;
+    }
+
+    .stat-icon.users {
+        background: linear-gradient(135deg, #3498db, #2980b9);
+    }
+
+    .stat-icon.staff {
+        background: linear-gradient(135deg, #2ecc71, #27ae60);
+    }
+
+    .stat-icon.students {
+        background: linear-gradient(135deg, #9b59b6, #8e44ad);
+    }
+
+    .stat-icon.system {
+        background: linear-gradient(135deg, #e67e22, #d35400);
+    }
+
+    .stat-trend {
+        font-size: 0.85rem;
+        padding: 0.25rem 0.75rem;
+        border-radius: 20px;
+        font-weight: 500;
+    }
+
+    .trend-up {
+        background: rgba(46, 204, 113, 0.1);
+        color: #27ae60;
+    }
+
+    .trend-down {
+        background: rgba(231, 76, 60, 0.1);
+        color: #c0392b;
+    }
+
+    .stat-value {
+        font-size: 2.5rem;
+        font-weight: 700;
+        color: var(--primary-blue);
+        line-height: 1;
+        margin-bottom: 0.5rem;
+    }
+
+    .stat-label {
+        color: #6c757d;
+        font-size: 0.9rem;
+        margin-bottom: 0.25rem;
+    }
+
+    .stat-subtext {
+        font-size: 0.8rem;
+        color: #adb5bd;
+    }
+
+    /* Quick Actions */
+    .actions-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 1.5rem;
+    }
+
+    .actions-card {
+        background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+        border-radius: 15px;
+        border: 1px solid rgba(30, 60, 114, 0.1);
+        box-shadow: 0 5px 20px rgba(30, 60, 114, 0.08);
+        overflow: hidden;
+    }
+
+    .actions-header {
+        background: linear-gradient(135deg, var(--primary-blue), var(--secondary-blue));
+        color: white;
+        padding: 1.25rem 1.5rem;
+    }
+
+    .actions-header h5 {
+        margin: 0;
+        font-size: 1.1rem;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+
+    .actions-body {
+        padding: 1.5rem;
+    }
+
+    .action-items {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+    }
+
+    .action-item {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 1.5rem;
+        background: white;
+        border-radius: 10px;
+        border: 1px solid rgba(30, 60, 114, 0.1);
+        text-decoration: none;
+        transition: all 0.3s ease;
+        text-align: center;
+    }
+
+    .action-item:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 25px rgba(30, 60, 114, 0.15);
+        border-color: var(--secondary-blue);
+    }
+
+    .action-icon {
+        width: 60px;
+        height: 60px;
+        border-radius: 15px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+        margin-bottom: 1rem;
+        color: white;
+    }
+
+    .action-icon.users {
+        background: linear-gradient(135deg, #3498db, #2980b9);
+    }
+
+    .action-icon.staff {
+        background: linear-gradient(135deg, #2ecc71, #27ae60);
+    }
+
+    .action-icon.students {
+        background: linear-gradient(135deg, #9b59b6, #8e44ad);
+    }
+
+    .action-icon.settings {
+        background: linear-gradient(135deg, #e67e22, #d35400);
+    }
+
+    .action-icon.reports {
+        background: linear-gradient(135deg, #e74c3c, #c0392b);
+    }
+
+    .action-icon.security {
+        background: linear-gradient(135deg, #1e3c72, #2a5298);
+    }
+
+    .action-title {
+        font-weight: 600;
+        color: var(--primary-blue);
+        margin-bottom: 0.5rem;
+        font-size: 1rem;
+    }
+
+    .action-desc {
+        color: #6c757d;
+        font-size: 0.85rem;
+        line-height: 1.4;
+    }
+
+    /* Notifications Panel */
+    .notifications-card {
+        background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+        border-radius: 15px;
+        border: 1px solid rgba(30, 60, 114, 0.1);
+        box-shadow: 0 5px 20px rgba(30, 60, 114, 0.08);
+        overflow: hidden;
+        height: 100%;
+    }
+
+    .notifications-header {
+        background: linear-gradient(135deg, #9b59b6, #8e44ad);
+        color: white;
+        padding: 1.25rem 1.5rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .notifications-header h5 {
+        margin: 0;
+        font-size: 1.1rem;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+
+    .notifications-badge {
+        background: rgba(255, 255, 255, 0.2);
+        color: white;
+        padding: 0.25rem 0.75rem;
+        border-radius: 20px;
+        font-size: 0.85rem;
+        font-weight: 500;
+    }
+
+    .notifications-body {
+        padding: 1.5rem;
+        max-height: 300px;
+        overflow-y: auto;
+    }
+
+    .notifications-list {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+    }
+
+    .notification-item {
+        display: flex;
+        align-items: flex-start;
+        gap: 1rem;
+        padding: 1rem;
+        background: white;
+        border-radius: 10px;
+        border: 1px solid rgba(30, 60, 114, 0.1);
+        transition: all 0.3s ease;
+    }
+
+    .notification-item:hover {
+        border-color: var(--secondary-blue);
+        transform: translateX(5px);
+    }
+
+    .notification-item.unread {
+        background: rgba(52, 152, 219, 0.05);
+        border-left: 3px solid var(--secondary-blue);
+    }
+
+    .notification-icon {
+        width: 40px;
+        height: 40px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.2rem;
+        color: white;
+        flex-shrink: 0;
+    }
+
+    .notification-icon.success {
+        background: linear-gradient(135deg, #2ecc71, #27ae60);
+    }
+
+    .notification-icon.warning {
+        background: linear-gradient(135deg, #f39c12, #e67e22);
+    }
+
+    .notification-icon.info {
+        background: linear-gradient(135deg, #3498db, #2980b9);
+    }
+
+    .notification-icon.error {
+        background: linear-gradient(135deg, #e74c3c, #c0392b);
+    }
+
+    .notification-content {
+        flex: 1;
+    }
+
+    .notification-title {
+        font-weight: 600;
+        color: var(--primary-blue);
+        margin-bottom: 0.25rem;
+        font-size: 0.95rem;
+    }
+
+    .notification-text {
+        color: #6c757d;
+        font-size: 0.85rem;
+        margin-bottom: 0.5rem;
+        line-height: 1.4;
+    }
+
+    .notification-time {
+        font-size: 0.75rem;
+        color: #adb5bd;
+    }
+
+    .notification-actions {
+        display: flex;
+        gap: 0.5rem;
+    }
+
+    .notification-action {
+        background: none;
+        border: none;
+        color: #6c757d;
+        cursor: pointer;
+        font-size: 0.85rem;
+        transition: color 0.3s ease;
+    }
+
+    .notification-action:hover {
+        color: var(--secondary-blue);
+    }
+
+    .no-notifications {
+        text-align: center;
+        padding: 2rem 1rem;
+        color: #adb5bd;
+    }
+
+    .no-notifications i {
+        font-size: 2.5rem;
+        margin-bottom: 1rem;
+        color: #e1e5eb;
+    }
+
+    /* Recent Activities */
+    .activities-card {
+        background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+        border-radius: 15px;
+        border: 1px solid rgba(30, 60, 114, 0.1);
+        box-shadow: 0 5px 20px rgba(30, 60, 114, 0.08);
+        overflow: hidden;
+    }
+
+    .activities-header {
+        background: linear-gradient(135deg, #e67e22, #d35400);
+        color: white;
+        padding: 1.25rem 1.5rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .activities-header h5 {
+        margin: 0;
+        font-size: 1.1rem;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+
+    .activities-actions {
+        display: flex;
+        gap: 0.5rem;
+    }
+
+    .activities-action {
+        background: rgba(255, 255, 255, 0.2);
+        border: none;
+        color: white;
+        padding: 0.4rem 0.8rem;
+        border-radius: 6px;
+        font-size: 0.85rem;
+        cursor: pointer;
+        transition: background 0.3s ease;
+    }
+
+    .activities-action:hover {
+        background: rgba(255, 255, 255, 0.3);
+    }
+
+    .activities-body {
+        padding: 1.5rem;
+    }
+
+    .activities-table {
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 0;
+    }
+
+    .activities-table th {
+        background: #f8f9fa;
+        padding: 1rem;
+        font-weight: 600;
+        color: var(--primary-blue);
+        text-align: left;
+        border-bottom: 2px solid rgba(30, 60, 114, 0.1);
+        font-size: 0.9rem;
+    }
+
+    .activities-table td {
+        padding: 1rem;
+        border-bottom: 1px solid rgba(30, 60, 114, 0.05);
+        font-size: 0.9rem;
+    }
+
+    .activities-table tr:hover {
+        background: rgba(30, 60, 114, 0.03);
+    }
+
+    .activity-type {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .activity-icon {
+        width: 30px;
+        height: 30px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.9rem;
+        color: white;
+    }
+
+    .activity-icon.create {
+        background: linear-gradient(135deg, #2ecc71, #27ae60);
+    }
+
+    .activity-icon.update {
+        background: linear-gradient(135deg, #3498db, #2980b9);
+    }
+
+    .activity-icon.delete {
+        background: linear-gradient(135deg, #e74c3c, #c0392b);
+    }
+
+    .activity-icon.login {
+        background: linear-gradient(135deg, #9b59b6, #8e44ad);
+    }
+
+    .activity-icon.system {
+        background: linear-gradient(135deg, #e67e22, #d35400);
+    }
+
+    .activity-user {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+
+    .user-avatar {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, var(--primary-blue), var(--secondary-blue));
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 0.85rem;
+        font-weight: 500;
+    }
+
+    .activity-time {
+        color: #6c757d;
+        font-size: 0.85rem;
+        white-space: nowrap;
+    }
+
+    .no-activities {
+        text-align: center;
+        padding: 3rem 1rem;
+        color: #adb5bd;
+    }
+
+    .no-activities i {
+        font-size: 3rem;
+        margin-bottom: 1rem;
+        color: #e1e5eb;
+    }
+
+    /* System Status */
+    .status-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 1rem;
+        margin-top: 1rem;
+    }
+
+    .status-item {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 1rem;
+        background: white;
+        border-radius: 10px;
+        border: 1px solid rgba(30, 60, 114, 0.1);
+    }
+
+    .status-indicator {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+    }
+
+    .status-indicator.online {
+        background: #2ecc71;
+        box-shadow: 0 0 10px rgba(46, 204, 113, 0.5);
+    }
+
+    .status-indicator.warning {
+        background: #f39c12;
+        box-shadow: 0 0 10px rgba(243, 156, 18, 0.5);
+    }
+
+    .status-indicator.offline {
+        background: #e74c3c;
+        box-shadow: 0 0 10px rgba(231, 76, 60, 0.5);
+    }
+
+    .status-label {
+        font-size: 0.9rem;
+        color: var(--primary-blue);
+        font-weight: 500;
+    }
+
+    /* Responsive Design */
+    @media (max-width: 1200px) {
+        .stats-grid {
+            grid-template-columns: repeat(2, 1fr);
+        }
+        
+        .actions-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    @media (max-width: 768px) {
+        .stats-grid {
+            grid-template-columns: 1fr;
+        }
+        
+        .action-items {
+            grid-template-columns: 1fr;
+        }
+        
+        .status-grid {
+            grid-template-columns: repeat(2, 1fr);
+        }
+        
+        .activities-table {
+            display: block;
+            overflow-x: auto;
+        }
+    }
+
+    @media (max-width: 480px) {
+        .stat-value {
+            font-size: 2rem;
+        }
+        
+        .action-item {
+            padding: 1rem;
+        }
+        
+        .notification-item {
+            flex-direction: column;
+            text-align: center;
+        }
+        
+        .notification-actions {
+            justify-content: center;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- System Overview Section -->
+<div class="dashboard-section">
+    <h2 class="section-title">
+        <i class="bi bi-speedometer2"></i>
+        System Overview
+    </h2>
+    
+    <!-- Statistics Cards -->
+    <div class="stats-grid">
+        <!-- Users Card -->
+        <div class="stat-card users">
+            <div class="stat-header">
+                <div class="stat-icon users">
+                    <i class="bi bi-people-fill"></i>
+                </div>
+                <span class="stat-trend trend-up">
+                    <i class="bi bi-arrow-up"></i> 12%
+                </span>
+            </div>
+            <div class="stat-value">{{ total_users|default:"0"|intcomma }}</div>
+            <div class="stat-label">Total System Users</div>
+            <div class="stat-subtext">
+                <i class="bi bi-clock-history"></i> Updated just now
+            </div>
+        </div>
+        
+        <!-- Staff Card -->
+        <div class="stat-card staff">
+            <div class="stat-header">
+                <div class="stat-icon staff">
+                    <i class="bi bi-person-badge-fill"></i>
+                </div>
+                <span class="stat-trend trend-up">
+                    <i class="bi bi-arrow-up"></i> 5%
+                </span>
+            </div>
+            <div class="stat-value">{{ total_staff|default:"0"|intcomma }}</div>
+            <div class="stat-label">Staff Members</div>
+            <div class="stat-subtext">
+                {{ active_staff|default:"0" }} active, {{ inactive_staff|default:"0" }} inactive
+            </div>
+        </div>
+        
+        <!-- Students Card -->
+        <div class="stat-card students">
+            <div class="stat-header">
+                <div class="stat-icon students">
+                    <i class="bi bi-mortarboard-fill"></i>
+                </div>
+                <span class="stat-trend trend-up">
+                    <i class="bi bi-arrow-up"></i> 8%
+                </span>
+            </div>
+            <div class="stat-value">{{ total_students|default:"0"|intcomma }}</div>
+            <div class="stat-label">Enrolled Students</div>
+            <div class="stat-subtext">
+                {{ active_students|default:"0" }} active, {{ graduated_students|default:"0" }} graduated
+            </div>
+        </div>
+        
+        <!-- System Status Card -->
+        <div class="stat-card system">
+            <div class="stat-header">
+                <div class="stat-icon system">
+                    <i class="bi bi-server"></i>
+                </div>
+                <span class="stat-trend trend-up">
+                    <i class="bi bi-arrow-up"></i> 99.8%
+                </span>
+            </div>
+            <div class="stat-value">
+                <span class="status-indicator online"></span>
+                Active
+            </div>
+            <div class="stat-label">System Status</div>
+            <div class="stat-subtext">
+                All services operational
+            </div>
+            
+            <!-- System Status Details -->
+            <div class="status-grid">
+                <div class="status-item">
+                    <span class="status-indicator online"></span>
+                    <span class="status-label">Web Server</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-indicator online"></span>
+                    <span class="status-label">Database</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-indicator online"></span>
+                    <span class="status-label">API Services</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-indicator online"></span>
+                    <span class="status-label">Email Server</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Main Content Grid -->
+<div class="row">
+    <!-- Quick Actions & System Info -->
+    <div class="col-lg-8">
+        <div class="dashboard-section">
+            <h2 class="section-title">
+                <i class="bi bi-lightning-charge"></i>
+                Quick Actions
+            </h2>
+            
+            <div class="actions-grid">
+                <!-- Quick Actions Card -->
+                <div class="actions-card">
+                    <div class="actions-header">
+                        <h5><i class="bi bi-bolt"></i> Administrative Actions</h5>
+                    </div>
+                    <div class="actions-body">
+                        <div class="action-items">
+                            <a href="{% url 'admin_users_add' %}" class="action-item">
+                                <div class="action-icon users">
+                                    <i class="bi bi-person-plus"></i>
+                                </div>
+                                <div class="action-title">Add User</div>
+                                <div class="action-desc">Create new system user account</div>
+                            </a>
+                            
+                            <a href="{% url 'admin_staff_add' %}" class="action-item">
+                                <div class="action-icon staff">
+                                    <i class="bi bi-person-badge"></i>
+                                </div>
+                                <div class="action-title">Add Staff</div>
+                                <div class="action-desc">Register new staff member</div>
+                            </a>
+                            
+                            <a href="{% url 'admin_students_add' %}" class="action-item">
+                                <div class="action-icon students">
+                                    <i class="bi bi-person-plus"></i>
+                                </div>
+                                <div class="action-title">Add Student</div>
+                                <div class="action-desc">Register new student</div>
+                            </a>
+                            
+                            <a href="{% url 'admin_system_config' %}" class="action-item">
+                                <div class="action-icon settings">
+                                    <i class="bi bi-gear"></i>
+                                </div>
+                                <div class="action-title">System Settings</div>
+                                <div class="action-desc">Configure system preferences</div>
+                            </a>
+                            
+                            <a href="{% url 'admin_reports' %}" class="action-item">
+                                <div class="action-icon reports">
+                                    <i class="bi bi-bar-chart"></i>
+                                </div>
+                                <div class="action-title">Generate Reports</div>
+                                <div class="action-desc">Create system reports</div>
+                            </a>
+                            
+                            <a href="{% url 'admin_security_settings' %}" class="action-item">
+                                <div class="action-icon security">
+                                    <i class="bi bi-shield-lock"></i>
+                                </div>
+                                <div class="action-title">Security</div>
+                                <div class="action-desc">Manage security settings</div>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- System Information Card -->
+                <div class="actions-card">
+                    <div class="actions-header">
+                        <h5><i class="bi bi-info-circle"></i> System Information</h5>
+                    </div>
+                    <div class="actions-body">
+                        <div class="system-info-grid">
+                            <div class="info-item">
+                                <span class="info-label">System Version:</span>
+                                <span class="info-value">v2.0.1</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">Last Updated:</span>
+                                <span class="info-value">{{ current_date|date:"F d, Y" }}</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">Database:</span>
+                                <span class="info-value">PostgreSQL 14</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">Server Uptime:</span>
+                                <span class="info-value">30 days, 5 hours</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">Storage Used:</span>
+                                <span class="info-value">4.2 GB / 50 GB</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">Active Sessions:</span>
+                                <span class="info-value">{{ active_sessions|default:"12" }}</span>
+                            </div>
+                        </div>
+                        
+                        <div class="storage-progress" style="margin-top: 1.5rem;">
+                            <div class="progress-header">
+                                <span>Storage Usage</span>
+                                <span>84%</span>
+                            </div>
+                            <div class="progress-bar">
+                                <div class="progress-fill storage" style="width: 84%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Notifications Panel -->
+    <div class="col-lg-4">
+        <div class="dashboard-section">
+            <h2 class="section-title">
+                <i class="bi bi-bell"></i>
+                Notifications
+            </h2>
+            
+            <div class="notifications-card">
+                <div class="notifications-header">
+                    <h5><i class="bi bi-bell-fill"></i> Recent Alerts</h5>
+                    <span class="notifications-badge">{{ unread_notifications|default:"3" }} New</span>
+                </div>
+                <div class="notifications-body">
+                    {% if notifications %}
+                    <div class="notifications-list">
+                        {% for notification in notifications %}
+                        <div class="notification-item {% if not notification.read %}unread{% endif %}">
+                            <div class="notification-icon {{ notification.type }}">
+                                <i class="bi bi-{{ notification.icon }}"></i>
+                            </div>
+                            <div class="notification-content">
+                                <div class="notification-title">{{ notification.title }}</div>
+                                <div class="notification-text">{{ notification.message }}</div>
+                                <div class="notification-time">
+                                    <i class="bi bi-clock"></i> {{ notification.timestamp|naturaltime }}
+                                </div>
+                            </div>
+                            <div class="notification-actions">
+                                {% if not notification.read %}
+                                <button class="notification-action mark-read" data-id="{{ notification.id }}">
+                                    <i class="bi bi-check"></i>
+                                </button>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="no-notifications">
+                        <i class="bi bi-bell-slash"></i>
+                        <p>No new notifications</p>
+                        <small class="text-muted">All systems are functioning normally</small>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Activities Section -->
+<div class="dashboard-section">
+    <h2 class="section-title">
+        <i class="bi bi-clock-history"></i>
+        Recent System Activities
+    </h2>
+    
+    <div class="activities-card">
+        <div class="activities-header">
+            <h5><i class="bi bi-activity"></i> System Audit Log</h5>
+            <div class="activities-actions">
+                <button class="activities-action" id="refreshActivities">
+                    <i class="bi bi-arrow-clockwise"></i> Refresh
+                </button>
+                <button class="activities-action" id="exportActivities">
+                    <i class="bi bi-download"></i> Export
+                </button>
+            </div>
+        </div>
+        <div class="activities-body">
+            {% if activities %}
+            <div class="table-responsive">
+                <table class="activities-table">
+                    <thead>
+                        <tr>
+                            <th>Activity</th>
+                            <th>User</th>
+                            <th>IP Address</th>
+                            <th>Timestamp</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for activity in activities %}
+                        <tr>
+                            <td>
+                                <div class="activity-type">
+                                    <div class="activity-icon {{ activity.type }}">
+                                        <i class="bi bi-{{ activity.icon }}"></i>
+                                    </div>
+                                    <span>{{ activity.description }}</span>
+                                </div>
+                            </td>
+                            <td>
+                                <div class="activity-user">
+                                    <div class="user-avatar">
+                                        {{ activity.user_initials }}
+                                    </div>
+                                    <span>{{ activity.user_name }}</span>
+                                </div>
+                            </td>
+                            <td>
+                                <code>{{ activity.ip_address }}</code>
+                            </td>
+                            <td>
+                                <span class="activity-time">{{ activity.timestamp|naturaltime }}</span>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="no-activities">
+                <i class="bi bi-activity"></i>
+                <p>No activities recorded yet</p>
+                <small class="text-muted">System activities will appear here</small>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Performance Metrics -->
+<div class="dashboard-section">
+    <h2 class="section-title">
+        <i class="bi bi-graph-up"></i>
+        Performance Metrics
+    </h2>
+    
+    <div class="row">
+        <div class="col-md-4">
+            <div class="stat-card">
+                <div class="stat-header">
+                    <div class="stat-icon" style="background: linear-gradient(135deg, #3498db, #2980b9);">
+                        <i class="bi bi-cpu"></i>
+                    </div>
+                </div>
+                <div class="stat-value" id="cpuUsage">45%</div>
+                <div class="stat-label">CPU Usage</div>
+                <div class="stat-subtext">Server processor load</div>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <div class="stat-card">
+                <div class="stat-header">
+                    <div class="stat-icon" style="background: linear-gradient(135deg, #2ecc71, #27ae60);">
+                        <i class="bi bi-memory"></i>
+                    </div>
+                </div>
+                <div class="stat-value" id="memoryUsage">68%</div>
+                <div class="stat-label">Memory Usage</div>
+                <div class="stat-subtext">System RAM utilization</div>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <div class="stat-card">
+                <div class="stat-header">
+                    <div class="stat-icon" style="background: linear-gradient(135deg, #9b59b6, #8e44ad);">
+                        <i class="bi bi-hdd"></i>
+                    </div>
+                </div>
+                <div class="stat-value" id="diskUsage">84%</div>
+                <div class="stat-label">Disk Usage</div>
+                <div class="stat-subtext">Storage space utilized</div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Update statistics with animation
+        function animateCounter(elementId, targetValue) {
+            const element = document.getElementById(elementId);
+            if (!element) return;
+            
+            let current = 0;
+            const increment = targetValue / 100;
+            const timer = setInterval(() => {
+                current += increment;
+                if (current >= targetValue) {
+                    current = targetValue;
+                    clearInterval(timer);
+                }
+                element.textContent = Math.floor(current).toLocaleString();
+            }, 20);
+        }
+        
+        // Animate counters on page load
+        setTimeout(() => {
+            animateCounter('totalUsers', {{ total_users|default:0 }});
+            animateCounter('totalStaff', {{ total_staff|default:0 }});
+            animateCounter('totalStudents', {{ total_students|default:0 }});
+        }, 500);
+        
+        // Refresh activities
+        document.getElementById('refreshActivities')?.addEventListener('click', function() {
+            this.innerHTML = '<i class="bi bi-arrow-clockwise spin"></i> Refreshing...';
+            this.disabled = true;
+            
+            // Simulate API call
+            setTimeout(() => {
+                location.reload();
+            }, 1000);
+        });
+        
+        // Export activities
+        document.getElementById('exportActivities')?.addEventListener('click', function() {
+            // Simulate export functionality
+            alert('Activity log export feature would be implemented here.');
+        });
+        
+        // Mark notification as read
+        document.querySelectorAll('.mark-read').forEach(button => {
+            button.addEventListener('click', function() {
+                const notificationId = this.dataset.id;
+                const notificationItem = this.closest('.notification-item');
+                
+                // Remove unread styling
+                notificationItem.classList.remove('unread');
+                
+                // Update badge count
+                const badge = document.querySelector('.notifications-badge');
+                if (badge) {
+                    const currentCount = parseInt(badge.textContent) || 0;
+                    if (currentCount > 0) {
+                        badge.textContent = currentCount - 1;
+                    }
+                }
+                
+                // Hide the mark read button
+                this.style.display = 'none';
+                
+                // Simulate API call
+                console.log(`Marked notification ${notificationId} as read`);
+            });
+        });
+        
+        // Update performance metrics periodically
+        function updatePerformanceMetrics() {
+            // Simulate changing metrics
+            const metrics = {
+                cpuUsage: Math.floor(Math.random() * 30) + 30,
+                memoryUsage: Math.floor(Math.random() * 20) + 60,
+                diskUsage: Math.floor(Math.random() * 10) + 80
+            };
+            
+            Object.entries(metrics).forEach(([id, value]) => {
+                const element = document.getElementById(id);
+                if (element) {
+                    // Animate the change
+                    const current = parseInt(element.textContent) || 0;
+                    const diff = value - current;
+                    const steps = 20;
+                    const step = diff / steps;
+                    
+                    let stepCount = 0;
+                    const interval = setInterval(() => {
+                        stepCount++;
+                        const newValue = Math.round(current + (step * stepCount));
+                        element.textContent = newValue + '%';
+                        
+                        if (stepCount >= steps) {
+                            clearInterval(interval);
+                            element.textContent = value + '%';
+                        }
+                    }, 50);
+                }
+            });
+        }
+        
+        // Update metrics every 30 seconds
+        setInterval(updatePerformanceMetrics, 30000);
+        
+        // Initialize metrics
+        updatePerformanceMetrics();
+        
+        // Add CSS for spinning animation
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes spin {
+                0% { transform: rotate(0deg); }
+                100% { transform: rotate(360deg); }
+            }
+            .spin {
+                animation: spin 1s linear infinite;
+            }
+            .progress-bar {
+                height: 6px;
+                background: rgba(30, 60, 114, 0.1);
+                border-radius: 3px;
+                overflow: hidden;
+                margin-top: 0.5rem;
+            }
+            .progress-fill {
+                height: 100%;
+                background: linear-gradient(90deg, #3498db, #2980b9);
+                border-radius: 3px;
+                transition: width 1s ease;
+            }
+            .progress-fill.storage {
+                background: linear-gradient(90deg, #2ecc71, #27ae60);
+            }
+            .progress-header {
+                display: flex;
+                justify-content: space-between;
+                font-size: 0.9rem;
+                color: #6c757d;
+                margin-bottom: 0.25rem;
+            }
+            .system-info-grid {
+                display: grid;
+                grid-template-columns: repeat(2, 1fr);
+                gap: 1rem;
+            }
+            .info-item {
+                display: flex;
+                flex-direction: column;
+                gap: 0.25rem;
+            }
+            .info-label {
+                font-size: 0.85rem;
+                color: #6c757d;
+            }
+            .info-value {
+                font-size: 0.9rem;
+                font-weight: 500;
+                color: var(--primary-blue);
+            }
+        `;
+        document.head.appendChild(style);
+    });
+</script>
+{% endblock %}

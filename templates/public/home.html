@@ -1,0 +1,76 @@
+{% extends 'public/base.html' %}
+
+{% block content %}
+<div class="hero">
+    <h1>Welcome to Matimbwa Secondary School</h1>
+    <p>Excellence in Education, Commitment to Success</p>
+    <p style="font-size: 1rem; margin-top: 1.5rem;">A Government Institution Serving Makueni County Since 1985</p>
+    <div style="margin-top: 2rem; display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap;">
+        <a href="{% url 'about_school' %}" class="btn">Learn More</a>
+        <a href="{% url 'academic_programs' %}" class="btn btn-secondary">Explore Programs</a>
+    </div>
+</div>
+
+<div class="container-section">
+    <h2 style="color: #1e3c72; margin-bottom: 1.5rem;">Why Choose Matimbwa Secondary School?</h2>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 2rem;">
+        <div style="padding: 1.5rem; background-color: #f0f4f8; border-radius: 8px; border-left: 4px solid #1e3c72;">
+            <h3 style="color: #1e3c72; margin-bottom: 0.5rem;">🎓 Quality Education</h3>
+            <p>We provide comprehensive education across science, arts, and technical streams with experienced and dedicated teachers.</p>
+        </div>
+
+        <div style="padding: 1.5rem; background-color: #f0f4f8; border-radius: 8px; border-left: 4px solid #2a5298;">
+            <h3 style="color: #1e3c72; margin-bottom: 0.5rem;">🏢 Modern Facilities</h3>
+            <p>State-of-the-art laboratories, computer labs, library, and sports facilities for holistic student development.</p>
+        </div>
+
+        <div style="padding: 1.5rem; background-color: #f0f4f8; border-radius: 8px; border-left: 4px solid #1e3c72;">
+            <h3 style="color: #1e3c72; margin-bottom: 0.5rem;">👨‍🏫 Expert Teachers</h3>
+            <p>Qualified and experienced instructors committed to nurturing student potential and academic excellence.</p>
+        </div>
+
+        <div style="padding: 1.5rem; background-color: #f0f4f8; border-radius: 8px; border-left: 4px solid #2a5298;">
+            <h3 style="color: #1e3c72; margin-bottom: 0.5rem;">🏆 Achievements</h3>
+            <p>Consistent academic excellence with high KCSE pass rates and numerous inter-school competition victories.</p>
+        </div>
+
+        <div style="padding: 1.5rem; background-color: #f0f4f8; border-radius: 8px; border-left: 4px solid #1e3c72;">
+            <h3 style="color: #1e3c72; margin-bottom: 0.5rem;">🌟 Student Support</h3>
+            <p>Comprehensive guidance and counseling services ensuring students' physical, emotional, and social well-being.</p>
+        </div>
+
+        <div style="padding: 1.5rem; background-color: #f0f4f8; border-radius: 8px; border-left: 4px solid #2a5298;">
+            <h3 style="color: #1e3c72; margin-bottom: 0.5rem;">🌍 Holistic Development</h3>
+            <p>Emphasis on character development, sports, culture, and entrepreneurship skills for future leaders.</p>
+        </div>
+    </div>
+</div>
+
+<div class="container-section" style="background-color: #f9f9f9; padding: 2rem; border-radius: 8px; margin-top: 2rem;">
+    <h2 style="color: #1e3c72; margin-bottom: 1rem;">School Statistics</h2>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 2rem; text-align: center;">
+        <div>
+            <h3 style="font-size: 2.5rem; color: #2a5298;">850+</h3>
+            <p style="color: #666;">Students Enrolled</p>
+        </div>
+        <div>
+            <h3 style="font-size: 2.5rem; color: #2a5298;">120+</h3>
+            <p style="color: #666;">Qualified Staff Members</p>
+        </div>
+        <div>
+            <h3 style="font-size: 2.5rem; color: #2a5298;">40+</h3>
+            <p style="color: #666;">Years of Excellence</p>
+        </div>
+        <div>
+            <h3 style="font-size: 2.5rem; color: #2a5298;">95%</h3>
+            <p style="color: #666;">KCSE Pass Rate</p>
+        </div>
+    </div>
+</div>
+
+<div class="container-section" style="margin-top: 2rem; text-align: center;">
+    <h2 style="color: #1e3c72; margin-bottom: 1rem;">Ready to Join Us?</h2>
+    <p style="margin-bottom: 1.5rem; font-size: 1.1rem;">For more information about admissions, programs, and school activities</p>
+    <a href="{% url 'public_contact' %}" class="btn">Contact Us Today</a>
+</div>
+{% endblock %}

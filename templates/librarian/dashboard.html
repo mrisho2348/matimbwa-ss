@@ -1,0 +1,90 @@
+{% extends 'librarian/base.html' %}
+
+{% block title %}Librarian Dashboard - MSMS{% endblock %}
+{% block page_title %}Librarian Dashboard{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card bg-primary text-white">
+            <div class="card-body">
+                <h5 class="card-title">Total Books</h5>
+                <h2>0</h2>
+                <p class="card-text"><small>In Collection</small></p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-success text-white">
+            <div class="card-body">
+                <h5 class="card-title">Books Issued</h5>
+                <h2>0</h2>
+                <p class="card-text"><small>Currently Out</small></p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-info text-white">
+            <div class="card-body">
+                <h5 class="card-title">Overdue Books</h5>
+                <h2>0</h2>
+                <p class="card-text"><small>Not Returned</small></p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-warning text-white">
+            <div class="card-body">
+                <h5 class="card-title">Active Members</h5>
+                <h2>0</h2>
+                <p class="card-text"><small>Library Users</small></p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="bi bi-list-check"></i> Library Management</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <a href="/librarian/books/" class="btn btn-outline-primary w-100">
+                            <i class="bi bi-book"></i> Manage Books
+                        </a>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <a href="/librarian/issue/" class="btn btn-outline-primary w-100">
+                            <i class="bi bi-arrow-right-circle"></i> Issue Books
+                        </a>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <a href="/librarian/return/" class="btn btn-outline-primary w-100">
+                            <i class="bi bi-arrow-left-circle"></i> Return Books
+                        </a>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <a href="/librarian/reports/" class="btn btn-outline-primary w-100">
+                            <i class="bi bi-file-earmark"></i> Library Reports
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="bi bi-exclamation-circle"></i> Overdue Alerts</h5>
+            </div>
+            <div class="card-body">
+                <p class="text-muted">No overdue books</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

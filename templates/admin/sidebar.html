@@ -1,0 +1,837 @@
+<aside class="sidebar">
+    <!-- Brand Section -->
+    <div class="sidebar-brand">
+        <div class="brand-logo">
+            <i class="bi bi-shield-lock"></i>
+        </div>
+        <div class="brand-text">
+            <h3>Admin Portal</h3>
+            <p>System Administration</p>
+        </div>
+    </div>
+
+    <!-- User Profile Section -->
+    <div class="user-profile">
+        <div class="profile-avatar">
+            <i class="bi bi-person-circle"></i>
+        </div>
+        <div class="profile-info">
+            <h4>{{ request.user.get_full_name|default:request.user.username }}</h4>
+            <span class="user-role">Administrator</span>
+        </div>
+        <div class="profile-status">
+            <span class="status-indicator active"></span>
+        </div>
+    </div>
+
+    <!-- Main Navigation -->
+    <nav class="sidebar-nav">
+        <!-- Dashboard -->
+        <div class="nav-section">
+            <div class="nav-section-header">
+                <i class="bi bi-house-fill"></i>
+                <span>Dashboard</span>
+            </div>
+            <div class="nav-section-content">
+                <a class="nav-link" href="{% url 'admin_dashboard' %}">
+                    <i class="bi bi-speedometer2"></i>
+                    <span>Overview</span>
+                    <span class="nav-badge">New</span>
+                </a>
+                <a class="nav-link" href="{% url 'admin_analytics' %}">
+                    <i class="bi bi-graph-up"></i>
+                    <span>Analytics</span>
+                </a>
+                <a class="nav-link" href="{% url 'admin_reports' %}">
+                    <i class="bi bi-file-earmark-bar-graph"></i>
+                    <span>Reports</span>
+                </a>
+            </div>
+        </div>
+
+        <!-- Academic Management -->
+        <div class="nav-section">
+            <div class="nav-section-header">
+                <i class="bi bi-mortarboard-fill"></i>
+                <span>Academic Management</span>
+            </div>
+            <div class="nav-section-content">
+                <a class="nav-link" href="{% url 'admin_educational_levels' %}">
+                    <i class="bi bi-layers"></i>
+                    <span>Educational Levels</span>
+                </a>
+                <a class="nav-link" href="{% url 'admin_academic_years' %}">
+                    <i class="bi bi-calendar-range"></i>
+                    <span>Academic Years</span>
+                    <span class="nav-badge active-badge">Active</span>
+                </a>
+                <a class="nav-link" href="{% url 'admin_terms' %}">
+                    <i class="bi bi-calendar-week"></i>
+                    <span>Terms</span>
+                </a>
+                <a class="nav-link" href="{% url 'admin_subjects' %}">
+                    <i class="bi bi-book-half"></i>
+                    <span>Subjects</span>
+                </a>
+                <a class="nav-link" href="{% url 'admin_class_levels' %}">
+                    <i class="bi bi-diagram-3"></i>
+                    <span>Class Levels</span>
+                </a>
+                <a class="nav-link" href="{% url 'admin_stream_classes' %}">
+                    <i class="bi bi-people-fill"></i>
+                    <span>Stream Classes</span>
+                </a>
+            </div>
+        </div>
+
+        <!-- Student Management -->
+        <div class="nav-section">
+            <div class="nav-section-header">
+                <i class="bi bi-person-badge-fill"></i>
+                <span>Student Management</span>
+            </div>
+            <div class="nav-section-content">
+                <a class="nav-link" href="{% url 'admin_students_list' %}">
+                    <i class="bi bi-people"></i>
+                    <span>All Students</span>
+                    <span class="nav-counter">{{ student_count|default:0 }}</span>
+                </a>
+                <a class="nav-link" href="{% url 'admin_students_add' %}">
+                    <i class="bi bi-person-plus"></i>
+                    <span>Add Student</span>
+                </a>
+                <a class="nav-link" href="{% url 'admin_students_by_class' %}">
+                    <i class="bi bi-filter-square"></i>
+                    <span>By Class</span>
+                </a>
+                <a class="nav-link" href="{% url 'admin_student_status' %}">
+                    <i class="bi bi-activity"></i>
+                    <span>Status Management</span>
+                </a>
+                <a class="nav-link" href="{% url 'admin_parents_list' %}">
+                    <i class="bi bi-people"></i>
+                    <span>Parents</span>
+                    <span class="nav-counter">{{ parent_count|default:0 }}</span>
+                </a>
+                <a class="nav-link" href="{% url 'admin_previous_schools' %}">
+                    <i class="bi bi-building"></i>
+                    <span>Previous Schools</span>
+                </a>
+            </div>
+        </div>
+
+        <!-- Staff Management -->
+        <div class="nav-section">
+            <div class="nav-section-header">
+                <i class="bi bi-briefcase-fill"></i>
+                <span>Staff Management</span>
+            </div>
+            <div class="nav-section-content">
+                <a class="nav-link" href="{% url 'admin_staff_list' %}">
+                    <i class="bi bi-person-lines-fill"></i>
+                    <span>All Staff</span>
+                    <span class="nav-counter">{{ staff_count|default:0 }}</span>
+                </a>
+                <a class="nav-link" href="{% url 'admin_staff_add' %}">
+                    <i class="bi bi-person-plus"></i>
+                    <span>Add Staff</span>
+                </a>
+                <a class="nav-link" href="{% url 'admin_staff_roles' %}">
+                    <i class="bi bi-tags"></i>
+                    <span>Roles Management</span>
+                </a>
+                <a class="nav-link" href="{% url 'admin_staff_assignments' %}">
+                    <i class="bi bi-clipboard-check"></i>
+                    <span>Class Assignments</span>
+                </a>
+            </div>
+        </div>
+
+        <!-- User Management -->
+        <div class="nav-section">
+            <div class="nav-section-header">
+                <i class="bi bi-person-gear"></i>
+                <span>User Management</span>
+            </div>
+            <div class="nav-section-content">
+                <a class="nav-link" href="{% url 'admin_users_list' %}">
+                    <i class="bi bi-people"></i>
+                    <span>All Users</span>
+                    <span class="nav-counter">{{ user_count|default:0 }}</span>
+                </a>
+                <a class="nav-link" href="{% url 'admin_users_add' %}">
+                    <i class="bi bi-person-add"></i>
+                    <span>Create User</span>
+                </a>
+                <a class="nav-link" href="{% url 'admin_users_roles' %}">
+                    <i class="bi bi-shield-check"></i>
+                    <span>User Roles</span>
+                </a>
+                <a class="nav-link" href="{% url 'admin_permissions' %}">
+                    <i class="bi bi-key"></i>
+                    <span>Permissions</span>
+                </a>
+                <a class="nav-link" href="{% url 'admin_user_activity' %}">
+                    <i class="bi bi-clock-history"></i>
+                    <span>User Activity</span>
+                </a>
+            </div>
+        </div>
+
+        <!-- System Settings -->
+        <div class="nav-section">
+            <div class="nav-section-header">
+                <i class="bi bi-gear-fill"></i>
+                <span>System Settings</span>
+            </div>
+            <div class="nav-section-content">
+                <a class="nav-link" href="{% url 'admin_system_config' %}">
+                    <i class="bi bi-sliders"></i>
+                    <span>Configuration</span>
+                </a>
+                <a class="nav-link" href="{% url 'admin_email_settings' %}">
+                    <i class="bi bi-envelope"></i>
+                    <span>Email Settings</span>
+                </a>
+                <a class="nav-link" href="{% url 'admin_sms_settings' %}">
+                    <i class="bi bi-chat-dots"></i>
+                    <span>SMS Settings</span>
+                </a>
+                <a class="nav-link" href="{% url 'admin_notifications' %}">
+                    <i class="bi bi-bell"></i>
+                    <span>Notifications</span>
+                </a>
+                <a class="nav-link" href="{% url 'admin_backup' %}">
+                    <i class="bi bi-hdd"></i>
+                    <span>Backup & Restore</span>
+                </a>
+            </div>
+        </div>
+
+        <!-- Security & Logs -->
+        <div class="nav-section">
+            <div class="nav-section-header">
+                <i class="bi bi-shield-check"></i>
+                <span>Security & Logs</span>
+            </div>
+            <div class="nav-section-content">
+                <a class="nav-link" href="{% url 'admin_audit_logs' %}">
+                    <i class="bi bi-journal-text"></i>
+                    <span>Audit Logs</span>
+                </a>
+                <a class="nav-link" href="{% url 'admin_login_history' %}">
+                    <i class="bi bi-door-open"></i>
+                    <span>Login History</span>
+                </a>
+                <a class="nav-link" href="{% url 'admin_security_settings' %}">
+                    <i class="bi bi-shield-lock"></i>
+                    <span>Security Settings</span>
+                </a>
+                <a class="nav-link" href="{% url 'admin_api_settings' %}">
+                    <i class="bi bi-plug"></i>
+                    <span>API Settings</span>
+                </a>
+            </div>
+        </div>
+
+        <!-- Reports & Analytics -->
+        <div class="nav-section">
+            <div class="nav-section-header">
+                <i class="bi bi-pie-chart-fill"></i>
+                <span>Reports & Analytics</span>
+            </div>
+            <div class="nav-section-content">
+                <a class="nav-link" href="{% url 'admin_financial_reports' %}">
+                    <i class="bi bi-cash-coin"></i>
+                    <span>Financial Reports</span>
+                </a>
+                <a class="nav-link" href="{% url 'admin_academic_reports' %}">
+                    <i class="bi bi-bar-chart"></i>
+                    <span>Academic Reports</span>
+                </a>
+                <a class="nav-link" href="{% url 'admin_attendance_reports' %}">
+                    <i class="bi bi-calendar-check"></i>
+                    <span>Attendance Reports</span>
+                </a>
+                <a class="nav-link" href="{% url 'admin_custom_reports' %}">
+                    <i class="bi bi-file-earmark-plus"></i>
+                    <span>Custom Reports</span>
+                </a>
+                <a class="nav-link" href="{% url 'admin_export_data' %}">
+                    <i class="bi bi-download"></i>
+                    <span>Export Data</span>
+                </a>
+            </div>
+        </div>
+
+        <!-- Help & Support -->
+        <div class="nav-section">
+            <div class="nav-section-header">
+                <i class="bi bi-question-circle-fill"></i>
+                <span>Help & Support</span>
+            </div>
+            <div class="nav-section-content">
+                <a class="nav-link" href="{% url 'admin_documentation' %}">
+                    <i class="bi bi-book"></i>
+                    <span>Documentation</span>
+                </a>
+                <a class="nav-link" href="{% url 'admin_faq' %}">
+                    <i class="bi bi-question-square"></i>
+                    <span>FAQ</span>
+                </a>
+                <a class="nav-link" href="{% url 'admin_support_tickets' %}">
+                    <i class="bi bi-ticket-detailed"></i>
+                    <span>Support Tickets</span>
+                    <span class="nav-badge urgent-badge">3</span>
+                </a>
+                <a class="nav-link" href="{% url 'admin_system_status' %}">
+                    <i class="bi bi-heart-pulse"></i>
+                    <span>System Status</span>
+                    <span class="nav-badge success-badge">Online</span>
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Sidebar Footer -->
+    <div class="sidebar-footer">
+        <div class="system-status">
+            <div class="status-item">
+                <span class="status-label">Database</span>
+                <span class="status-value healthy">Healthy</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">Storage</span>
+                <span class="status-value warning">85%</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">Users Online</span>
+                <span class="status-value">{{ online_users|default:12 }}</span>
+            </div>
+        </div>
+        <div class="quick-actions">
+            <button class="quick-action-btn" title="Quick Settings">
+                <i class="bi bi-lightning-charge"></i>
+            </button>
+            <button class="quick-action-btn" title="Notifications">
+                <i class="bi bi-bell"></i>
+                <span class="notification-badge">5</span>
+            </button>
+            <button class="quick-action-btn" title="Support">
+                <i class="bi bi-headset"></i>
+            </button>
+        </div>
+    </div>
+</aside>
+
+<style>
+    /* Premium Sidebar Styling */
+    .sidebar {
+        width: 280px;
+        background: linear-gradient(180deg, #1e3c72 0%, #2a5298 100%);
+        color: white;
+        height: 100vh;
+        position: fixed;
+        left: 0;
+        top: 0;
+        overflow-y: auto;
+        box-shadow: 5px 0 20px rgba(0, 0, 0, 0.2);
+        display: flex;
+        flex-direction: column;
+        z-index: 1000;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .sidebar::-webkit-scrollbar {
+        width: 6px;
+    }
+
+    .sidebar::-webkit-scrollbar-track {
+        background: rgba(255, 255, 255, 0.1);
+    }
+
+    .sidebar::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.2);
+        border-radius: 3px;
+    }
+
+    /* Brand Section */
+    .sidebar-brand {
+        padding: 1.5rem 1.5rem 1rem;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+    }
+
+    .brand-logo {
+        width: 40px;
+        height: 40px;
+        background: linear-gradient(135deg, #ffd700, #ffed4e);
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+        color: #1e3c72;
+        box-shadow: 0 4px 15px rgba(255, 215, 0, 0.3);
+    }
+
+    .brand-text h3 {
+        margin: 0;
+        font-size: 1.2rem;
+        font-weight: 600;
+    }
+
+    .brand-text p {
+        margin: 0;
+        font-size: 0.8rem;
+        opacity: 0.8;
+    }
+
+    /* User Profile */
+    .user-profile {
+        padding: 1.5rem;
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        background: rgba(255, 255, 255, 0.05);
+        margin: 0.5rem 1rem;
+        border-radius: 12px;
+        transition: all 0.3s ease;
+    }
+
+    .user-profile:hover {
+        background: rgba(255, 255, 255, 0.1);
+        transform: translateY(-2px);
+    }
+
+    .profile-avatar {
+        width: 45px;
+        height: 45px;
+        background: linear-gradient(135deg, #3498db, #2980b9);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+    }
+
+    .profile-info {
+        flex: 1;
+    }
+
+    .profile-info h4 {
+        margin: 0;
+        font-size: 0.95rem;
+        font-weight: 500;
+    }
+
+    .user-role {
+        font-size: 0.8rem;
+        opacity: 0.8;
+        display: block;
+        margin-top: 0.2rem;
+    }
+
+    .profile-status .status-indicator {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: #2ecc71;
+        display: block;
+        position: relative;
+    }
+
+    .status-indicator.active:after {
+        content: '';
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        border-radius: 50%;
+        background: #2ecc71;
+        animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+        0% {
+            transform: scale(1);
+            opacity: 1;
+        }
+        70% {
+            transform: scale(2);
+            opacity: 0;
+        }
+        100% {
+            transform: scale(2);
+            opacity: 0;
+        }
+    }
+
+    /* Navigation Sections */
+    .sidebar-nav {
+        flex: 1;
+        padding: 1rem 0;
+        overflow-y: auto;
+    }
+
+    .nav-section {
+        margin-bottom: 0.5rem;
+    }
+
+    .nav-section-header {
+        padding: 0.75rem 1.5rem;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        font-weight: 500;
+        font-size: 0.9rem;
+        opacity: 0.9;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        user-select: none;
+    }
+
+    .nav-section-header:hover {
+        opacity: 1;
+        background: rgba(255, 255, 255, 0.05);
+    }
+
+    .nav-section-header i {
+        font-size: 1rem;
+    }
+
+    .nav-section-content {
+        display: none;
+        animation: slideDown 0.3s ease-out;
+    }
+
+    .nav-section.active .nav-section-content {
+        display: block;
+    }
+
+    .nav-section.active .nav-section-header {
+        background: rgba(255, 255, 255, 0.1);
+        opacity: 1;
+        border-left: 3px solid #ffd700;
+    }
+
+    @keyframes slideDown {
+        from {
+            opacity: 0;
+            transform: translateY(-10px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    /* Navigation Links */
+    .nav-link {
+        padding: 0.75rem 1.5rem 0.75rem 3rem;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        color: rgba(255, 255, 255, 0.8);
+        text-decoration: none;
+        transition: all 0.3s ease;
+        position: relative;
+        font-size: 0.9rem;
+    }
+
+    .nav-link:hover {
+        background: rgba(255, 255, 255, 0.1);
+        color: white;
+        padding-left: 3.25rem;
+    }
+
+    .nav-link.active {
+        background: linear-gradient(90deg, rgba(255, 215, 0, 0.2), transparent);
+        color: #ffd700;
+        border-left: 3px solid #ffd700;
+    }
+
+    .nav-link i {
+        font-size: 0.95rem;
+        width: 20px;
+        text-align: center;
+    }
+
+    .nav-badge {
+        margin-left: auto;
+        font-size: 0.7rem;
+        padding: 0.2rem 0.5rem;
+        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.1);
+    }
+
+    .nav-badge.active-badge {
+        background: #27ae60;
+        color: white;
+    }
+
+    .nav-badge.urgent-badge {
+        background: #e74c3c;
+        color: white;
+    }
+
+    .nav-badge.success-badge {
+        background: #2ecc71;
+        color: white;
+    }
+
+    .nav-counter {
+        margin-left: auto;
+        background: rgba(255, 255, 255, 0.15);
+        color: white;
+        font-size: 0.75rem;
+        padding: 0.15rem 0.5rem;
+        border-radius: 10px;
+        min-width: 24px;
+        text-align: center;
+    }
+
+    /* Sidebar Footer */
+    .sidebar-footer {
+        padding: 1rem;
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
+        background: rgba(0, 0, 0, 0.2);
+    }
+
+    .system-status {
+        margin-bottom: 1rem;
+    }
+
+    .status-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 0.5rem;
+        font-size: 0.8rem;
+    }
+
+    .status-label {
+        opacity: 0.8;
+    }
+
+    .status-value {
+        font-weight: 500;
+    }
+
+    .status-value.healthy {
+        color: #2ecc71;
+    }
+
+    .status-value.warning {
+        color: #f39c12;
+    }
+
+    .quick-actions {
+        display: flex;
+        justify-content: space-around;
+        gap: 0.5rem;
+    }
+
+    .quick-action-btn {
+        background: rgba(255, 255, 255, 0.1);
+        border: none;
+        color: white;
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        position: relative;
+    }
+
+    .quick-action-btn:hover {
+        background: rgba(255, 255, 255, 0.2);
+        transform: translateY(-2px);
+    }
+
+    .notification-badge {
+        position: absolute;
+        top: -5px;
+        right: -5px;
+        background: #e74c3c;
+        color: white;
+        font-size: 0.6rem;
+        padding: 0.15rem 0.4rem;
+        border-radius: 50%;
+        min-width: 18px;
+        height: 18px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    /* Collapsible functionality */
+    .nav-section-header {
+        position: relative;
+    }
+
+    .nav-section-header:after {
+        content: '\f282';
+        font-family: 'bootstrap-icons';
+        position: absolute;
+        right: 1.5rem;
+        transition: transform 0.3s ease;
+    }
+
+    .nav-section.active .nav-section-header:after {
+        transform: rotate(180deg);
+    }
+
+    /* Responsive Design */
+    @media (max-width: 1200px) {
+        .sidebar {
+            width: 260px;
+        }
+    }
+
+    @media (max-width: 992px) {
+        .sidebar {
+            transform: translateX(-100%);
+        }
+        
+        .sidebar.active {
+            transform: translateX(0);
+        }
+        
+        .mobile-toggle {
+            display: block;
+            position: fixed;
+            top: 1rem;
+            left: 1rem;
+            z-index: 999;
+            background: #1e3c72;
+            color: white;
+            border: none;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+        }
+    }
+
+    /* Dark/Light theme support */
+    .theme-dark .sidebar {
+        background: linear-gradient(180deg, #1a1a2e 0%, #16213e 100%);
+    }
+
+    .theme-light .sidebar {
+        background: linear-gradient(180deg, #2c3e50 0%, #34495e 100%);
+    }
+</style>
+
+<script>
+    // Add interactive functionality
+    document.addEventListener('DOMContentLoaded', function() {
+        // Make navigation sections collapsible
+        const navSections = document.querySelectorAll('.nav-section-header');
+        
+        navSections.forEach(header => {
+            header.addEventListener('click', function() {
+                const section = this.parentElement;
+                section.classList.toggle('active');
+                
+                // Save state to localStorage
+                const sectionId = this.textContent.trim();
+                if (section.classList.contains('active')) {
+                    localStorage.setItem(`nav-section-${sectionId}`, 'expanded');
+                } else {
+                    localStorage.removeItem(`nav-section-${sectionId}`);
+                }
+            });
+            
+            // Restore saved state
+            const sectionId = header.textContent.trim();
+            if (localStorage.getItem(`nav-section-${sectionId}`) === 'expanded') {
+                header.parentElement.classList.add('active');
+            }
+        });
+        
+        // Mark active link based on current URL
+        const currentPath = window.location.pathname;
+        const navLinks = document.querySelectorAll('.nav-link');
+        
+        navLinks.forEach(link => {
+            if (link.href.includes(currentPath)) {
+                link.classList.add('active');
+                // Expand parent section
+                const parentSection = link.closest('.nav-section');
+                if (parentSection) {
+                    parentSection.classList.add('active');
+                }
+            }
+        });
+        
+        // Add smooth hover effects
+        const navItems = document.querySelectorAll('.nav-link, .user-profile');
+        navItems.forEach(item => {
+            item.addEventListener('mouseenter', function() {
+                this.style.transform = 'translateX(5px)';
+            });
+            
+            item.addEventListener('mouseleave', function() {
+                this.style.transform = 'translateX(0)';
+            });
+        });
+        
+        // Mobile toggle functionality
+        const mobileToggle = document.createElement('button');
+        mobileToggle.className = 'mobile-toggle';
+        mobileToggle.innerHTML = '<i class="bi bi-list"></i>';
+        document.body.appendChild(mobileToggle);
+        
+        mobileToggle.addEventListener('click', function() {
+            document.querySelector('.sidebar').classList.toggle('active');
+        });
+        
+        // Close sidebar when clicking outside on mobile
+        document.addEventListener('click', function(event) {
+            const sidebar = document.querySelector('.sidebar');
+            if (window.innerWidth <= 992 && 
+                !sidebar.contains(event.target) && 
+                !mobileToggle.contains(event.target)) {
+                sidebar.classList.remove('active');
+            }
+        });
+        
+        // Add keyboard shortcuts
+        document.addEventListener('keydown', function(e) {
+            // Ctrl+Shift+S to toggle sidebar
+            if (e.ctrlKey && e.shiftKey && e.key === 'S') {
+                document.querySelector('.sidebar').classList.toggle('active');
+            }
+            
+            // Escape to close sidebar on mobile
+            if (e.key === 'Escape' && window.innerWidth <= 992) {
+                document.querySelector('.sidebar').classList.remove('active');
+            }
+        });
+        
+        // Update online users counter (simulated)
+        function updateOnlineUsers() {
+            const counter = document.querySelector('.status-value:last-child');
+            if (counter) {
+                const base = parseInt(counter.textContent) || 12;
+                const variation = Math.floor(Math.random() * 5) - 2;
+                const newCount = Math.max(1, base + variation);
+                counter.textContent = newCount;
+            }
+        }
+        
+        // Update every 30 seconds
+        setInterval(updateOnlineUsers, 30000);
+    });
+</script>

@@ -1,0 +1,14 @@
+{% extends 'admin/base.html' %}
+{% block title %}{{ page_title|default:'Activity Logs' }}{% endblock %}
+{% block content %}
+<div class="container">
+  <h1>{{ page_title|default:'Activity Logs' }}</h1>
+  <ul>
+    {% for a in activities %}
+      <li>{{ a.timestamp }} — {{ a.description }}</li>
+    {% empty %}
+      <li>No recent activity.</li>
+    {% endfor %}
+  </ul>
+</div>
+{% endblock %}

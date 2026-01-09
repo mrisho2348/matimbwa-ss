@@ -1,0 +1,90 @@
+{% extends 'academic/base.html' %}
+
+{% block title %}Academic Officer Dashboard - MSMS{% endblock %}
+{% block page_title %}Academic Officer Dashboard{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card bg-primary text-white">
+            <div class="card-body">
+                <h5 class="card-title">Total Classes</h5>
+                <h2>0</h2>
+                <p class="card-text"><small>Active Classes</small></p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-success text-white">
+            <div class="card-body">
+                <h5 class="card-title">Total Teachers</h5>
+                <h2>0</h2>
+                <p class="card-text"><small>Staff Members</small></p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-info text-white">
+            <div class="card-body">
+                <h5 class="card-title">Results Submitted</h5>
+                <h2>0%</h2>
+                <p class="card-text"><small>Current Term</small></p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-warning text-white">
+            <div class="card-body">
+                <h5 class="card-title">Avg Attendance</h5>
+                <h3><span class="badge bg-success">0%</span></h3>
+                <p class="card-text"><small>All Classes</small></p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="bi bi-list-check"></i> Academic Functions</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <a href="/academic/classes/" class="btn btn-outline-primary w-100">
+                            <i class="bi bi-book"></i> Manage Classes
+                        </a>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <a href="/academic/results/" class="btn btn-outline-primary w-100">
+                            <i class="bi bi-graph-up"></i> View Results
+                        </a>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <a href="/academic/timetable/" class="btn btn-outline-primary w-100">
+                            <i class="bi bi-calendar"></i> Manage Timetable
+                        </a>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <a href="/academic/reports/" class="btn btn-outline-primary w-100">
+                            <i class="bi bi-file-earmark"></i> Academic Reports
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="bi bi-exclamation-circle"></i> Alerts</h5>
+            </div>
+            <div class="card-body">
+                <p class="text-muted">No pending alerts</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

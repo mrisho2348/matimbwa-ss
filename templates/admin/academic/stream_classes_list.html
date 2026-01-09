@@ -1,16 +1,14 @@
 {% extends 'admin/base.html' %}
 {% load static %}
-{% block title %} Education Levels Management {% endblock title %}
+{% block title %} Stream Classes Management {% endblock title %}
 
 {% block breadcrumb %}
-    <button type="button" class="btn btn-primary" data-toggle="modal" data-target="#addEducationLevelModal">
-        <i class="fas fa-plus"></i> Add Education Level
+    <button type="button" class="btn btn-primary" data-toggle="modal" data-target="#addStreamModal">
+        <i class="fas fa-plus"></i> Add Stream
     </button>
 {% endblock breadcrumb %}
 
 {%block extra_css %}
-
-
 <style>
     .table th {
         font-weight: 600;
@@ -32,12 +30,6 @@
     #table-container {
         min-height: 300px;
     }
-    .truncate-text {
-        display: -webkit-box;
-        -webkit-line-clamp: 2;
-        -webkit-box-orient: vertical;
-        overflow: hidden;
-    }
     .dataTables_wrapper .dataTables_filter {
         float: right;
         text-align: right;
@@ -48,9 +40,6 @@
     .dataTables_wrapper .dataTables_paginate {
         float: right;
         margin-top: 10px;
-    }
-    .dt-buttons {
-        margin-bottom: 10px;
     }
     .success-toast {
         position: fixed;
@@ -88,46 +77,65 @@
                 <div class="card shadow-lg">
                     <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
                         <h6 class="header-title mb-0 text-uppercase">
-                            <i class="fas fa-graduation-cap"></i> Education Levels Management
+                            <i class="fas fa-cube"></i> Stream Classes Management
                         </h6>
-                        <span class="badge badge-light" id="total-count">Total: {{ education_levels|length }}</span>
+                        <span class="badge badge-light" id="total-count">Total: {{ streams|length }}</span>
                     </div>
                     <div class="card-body">
                         <!-- Table Container -->
                         <div class="table-responsive" id="table-container">
-                            <table class="table table-hover table-striped table-bordered" id="education-levels-table">
+                            <table class="table table-hover table-striped table-bordered" id="streams-table">
                                 <thead class="bg-light">
                                     <tr>
-                                        <th>Code</th>
-                                        <th>Name</th>
-                                        <th>Description</th>
+                                        <th>Stream</th>
+                                        <th>Class Level</th>
+                                        <th>Capacity</th>
+                                        <th>Students</th>
+                                        <th>Status</th>
                                         <th class="text-center">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody id="table-body">
-                                    {% for level in education_levels %}
-                                    <tr id="row-{{ level.id }}">
-                                        <td><span class="badge badge-info">{{ level.code }}</span></td>
-                                        <td>{{ level.name }}</td>
+                                    {% for stream in streams %}
+                                    <tr id="row-{{ stream.id }}">
+                                        <td><span class="badge badge-primary">{{ stream.stream_letter }}</span></td>
+                                        <td><strong>{{ stream.class_level.name }}</strong></td>
+                                        <td>{{ stream.capacity }}</td>
                                         <td>
-                                            {% if level.description %}
-                                                <span class="truncate-text">{{ level.description }}</span>
+                                            <span class="badge badge-info">{{ stream.student_count }}</span>
+                                        </td>
+                                        <td>
+                                            {% if stream.is_active %}
+                                                <span class="badge badge-success"><i class="fas fa-check-circle"></i> Active</span>
                                             {% else %}
-                                                <span class="text-muted">No description</span>
+                                                <span class="badge badge-secondary"><i class="fas fa-times-circle"></i> Inactive</span>
                                             {% endif %}
                                         </td>
                                         <td class="text-center">
                                             <div class="btn-group" role="group">
                                                 <button class="btn btn-sm btn-primary edit-btn" 
-                                                        data-id="{{ level.id }}"
-                                                        data-code="{{ level.code }}"
-                                                        data-name="{{ level.name }}"
-                                                        data-description="{{ level.description|default:'' }}">
+                                                        data-id="{{ stream.id }}"
+                                                        data-class-level-id="{{ stream.class_level.id }}"
+                                                        data-stream-letter="{{ stream.stream_letter }}"
+                                                        data-capacity="{{ stream.capacity }}">
                                                     <i class="fas fa-edit"></i> Edit
                                                 </button>
+                                                {% if stream.is_active %}
+                                                <button class="btn btn-sm btn-warning toggle-active-btn" 
+                                                        data-id="{{ stream.id }}"
+                                                        data-stream="{{ stream }}">
+                                                    <i class="fas fa-pause"></i> Deactivate
+                                                </button>
+                                                {% else %}
+                                                <button class="btn btn-sm btn-info toggle-active-btn" 
+                                                        data-id="{{ stream.id }}"
+                                                        data-stream="{{ stream }}">
+                                                    <i class="fas fa-play"></i> Activate
+                                                </button>
+                                                {% endif %}
                                                 <button class="btn btn-sm btn-danger delete-btn" 
-                                                        data-id="{{ level.id }}"
-                                                        data-name="{{ level.name }}">
+                                                        data-id="{{ stream.id }}"
+                                                        data-stream="{{ stream }}">
                                                     <i class="fas fa-trash"></i> Delete
                                                 </button>
                                             </div>
@@ -135,9 +143,9 @@
                                     </tr>
                                     {% empty %}
                                     <tr id="no-data-row">
-                                        <td colspan="4" class="text-center text-muted py-4">
+                                        <td colspan="6" class="text-center text-muted py-4">
                                             <i class="fas fa-inbox fa-2x mb-2"></i><br>
-                                            No education levels found. Click "Add Education Level" to create one.
+                                            No streams found. Click "Add Stream" to create one.
                                         </td>
                                     </tr>
                                     {% endfor %}
@@ -151,13 +159,13 @@
     </div>
 </section>
 
-<!-- Add Education Level Modal -->
-<div class="modal fade" id="addEducationLevelModal" tabindex="-1" role="dialog" aria-labelledby="addModalLabel" aria-hidden="true">
+<!-- Add Stream Modal -->
+<div class="modal fade" id="addStreamModal" tabindex="-1" role="dialog" aria-labelledby="addModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg" role="document">
         <div class="modal-content">
             <div class="modal-header bg-primary text-white">
                 <h5 class="modal-title" id="addModalLabel">
-                    <i class="fas fa-plus-circle"></i> Add New Education Level
+                    <i class="fas fa-plus-circle"></i> Add New Stream
                 </h5>
                 <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
                     <span aria-hidden="true">&times;</span>
@@ -167,27 +175,29 @@
                 {% csrf_token %}
                 <div class="modal-body">
                     <div class="form-group">
-                        <label for="code">Code <span class="text-danger">*</span></label>
-                        <input type="text" class="form-control" id="code" name="code" required 
-                               placeholder="e.g., PRIMARY, SECONDARY, UNIVERSITY">
-                        <small class="form-text text-muted">Unique identifier for the education level</small>
+                        <label for="class_level_id">Class Level <span class="text-danger">*</span></label>
+                        <select class="form-control" id="class_level_id" name="class_level_id" required>
+                            <option value="">Select Class Level</option>
+                        </select>
                     </div>
                     <div class="form-group">
-                        <label for="name">Name <span class="text-danger">*</span></label>
-                        <input type="text" class="form-control" id="name" name="name" required 
-                               placeholder="e.g., Primary Education, Secondary Education">
+                        <label for="stream_letter">Stream Letter <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="stream_letter" name="stream_letter" 
+                               maxlength="1" placeholder="A, B, C, etc." required>
+                        <small class="form-text text-muted">Single letter (A-Z)</small>
                     </div>
                     <div class="form-group">
-                        <label for="description">Description</label>
-                        <textarea class="form-control" id="description" name="description" 
-                                  rows="3" placeholder="Optional description of the education level"></textarea>
+                        <label for="capacity">Capacity <span class="text-danger">*</span></label>
+                        <input type="number" class="form-control" id="capacity" name="capacity" 
+                               value="50" min="1" required>
+                        <small class="form-text text-muted">Number of students the stream can accommodate</small>
                     </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-dismiss="modal" id="cancel-add-btn">Cancel</button>
                     <button type="submit" class="btn btn-primary" id="save-btn">
                         <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="display: none;"></span>
-                        Save Education Level
+                        Save Stream
                     </button>
                 </div>
             </form>
@@ -195,13 +205,13 @@
     </div>
 </div>
 
-<!-- Edit Education Level Modal -->
-<div class="modal fade" id="editEducationLevelModal" tabindex="-1" role="dialog" aria-labelledby="editModalLabel" aria-hidden="true">
+<!-- Edit Stream Modal -->
+<div class="modal fade" id="editStreamModal" tabindex="-1" role="dialog" aria-labelledby="editModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg" role="document">
         <div class="modal-content">
             <div class="modal-header bg-warning text-dark">
                 <h5 class="modal-title" id="editModalLabel">
-                    <i class="fas fa-edit"></i> Edit Education Level
+                    <i class="fas fa-edit"></i> Edit Stream
                 </h5>
                 <button type="button" class="close" data-dismiss="modal" aria-label="Close">
                     <span aria-hidden="true">&times;</span>
@@ -212,24 +222,28 @@
                 <input type="hidden" id="edit-id" name="id">
                 <div class="modal-body">
                     <div class="form-group">
-                        <label for="edit-code">Code <span class="text-danger">*</span></label>
-                        <input type="text" class="form-control" id="edit-code" name="code" required>
-                        <small class="form-text text-muted">Unique identifier for the education level</small>
+                        <label for="edit-class_level_id">Class Level <span class="text-danger">*</span></label>
+                        <select class="form-control" id="edit-class_level_id" name="class_level_id" required>
+                            <option value="">Select Class Level</option>
+                        </select>
                     </div>
                     <div class="form-group">
-                        <label for="edit-name">Name <span class="text-danger">*</span></label>
-                        <input type="text" class="form-control" id="edit-name" name="name" required>
+                        <label for="edit-stream_letter">Stream Letter <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="edit-stream_letter" name="stream_letter" 
+                               maxlength="1" required>
+                        <small class="form-text text-muted">Single letter (A-Z)</small>
                     </div>
                     <div class="form-group">
-                        <label for="edit-description">Description</label>
-                        <textarea class="form-control" id="edit-description" name="description" rows="3"></textarea>
+                        <label for="edit-capacity">Capacity <span class="text-danger">*</span></label>
+                        <input type="number" class="form-control" id="edit-capacity" name="capacity" 
+                               min="1" required>
                     </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-dismiss="modal" id="cancel-edit-btn">Cancel</button>
                     <button type="submit" class="btn btn-warning" id="update-btn">
                         <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="display: none;"></span>
-                        Update Education Level
+                        Update Stream
                     </button>
                 </div>
             </form>
@@ -238,7 +252,7 @@
 </div>
 
 <!-- Delete Confirmation Modal -->
-<div class="modal fade" id="deleteEducationLevelModal" tabindex="-1" role="dialog" aria-labelledby="deleteModalLabel" aria-hidden="true">
+<div class="modal fade" id="deleteStreamModal" tabindex="-1" role="dialog" aria-labelledby="deleteModalLabel" aria-hidden="true">
     <div class="modal-dialog" role="document">
         <div class="modal-content">
             <div class="modal-header bg-danger text-white">
@@ -250,8 +264,8 @@
                 </button>
             </div>
             <div class="modal-body">
-                <p>Are you sure you want to delete the education level <strong id="delete-level-name"></strong>?</p>
-                <p class="text-danger"><small>This action cannot be undone. All associated data might be affected.</small></p>
+                <p>Are you sure you want to delete stream <strong id="delete-stream-name"></strong>?</p>
+                <p class="text-danger"><small>This action cannot be undone. All students in this stream might be affected.</small></p>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-dismiss="modal" id="cancel-delete-btn">Cancel</button>
@@ -266,12 +280,10 @@
 {% endblock content %}
 
 {% block extra_js %}
-
 <script>
     $(document).ready(function() {
-        // Initialize DataTable WITH proper configuration
-        var table = $('#education-levels-table').DataTable({
-            // DataTables configuration options
+        // Initialize DataTable
+        var table = $('#streams-table').DataTable({
             "dom": "<'row'<'col-sm-12 col-md-6'l><'col-sm-12 col-md-6'f>>" +
                    "<'row'<'col-sm-12'tr>>" +
                    "<'row'<'col-sm-12 col-md-5'i><'col-sm-12 col-md-7'p>>",
@@ -281,14 +293,19 @@
             "autoWidth": false,
             "ordering": true,
             "order": [[1, 'asc']],
-            
-            // CRITICAL: Ensure DataTables uses the existing DOM data
-            "destroy": true,
-            "retrieve": true,
-            "deferRender": true,
-            
+               "columnDefs": [
+                   {"targets": 5, "orderable": false, "searchable": false}
+               ],
+               "columns": [
+                   {"data": null},
+                   {"data": null},
+                   {"data": null},
+                   {"data": null},
+                   {"data": null},
+                   {"data": null}
+               ],
             "language": {
-                "emptyTable": "No education levels found. Click 'Add Education Level' to create one.",
+                "emptyTable": "No streams found. Click 'Add Stream' to create one.",
                 "search": "_INPUT_",
                 "searchPlaceholder": "Search...",
                 "lengthMenu": "_MENU_ records per page",
@@ -303,20 +320,16 @@
                 }
             },
             "drawCallback": function(settings) {
-                // Update total count
                 var api = this.api();
                 var total = api.rows().count();
                 $('#total-count').text('Total: ' + total);
             }
-            // REMOVED 'createdRow' function as it's unnecessary and likely causing the column count warning
         });
 
-        // CSRF token for AJAX requests
         function getCSRFToken() {
-            return $('input[name="csrfmiddlewaretoken"]').val();
+            return document.querySelector('[name=csrfmiddlewaretoken]').value;
         }
 
-        // Show toast message
         function showToast(message, type = 'success') {
             if (type === 'success') {
                 $('#success-message').text(message);
@@ -333,7 +346,6 @@
             }
         }
 
-        // Function to reload page after delay
         function reloadPageAfterDelay(message, type = 'success') {
             showToast(message, type);
             var delay = type === 'success' ? 2000 : 3000;
@@ -342,19 +354,17 @@
             }, delay);
         }
 
-        // Fix for modal close/cancel buttons
         $(document).on('click', '[data-dismiss="modal"]', function(e) {
             e.preventDefault();
             $(this).closest('.modal').modal('hide');
         });
 
-        // Handle cancel buttons
         $('#cancel-add-btn, #cancel-edit-btn, #cancel-delete-btn').on('click', function(e) {
             e.preventDefault();
             $(this).closest('.modal').modal('hide');
         });
 
-        // Add Education Level
+        // Add Stream
         $('#add-form').on('submit', function(e) {
             e.preventDefault();
             
@@ -367,7 +377,7 @@
             formData.append('action', 'create');
             
             $.ajax({
-                url: '{% url "admin_educational_levels_crud" %}',
+                url: '{% url "admin_stream_classes_crud" %}',
                 method: 'POST',
                 headers: {
                     'X-CSRFToken': getCSRFToken(),
@@ -378,7 +388,7 @@
                 contentType: false,
                 success: function(data) {
                     if (data.success) {
-                        $('#addEducationLevelModal').modal('hide');
+                        $('#addStreamModal').modal('hide');
                         reloadPageAfterDelay(data.message, 'success');
                         $('#add-form')[0].reset();
                     } else {
@@ -396,20 +406,18 @@
             });
         });
 
-        // **CRITICAL FIX: Use event delegation for dynamically created elements**
-        // Edit Education Level - Setup modal
+        // Edit Stream
         $(document).on('click', '.edit-btn', function() {
             const btn = $(this);
             
             $('#edit-id').val(btn.data('id'));
-            $('#edit-code').val(btn.data('code'));
-            $('#edit-name').val(btn.data('name'));
-            $('#edit-description').val(btn.data('description'));
+            $('#edit-class_level_id').val(btn.data('class-level-id'));
+            $('#edit-stream_letter').val(btn.data('stream-letter'));
+            $('#edit-capacity').val(btn.data('capacity'));
             
-            $('#editEducationLevelModal').modal('show');
+            $('#editStreamModal').modal('show');
         });
 
-        // Edit Education Level - Submit form
         $('#edit-form').on('submit', function(e) {
             e.preventDefault();
             
@@ -422,7 +430,7 @@
             formData.append('action', 'update');
             
             $.ajax({
-                url: '{% url "admin_educational_levels_crud" %}',
+                url: '{% url "admin_stream_classes_crud" %}',
                 method: 'POST',
                 headers: {
                     'X-CSRFToken': getCSRFToken(),
@@ -433,7 +441,7 @@
                 contentType: false,
                 success: function(data) {
                     if (data.success) {
-                        $('#editEducationLevelModal').modal('hide');
+                        $('#editStreamModal').modal('hide');
                         reloadPageAfterDelay(data.message, 'success');
                     } else {
                         showToast(data.message, 'danger');
@@ -450,37 +458,19 @@
             });
         });
 
-        // Delete Education Level - Setup modal
-        let levelToDelete = null;
-        
-        $(document).on('click', '.delete-btn', function() {
+        // Toggle Stream Active Status
+        $(document).on('click', '.toggle-active-btn', function() {
             const btn = $(this);
-            
-            levelToDelete = {
-                id: btn.data('id'),
-                name: btn.data('name')
-            };
-            
-            $('#delete-level-name').text(btn.data('name'));
-            $('#deleteEducationLevelModal').modal('show');
-        });
-
-        // Delete Education Level - Confirm
-        $('#confirm-delete-btn').on('click', function() {
-            if (!levelToDelete) return;
-            
-            const deleteBtn = $(this);
-            const spinner = deleteBtn.find('.spinner-border');
-            deleteBtn.prop('disabled', true);
-            spinner.show();
+            const streamId = btn.data('id');
+            const streamName = btn.data('stream');
             
             const formData = new FormData();
-            formData.append('action', 'delete');
-            formData.append('id', levelToDelete.id);
+            formData.append('action', 'toggle_active');
+            formData.append('id', streamId);
             formData.append('csrfmiddlewaretoken', getCSRFToken());
             
             $.ajax({
-                url: '{% url "admin_educational_levels_crud" %}',
+                url: '{% url "admin_stream_classes_crud" %}',
                 method: 'POST',
                 headers: {
                     'X-CSRFToken': getCSRFToken(),
@@ -491,7 +481,59 @@
                 contentType: false,
                 success: function(data) {
                     if (data.success) {
-                        $('#deleteEducationLevelModal').modal('hide');
+                        reloadPageAfterDelay(data.message, 'success');
+                    } else {
+                        showToast(data.message, 'danger');
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error:', error);
+                    showToast('An error occurred. Please try again.', 'danger');
+                }
+            });
+        });
+
+        // Delete Stream
+        let streamToDelete = null;
+        
+        $(document).on('click', '.delete-btn', function() {
+            const btn = $(this);
+            
+            streamToDelete = {
+                id: btn.data('id'),
+                stream: btn.data('stream')
+            };
+            
+            $('#delete-stream-name').text(btn.data('stream'));
+            $('#deleteStreamModal').modal('show');
+        });
+
+        $('#confirm-delete-btn').on('click', function() {
+            if (!streamToDelete) return;
+            
+            const deleteBtn = $(this);
+            const spinner = deleteBtn.find('.spinner-border');
+            deleteBtn.prop('disabled', true);
+            spinner.show();
+            
+            const formData = new FormData();
+            formData.append('action', 'delete');
+            formData.append('id', streamToDelete.id);
+            formData.append('csrfmiddlewaretoken', getCSRFToken());
+            
+            $.ajax({
+                url: '{% url "admin_stream_classes_crud" %}',
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCSRFToken(),
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function(data) {
+                    if (data.success) {
+                        $('#deleteStreamModal').modal('hide');
                         reloadPageAfterDelay(data.message, 'success');
                     } else {
                         showToast(data.message, 'danger');
@@ -508,22 +550,13 @@
             });
         });
 
-        // Clear form on modal close
-        $('#addEducationLevelModal').on('hidden.bs.modal', function() {
+        $('#addStreamModal').on('hidden.bs.modal', function() {
             $('#add-form')[0].reset();
         });
         
-        // Reset delete confirmation on modal close
-        $('#deleteEducationLevelModal').on('hidden.bs.modal', function() {
-            levelToDelete = null;
-        });
-
-        // Manual refresh button
-        $('.btn-outline-secondary').on('click', function() {
-            if ($(this).find('.fa-sync-alt').length) {
-                location.reload();
-            }
+        $('#deleteStreamModal').on('hidden.bs.modal', function() {
+            streamToDelete = null;
         });
     });
 </script>
-{% endblock %}
+{% endblock extra_js %}

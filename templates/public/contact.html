@@ -1,0 +1,146 @@
+{% extends 'public/base.html' %}
+
+{% block content %}
+<h1 class="page-title">Contact Us</h1>
+
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 2rem; margin-bottom: 3rem;">
+    <!-- Contact Information -->
+    <div style="background-color: #f0f4f8; padding: 2rem; border-radius: 8px; border-left: 4px solid #1e3c72;">
+        <h3 style="color: #1e3c72; margin-bottom: 1rem;">📍 School Location</h3>
+        <p style="color: #666; line-height: 1.8;">
+            {{ contact_info.address }}<br>
+            <small style="color: #888;">Located in the heart of Makueni County</small>
+        </p>
+    </div>
+
+    <div style="background-color: #f0f4f8; padding: 2rem; border-radius: 8px; border-left: 4px solid #2a5298;">
+        <h3 style="color: #1e3c72; margin-bottom: 1rem;">📞 Phone Number</h3>
+        <p style="color: #666; font-size: 1.1rem;">
+            <a href="tel:+254712345678" style="color: #2a5298; text-decoration: none;">{{ contact_info.phone }}</a>
+        </p>
+        <p style="color: #888; margin-top: 0.5rem;">Call us during office hours for immediate assistance</p>
+    </div>
+
+    <div style="background-color: #f0f4f8; padding: 2rem; border-radius: 8px; border-left: 4px solid #17a2b8;">
+        <h3 style="color: #1e3c72; margin-bottom: 1rem;">📧 Email Address</h3>
+        <p style="color: #666;">
+            <a href="mailto:info@matimbwa.ac.ke" style="color: #2a5298; text-decoration: none; font-size: 1.05rem;">{{ contact_info.email }}</a>
+        </p>
+        <p style="color: #888; margin-top: 0.5rem;">Respond within 24 hours</p>
+    </div>
+
+    <div style="background-color: #f0f4f8; padding: 2rem; border-radius: 8px; border-left: 4px solid #28a745;">
+        <h3 style="color: #1e3c72; margin-bottom: 1rem;">🕐 Office Hours</h3>
+        <p style="color: #666; line-height: 1.8;">
+            {{ contact_info.office_hours }}<br>
+            <small style="color: #888;">Closed on public holidays</small>
+        </p>
+    </div>
+
+    <div style="background-color: #f0f4f8; padding: 2rem; border-radius: 8px; border-left: 4px solid #ffc107;">
+        <h3 style="color: #1e3c72; margin-bottom: 1rem;">👨‍💼 Principal</h3>
+        <p style="color: #666; font-size: 1.05rem; font-weight: bold;">{{ contact_info.principal }}</p>
+        <p style="color: #888; margin-top: 0.5rem;">School Principal & Administrator</p>
+    </div>
+
+    <div style="background-color: #f0f4f8; padding: 2rem; border-radius: 8px; border-left: 4px solid #dc3545;">
+        <h3 style="color: #1e3c72; margin-bottom: 1rem;">👩‍💼 Deputy Principal</h3>
+        <p style="color: #666; font-size: 1.05rem; font-weight: bold;">{{ contact_info.deputy_principal }}</p>
+        <p style="color: #888; margin-top: 0.5rem;">Academic Affairs & Curriculum</p>
+    </div>
+</div>
+
+<!-- Contact Form -->
+<div style="background-color: #fff3cd; padding: 2rem; border-radius: 8px; margin-bottom: 3rem;">
+    <h2 style="color: #1e3c72; margin-bottom: 1.5rem;">📝 Send us a Message</h2>
+    <p style="color: #666; margin-bottom: 1.5rem;">Have questions? Fill out the form below and we'll get back to you as soon as possible.</p>
+    
+    <form method="POST" style="display: grid; gap: 1.5rem;">
+        {% csrf_token %}
+        
+        <div>
+            <label for="name" style="display: block; margin-bottom: 0.5rem; color: #1e3c72; font-weight: bold;">Full Name</label>
+            <input type="text" id="name" name="name" required style="width: 100%; padding: 0.8rem; border: 1px solid #ddd; border-radius: 4px; font-size: 1rem;">
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+            <div>
+                <label for="email" style="display: block; margin-bottom: 0.5rem; color: #1e3c72; font-weight: bold;">Email Address</label>
+                <input type="email" id="email" name="email" required style="width: 100%; padding: 0.8rem; border: 1px solid #ddd; border-radius: 4px; font-size: 1rem;">
+            </div>
+
+            <div>
+                <label for="phone" style="display: block; margin-bottom: 0.5rem; color: #1e3c72; font-weight: bold;">Phone Number</label>
+                <input type="tel" id="phone" name="phone" style="width: 100%; padding: 0.8rem; border: 1px solid #ddd; border-radius: 4px; font-size: 1rem;">
+            </div>
+        </div>
+
+        <div>
+            <label for="subject" style="display: block; margin-bottom: 0.5rem; color: #1e3c72; font-weight: bold;">Subject</label>
+            <input type="text" id="subject" name="subject" required style="width: 100%; padding: 0.8rem; border: 1px solid #ddd; border-radius: 4px; font-size: 1rem;">
+        </div>
+
+        <div>
+            <label for="message" style="display: block; margin-bottom: 0.5rem; color: #1e3c72; font-weight: bold;">Message</label>
+            <textarea id="message" name="message" rows="6" required style="width: 100%; padding: 0.8rem; border: 1px solid #ddd; border-radius: 4px; font-size: 1rem; font-family: inherit;"></textarea>
+        </div>
+
+        <button type="submit" class="btn" style="width: 100%; padding: 1rem; font-size: 1.05rem;">Send Message</button>
+    </form>
+</div>
+
+<!-- FAQ Section -->
+<div style="background-color: #f0f4f8; padding: 2rem; border-radius: 8px; margin-bottom: 2rem;">
+    <h2 style="color: #1e3c72; margin-bottom: 1.5rem;">❓ Frequently Asked Questions</h2>
+    
+    <div style="display: grid; gap: 1.5rem;">
+        <div style="border-left: 4px solid #2a5298; padding-left: 1.5rem;">
+            <h4 style="color: #1e3c72; margin-bottom: 0.5rem;">What is the admission process?</h4>
+            <p style="color: #666;">Students are admitted through the national selection process. Submit your Form 4 exam results and follow the KNEC instructions. Contact our office for specific guidelines.</p>
+        </div>
+
+        <div style="border-left: 4px solid #28a745; padding-left: 1.5rem;">
+            <h4 style="color: #1e3c72; margin-bottom: 0.5rem;">Are scholarships available?</h4>
+            <p style="color: #666;">Yes, we offer scholarships for needy but academically talented students. Contact the Principal's office for scholarship application details and requirements.</p>
+        </div>
+
+        <div style="border-left: 4px solid #17a2b8; padding-left: 1.5rem;">
+            <h4 style="color: #1e3c72; margin-bottom: 0.5rem;">When does the school year begin?</h4>
+            <p style="color: #666;">The school operates on a three-term system. First term begins in January, second term in April, and third term in July. Check our news section for exact dates.</p>
+        </div>
+
+        <div style="border-left: 4px solid #ffc107; padding-left: 1.5rem;">
+            <h4 style="color: #1e3c72; margin-bottom: 0.5rem;">What are the school fees?</h4>
+            <p style="color: #666;">School fees vary by form level and stream. Installment plans are available for needy students. Contact the Accounts office for detailed fee schedules.</p>
+        </div>
+
+        <div style="border-left: 4px solid #dc3545; padding-left: 1.5rem;">
+            <h4 style="color: #1e3c72; margin-bottom: 0.5rem;">Can I visit the school?</h4>
+            <p style="color: #666;">Yes, we welcome visits during school hours (8:00 AM - 4:00 PM). Please call ahead to arrange a campus tour or meeting with the Principal.</p>
+        </div>
+
+        <div style="border-left: 4px solid #6c757d; padding-left: 1.5rem;">
+            <h4 style="color: #1e3c72; margin-bottom: 0.5rem;">What facilities are available for boarding?</h4>
+            <p style="color: #666;">We have modern dormitories with basic amenities. Boarding is optional. Interested students should indicate this during admission.</p>
+        </div>
+    </div>
+</div>
+
+<!-- Location Map -->
+<div style="background-color: #f0f4f8; padding: 2rem; border-radius: 8px;">
+    <h2 style="color: #1e3c72; margin-bottom: 1rem;">🗺️ School Location</h2>
+    <p style="color: #666; margin-bottom: 1.5rem;">
+        Matimbwa Secondary School is conveniently located in Makueni County, easily accessible by road. 
+        The school is approximately 15km from the county capital.
+    </p>
+    <div style="background-color: #e8f4f8; border: 2px solid #2a5298; border-radius: 4px; padding: 3rem; text-align: center; color: #666;">
+        <p>📍 Map would be displayed here</p>
+        <p style="font-size: 0.9rem; margin-top: 0.5rem;">Click <a href="https://maps.google.com" style="color: #2a5298; text-decoration: none;">here</a> to view directions on Google Maps</p>
+    </div>
+</div>
+
+<div class="container-section" style="text-align: center; margin-top: 2rem;">
+    <h2 style="color: #1e3c72; margin-bottom: 1rem;">We Look Forward to Hearing From You!</h2>
+    <p style="font-size: 1.05rem; color: #666;">Your questions and feedback are important to us.</p>
+</div>
+{% endblock %}

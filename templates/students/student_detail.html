@@ -1,0 +1,89 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ student.user.get_full_name }} - MSMS{% endblock %}
+{% block page_title %}Student Details{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body text-center">
+                <img src="https://via.placeholder.com/150" class="rounded-circle mb-3" alt="Photo">
+                <h5 class="card-title">{{ student.user.get_full_name }}</h5>
+                <p class="text-muted">{{ student.admission_number }}</p>
+                <span class="badge bg-success">{{ student.get_status_display }}</span>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">Personal Information</h5>
+            </div>
+            <div class="card-body">
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <strong>Admission Number:</strong>
+                        <p>{{ student.admission_number }}</p>
+                    </div>
+                    <div class="col-md-6">
+                        <strong>Date of Birth:</strong>
+                        <p>{{ student.date_of_birth|date:"F d, Y" }} (Age: {{ student.age }})</p>
+                    </div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <strong>Gender:</strong>
+                        <p>{{ student.get_gender_display }}</p>
+                    </div>
+                    <div class="col-md-6">
+                        <strong>Current Class:</strong>
+                        <p>{{ student.current_class|default:"-" }}</p>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-6">
+                        <strong>Email:</strong>
+                        <p>{{ student.user.email }}</p>
+                    </div>
+                    <div class="col-md-6">
+                        <strong>Phone:</strong>
+                        <p>{{ student.user.phone_number|default:"-" }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card mt-3">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">Guardians</h5>
+            </div>
+            <div class="card-body">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Guardian Name</th>
+                            <th>Relationship</th>
+                            <th>Contact</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for guardian in student.guardians.all %}
+                            <tr>
+                                <td>{{ guardian.guardian.user.get_full_name }}</td>
+                                <td>{{ guardian.get_relationship_display }}</td>
+                                <td>{{ guardian.guardian.user.phone_number }}</td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="3" class="text-muted">No guardians assigned</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

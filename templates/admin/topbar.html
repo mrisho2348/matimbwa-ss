@@ -1,0 +1,1176 @@
+<!-- Admin Top Navigation Bar -->
+<nav class="admin-topbar">
+    <!-- Left Section: Breadcrumb & Search -->
+    <div class="topbar-left">
+        <!-- Mobile Menu Toggle -->
+        <button class="menu-toggle" id="sidebarToggle">
+            <i class="bi bi-list"></i>
+        </button>
+        
+        <!-- Breadcrumb Navigation -->
+        <nav aria-label="breadcrumb" class="breadcrumb-nav">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item">
+                    <a href="{% url 'admin_dashboard' %}">
+                        <i class="bi bi-house-door"></i> Home
+                    </a>
+                </li>
+                {% if page_title %}
+                <li class="breadcrumb-item active" aria-current="page">
+                    {{ page_title }}
+                </li>
+                {% endif %}
+            </ol>
+        </nav>
+        
+        <!-- Quick Search -->
+        <div class="topbar-search">
+            <div class="search-container">
+                <i class="bi bi-search search-icon"></i>
+                <input type="text" 
+                       class="search-input" 
+                       placeholder="Search students, staff, reports..." 
+                       id="globalSearch">
+                <button class="search-clear" id="clearSearch">
+                    <i class="bi bi-x"></i>
+                </button>
+            </div>
+            <div class="search-results" id="searchResults"></div>
+        </div>
+    </div>
+
+    <!-- Right Section: User Controls & Notifications -->
+    <div class="topbar-right">
+        <!-- Quick Action Buttons -->
+        <div class="quick-actions">
+            <button class="action-btn" title="Quick Add" id="quickAddBtn">
+                <i class="bi bi-plus-lg"></i>
+                <span class="action-label">Add New</span>
+            </button>
+            
+            <button class="action-btn" title="Notifications" id="notificationsBtn">
+                <i class="bi bi-bell"></i>
+                <span class="notification-badge" id="notificationCount">3</span>
+            </button>
+            
+            <button class="action-btn" title="Messages" id="messagesBtn">
+                <i class="bi bi-chat-dots"></i>
+                <span class="notification-badge message-badge" id="messageCount">2</span>
+            </button>
+            
+            <button class="action-btn" title="Calendar" id="calendarBtn">
+                <i class="bi bi-calendar-event"></i>
+                <span class="date-badge">{{ current_date|date:"d" }}</span>
+            </button>
+        </div>
+
+        <!-- System Status Indicators -->
+        <div class="system-status">
+            <div class="status-indicator online" title="System Online">
+                <i class="bi bi-check-circle"></i>
+            </div>
+            <div class="status-indicator database" title="Database Healthy">
+                <i class="bi bi-database"></i>
+            </div>
+        </div>
+
+        <!-- User Profile Dropdown -->
+        <div class="user-profile-dropdown">
+            <button class="user-profile-btn" id="userProfileBtn">
+                <div class="user-avatar">
+                    {% if request.user.staff.profile_picture %}
+                    <img src="{{ request.user.staff.profile_picture.url }}" alt="{{ request.user.get_full_name }}">
+                    {% else %}
+                    <div class="avatar-fallback">
+                        {{ request.user.first_name|first|upper }}{{ request.user.last_name|first|upper }}
+                    </div>
+                    {% endif %}
+                </div>
+                <div class="user-info">
+                    <div class="user-name">{{ request.user.get_full_name|default:request.user.username }}</div>
+                    <div class="user-role">Administrator</div>
+                </div>
+                <i class="bi bi-chevron-down dropdown-arrow"></i>
+            </button>
+            
+            <!-- User Dropdown Menu -->
+            <div class="user-dropdown-menu" id="userDropdownMenu">
+                <div class="dropdown-header">
+                    <div class="dropdown-avatar">
+                        {% if request.user.staff.profile_picture %}
+                        <img src="{{ request.user.staff.profile_picture.url }}" alt="{{ request.user.get_full_name }}">
+                        {% else %}
+                        <div class="avatar-fallback large">
+                            {{ request.user.first_name|first|upper }}{{ request.user.last_name|first|upper }}
+                        </div>
+                        {% endif %}
+                    </div>
+                    <div class="dropdown-user-info">
+                        <h6>{{ request.user.get_full_name|default:request.user.username }}</h6>
+                        <p>{{ request.user.email }}</p>
+                        <span class="badge badge-admin">Admin</span>
+                    </div>
+                </div>
+                
+                <div class="dropdown-divider"></div>
+                
+                <a href="{% url 'admin_profile' %}" class="dropdown-item">
+                    <i class="bi bi-person"></i>
+                    <span>My Profile</span>
+                </a>
+                
+                <a href="#" class="dropdown-item">
+                    <i class="bi bi-gear"></i>
+                    <span>Account Settings</span>
+                </a>
+                
+                <a href="#" class="dropdown-item">
+                    <i class="bi bi-shield-lock"></i>
+                    <span>Security</span>
+                </a>
+                
+                <div class="dropdown-divider"></div>
+                
+                <a href="{% url 'admin_notifications' %}" class="dropdown-item">
+                    <i class="bi bi-bell"></i>
+                    <span>Notifications</span>
+                    <span class="notification-count">3</span>
+                </a>
+                
+                <a href="#" class="dropdown-item">
+                    <i class="bi bi-clock-history"></i>
+                    <span>Activity Log</span>
+                </a>
+                
+                <div class="dropdown-divider"></div>
+                
+                <div class="dropdown-footer">
+                    <div class="last-login">
+                        <small>Last login: {{ request.user.last_login|date:"M d, Y H:i" }}</small>
+                    </div>
+                    <a href="{% url 'public_logout' %}" class="logout-btn">
+                        <i class="bi bi-box-arrow-right"></i>
+                        Logout
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Add Menu (Hidden by default) -->
+    <div class="quick-add-menu" id="quickAddMenu">
+        <div class="quick-add-header">
+            <h6>Quick Add</h6>
+            <button class="close-quick-add" id="closeQuickAdd">
+                <i class="bi bi-x"></i>
+            </button>
+        </div>
+        <div class="quick-add-items">
+            <a href="{% url 'admin_students_add' %}" class="quick-add-item">
+                <div class="quick-add-icon student">
+                    <i class="bi bi-person-plus"></i>
+                </div>
+                <div class="quick-add-content">
+                    <h6>Add Student</h6>
+                    <p>Register new student</p>
+                </div>
+            </a>
+            
+            <a href="{% url 'admin_staff_add' %}" class="quick-add-item">
+                <div class="quick-add-icon staff">
+                    <i class="bi bi-person-badge"></i>
+                </div>
+                <div class="quick-add-content">
+                    <h6>Add Staff</h6>
+                    <p>Register new staff member</p>
+                </div>
+            </a>
+            
+            <a href="{% url 'admin_users_add' %}" class="quick-add-item">
+                <div class="quick-add-icon user">
+                    <i class="bi bi-person-plus"></i>
+                </div>
+                <div class="quick-add-content">
+                    <h6>Add User</h6>
+                    <p>Create new system user</p>
+                </div>
+            </a>
+            
+            <a href="{% url 'admin_students_add' %}?quick=true" class="quick-add-item">
+                <div class="quick-add-icon class">
+                    <i class="bi bi-people"></i>
+                </div>
+                <div class="quick-add-content">
+                    <h6>Add Class</h6>
+                    <p>Create new class level</p>
+                </div>
+            </a>
+        </div>
+    </div>
+</nav>
+
+<!-- Notifications Panel (Hidden by default) -->
+<div class="notifications-panel" id="notificationsPanel">
+    <div class="notifications-header">
+        <h6>Notifications</h6>
+        <div class="notifications-actions">
+            <button class="mark-all-read" id="markAllRead">
+                <i class="bi bi-check-all"></i>
+                Mark all read
+            </button>
+            <button class="close-notifications" id="closeNotifications">
+                <i class="bi bi-x"></i>
+            </button>
+        </div>
+    </div>
+    <div class="notifications-list" id="notificationsList">
+        <!-- Notifications will be loaded here via JavaScript -->
+    </div>
+</div>
+
+<style>
+    /* Premium Admin Topbar Styles */
+    .admin-topbar {
+        background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+        height: 70px;
+        padding: 0 1.5rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        position: fixed;
+        top: 0;
+        left: 280px; /* Sidebar width */
+        right: 0;
+        z-index: 999;
+        box-shadow: 0 2px 20px rgba(30, 60, 114, 0.1);
+        border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    /* When sidebar is collapsed */
+    .sidebar-collapsed + .main-content .admin-topbar {
+        left: 70px;
+    }
+
+    .topbar-left {
+        display: flex;
+        align-items: center;
+        gap: 1.5rem;
+        flex: 1;
+    }
+
+    .menu-toggle {
+        background: none;
+        border: none;
+        color: var(--primary-blue);
+        font-size: 1.5rem;
+        cursor: pointer;
+        padding: 0.5rem;
+        border-radius: 8px;
+        transition: all 0.3s ease;
+        display: none;
+    }
+
+    .menu-toggle:hover {
+        background: rgba(30, 60, 114, 0.1);
+        transform: rotate(90deg);
+    }
+
+    .breadcrumb-nav .breadcrumb {
+        margin: 0;
+        background: none;
+        padding: 0;
+    }
+
+    .breadcrumb-item a {
+        color: #6c757d;
+        text-decoration: none;
+        font-weight: 500;
+        transition: color 0.3s ease;
+    }
+
+    .breadcrumb-item a:hover {
+        color: var(--primary-blue);
+    }
+
+    .breadcrumb-item.active {
+        color: var(--primary-blue);
+        font-weight: 600;
+    }
+
+    .topbar-search {
+        position: relative;
+        flex: 1;
+        max-width: 400px;
+    }
+
+    .search-container {
+        position: relative;
+    }
+
+    .search-input {
+        width: 100%;
+        padding: 0.6rem 2.5rem 0.6rem 2.5rem;
+        border: 2px solid #e1e5eb;
+        border-radius: 25px;
+        font-size: 0.9rem;
+        transition: all 0.3s ease;
+        background: white;
+    }
+
+    .search-input:focus {
+        outline: none;
+        border-color: var(--secondary-blue);
+        box-shadow: 0 0 0 3px rgba(42, 82, 152, 0.1);
+        width: 120%;
+    }
+
+    .search-icon {
+        position: absolute;
+        left: 1rem;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #6c757d;
+        font-size: 0.9rem;
+    }
+
+    .search-clear {
+        position: absolute;
+        right: 1rem;
+        top: 50%;
+        transform: translateY(-50%);
+        background: none;
+        border: none;
+        color: #6c757d;
+        cursor: pointer;
+        display: none;
+    }
+
+    .search-input:not(:placeholder-shown) + .search-clear {
+        display: block;
+    }
+
+    .search-results {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        background: white;
+        border-radius: 10px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+        margin-top: 0.5rem;
+        display: none;
+        max-height: 400px;
+        overflow-y: auto;
+        z-index: 1000;
+    }
+
+    .search-results.active {
+        display: block;
+        animation: slideDown 0.3s ease-out;
+    }
+
+    .topbar-right {
+        display: flex;
+        align-items: center;
+        gap: 1.5rem;
+    }
+
+    .quick-actions {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+
+    .action-btn {
+        background: rgba(30, 60, 114, 0.08);
+        border: none;
+        border-radius: 12px;
+        padding: 0.6rem 1rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        position: relative;
+        color: var(--primary-blue);
+        font-weight: 500;
+    }
+
+    .action-btn:hover {
+        background: rgba(30, 60, 114, 0.15);
+        transform: translateY(-2px);
+    }
+
+    .action-label {
+        font-size: 0.85rem;
+    }
+
+    .notification-badge {
+        position: absolute;
+        top: -8px;
+        right: -8px;
+        background: #e74c3c;
+        color: white;
+        font-size: 0.7rem;
+        padding: 0.15rem 0.4rem;
+        border-radius: 50%;
+        min-width: 20px;
+        height: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .message-badge {
+        background: #3498db;
+    }
+
+    .date-badge {
+        position: absolute;
+        top: -8px;
+        right: -8px;
+        background: #27ae60;
+        color: white;
+        font-size: 0.7rem;
+        padding: 0.15rem 0.4rem;
+        border-radius: 50%;
+        min-width: 20px;
+        height: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .system-status {
+        display: flex;
+        gap: 0.5rem;
+    }
+
+    .status-indicator {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 1rem;
+        cursor: pointer;
+        transition: transform 0.3s ease;
+    }
+
+    .status-indicator.online {
+        background: linear-gradient(135deg, #2ecc71, #27ae60);
+    }
+
+    .status-indicator.database {
+        background: linear-gradient(135deg, #3498db, #2980b9);
+    }
+
+    .status-indicator:hover {
+        transform: scale(1.1);
+    }
+
+    .user-profile-dropdown {
+        position: relative;
+    }
+
+    .user-profile-btn {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        background: none;
+        border: none;
+        cursor: pointer;
+        padding: 0.5rem;
+        border-radius: 12px;
+        transition: all 0.3s ease;
+    }
+
+    .user-profile-btn:hover {
+        background: rgba(30, 60, 114, 0.1);
+    }
+
+    .user-avatar {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        overflow: hidden;
+        background: linear-gradient(135deg, #1e3c72, #2a5298);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .user-avatar img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    .avatar-fallback {
+        color: white;
+        font-weight: bold;
+        font-size: 1rem;
+    }
+
+    .avatar-fallback.large {
+        font-size: 1.5rem;
+    }
+
+    .user-info {
+        text-align: left;
+    }
+
+    .user-name {
+        font-weight: 600;
+        font-size: 0.9rem;
+        color: var(--primary-blue);
+    }
+
+    .user-role {
+        font-size: 0.8rem;
+        color: #6c757d;
+    }
+
+    .dropdown-arrow {
+        font-size: 0.8rem;
+        color: #6c757d;
+        transition: transform 0.3s ease;
+    }
+
+    .user-profile-dropdown.active .dropdown-arrow {
+        transform: rotate(180deg);
+    }
+
+    .user-dropdown-menu {
+        position: absolute;
+        top: 100%;
+        right: 0;
+        width: 320px;
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 15px 40px rgba(0, 0, 0, 0.15);
+        margin-top: 1rem;
+        display: none;
+        z-index: 1000;
+        animation: fadeIn 0.3s ease-out;
+    }
+
+    .user-profile-dropdown.active .user-dropdown-menu {
+        display: block;
+    }
+
+    .dropdown-header {
+        padding: 1.5rem;
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+        border-radius: 12px 12px 0 0;
+    }
+
+    .dropdown-avatar {
+        width: 60px;
+        height: 60px;
+        border-radius: 50%;
+        overflow: hidden;
+        background: linear-gradient(135deg, #1e3c72, #2a5298);
+    }
+
+    .dropdown-avatar img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    .dropdown-user-info h6 {
+        margin: 0;
+        font-size: 1rem;
+        color: var(--primary-blue);
+    }
+
+    .dropdown-user-info p {
+        margin: 0.25rem 0;
+        font-size: 0.85rem;
+        color: #6c757d;
+    }
+
+    .badge-admin {
+        background: linear-gradient(135deg, #ffd700, #ffed4e);
+        color: var(--primary-blue);
+        font-size: 0.7rem;
+        padding: 0.2rem 0.6rem;
+        border-radius: 20px;
+        font-weight: 600;
+    }
+
+    .dropdown-divider {
+        height: 1px;
+        background: rgba(0, 0, 0, 0.1);
+        margin: 0.5rem 0;
+    }
+
+    .dropdown-item {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        padding: 0.75rem 1.5rem;
+        color: #495057;
+        text-decoration: none;
+        transition: all 0.3s ease;
+    }
+
+    .dropdown-item:hover {
+        background: rgba(30, 60, 114, 0.05);
+        color: var(--primary-blue);
+        padding-left: 1.75rem;
+    }
+
+    .dropdown-item i {
+        width: 20px;
+        text-align: center;
+        font-size: 1rem;
+    }
+
+    .notification-count {
+        margin-left: auto;
+        background: #e74c3c;
+        color: white;
+        font-size: 0.7rem;
+        padding: 0.15rem 0.4rem;
+        border-radius: 10px;
+        min-width: 20px;
+        text-align: center;
+    }
+
+    .dropdown-footer {
+        padding: 1rem 1.5rem;
+        border-top: 1px solid rgba(0, 0, 0, 0.1);
+    }
+
+    .last-login {
+        font-size: 0.8rem;
+        color: #6c757d;
+        margin-bottom: 1rem;
+    }
+
+    .logout-btn {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        color: #e74c3c;
+        text-decoration: none;
+        font-weight: 500;
+        transition: color 0.3s ease;
+    }
+
+    .logout-btn:hover {
+        color: #c0392b;
+    }
+
+    /* Quick Add Menu */
+    .quick-add-menu {
+        position: absolute;
+        top: 100%;
+        left: 1.5rem;
+        width: 300px;
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 15px 40px rgba(0, 0, 0, 0.15);
+        margin-top: 1rem;
+        display: none;
+        z-index: 1000;
+        animation: fadeIn 0.3s ease-out;
+    }
+
+    .quick-add-menu.active {
+        display: block;
+    }
+
+    .quick-add-header {
+        padding: 1rem 1.5rem;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .quick-add-header h6 {
+        margin: 0;
+        color: var(--primary-blue);
+    }
+
+    .close-quick-add {
+        background: none;
+        border: none;
+        color: #6c757d;
+        cursor: pointer;
+        font-size: 1.2rem;
+    }
+
+    .quick-add-items {
+        padding: 0.5rem 0;
+    }
+
+    .quick-add-item {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        padding: 1rem 1.5rem;
+        text-decoration: none;
+        transition: all 0.3s ease;
+    }
+
+    .quick-add-item:hover {
+        background: rgba(30, 60, 114, 0.05);
+    }
+
+    .quick-add-icon {
+        width: 40px;
+        height: 40px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.2rem;
+        color: white;
+    }
+
+    .quick-add-icon.student {
+        background: linear-gradient(135deg, #3498db, #2980b9);
+    }
+
+    .quick-add-icon.staff {
+        background: linear-gradient(135deg, #9b59b6, #8e44ad);
+    }
+
+    .quick-add-icon.user {
+        background: linear-gradient(135deg, #2ecc71, #27ae60);
+    }
+
+    .quick-add-icon.class {
+        background: linear-gradient(135deg, #e67e22, #d35400);
+    }
+
+    .quick-add-content h6 {
+        margin: 0;
+        color: var(--primary-blue);
+        font-size: 0.95rem;
+    }
+
+    .quick-add-content p {
+        margin: 0.25rem 0 0;
+        font-size: 0.8rem;
+        color: #6c757d;
+    }
+
+    /* Notifications Panel */
+    .notifications-panel {
+        position: absolute;
+        top: 100%;
+        right: 1.5rem;
+        width: 350px;
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 15px 40px rgba(0, 0, 0, 0.15);
+        margin-top: 1rem;
+        display: none;
+        z-index: 1000;
+        animation: fadeIn 0.3s ease-out;
+    }
+
+    .notifications-panel.active {
+        display: block;
+    }
+
+    .notifications-header {
+        padding: 1rem 1.5rem;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .notifications-header h6 {
+        margin: 0;
+        color: var(--primary-blue);
+    }
+
+    .notifications-actions {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+    }
+
+    .mark-all-read, .close-notifications {
+        background: none;
+        border: none;
+        color: #6c757d;
+        cursor: pointer;
+        font-size: 0.85rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .close-notifications {
+        font-size: 1.2rem;
+    }
+
+    .mark-all-read:hover {
+        color: var(--primary-blue);
+    }
+
+    .notifications-list {
+        max-height: 400px;
+        overflow-y: auto;
+    }
+
+    /* Animations */
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(-10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes slideDown {
+        from { opacity: 0; transform: translateY(-20px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Responsive Design */
+    @media (max-width: 1200px) {
+        .admin-topbar {
+            left: 260px;
+        }
+        
+        .action-label {
+            display: none;
+        }
+        
+        .topbar-search {
+            max-width: 300px;
+        }
+    }
+
+    @media (max-width: 992px) {
+        .admin-topbar {
+            left: 0;
+        }
+        
+        .menu-toggle {
+            display: block;
+        }
+        
+        .topbar-search {
+            display: none;
+        }
+        
+        .breadcrumb-nav {
+            display: none;
+        }
+        
+        .quick-actions {
+            gap: 0.5rem;
+        }
+        
+        .action-btn {
+            padding: 0.6rem;
+        }
+        
+        .user-info {
+            display: none;
+        }
+    }
+
+    @media (max-width: 768px) {
+        .admin-topbar {
+            padding: 0 1rem;
+        }
+        
+        .system-status {
+            display: none;
+        }
+        
+        .user-dropdown-menu {
+            width: 280px;
+            right: -1rem;
+        }
+        
+        .notifications-panel,
+        .quick-add-menu {
+            width: 280px;
+        }
+    }
+</style>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Sidebar Toggle
+        const sidebarToggle = document.getElementById('sidebarToggle');
+        const sidebar = document.querySelector('.sidebar');
+        
+        if (sidebarToggle && sidebar) {
+            sidebarToggle.addEventListener('click', function() {
+                sidebar.classList.toggle('collapsed');
+                document.body.classList.toggle('sidebar-collapsed');
+            });
+        }
+        
+        // User Profile Dropdown
+        const userProfileBtn = document.getElementById('userProfileBtn');
+        const userProfileDropdown = document.querySelector('.user-profile-dropdown');
+        
+        if (userProfileBtn) {
+            userProfileBtn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                userProfileDropdown.classList.toggle('active');
+                closeOtherDropdowns('user');
+            });
+        }
+        
+        // Quick Add Menu
+        const quickAddBtn = document.getElementById('quickAddBtn');
+        const quickAddMenu = document.getElementById('quickAddMenu');
+        const closeQuickAdd = document.getElementById('closeQuickAdd');
+        
+        if (quickAddBtn) {
+            quickAddBtn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                quickAddMenu.classList.toggle('active');
+                closeOtherDropdowns('quickAdd');
+            });
+        }
+        
+        if (closeQuickAdd) {
+            closeQuickAdd.addEventListener('click', function() {
+                quickAddMenu.classList.remove('active');
+            });
+        }
+        
+        // Notifications Panel
+        const notificationsBtn = document.getElementById('notificationsBtn');
+        const notificationsPanel = document.getElementById('notificationsPanel');
+        const closeNotifications = document.getElementById('closeNotifications');
+        
+        if (notificationsBtn) {
+            notificationsBtn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                notificationsPanel.classList.toggle('active');
+                closeOtherDropdowns('notifications');
+                loadNotifications();
+            });
+        }
+        
+        if (closeNotifications) {
+            closeNotifications.addEventListener('click', function() {
+                notificationsPanel.classList.remove('active');
+            });
+        }
+        
+        // Mark all notifications as read
+        const markAllRead = document.getElementById('markAllRead');
+        if (markAllRead) {
+            markAllRead.addEventListener('click', function() {
+                const notificationBadge = document.getElementById('notificationCount');
+                if (notificationBadge) {
+                    notificationBadge.style.display = 'none';
+                }
+                // Add API call to mark all as read
+            });
+        }
+        
+        // Global Search
+        const globalSearch = document.getElementById('globalSearch');
+        const searchResults = document.getElementById('searchResults');
+        const clearSearch = document.getElementById('clearSearch');
+        
+        if (globalSearch) {
+            globalSearch.addEventListener('focus', function() {
+                if (this.value.trim()) {
+                    performSearch(this.value);
+                }
+            });
+            
+            globalSearch.addEventListener('input', function() {
+                if (this.value.trim()) {
+                    performSearch(this.value);
+                } else {
+                    searchResults.classList.remove('active');
+                }
+            });
+        }
+        
+        if (clearSearch) {
+            clearSearch.addEventListener('click', function() {
+                globalSearch.value = '';
+                searchResults.classList.remove('active');
+                globalSearch.focus();
+            });
+        }
+        
+        // Function to close other dropdowns
+        function closeOtherDropdowns(current) {
+            const dropdowns = {
+                user: userProfileDropdown,
+                quickAdd: quickAddMenu,
+                notifications: notificationsPanel
+            };
+            
+            Object.entries(dropdowns).forEach(([key, element]) => {
+                if (key !== current && element) {
+                    element.classList.remove('active');
+                }
+            });
+        }
+        
+        // Close dropdowns when clicking outside
+        document.addEventListener('click', function(e) {
+            if (!userProfileDropdown?.contains(e.target)) {
+                userProfileDropdown?.classList.remove('active');
+            }
+            
+            if (!quickAddMenu?.contains(e.target) && !quickAddBtn?.contains(e.target)) {
+                quickAddMenu?.classList.remove('active');
+            }
+            
+            if (!notificationsPanel?.contains(e.target) && !notificationsBtn?.contains(e.target)) {
+                notificationsPanel?.classList.remove('active');
+            }
+            
+            if (!searchResults?.contains(e.target) && !globalSearch?.contains(e.target)) {
+                searchResults?.classList.remove('active');
+            }
+        });
+        
+        // Keyboard shortcuts
+        document.addEventListener('keydown', function(e) {
+            // Ctrl + K for search
+            if (e.ctrlKey && e.key === 'k') {
+                e.preventDefault();
+                globalSearch?.focus();
+            }
+            
+            // Escape to close dropdowns
+            if (e.key === 'Escape') {
+                closeOtherDropdowns('');
+            }
+        });
+        
+        // Load notifications
+        async function loadNotifications() {
+            const notificationsList = document.getElementById('notificationsList');
+            if (!notificationsList) return;
+            
+            try {
+                // This would be an API call in a real application
+                const mockNotifications = [
+                    {
+                        id: 1,
+                        title: 'New Student Registration',
+                        message: 'John Doe has been registered',
+                        time: '5 minutes ago',
+                        type: 'success',
+                        read: false
+                    },
+                    {
+                        id: 2,
+                        title: 'System Update',
+                        message: 'Database maintenance scheduled',
+                        time: '1 hour ago',
+                        type: 'info',
+                        read: false
+                    },
+                    {
+                        id: 3,
+                        title: 'Security Alert',
+                        message: 'Unusual login detected',
+                        time: '2 hours ago',
+                        type: 'warning',
+                        read: true
+                    }
+                ];
+                
+                notificationsList.innerHTML = mockNotifications.map(notification => `
+                    <div class="notification-item ${notification.read ? 'read' : 'unread'}">
+                        <div class="notification-icon ${notification.type}">
+                            <i class="bi bi-${getNotificationIcon(notification.type)}"></i>
+                        </div>
+                        <div class="notification-content">
+                            <h6>${notification.title}</h6>
+                            <p>${notification.message}</p>
+                            <small>${notification.time}</small>
+                        </div>
+                    </div>
+                `).join('');
+                
+            } catch (error) {
+                console.error('Error loading notifications:', error);
+            }
+        }
+        
+        function getNotificationIcon(type) {
+            const icons = {
+                success: 'check-circle',
+                info: 'info-circle',
+                warning: 'exclamation-triangle',
+                error: 'x-circle'
+            };
+            return icons[type] || 'bell';
+        }
+        
+        // Global search function
+        async function performSearch(query) {
+            try {
+                // This would be an API call in a real application
+                const results = [
+                    { type: 'student', name: 'John Doe', details: 'Form 2A', url: '#' },
+                    { type: 'staff', name: 'Jane Smith', details: 'Mathematics Teacher', url: '#' },
+                    { type: 'class', name: 'Form 3B', details: '30 students', url: '#' }
+                ];
+                
+                searchResults.innerHTML = `
+                    <div class="search-results-header">
+                        <h6>Search Results</h6>
+                        <small>${results.length} results found</small>
+                    </div>
+                    ${results.map(result => `
+                        <a href="${result.url}" class="search-result-item">
+                            <div class="result-icon">
+                                <i class="bi bi-${result.type === 'student' ? 'person' : result.type === 'staff' ? 'person-badge' : 'people'}"></i>
+                            </div>
+                            <div class="result-content">
+                                <h6>${result.name}</h6>
+                                <p>${result.details}</p>
+                            </div>
+                        </a>
+                    `).join('')}
+                `;
+                
+                searchResults.classList.add('active');
+                
+            } catch (error) {
+                console.error('Search error:', error);
+                searchResults.innerHTML = '<div class="search-error">Error performing search</div>';
+            }
+        }
+        
+        // Update notification count (simulated)
+        function updateNotificationCount() {
+            // This would be an API call in a real application
+            setTimeout(() => {
+                const count = Math.floor(Math.random() * 10);
+                const badge = document.getElementById('notificationCount');
+                if (badge && count > 0) {
+                    badge.textContent = count;
+                    badge.style.display = 'flex';
+                }
+            }, 5000);
+        }
+        
+        // Initialize
+        loadNotifications();
+        updateNotificationCount();
+    });
+</script>

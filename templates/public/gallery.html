@@ -1,0 +1,151 @@
+{% extends 'public/base.html' %}
+
+{% block content %}
+<h1 class="page-title">Gallery & Events</h1>
+
+<div class="container-section">
+    <p style="font-size: 1.1rem; line-height: 1.8; margin-bottom: 2rem;">
+        Explore the vibrant life at Matimbwa Secondary School through our gallery of events, activities, and campus facilities. 
+        These moments capture the essence of our school community and the diverse experiences our students enjoy.
+    </p>
+</div>
+
+<h2 style="color: #1e3c72; margin-bottom: 1.5rem; border-bottom: 3px solid #ffd700; padding-bottom: 0.5rem;">📸 School Events</h2>
+
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 2rem; margin-bottom: 3rem;">
+    {% for event in events %}
+    <div style="background-color: #f0f4f8; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
+        <div style="background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); color: white; padding: 2rem; text-align: center; min-height: 150px; display: flex; flex-direction: column; justify-content: center;">
+            <div style="font-size: 3rem; margin-bottom: 1rem;">
+                {% if 'Speech' in event.name %}🎤
+                {% elif 'Science' in event.name %}🔬
+                {% elif 'Debate' in event.name %}💬
+                {% elif 'Career' in event.name %}💼
+                {% else %}📅
+                {% endif %}
+            </div>
+            <h3 style="margin-bottom: 0.5rem;">{{ event.name }}</h3>
+            <p style="opacity: 0.9;">📅 {{ event.date }}</p>
+        </div>
+        <div style="padding: 1.5rem;">
+            <p style="color: #666; line-height: 1.6; font-size: 1rem;">{{ event.description }}</p>
+            <a href="#" style="color: #2a5298; text-decoration: none; font-weight: bold; margin-top: 1rem; display: inline-block;">View Photos →</a>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<h2 style="color: #1e3c72; margin-bottom: 1.5rem; border-bottom: 3px solid #ffd700; padding-bottom: 0.5rem;">🏫 Campus Gallery</h2>
+
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem; margin-bottom: 3rem;">
+    {% for image in gallery_images %}
+    <div style="position: relative; overflow: hidden; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); background-color: #e0e0e0; height: 250px; cursor: pointer;">
+        <div style="width: 100%; height: 100%; background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); display: flex; align-items: center; justify-content: center; transition: transform 0.3s;">
+            <div style="text-align: center; color: white;">
+                <div style="font-size: 3rem; margin-bottom: 1rem;">
+                    {% if 'Building' in image.title %}🏢
+                    {% elif 'Classroom' in image.title %}📚
+                    {% elif 'Library' in image.title %}📖
+                    {% elif 'Sports' in image.title %}⚽
+                    {% elif 'Laboratory' in image.title %}🔬
+                    {% else %}👥
+                    {% endif %}
+                </div>
+                <h4>{{ image.title }}</h4>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<h2 style="color: #1e3c72; margin-bottom: 1.5rem; border-bottom: 3px solid #ffd700; padding-bottom: 0.5rem;">🎯 Student Activities</h2>
+
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 2rem; margin-bottom: 3rem;">
+    <div style="padding: 1.5rem; background-color: #fff3cd; border-radius: 8px; border-left: 4px solid #ffc107;">
+        <h4 style="color: #1e3c72; margin-bottom: 0.5rem; font-size: 1.1rem;">⚽ Sports & Athletics</h4>
+        <ul style="font-size: 0.95rem; color: #666; line-height: 1.8;">
+            <li>Football</li>
+            <li>Basketball</li>
+            <li>Volleyball</li>
+            <li>Tennis</li>
+            <li>Track & Field</li>
+            <li>Netball</li>
+        </ul>
+    </div>
+
+    <div style="padding: 1.5rem; background-color: #d1ecf1; border-radius: 8px; border-left: 4px solid #17a2b8;">
+        <h4 style="color: #1e3c72; margin-bottom: 0.5rem; font-size: 1.1rem;">🎨 Clubs & Societies</h4>
+        <ul style="font-size: 0.95rem; color: #666; line-height: 1.8;">
+            <li>Debate Club</li>
+            <li>Science Club</li>
+            <li>Photography Club</li>
+            <li>Drama Club</li>
+            <li>Music Ensemble</li>
+            <li>Environmental Club</li>
+        </ul>
+    </div>
+
+    <div style="padding: 1.5rem; background-color: #d4edda; border-radius: 8px; border-left: 4px solid #28a745;">
+        <h4 style="color: #1e3c72; margin-bottom: 0.5rem; font-size: 1.1rem;">🌍 Community Service</h4>
+        <ul style="font-size: 0.95rem; color: #666; line-height: 1.8;">
+            <li>Environmental Cleanups</li>
+            <li>Tree Planting</li>
+            <li>Community Projects</li>
+            <li>Mentorship Programs</li>
+            <li>Charity Events</li>
+            <li>Social Outreach</li>
+        </ul>
+    </div>
+
+    <div style="padding: 1.5rem; background-color: #f8d7da; border-radius: 8px; border-left: 4px solid #dc3545;">
+        <h4 style="color: #1e3c72; margin-bottom: 0.5rem; font-size: 1.1rem;">🎭 Cultural Events</h4>
+        <ul style="font-size: 0.95rem; color: #666; line-height: 1.8;">
+            <li>Music Festival</li>
+            <li>Dance Competitions</li>
+            <li>Cultural Day</li>
+            <li>Fashion Show</li>
+            <li>Talent Show</li>
+            <li>Theater Productions</li>
+        </ul>
+    </div>
+
+    <div style="padding: 1.5rem; background-color: #e2e3e5; border-radius: 8px; border-left: 4px solid #6c757d;">
+        <h4 style="color: #1e3c72; margin-bottom: 0.5rem; font-size: 1.1rem;">🏆 Academic Events</h4>
+        <ul style="font-size: 0.95rem; color: #666; line-height: 1.8;">
+            <li>Science Fair</li>
+            <li>Quiz Competitions</li>
+            <li>Mathematics Olympiad</li>
+            <li>Inter-school Debates</li>
+            <li>Research Projects</li>
+            <li>Study Competitions</li>
+        </ul>
+    </div>
+
+    <div style="padding: 1.5rem; background-color: #fff3cd; border-radius: 8px; border-left: 4px solid #ffc107;">
+        <h4 style="color: #1e3c72; margin-bottom: 0.5rem; font-size: 1.1rem;">💼 Student Leadership</h4>
+        <ul style="font-size: 0.95rem; color: #666; line-height: 1.8;">
+            <li>School Council</li>
+            <li>Class Representatives</li>
+            <li>Prefect Team</li>
+            <li>Club Leadership</li>
+            <li>Mentors Program</li>
+            <li>Student Parliament</li>
+        </ul>
+    </div>
+</div>
+
+<div class="container-section" style="background-color: #f0f4f8; padding: 2rem; border-radius: 8px;">
+    <h2 style="color: #1e3c72; margin-bottom: 1rem;">📷 Photo Request</h2>
+    <p style="margin-bottom: 1rem; font-size: 1.05rem;">
+        Did you participate in one of our events? We'd love to see and share your photos! 
+        Send your event photos to our gallery and showcase your memorable moments.
+    </p>
+    <a href="{% url 'public_contact' %}" class="btn">Submit Photos</a>
+</div>
+
+<div class="container-section" style="text-align: center; margin-top: 2rem;">
+    <h2 style="color: #1e3c72; margin-bottom: 1rem;">More Information Needed?</h2>
+    <p style="margin-bottom: 1.5rem; font-size: 1.05rem;">Contact us for details about our events and activities</p>
+    <a href="{% url 'public_contact' %}" class="btn">Get in Touch</a>
+</div>
+{% endblock %}
