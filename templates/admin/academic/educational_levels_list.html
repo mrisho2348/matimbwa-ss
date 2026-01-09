@@ -1,0 +1,532 @@
+{% extends 'admin/base.html' %}
+{% load static %}
+{% block title %} Education Levels Management {% endblock title %}
+
+{% block breadcrumb %}
+    <button type="button" class="btn btn-primary" data-toggle="modal" data-target="#addEducationLevelModal">
+        <i class="fas fa-plus"></i> Add Education Level
+    </button>
+{% endblock breadcrumb %}
+
+{%block extra_css %}
+
+
+<style>
+    .table th {
+        font-weight: 600;
+        border-top: none;
+    }
+    .table td {
+        vertical-align: middle;
+    }
+    .badge {
+        font-size: 0.85em;
+        padding: 0.4em 0.8em;
+    }
+    .modal-header {
+        border-radius: 0;
+    }
+    .btn-group .btn {
+        margin: 0 2px;
+    }
+    #table-container {
+        min-height: 300px;
+    }
+    .truncate-text {
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+    .dataTables_wrapper .dataTables_filter {
+        float: right;
+        text-align: right;
+    }
+    .dataTables_wrapper .dataTables_length {
+        float: left;
+    }
+    .dataTables_wrapper .dataTables_paginate {
+        float: right;
+        margin-top: 10px;
+    }
+    .dt-buttons {
+        margin-bottom: 10px;
+    }
+    .success-toast {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 1056;
+        min-width: 300px;
+    }
+</style>
+{% endblock extra_css %}
+
+{% block content %}
+<section class="content">
+    <div class="container-fluid">  
+        <!-- Success Toast Message -->
+        <div id="success-toast" class="alert alert-success alert-dismissible fade show success-toast" style="display: none;" role="alert">
+            <strong><i class="fas fa-check-circle"></i> Success!</strong> 
+            <span id="success-message"></span>
+            <button type="button" class="close" onclick="$('#success-toast').fadeOut()">
+                <span aria-hidden="true">&times;</span>
+            </button>
+        </div>
+
+        <!-- Error Toast Message -->
+        <div id="error-toast" class="alert alert-danger alert-dismissible fade show success-toast" style="display: none;" role="alert">
+            <strong><i class="fas fa-exclamation-circle"></i> Error!</strong> 
+            <span id="error-message"></span>
+            <button type="button" class="close" onclick="$('#error-toast').fadeOut()">
+                <span aria-hidden="true">&times;</span>
+            </button>
+        </div>
+
+        <div class="row">
+            <div class="col-lg-12">
+                <div class="card shadow-lg">
+                    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                        <h6 class="header-title mb-0 text-uppercase">
+                            <i class="fas fa-graduation-cap"></i> Education Levels Management
+                        </h6>
+                        <span class="badge badge-light" id="total-count">Total: {{ education_levels|length }}</span>
+                    </div>
+                    <div class="card-body">
+                        <!-- Table Container -->
+                        <div class="table-responsive" id="table-container">
+                            <table class="table table-hover table-striped table-bordered" id="education-levels-table">
+                                <thead class="bg-light">
+                                    <tr>
+                                        <th>Code</th>
+                                        <th>Name</th>
+                                        <th>Description</th>
+                                        <th class="text-center">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="table-body">
+                                    {% for level in education_levels %}
+                                    <tr id="row-{{ level.id }}">
+                                        <td><span class="badge badge-info">{{ level.code }}</span></td>
+                                        <td>{{ level.name }}</td>
+                                        <td>
+                                            {% if level.description %}
+                                                <span class="truncate-text">{{ level.description }}</span>
+                                            {% else %}
+                                                <span class="text-muted">No description</span>
+                                            {% endif %}
+                                        </td>
+                                        <td class="text-center">
+                                            <div class="btn-group" role="group">
+                                                <button class="btn btn-sm btn-primary edit-btn" 
+                                                        data-id="{{ level.id }}"
+                                                        data-code="{{ level.code }}"
+                                                        data-name="{{ level.name }}"
+                                                        data-description="{{ level.description|default:'' }}">
+                                                    <i class="fas fa-edit"></i> Edit
+                                                </button>
+                                                <button class="btn btn-sm btn-danger delete-btn" 
+                                                        data-id="{{ level.id }}"
+                                                        data-name="{{ level.name }}">
+                                                    <i class="fas fa-trash"></i> Delete
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% empty %}
+                                    <tr id="no-data-row">
+                                        <td colspan="4" class="text-center text-muted py-4">
+                                            <i class="fas fa-inbox fa-2x mb-2"></i><br>
+                                            No education levels found. Click "Add Education Level" to create one.
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Add Education Level Modal -->
+<div class="modal fade" id="addEducationLevelModal" tabindex="-1" role="dialog" aria-labelledby="addModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="addModalLabel">
+                    <i class="fas fa-plus-circle"></i> Add New Education Level
+                </h5>
+                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <form id="add-form">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="code">Code <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="code" name="code" required 
+                               placeholder="e.g., PRIMARY, SECONDARY, UNIVERSITY">
+                        <small class="form-text text-muted">Unique identifier for the education level</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="name">Name <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="name" name="name" required 
+                               placeholder="e.g., Primary Education, Secondary Education">
+                    </div>
+                    <div class="form-group">
+                        <label for="description">Description</label>
+                        <textarea class="form-control" id="description" name="description" 
+                                  rows="3" placeholder="Optional description of the education level"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal" id="cancel-add-btn">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="save-btn">
+                        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="display: none;"></span>
+                        Save Education Level
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Education Level Modal -->
+<div class="modal fade" id="editEducationLevelModal" tabindex="-1" role="dialog" aria-labelledby="editModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-warning text-dark">
+                <h5 class="modal-title" id="editModalLabel">
+                    <i class="fas fa-edit"></i> Edit Education Level
+                </h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <form id="edit-form">
+                {% csrf_token %}
+                <input type="hidden" id="edit-id" name="id">
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="edit-code">Code <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="edit-code" name="code" required>
+                        <small class="form-text text-muted">Unique identifier for the education level</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-name">Name <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="edit-name" name="name" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-description">Description</label>
+                        <textarea class="form-control" id="edit-description" name="description" rows="3"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal" id="cancel-edit-btn">Cancel</button>
+                    <button type="submit" class="btn btn-warning" id="update-btn">
+                        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="display: none;"></span>
+                        Update Education Level
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="deleteEducationLevelModal" tabindex="-1" role="dialog" aria-labelledby="deleteModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="deleteModalLabel">
+                    <i class="fas fa-exclamation-triangle"></i> Confirm Deletion
+                </h5>
+                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete the education level <strong id="delete-level-name"></strong>?</p>
+                <p class="text-danger"><small>This action cannot be undone. All associated data might be affected.</small></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal" id="cancel-delete-btn">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirm-delete-btn">
+                    <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="display: none;"></span>
+                    Delete
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+
+<script>
+    $(document).ready(function() {
+        // Initialize DataTable WITH proper configuration to preserve data attributes
+        var table = $('#education-levels-table').DataTable({
+            "dom": "<'row'<'col-sm-12 col-md-6'l><'col-sm-12 col-md-6'f>>" +
+                   "<'row'<'col-sm-12'tr>>" +
+                   "<'row'<'col-sm-12 col-md-5'i><'col-sm-12 col-md-7'p>>",
+            "lengthMenu": [[10, 25, 50, -1], [10, 25, 50, "All"]],
+            "pageLength": 10,
+            "responsive": true,
+            "autoWidth": false,
+            "ordering": true,
+            "order": [[1, 'asc']],
+            // CRITICAL: Preserve the original DOM elements and their data attributes
+            "destroy": true,
+            "retrieve": true,
+            "deferRender": true,
+            "language": {
+                "emptyTable": "No education levels found. Click 'Add Education Level' to create one.",
+                "search": "_INPUT_",
+                "searchPlaceholder": "Search...",
+                "lengthMenu": "_MENU_ records per page",
+                "info": "Showing _START_ to _END_ of _TOTAL_ entries",
+                "infoEmpty": "Showing 0 to 0 of 0 entries",
+                "infoFiltered": "(filtered from _MAX_ total entries)",
+                "paginate": {
+                    "first": "First",
+                    "last": "Last",
+                    "next": "Next",
+                    "previous": "Previous"
+                }
+            },
+            "drawCallback": function(settings) {
+                // Update total count
+                var api = this.api();
+                var total = api.rows().count();
+                $('#total-count').text('Total: ' + total);
+            },
+            // Ensure data attributes are preserved when DataTables processes rows
+            "createdRow": function(row, data, dataIndex) {
+                $(row).attr({
+                    'id': 'row-' + dataIndex,
+                    'data-id': data[3] // Assuming ID is in the 4th column (adjust index as needed)
+                });
+            }
+        });
+
+        // CSRF token for AJAX requests
+        function getCSRFToken() {
+            return $('input[name="csrfmiddlewaretoken"]').val();
+        }
+
+        // Show toast message
+        function showToast(message, type = 'success') {
+            if (type === 'success') {
+                $('#success-message').text(message);
+                $('#success-toast').fadeIn();
+                setTimeout(function() {
+                    $('#success-toast').fadeOut();
+                }, 3000);
+            } else {
+                $('#error-message').text(message);
+                $('#error-toast').fadeIn();
+                setTimeout(function() {
+                    $('#error-toast').fadeOut();
+                }, 5000);
+            }
+        }
+
+        // Function to reload page after delay
+        function reloadPageAfterDelay(message, type = 'success') {
+            showToast(message, type);
+            var delay = type === 'success' ? 2000 : 3000;
+            setTimeout(function() {
+                location.reload();
+            }, delay);
+        }
+
+        // Fix for modal close/cancel buttons
+        $(document).on('click', '[data-dismiss="modal"]', function(e) {
+            e.preventDefault();
+            $(this).closest('.modal').modal('hide');
+        });
+
+        // Handle cancel buttons
+        $('#cancel-add-btn, #cancel-edit-btn, #cancel-delete-btn').on('click', function(e) {
+            e.preventDefault();
+            $(this).closest('.modal').modal('hide');
+        });
+
+        // Add Education Level
+        $('#add-form').on('submit', function(e) {
+            e.preventDefault();
+            
+            const saveBtn = $('#save-btn');
+            const spinner = saveBtn.find('.spinner-border');
+            saveBtn.prop('disabled', true);
+            spinner.show();
+            
+            const formData = new FormData(this);
+            formData.append('action', 'create');
+            
+            $.ajax({
+                url: '{% url "admin_educational_levels_crud" %}',
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCSRFToken(),
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function(data) {
+                    if (data.success) {
+                        $('#addEducationLevelModal').modal('hide');
+                        reloadPageAfterDelay(data.message, 'success');
+                        $('#add-form')[0].reset();
+                    } else {
+                        showToast(data.message, 'danger');
+                        saveBtn.prop('disabled', false);
+                        spinner.hide();
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error:', error);
+                    showToast('An error occurred while saving. Please try again.', 'danger');
+                    saveBtn.prop('disabled', false);
+                    spinner.hide();
+                }
+            });
+        });
+
+        // **CRITICAL FIX: Use event delegation for dynamically created elements**
+        // Edit Education Level - Setup modal
+        $(document).on('click', '.edit-btn', function() {
+            const btn = $(this);
+            
+            $('#edit-id').val(btn.data('id'));
+            $('#edit-code').val(btn.data('code'));
+            $('#edit-name').val(btn.data('name'));
+            $('#edit-description').val(btn.data('description'));
+            
+            $('#editEducationLevelModal').modal('show');
+        });
+
+        // Edit Education Level - Submit form
+        $('#edit-form').on('submit', function(e) {
+            e.preventDefault();
+            
+            const updateBtn = $('#update-btn');
+            const spinner = updateBtn.find('.spinner-border');
+            updateBtn.prop('disabled', true);
+            spinner.show();
+            
+            const formData = new FormData(this);
+            formData.append('action', 'update');
+            
+            $.ajax({
+                url: '{% url "admin_educational_levels_crud" %}',
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCSRFToken(),
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function(data) {
+                    if (data.success) {
+                        $('#editEducationLevelModal').modal('hide');
+                        reloadPageAfterDelay(data.message, 'success');
+                    } else {
+                        showToast(data.message, 'danger');
+                        updateBtn.prop('disabled', false);
+                        spinner.hide();
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error:', error);
+                    showToast('An error occurred while updating. Please try again.', 'danger');
+                    updateBtn.prop('disabled', false);
+                    spinner.hide();
+                }
+            });
+        });
+
+        // Delete Education Level - Setup modal
+        let levelToDelete = null;
+        
+        $(document).on('click', '.delete-btn', function() {
+            const btn = $(this);
+            
+            levelToDelete = {
+                id: btn.data('id'),
+                name: btn.data('name')
+            };
+            
+            $('#delete-level-name').text(btn.data('name'));
+            $('#deleteEducationLevelModal').modal('show');
+        });
+
+        // Delete Education Level - Confirm
+        $('#confirm-delete-btn').on('click', function() {
+            if (!levelToDelete) return;
+            
+            const deleteBtn = $(this);
+            const spinner = deleteBtn.find('.spinner-border');
+            deleteBtn.prop('disabled', true);
+            spinner.show();
+            
+            const formData = new FormData();
+            formData.append('action', 'delete');
+            formData.append('id', levelToDelete.id);
+            formData.append('csrfmiddlewaretoken', getCSRFToken());
+            
+            $.ajax({
+                url: '{% url "admin_educational_levels_crud" %}',
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCSRFToken(),
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function(data) {
+                    if (data.success) {
+                        $('#deleteEducationLevelModal').modal('hide');
+                        reloadPageAfterDelay(data.message, 'success');
+                    } else {
+                        showToast(data.message, 'danger');
+                        deleteBtn.prop('disabled', false);
+                        spinner.hide();
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error:', error);
+                    showToast('An error occurred while deleting. Please try again.', 'danger');
+                    deleteBtn.prop('disabled', false);
+                    spinner.hide();
+                }
+            });
+        });
+
+        // Clear form on modal close
+        $('#addEducationLevelModal').on('hidden.bs.modal', function() {
+            $('#add-form')[0].reset();
+        });
+        
+        // Reset delete confirmation on modal close
+        $('#deleteEducationLevelModal').on('hidden.bs.modal', function() {
+            levelToDelete = null;
+        });
+
+        // Manual refresh button
+        $('.btn-outline-secondary').on('click', function() {
+            if ($(this).find('.fa-sync-alt').length) {
+                location.reload();
+            }
+        });
+    });
+</script>
+{% endblock  %}
