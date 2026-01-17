@@ -8,9 +8,7 @@
     </button>
 {% endblock breadcrumb %}
 
-{%block extra_css %}
-
-
+{% block extra_css %}
 <style>
     .table th {
         font-weight: 600;
@@ -30,7 +28,7 @@
         margin: 0 2px;
     }
     #table-container {
-        min-height: 300px;
+        min-height: 300px; /* Ensure space even when empty */
     }
     .truncate-text {
         display: -webkit-box;
@@ -38,6 +36,7 @@
         -webkit-box-orient: vertical;
         overflow: hidden;
     }
+    /* DataTable Styles */
     .dataTables_wrapper .dataTables_filter {
         float: right;
         text-align: right;
@@ -52,7 +51,7 @@
     .dt-buttons {
         margin-bottom: 10px;
     }
-    .success-toast {
+    .success-toast, .error-toast {
         position: fixed;
         top: 20px;
         right: 20px;
@@ -64,21 +63,19 @@
 
 {% block content %}
 <section class="content">
-    <div class="container-fluid">  
-        <!-- Success Toast Message -->
-        <div id="success-toast" class="alert alert-success alert-dismissible fade show success-toast" style="display: none;" role="alert">
+    <div class="container-fluid"> 
+        <div id="success-toast" class="alert alert-success alert-dismissible fade success-toast" style="display: none;" role="alert">
             <strong><i class="fas fa-check-circle"></i> Success!</strong> 
             <span id="success-message"></span>
-            <button type="button" class="close" onclick="$('#success-toast').fadeOut()">
+            <button type="button" class="close" onclick="$('#success-toast').fadeOut()" data-dismiss="alert" aria-label="Close">
                 <span aria-hidden="true">&times;</span>
             </button>
         </div>
 
-        <!-- Error Toast Message -->
-        <div id="error-toast" class="alert alert-danger alert-dismissible fade show success-toast" style="display: none;" role="alert">
+        <div id="error-toast" class="alert alert-danger alert-dismissible fade error-toast" style="display: none;" role="alert">
             <strong><i class="fas fa-exclamation-circle"></i> Error!</strong> 
             <span id="error-message"></span>
-            <button type="button" class="close" onclick="$('#error-toast').fadeOut()">
+            <button type="button" class="close" onclick="$('#error-toast').fadeOut()" data-dismiss="alert" aria-label="Close">
                 <span aria-hidden="true">&times;</span>
             </button>
         </div>
@@ -93,9 +90,8 @@
                         <span class="badge badge-light" id="total-count">Total: {{ education_levels|length }}</span>
                     </div>
                     <div class="card-body">
-                        <!-- Table Container -->
                         <div class="table-responsive" id="table-container">
-                            <table class="table table-hover table-striped table-bordered" id="education-levels-table">
+                            <table class="table table-hover text-nowrap table-responsive-sm table-bordered table-striped table-sm display" id="education-levels-table">
                                 <thead class="bg-light">
                                     <tr>
                                         <th>Code</th>
@@ -133,13 +129,6 @@
                                             </div>
                                         </td>
                                     </tr>
-                                    {% empty %}
-                                    <tr id="no-data-row">
-                                        <td colspan="4" class="text-center text-muted py-4">
-                                            <i class="fas fa-inbox fa-2x mb-2"></i><br>
-                                            No education levels found. Click "Add Education Level" to create one.
-                                        </td>
-                                    </tr>
                                     {% endfor %}
                                 </tbody>
                             </table>
@@ -151,7 +140,6 @@
     </div>
 </section>
 
-<!-- Add Education Level Modal -->
 <div class="modal fade" id="addEducationLevelModal" tabindex="-1" role="dialog" aria-labelledby="addModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg" role="document">
         <div class="modal-content">
@@ -180,7 +168,7 @@
                     <div class="form-group">
                         <label for="description">Description</label>
                         <textarea class="form-control" id="description" name="description" 
-                                  rows="3" placeholder="Optional description of the education level"></textarea>
+                                 rows="3" placeholder="Optional description of the education level"></textarea>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -195,7 +183,6 @@
     </div>
 </div>
 
-<!-- Edit Education Level Modal -->
 <div class="modal fade" id="editEducationLevelModal" tabindex="-1" role="dialog" aria-labelledby="editModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg" role="document">
         <div class="modal-content">
@@ -237,7 +224,6 @@
     </div>
 </div>
 
-<!-- Delete Confirmation Modal -->
 <div class="modal fade" id="deleteEducationLevelModal" tabindex="-1" role="dialog" aria-labelledby="deleteModalLabel" aria-hidden="true">
     <div class="modal-dialog" role="document">
         <div class="modal-content">
@@ -266,7 +252,6 @@
 {% endblock content %}
 
 {% block extra_js %}
-
 <script>
     $(document).ready(function() {
         // Initialize DataTable WITH proper configuration
@@ -282,13 +267,14 @@
             "ordering": true,
             "order": [[1, 'asc']],
             
-            // CRITICAL: Ensure DataTables uses the existing DOM data
+            // Critical setup for Django tables
             "destroy": true,
             "retrieve": true,
             "deferRender": true,
             
             "language": {
-                "emptyTable": "No education levels found. Click 'Add Education Level' to create one.",
+                // **CRITICAL FIX:** This message will now be used when the `<tbody>` is empty.
+                "emptyTable": "<div class='text-center py-4'><i class='fas fa-inbox fa-2x mb-2'></i><br>No education levels found. Click \"Add Education Level\" to create one.</div>",
                 "search": "_INPUT_",
                 "searchPlaceholder": "Search...",
                 "lengthMenu": "_MENU_ records per page",
@@ -308,7 +294,6 @@
                 var total = api.rows().count();
                 $('#total-count').text('Total: ' + total);
             }
-            // REMOVED 'createdRow' function as it's unnecessary and likely causing the column count warning
         });
 
         // CSRF token for AJAX requests
@@ -318,19 +303,17 @@
 
         // Show toast message
         function showToast(message, type = 'success') {
-            if (type === 'success') {
-                $('#success-message').text(message);
-                $('#success-toast').fadeIn();
-                setTimeout(function() {
-                    $('#success-toast').fadeOut();
-                }, 3000);
-            } else {
-                $('#error-message').text(message);
-                $('#error-toast').fadeIn();
-                setTimeout(function() {
-                    $('#error-toast').fadeOut();
-                }, 5000);
-            }
+            const toastId = type === 'success' ? '#success-toast' : '#error-toast';
+            const messageId = type === 'success' ? '#success-message' : '#error-message';
+            
+            $(messageId).text(message);
+            $(toastId).addClass('show').fadeIn(); // Use show class for bootstrap fade effect
+            
+            setTimeout(function() {
+                $(toastId).fadeOut(function() {
+                    $(this).removeClass('show');
+                });
+            }, type === 'success' ? 3000 : 5000);
         }
 
         // Function to reload page after delay
@@ -342,7 +325,7 @@
             }, delay);
         }
 
-        // Fix for modal close/cancel buttons
+        // Handle modal close/cancel buttons
         $(document).on('click', '[data-dismiss="modal"]', function(e) {
             e.preventDefault();
             $(this).closest('.modal').modal('hide');
@@ -354,14 +337,25 @@
             $(this).closest('.modal').modal('hide');
         });
 
+        // Helper function to handle button loading state
+        function setButtonLoading(btn, isLoading, originalText) {
+            const spinner = btn.find('.spinner-border');
+            if (isLoading) {
+                btn.data('original-text', btn.text().trim());
+                btn.prop('disabled', true);
+                btn.html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Loading...');
+            } else {
+                btn.prop('disabled', false);
+                btn.html(btn.data('original-text'));
+            }
+        }
+        
         // Add Education Level
         $('#add-form').on('submit', function(e) {
             e.preventDefault();
             
             const saveBtn = $('#save-btn');
-            const spinner = saveBtn.find('.spinner-border');
-            saveBtn.prop('disabled', true);
-            spinner.show();
+            setButtonLoading(saveBtn, true);
             
             const formData = new FormData(this);
             formData.append('action', 'create');
@@ -383,21 +377,18 @@
                         $('#add-form')[0].reset();
                     } else {
                         showToast(data.message, 'danger');
-                        saveBtn.prop('disabled', false);
-                        spinner.hide();
+                        setButtonLoading(saveBtn, false);
                     }
                 },
                 error: function(xhr, status, error) {
                     console.error('Error:', error);
                     showToast('An error occurred while saving. Please try again.', 'danger');
-                    saveBtn.prop('disabled', false);
-                    spinner.hide();
+                    setButtonLoading(saveBtn, false);
                 }
             });
         });
 
-        // **CRITICAL FIX: Use event delegation for dynamically created elements**
-        // Edit Education Level - Setup modal
+        // Edit Education Level - Setup modal (using event delegation)
         $(document).on('click', '.edit-btn', function() {
             const btn = $(this);
             
@@ -414,9 +405,7 @@
             e.preventDefault();
             
             const updateBtn = $('#update-btn');
-            const spinner = updateBtn.find('.spinner-border');
-            updateBtn.prop('disabled', true);
-            spinner.show();
+            setButtonLoading(updateBtn, true);
             
             const formData = new FormData(this);
             formData.append('action', 'update');
@@ -437,20 +426,18 @@
                         reloadPageAfterDelay(data.message, 'success');
                     } else {
                         showToast(data.message, 'danger');
-                        updateBtn.prop('disabled', false);
-                        spinner.hide();
+                        setButtonLoading(updateBtn, false);
                     }
                 },
                 error: function(xhr, status, error) {
                     console.error('Error:', error);
                     showToast('An error occurred while updating. Please try again.', 'danger');
-                    updateBtn.prop('disabled', false);
-                    spinner.hide();
+                    setButtonLoading(updateBtn, false);
                 }
             });
         });
 
-        // Delete Education Level - Setup modal
+        // Delete Education Level - Setup modal (using event delegation)
         let levelToDelete = null;
         
         $(document).on('click', '.delete-btn', function() {
@@ -470,9 +457,7 @@
             if (!levelToDelete) return;
             
             const deleteBtn = $(this);
-            const spinner = deleteBtn.find('.spinner-border');
-            deleteBtn.prop('disabled', true);
-            spinner.show();
+            setButtonLoading(deleteBtn, true);
             
             const formData = new FormData();
             formData.append('action', 'delete');
@@ -495,15 +480,13 @@
                         reloadPageAfterDelay(data.message, 'success');
                     } else {
                         showToast(data.message, 'danger');
-                        deleteBtn.prop('disabled', false);
-                        spinner.hide();
+                        setButtonLoading(deleteBtn, false);
                     }
                 },
                 error: function(xhr, status, error) {
                     console.error('Error:', error);
                     showToast('An error occurred while deleting. Please try again.', 'danger');
-                    deleteBtn.prop('disabled', false);
-                    spinner.hide();
+                    setButtonLoading(deleteBtn, false);
                 }
             });
         });
@@ -518,7 +501,7 @@
             levelToDelete = null;
         });
 
-        // Manual refresh button
+        // Manual refresh button (kept for completeness, though not in the original prompt's snippet)
         $('.btn-outline-secondary').on('click', function() {
             if ($(this).find('.fa-sync-alt').length) {
                 location.reload();

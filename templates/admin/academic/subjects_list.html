@@ -8,11 +8,14 @@
     </button>
 {% endblock breadcrumb %}
 
-{%block extra_css %}
+{% block extra_css %}
+<!-- Select2 CSS -->
+<link rel="stylesheet" href="{% static 'admin/plugins/select2/css/select2.min.css' %}">
+<link rel="stylesheet" href="{% static 'admin/plugins/select2-bootstrap4-theme/select2-bootstrap4.min.css' %}">
 <style>
     .table th {
         font-weight: 600;
-        border-top: none;
+        border-bottom-width: 2px;
     }
     .table td {
         vertical-align: middle;
@@ -27,15 +30,7 @@
     .btn-group .btn {
         margin: 0 2px;
     }
-    #table-container {
-        min-height: 300px;
-    }
-    .truncate-text {
-        display: -webkit-box;
-        -webkit-line-clamp: 2;
-        -webkit-box-orient: vertical;
-        overflow: hidden;
-    }
+    /* DataTable Styles */
     .dataTables_wrapper .dataTables_filter {
         float: right;
         text-align: right;
@@ -47,33 +42,121 @@
         float: right;
         margin-top: 10px;
     }
-    .success-toast {
+    .success-toast, .error-toast {
         position: fixed;
         top: 20px;
         right: 20px;
         z-index: 1056;
         min-width: 300px;
     }
+    .educational-level-badge {
+        background-color: #6c757d;
+        color: white;
+        padding: 3px 8px;
+        border-radius: 4px;
+        font-size: 0.8em;
+    }
+    /* Select2 in modal fix */
+    .select2-container {
+        z-index: 1056 !important;
+    }
+    .select2-dropdown {
+        z-index: 1057 !important;
+    }
+    /* Compulsory badge */
+    .compulsory-badge {
+        background-color: #28a745;
+        color: white;
+    }
+    .optional-badge {
+        background-color: #6c757d;
+        color: white;
+    }
+    /* Action buttons */
+    .action-btn-sm {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.75rem;
+        border-radius: 0.2rem;
+    }
+   /* Container: Reduce gap to pull buttons closer together */
+.quick-actions {
+    display: flex;
+    gap: 4px; /* Reduced from 6px/8px to 4px for a tighter group */
+    justify-content: center;
+    align-items: center;
+}
+
+/* Base button styling: Circular & Professional */
+.quick-action-btn {
+    width: 28px;  /* Slightly smaller for better fit in tight rows */
+    height: 28px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%; /* Perfect circles */
+    border: none;
+    transition: all 0.2s ease;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+}
+
+/* Fix for the Compulsory (Star) button visibility */
+/* Optional state (grey/white) */
+.btn-secondary.toggle-compulsory-btn {
+    background-color: #f8f9fa !important;
+    border: 1px solid #dee2e6 !important;
+}
+.btn-secondary.toggle-compulsory-btn i {
+    color: #adb5bd !important; /* Soft grey star */
+}
+
+/* Compulsory state (Teal/Gold) */
+.btn-info.toggle-compulsory-btn {
+    background-color: #17a2b8 !important; /* Teal background */
+}
+.btn-info.toggle-compulsory-btn i {
+    color: #ffffff !important; /* Bright white star */
+}
+
+/* Standard icon color fix */
+.quick-action-btn i {
+    font-size: 0.75rem; /* Balanced size for 28px button */
+    color: #ffffff !important;
+}
+
+/* Hover effects */
+.quick-action-btn:hover {
+    transform: scale(1.1); /* Slight grow on hover instead of lift */
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    filter: brightness(1.05);
+}
+
+/* Adjust warning button icon for contrast */
+.btn-warning.quick-action-btn i {
+    color: #212529 !important;
+}
+.btn-success.quick-action-btn { background-color: #28a745; }
+.btn-primary.quick-action-btn { background-color: #007bff; }
+.btn-danger.quick-action-btn  { background-color: #dc3545; }
+.btn-info.quick-action-btn    { background-color: #17a2b8; }
 </style>
 {% endblock extra_css %}
 
 {% block content %}
 <section class="content">
-    <div class="container-fluid">  
-        <!-- Success Toast Message -->
-        <div id="success-toast" class="alert alert-success alert-dismissible fade show success-toast" style="display: none;" role="alert">
+    <div class="container-fluid"> 
+        <div id="success-toast" class="alert alert-success alert-dismissible fade success-toast" style="display: none;" role="alert">
             <strong><i class="fas fa-check-circle"></i> Success!</strong> 
             <span id="success-message"></span>
-            <button type="button" class="close" onclick="$('#success-toast').fadeOut()">
+            <button type="button" class="close" onclick="$('#success-toast').fadeOut()" data-dismiss="alert" aria-label="Close">
                 <span aria-hidden="true">&times;</span>
             </button>
         </div>
 
-        <!-- Error Toast Message -->
-        <div id="error-toast" class="alert alert-danger alert-dismissible fade show success-toast" style="display: none;" role="alert">
+        <div id="error-toast" class="alert alert-danger alert-dismissible fade error-toast" style="display: none;" role="alert">
             <strong><i class="fas fa-exclamation-circle"></i> Error!</strong> 
             <span id="error-message"></span>
-            <button type="button" class="close" onclick="$('#error-toast').fadeOut()">
+            <button type="button" class="close" onclick="$('#error-toast').fadeOut()" data-dismiss="alert" aria-label="Close">
                 <span aria-hidden="true">&times;</span>
             </button>
         </div>
@@ -85,60 +168,128 @@
                         <h6 class="header-title mb-0 text-uppercase">
                             <i class="fas fa-book"></i> Subjects Management
                         </h6>
-                        <span class="badge badge-light" id="total-count">Total: {{ subjects|length }}</span>
+                        <div class="d-flex align-items-center">
+                            <span class="badge badge-success mr-2">
+                                <i class="fas fa-check-circle"></i> Active: <span id="active-count">{{ active_subjects_count }}</span>
+                            </span>
+                            <span class="badge badge-light">
+                                Total: <span id="total-count">{{ subjects|length }}</span>
+                            </span>
+                        </div>
                     </div>
                     <div class="card-body">
-                        <!-- Table Container -->
-                        <div class="table-responsive" id="table-container">
-                            <table class="table table-hover table-striped table-bordered" id="subjects-table">
+                        <div class="table-responsive">
+                            <table class="table table-hover text-nowrap table-responsive-sm table-bordered table-striped table-sm display" id="subjects-table">
                                 <thead class="bg-light">
                                     <tr>
-                                        <th>Code</th>
-                                        <th>Name</th>
+                                        <th>Subject Name</th>
                                         <th>Short Name</th>
-                                        <th>Level</th>
-                                        <th>Compulsory</th>
+                                        <th>Code</th>
+                                        <th>Educational Level</th>
+                                        <th>Type</th>
+                                        <th>Status</th>
                                         <th class="text-center">Actions</th>
                                     </tr>
                                 </thead>
-                                <tbody id="table-body">
+                                <tbody>
                                     {% for subject in subjects %}
                                     <tr id="row-{{ subject.id }}">
-                                        <td><span class="badge badge-info">{{ subject.code }}</span></td>
-                                        <td>{{ subject.name }}</td>
+                                        <td>
+                                            <strong>{{ subject.name }}</strong>
+                                            {% if subject.description %}
+                                            <br>
+                                            <small class="text-muted">{{ subject.description|truncatechars:50 }}</small>
+                                            {% endif %}
+                                        </td>
                                         <td>{{ subject.short_name|default:"-" }}</td>
-                                        <td><span class="badge badge-secondary">{{ subject.educational_level.name }}</span></td>
+                                        <td><code>{{ subject.code }}</code></td>
+                                        <td>
+                                            <span class="educational-level-badge">{{ subject.educational_level.name }}</span>
+                                        </td>
                                         <td>
                                             {% if subject.is_compulsory %}
-                                                <span class="badge badge-success"><i class="fas fa-check"></i></span>
+                                                <span class="badge compulsory-badge" id="type-badge-{{ subject.id }}">
+                                                    <i class="fas fa-check-circle"></i> Compulsory
+                                                </span>
                                             {% else %}
-                                                <span class="badge badge-warning"><i class="fas fa-times"></i></span>
+                                                <span class="badge optional-badge" id="type-badge-{{ subject.id }}">
+                                                    <i class="fas fa-times-circle"></i> Optional
+                                                </span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if subject.is_active %}
+                                                <span class="badge badge-success" id="status-badge-{{ subject.id }}">
+                                                    <i class="fas fa-check-circle"></i> Active
+                                                </span>
+                                            {% else %}
+                                                <span class="badge badge-secondary" id="status-badge-{{ subject.id }}">
+                                                    <i class="fas fa-times-circle"></i> Inactive
+                                                </span>
                                             {% endif %}
                                         </td>
                                         <td class="text-center">
-                                            <div class="btn-group" role="group">
-                                                <button class="btn btn-sm btn-primary edit-btn" 
+                                            <div class="quick-actions">
+                                                <!-- Quick Status Toggle -->
+                                                {% if subject.is_active %}
+                                                <button class="btn btn-sm btn-warning quick-action-btn toggle-status-btn" 
                                                         data-id="{{ subject.id }}"
-                                                        data-educational-level-id="{{ subject.educational_level.id }}"
-                                                        data-code="{{ subject.code }}"
                                                         data-name="{{ subject.name }}"
-                                                        data-short-name="{{ subject.short_name|default:'' }}"
-                                                        data-is-compulsory="{{ subject.is_compulsory|yesno:'true,false' }}">
-                                                    <i class="fas fa-edit"></i> Edit
+                                                        data-current-status="active"
+                                                        title="Deactivate Subject">
+                                                    <i class="fas fa-toggle-off"></i>
                                                 </button>
-                                                <button class="btn btn-sm btn-danger delete-btn" 
+                                                {% else %}
+                                                <button class="btn btn-sm btn-success quick-action-btn toggle-status-btn" 
                                                         data-id="{{ subject.id }}"
-                                                        data-name="{{ subject.name }}">
-                                                    <i class="fas fa-trash"></i> Delete
+                                                        data-name="{{ subject.name }}"
+                                                        data-current-status="inactive"
+                                                        title="Activate Subject">
+                                                    <i class="fas fa-toggle-on"></i>
+                                                </button>
+                                                {% endif %}
+                                                
+                                                <!-- Quick Compulsory Toggle -->
+                                                {% if subject.is_compulsory %}
+                                                <button class="btn btn-sm btn-info quick-action-btn toggle-compulsory-btn" 
+                                                        data-id="{{ subject.id }}"
+                                                        data-name="{{ subject.name }}"
+                                                        data-current-type="compulsory"
+                                                        title="Mark as Optional">
+                                                    <i class="fas fa-star"></i>
+                                                </button>
+                                                {% else %}
+                                                <button class="btn btn-sm btn-secondary quick-action-btn toggle-compulsory-btn" 
+                                                        data-id="{{ subject.id }}"
+                                                        data-name="{{ subject.name }}"
+                                                        data-current-type="optional"
+                                                        title="Mark as Compulsory">
+                                                    <i class="far fa-star"></i>
+                                                </button>
+                                                {% endif %}
+                                                
+                                                <!-- Edit Button -->
+                                                <button class="btn btn-sm btn-primary quick-action-btn edit-btn" 
+                                                        data-id="{{ subject.id }}"
+                                                        data-educational-level="{{ subject.educational_level.id }}"
+                                                        data-name="{{ subject.name }}"
+                                                        data-short-name="{{ subject.short_name }}"
+                                                        data-code="{{ subject.code }}"
+                                                        data-is-compulsory="{{ subject.is_compulsory|yesno:'true,false' }}"
+                                                        data-description="{{ subject.description }}"
+                                                        data-is-active="{{ subject.is_active|yesno:'true,false' }}"
+                                                        title="Edit Subject">
+                                                    <i class="fas fa-edit"></i>
+                                                </button>
+                                                
+                                                <!-- Delete Button -->
+                                                <button class="btn btn-sm btn-danger quick-action-btn delete-btn" 
+                                                        data-id="{{ subject.id }}"
+                                                        data-name="{{ subject.name }}"
+                                                        title="Delete Subject">
+                                                    <i class="fas fa-trash"></i>
                                                 </button>
                                             </div>
-                                        </td>
-                                    </tr>
-                                    {% empty %}
-                                    <tr id="no-data-row">
-                                        <td colspan="6" class="text-center text-muted py-4">
-                                            <i class="fas fa-inbox fa-2x mb-2"></i><br>
-                                            No subjects found. Click "Add Subject" to create one.
                                         </td>
                                     </tr>
                                     {% endfor %}
@@ -167,33 +318,80 @@
             <form id="add-form">
                 {% csrf_token %}
                 <div class="modal-body">
-                    <div class="form-group">
-                        <label for="educational_level_id">Educational Level <span class="text-danger">*</span></label>
-                        <select class="form-control" id="educational_level_id" name="educational_level_id" required>
-                            <option value="">Select Level</option>
-                        </select>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="educational_level">Educational Level <span class="text-danger">*</span></label>
+                                <select class="form-control select2bs4" id="educational_level" name="educational_level" required style="width: 100%;">
+                                    <option value="">Select Educational Level</option>
+                                    {% for level in educational_levels %}
+                                        <option value="{{ level.id }}">{{ level.name }} ({{ level.code }})</option>
+                                    {% endfor %}
+                                </select>
+                                <small class="form-text text-muted">Select the educational level for this subject</small>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="code">Subject Code <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="code" name="code" required 
+                                       placeholder="e.g., MATH101, ENG201" maxlength="20">
+                                <small class="form-text text-muted">Unique code for this subject (max 20 characters)</small>
+                            </div>
+                        </div>
                     </div>
-                    <div class="form-group">
-                        <label for="code">Code <span class="text-danger">*</span></label>
-                        <input type="text" class="form-control" id="code" name="code" required 
-                               placeholder="e.g., MATH, ENG, SCI">
-                        <small class="form-text text-muted">Unique identifier for the subject</small>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="name">Subject Name <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="name" name="name" required 
+                                       placeholder="e.g., Mathematics, English Language" maxlength="100">
+                                <small class="form-text text-muted">Full name of the subject (max 100 characters)</small>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="short_name">Short Name</label>
+                                <input type="text" class="form-control" id="short_name" name="short_name" 
+                                       placeholder="e.g., Math, Eng" maxlength="20">
+                                <small class="form-text text-muted">Abbreviated name (max 20 characters)</small>
+                            </div>
+                        </div>
                     </div>
-                    <div class="form-group">
-                        <label for="name">Name <span class="text-danger">*</span></label>
-                        <input type="text" class="form-control" id="name" name="name" required 
-                               placeholder="e.g., Mathematics, English, Science">
+                    <div class="row">
+                        <div class="col-md-12">
+                            <div class="form-group">
+                                <label for="description">Description</label>
+                                <textarea class="form-control" id="description" name="description" rows="3" 
+                                          placeholder="Optional description of the subject"></textarea>
+                            </div>
+                        </div>
                     </div>
-                    <div class="form-group">
-                        <label for="short_name">Short Name</label>
-                        <input type="text" class="form-control" id="short_name" name="short_name" 
-                               placeholder="e.g., Math, Eng, Sci">
-                    </div>
-                    <div class="form-check">
-                        <input type="checkbox" class="form-check-input" id="is_compulsory" name="is_compulsory" value="true">
-                        <label class="form-check-label" for="is_compulsory">
-                            Compulsory Subject
-                        </label>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label>Subject Type</label>
+                                <div class="custom-control custom-switch mt-2">
+                                    <input type="checkbox" class="custom-control-input" id="is_compulsory" name="is_compulsory">
+                                    <label class="custom-control-label" for="is_compulsory">
+                                        <span id="compulsory-label">Optional</span>
+                                    </label>
+                                    <small class="form-text text-muted d-block">Toggle to mark as Compulsory</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label>Status</label>
+                                <div class="custom-control custom-switch mt-2">
+                                    <input type="checkbox" class="custom-control-input" id="is_active" name="is_active" checked>
+                                    <label class="custom-control-label" for="is_active">
+                                        <span id="active-label">Active</span>
+                                    </label>
+                                    <small class="form-text text-muted d-block">Toggle to activate/deactivate</small>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -224,29 +422,77 @@
                 {% csrf_token %}
                 <input type="hidden" id="edit-id" name="id">
                 <div class="modal-body">
-                    <div class="form-group">
-                        <label for="edit-educational_level_id">Educational Level <span class="text-danger">*</span></label>
-                        <select class="form-control" id="edit-educational_level_id" name="educational_level_id" required>
-                            <option value="">Select Level</option>
-                        </select>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="edit-educational_level">Educational Level <span class="text-danger">*</span></label>
+                                <select class="form-control select2bs4" id="edit-educational_level" name="educational_level" required style="width: 100%;">
+                                    <option value="">Select Educational Level</option>
+                                    {% for level in educational_levels %}
+                                        <option value="{{ level.id }}">{{ level.name }} ({{ level.code }})</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="edit-code">Subject Code <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="edit-code" name="code" required 
+                                       placeholder="e.g., MATH101, ENG201" maxlength="20">
+                                <small class="form-text text-muted">Unique code for this subject</small>
+                            </div>
+                        </div>
                     </div>
-                    <div class="form-group">
-                        <label for="edit-code">Code <span class="text-danger">*</span></label>
-                        <input type="text" class="form-control" id="edit-code" name="code" required>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="edit-name">Subject Name <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="edit-name" name="name" required 
+                                       placeholder="e.g., Mathematics, English Language" maxlength="100">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="edit-short_name">Short Name</label>
+                                <input type="text" class="form-control" id="edit-short_name" name="short_name" 
+                                       placeholder="e.g., Math, Eng" maxlength="20">
+                            </div>
+                        </div>
                     </div>
-                    <div class="form-group">
-                        <label for="edit-name">Name <span class="text-danger">*</span></label>
-                        <input type="text" class="form-control" id="edit-name" name="name" required>
+                    <div class="row">
+                        <div class="col-md-12">
+                            <div class="form-group">
+                                <label for="edit-description">Description</label>
+                                <textarea class="form-control" id="edit-description" name="description" rows="3" 
+                                          placeholder="Optional description of the subject"></textarea>
+                            </div>
+                        </div>
                     </div>
-                    <div class="form-group">
-                        <label for="edit-short_name">Short Name</label>
-                        <input type="text" class="form-control" id="edit-short_name" name="short_name">
-                    </div>
-                    <div class="form-check">
-                        <input type="checkbox" class="form-check-input" id="edit-is_compulsory" name="is_compulsory" value="true">
-                        <label class="form-check-label" for="edit-is_compulsory">
-                            Compulsory Subject
-                        </label>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label>Subject Type</label>
+                                <div class="custom-control custom-switch mt-2">
+                                    <input type="checkbox" class="custom-control-input" id="edit-is_compulsory" name="is_compulsory">
+                                    <label class="custom-control-label" for="edit-is_compulsory">
+                                        <span id="edit-compulsory-label">Optional</span>
+                                    </label>
+                                    <small class="form-text text-muted d-block">Toggle to mark as Compulsory</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label>Status</label>
+                                <div class="custom-control custom-switch mt-2">
+                                    <input type="checkbox" class="custom-control-input" id="edit-is_active" name="is_active">
+                                    <label class="custom-control-label" for="edit-is_active">
+                                        <span id="edit-active-label">Inactive</span>
+                                    </label>
+                                    <small class="form-text text-muted d-block">Toggle to activate/deactivate</small>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -261,7 +507,7 @@
     </div>
 </div>
 
-<!-- Delete Confirmation Modal -->
+<!-- Delete Subject Modal -->
 <div class="modal fade" id="deleteSubjectModal" tabindex="-1" role="dialog" aria-labelledby="deleteModalLabel" aria-hidden="true">
     <div class="modal-dialog" role="document">
         <div class="modal-content">
@@ -275,7 +521,7 @@
             </div>
             <div class="modal-body">
                 <p>Are you sure you want to delete the subject <strong id="delete-subject-name"></strong>?</p>
-                <p class="text-danger"><small>This action cannot be undone.</small></p>
+                <p class="text-danger"><small>This action cannot be undone. All associated data (classes, exams, results, etc.) might be affected.</small></p>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-dismiss="modal" id="cancel-delete-btn">Cancel</button>
@@ -290,8 +536,82 @@
 {% endblock content %}
 
 {% block extra_js %}
+<!-- Select2 JS -->
+<script src="{% static 'admin/plugins/select2/js/select2.full.min.js' %}"></script>
 <script>
     $(document).ready(function() {
+        // Toggle switch label updates
+        function updateSwitchLabels() {
+            // Add form
+            $('#is_compulsory').on('change', function() {
+                $('#compulsory-label').text($(this).is(':checked') ? 'Compulsory' : 'Optional');
+            });
+            
+            $('#is_active').on('change', function() {
+                $('#active-label').text($(this).is(':checked') ? 'Active' : 'Inactive');
+            });
+            
+            // Edit form
+            $('#edit-is_compulsory').on('change', function() {
+                $('#edit-compulsory-label').text($(this).is(':checked') ? 'Compulsory' : 'Optional');
+            });
+            
+            $('#edit-is_active').on('change', function() {
+                $('#edit-active-label').text($(this).is(':checked') ? 'Active' : 'Inactive');
+            });
+        }
+        
+        // Initialize switch labels
+        updateSwitchLabels();
+
+        // Initialize Select2
+        function initializeSelect2() {
+            $('.select2bs4').select2({
+                theme: 'bootstrap4',
+                dropdownParent: $('.modal:visible'),
+                width: '100%',
+                placeholder: 'Select an option',
+                allowClear: false
+            });
+        }
+        
+        // Initialize on page load
+        initializeSelect2();
+
+        // Reinitialize when modals are shown
+        $('#addSubjectModal').on('shown.bs.modal', function() {
+            $('#educational_level').select2({
+                theme: 'bootstrap4',
+                dropdownParent: $('#addSubjectModal'),
+                width: '100%',
+                placeholder: 'Select Educational Level',
+                allowClear: false
+            });
+        });
+
+        $('#editSubjectModal').on('shown.bs.modal', function() {
+            $('#edit-educational_level').select2({
+                theme: 'bootstrap4',
+                dropdownParent: $('#editSubjectModal'),
+                width: '100%',
+                placeholder: 'Select Educational Level',
+                allowClear: false
+            });
+        });
+
+        // Destroy Select2 when modals are hidden
+        $('#addSubjectModal').on('hidden.bs.modal', function() {
+            $('#educational_level').select2('destroy');
+            $('#add-form')[0].reset();
+            // Reset switch labels
+            $('#compulsory-label').text('Optional');
+            $('#active-label').text('Active');
+        });
+
+        $('#editSubjectModal').on('hidden.bs.modal', function() {
+            $('#edit-educational_level').select2('destroy');
+        });
+
         // Initialize DataTable
         var table = $('#subjects-table').DataTable({
             "dom": "<'row'<'col-sm-12 col-md-6'l><'col-sm-12 col-md-6'f>>" +
@@ -302,26 +622,28 @@
             "responsive": true,
             "autoWidth": false,
             "ordering": true,
-            "order": [[3, 'asc']],
-               "columnDefs": [
-                   {"targets": 5, "orderable": false, "searchable": false}
-               ],
-               "columns": [
-                   {"data": null},
-                   {"data": null},
-                   {"data": null},
-                   {"data": null},
-                   {"data": null},
-                   {"data": null}
-               ],
+            "order": [[0, 'asc']], // Sort by subject name
+            
+            "destroy": true,
+            "retrieve": true,
+            "deferRender": true,
+            
+            "columnDefs": [
+                { 
+                    "targets": 6, // Actions column
+                    "orderable": false,
+                    "searchable": false
+                }
+            ],
+            
             "language": {
-                "emptyTable": "No subjects found. Click 'Add Subject' to create one.",
+                "emptyTable": "<div class='text-center py-4'><i class='fas fa-inbox fa-2x mb-2'></i><br>No subjects found. Click \"Add Subject\" to create one.</div>",
                 "search": "_INPUT_",
-                "searchPlaceholder": "Search...",
-                "lengthMenu": "_MENU_ records per page",
-                "info": "Showing _START_ to _END_ of _TOTAL_ entries",
-                "infoEmpty": "Showing 0 to 0 of 0 entries",
-                "infoFiltered": "(filtered from _MAX_ total entries)",
+                "searchPlaceholder": "Search subjects...",
+                "lengthMenu": "_MENU_ subjects per page",
+                "info": "Showing _START_ to _END_ of _TOTAL_ subjects",
+                "infoEmpty": "Showing 0 to 0 of 0 subjects",
+                "infoFiltered": "(filtered from _MAX_ total subjects)",
                 "paginate": {
                     "first": "First",
                     "last": "Last",
@@ -332,30 +654,42 @@
             "drawCallback": function(settings) {
                 var api = this.api();
                 var total = api.rows().count();
-                $('#total-count').text('Total: ' + total);
+                $('#total-count').text(total);
+                
+                // Count active subjects
+                var activeCount = 0;
+                api.rows().every(function() {
+                    var data = this.data();
+                    var statusText = $(data[5]).text().toLowerCase();
+                    if (statusText.includes('active')) {
+                        activeCount++;
+                    }
+                });
+                $('#active-count').text(activeCount);
             }
         });
 
+        // CSRF token for AJAX requests
         function getCSRFToken() {
-            return document.querySelector('[name=csrfmiddlewaretoken]').value;
+            return $('input[name="csrfmiddlewaretoken"]').val();
         }
 
+        // Show toast message
         function showToast(message, type = 'success') {
-            if (type === 'success') {
-                $('#success-message').text(message);
-                $('#success-toast').fadeIn();
-                setTimeout(function() {
-                    $('#success-toast').fadeOut();
-                }, 3000);
-            } else {
-                $('#error-message').text(message);
-                $('#error-toast').fadeIn();
-                setTimeout(function() {
-                    $('#error-toast').fadeOut();
-                }, 5000);
-            }
+            const toastId = type === 'success' ? '#success-toast' : '#error-toast';
+            const messageId = type === 'success' ? '#success-message' : '#error-message';
+            
+            $(messageId).text(message);
+            $(toastId).addClass('show').fadeIn();
+            
+            setTimeout(function() {
+                $(toastId).fadeOut(function() {
+                    $(this).removeClass('show');
+                });
+            }, type === 'success' ? 3000 : 5000);
         }
 
+        // Function to reload page after delay
         function reloadPageAfterDelay(message, type = 'success') {
             showToast(message, type);
             var delay = type === 'success' ? 2000 : 3000;
@@ -364,24 +698,92 @@
             }, delay);
         }
 
+        // Function to update UI without reload
+        function updateSubjectUI(subjectId, data) {
+            // Update status badge
+            const statusBadge = $('#status-badge-' + subjectId);
+            const typeBadge = $('#type-badge-' + subjectId);
+            const statusBtn = $('.toggle-status-btn[data-id="' + subjectId + '"]');
+            const typeBtn = $('.toggle-compulsory-btn[data-id="' + subjectId + '"]');
+            
+            if (data.hasOwnProperty('is_active')) {
+                if (data.is_active) {
+                    statusBadge.removeClass('badge-secondary').addClass('badge-success')
+                        .html('<i class="fas fa-check-circle"></i> Active');
+                    statusBtn.removeClass('btn-success').addClass('btn-warning')
+                        .attr('title', 'Deactivate Subject')
+                        .html('<i class="fas fa-toggle-off"></i>')
+                        .attr('data-current-status', 'active');
+                } else {
+                    statusBadge.removeClass('badge-success').addClass('badge-secondary')
+                        .html('<i class="fas fa-times-circle"></i> Inactive');
+                    statusBtn.removeClass('btn-warning').addClass('btn-success')
+                        .attr('title', 'Activate Subject')
+                        .html('<i class="fas fa-toggle-on"></i>')
+                        .attr('data-current-status', 'inactive');
+                }
+                
+                // Update active count
+                var currentActive = parseInt($('#active-count').text());
+                if (data.is_active) {
+                    $('#active-count').text(currentActive + 1);
+                } else {
+                    $('#active-count').text(currentActive - 1);
+                }
+            }
+            
+            if (data.hasOwnProperty('is_compulsory')) {
+                if (data.is_compulsory) {
+                    typeBadge.removeClass('optional-badge').addClass('compulsory-badge')
+                        .html('<i class="fas fa-check-circle"></i> Compulsory');
+                    typeBtn.removeClass('btn-secondary').addClass('btn-info')
+                        .attr('title', 'Mark as Optional')
+                        .html('<i class="fas fa-star"></i>')
+                        .attr('data-current-type', 'compulsory');
+                } else {
+                    typeBadge.removeClass('compulsory-badge').addClass('optional-badge')
+                        .html('<i class="fas fa-times-circle"></i> Optional');
+                    typeBtn.removeClass('btn-info').addClass('btn-secondary')
+                        .attr('title', 'Mark as Compulsory')
+                        .html('<i class="far fa-star"></i>')
+                        .attr('data-current-type', 'optional');
+                }
+            }
+        }
+
+        // Handle modal close/cancel buttons
         $(document).on('click', '[data-dismiss="modal"]', function(e) {
             e.preventDefault();
             $(this).closest('.modal').modal('hide');
         });
 
+        // Handle cancel buttons
         $('#cancel-add-btn, #cancel-edit-btn, #cancel-delete-btn').on('click', function(e) {
             e.preventDefault();
             $(this).closest('.modal').modal('hide');
         });
 
+        // Helper function to handle button loading state
+        function setButtonLoading(btn, isLoading) {
+            const spinner = btn.find('.spinner-border');
+            if (isLoading) {
+                btn.data('original-text', btn.html());
+                btn.prop('disabled', true);
+                spinner.show();
+                btn.html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>');
+            } else {
+                btn.prop('disabled', false);
+                spinner.hide();
+                btn.html(btn.data('original-text'));
+            }
+        }
+        
         // Add Subject
         $('#add-form').on('submit', function(e) {
             e.preventDefault();
             
             const saveBtn = $('#save-btn');
-            const spinner = saveBtn.find('.spinner-border');
-            saveBtn.prop('disabled', true);
-            spinner.show();
+            setButtonLoading(saveBtn, true);
             
             const formData = new FormData(this);
             formData.append('action', 'create');
@@ -400,43 +802,61 @@
                     if (data.success) {
                         $('#addSubjectModal').modal('hide');
                         reloadPageAfterDelay(data.message, 'success');
-                        $('#add-form')[0].reset();
                     } else {
                         showToast(data.message, 'danger');
-                        saveBtn.prop('disabled', false);
-                        spinner.hide();
+                        setButtonLoading(saveBtn, false);
                     }
                 },
                 error: function(xhr, status, error) {
                     console.error('Error:', error);
                     showToast('An error occurred while saving. Please try again.', 'danger');
-                    saveBtn.prop('disabled', false);
-                    spinner.hide();
+                    setButtonLoading(saveBtn, false);
                 }
             });
         });
 
-        // Edit Subject
+        // Edit Subject - Setup modal
         $(document).on('click', '.edit-btn', function() {
             const btn = $(this);
             
             $('#edit-id').val(btn.data('id'));
-            $('#edit-educational_level_id').val(btn.data('educational-level-id'));
-            $('#edit-code').val(btn.data('code'));
-            $('#edit-name').val(btn.data('name'));
-            $('#edit-short_name').val(btn.data('short-name'));
-            $('#edit-is_compulsory').prop('checked', btn.data('is-compulsory') === 'true');
             
+            // Store values
+            const educationalLevelId = btn.data('educational-level');
+            const name = btn.data('name');
+            const shortName = btn.data('short-name');
+            const code = btn.data('code');
+            const isCompulsory = btn.data('is-compulsory') === 'true';
+            const description = btn.data('description');
+            const isActive = btn.data('is-active') === 'true';
+            
+            // Show modal first
             $('#editSubjectModal').modal('show');
+            
+            // Set values after modal is shown
+            setTimeout(function() {
+                $('#edit-educational_level').val(educationalLevelId).trigger('change');
+                $('#edit-name').val(name);
+                $('#edit-short_name').val(shortName);
+                $('#edit-code').val(code);
+                $('#edit-description').val(description);
+                
+                // Set checkbox states
+                $('#edit-is_compulsory').prop('checked', isCompulsory);
+                $('#edit-is_active').prop('checked', isActive);
+                
+                // Update labels
+                $('#edit-compulsory-label').text(isCompulsory ? 'Compulsory' : 'Optional');
+                $('#edit-active-label').text(isActive ? 'Active' : 'Inactive');
+            }, 500);
         });
 
+        // Edit Subject - Submit form
         $('#edit-form').on('submit', function(e) {
             e.preventDefault();
             
             const updateBtn = $('#update-btn');
-            const spinner = updateBtn.find('.spinner-border');
-            updateBtn.prop('disabled', true);
-            spinner.show();
+            setButtonLoading(updateBtn, true);
             
             const formData = new FormData(this);
             formData.append('action', 'update');
@@ -457,20 +877,102 @@
                         reloadPageAfterDelay(data.message, 'success');
                     } else {
                         showToast(data.message, 'danger');
-                        updateBtn.prop('disabled', false);
-                        spinner.hide();
+                        setButtonLoading(updateBtn, false);
                     }
                 },
                 error: function(xhr, status, error) {
                     console.error('Error:', error);
                     showToast('An error occurred while updating. Please try again.', 'danger');
-                    updateBtn.prop('disabled', false);
-                    spinner.hide();
+                    setButtonLoading(updateBtn, false);
                 }
             });
         });
 
-        // Delete Subject
+        // Toggle Subject Status (Activate/Deactivate)
+        $(document).on('click', '.toggle-status-btn', function() {
+            const btn = $(this);
+            const subjectId = btn.data('id');
+            const subjectName = btn.data('name');
+            const currentStatus = btn.data('current-status');
+            const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
+            const actionText = currentStatus === 'active' ? 'deactivate' : 'activate';
+            
+            if (confirm(`Are you sure you want to ${actionText} "${subjectName}"?`)) {
+                setButtonLoading(btn, true);
+                
+                $.ajax({
+                    url: '{% url "admin_subjects_crud" %}',
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': getCSRFToken(),
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    data: {
+                        'action': 'toggle_status',
+                        'id': subjectId,
+                        'csrfmiddlewaretoken': getCSRFToken()
+                    },
+                    success: function(data) {
+                        if (data.success) {
+                            updateSubjectUI(subjectId, { is_active: data.is_active });
+                            showToast(data.message, 'success');
+                        } else {
+                            showToast(data.message, 'danger');
+                        }
+                        setButtonLoading(btn, false);
+                    },
+                    error: function(xhr, status, error) {
+                        console.error('Error:', error);
+                        showToast('An error occurred while updating status. Please try again.', 'danger');
+                        setButtonLoading(btn, false);
+                    }
+                });
+            }
+        });
+
+        // Toggle Subject Type (Compulsory/Optional)
+        $(document).on('click', '.toggle-compulsory-btn', function() {
+            const btn = $(this);
+            const subjectId = btn.data('id');
+            const subjectName = btn.data('name');
+            const currentType = btn.data('current-type');
+            const newType = currentType === 'compulsory' ? 'optional' : 'compulsory';
+            const actionText = currentType === 'compulsory' ? 'mark as optional' : 'mark as compulsory';
+            
+            if (confirm(`Are you sure you want to ${actionText} "${subjectName}"?`)) {
+                setButtonLoading(btn, true);
+                
+                $.ajax({
+                    url: '{% url "admin_subjects_crud" %}',
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': getCSRFToken(),
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    data: {
+                        'action': 'toggle_compulsory',
+                        'id': subjectId,
+                        'csrfmiddlewaretoken': getCSRFToken()
+                    },
+                    success: function(data) {
+                        if (data.success) {
+                            updateSubjectUI(subjectId, { is_compulsory: data.is_compulsory });
+                            showToast(data.message, 'success');
+                        } else {
+                            showToast(data.message, 'danger');
+                        }
+                        setButtonLoading(btn, false);
+                    },
+                    error: function(xhr, status, error) {
+                        console.error('Error:', error);
+                        showToast('An error occurred while updating type. Please try again.', 'danger');
+                        setButtonLoading(btn, false);
+                    }
+                });
+            }
+        });
+
+        // Delete Subject - Setup modal
         let subjectToDelete = null;
         
         $(document).on('click', '.delete-btn', function() {
@@ -485,18 +987,12 @@
             $('#deleteSubjectModal').modal('show');
         });
 
+        // Delete Subject - Confirm
         $('#confirm-delete-btn').on('click', function() {
             if (!subjectToDelete) return;
             
             const deleteBtn = $(this);
-            const spinner = deleteBtn.find('.spinner-border');
-            deleteBtn.prop('disabled', true);
-            spinner.show();
-            
-            const formData = new FormData();
-            formData.append('action', 'delete');
-            formData.append('id', subjectToDelete.id);
-            formData.append('csrfmiddlewaretoken', getCSRFToken());
+            setButtonLoading(deleteBtn, true);
             
             $.ajax({
                 url: '{% url "admin_subjects_crud" %}',
@@ -505,34 +1001,81 @@
                     'X-CSRFToken': getCSRFToken(),
                     'X-Requested-With': 'XMLHttpRequest'
                 },
-                data: formData,
-                processData: false,
-                contentType: false,
+                data: {
+                    'action': 'delete',
+                    'id': subjectToDelete.id,
+                    'csrfmiddlewaretoken': getCSRFToken()
+                },
                 success: function(data) {
                     if (data.success) {
                         $('#deleteSubjectModal').modal('hide');
                         reloadPageAfterDelay(data.message, 'success');
                     } else {
                         showToast(data.message, 'danger');
-                        deleteBtn.prop('disabled', false);
-                        spinner.hide();
+                        setButtonLoading(deleteBtn, false);
                     }
                 },
                 error: function(xhr, status, error) {
                     console.error('Error:', error);
                     showToast('An error occurred while deleting. Please try again.', 'danger');
-                    deleteBtn.prop('disabled', false);
-                    spinner.hide();
+                    setButtonLoading(deleteBtn, false);
                 }
             });
         });
 
+        // Clear form and reset button state on modal close
         $('#addSubjectModal').on('hidden.bs.modal', function() {
             $('#add-form')[0].reset();
+            setButtonLoading($('#save-btn'), false);
+        });
+        
+        $('#editSubjectModal').on('hidden.bs.modal', function() {
+            setButtonLoading($('#update-btn'), false);
         });
         
         $('#deleteSubjectModal').on('hidden.bs.modal', function() {
             subjectToDelete = null;
+            setButtonLoading($('#confirm-delete-btn'), false);
+        });
+
+        // Manual refresh button
+        $('.btn-outline-secondary').on('click', function() {
+            if ($(this).find('.fa-sync-alt').length) {
+                location.reload();
+            }
+        });
+
+        // Form validation
+        $('#add-form, #edit-form').on('submit', function(e) {
+            const isAddForm = $(this).attr('id') === 'add-form';
+            const codeInput = isAddForm ? '#code' : '#edit-code';
+            const nameInput = isAddForm ? '#name' : '#edit-name';
+            
+            const code = $(codeInput).val().trim();
+            const name = $(nameInput).val().trim();
+            
+            // Validate code format (alphanumeric with optional underscores/hyphens)
+            if (!/^[A-Za-z0-9_-]+$/.test(code)) {
+                e.preventDefault();
+                showToast('Subject code can only contain letters, numbers, hyphens, and underscores.', 'danger');
+                $(codeInput).addClass('is-invalid');
+                return false;
+            }
+            
+            // Validate name length
+            if (name.length < 2) {
+                e.preventDefault();
+                showToast('Subject name must be at least 2 characters long.', 'danger');
+                $(nameInput).addClass('is-invalid');
+                return false;
+            }
+            
+            return true;
+        });
+
+        // Remove validation classes on input
+        $('#code, #edit-code, #name, #edit-name').on('input', function() {
+            $(this).removeClass('is-invalid');
         });
     });
 </script>

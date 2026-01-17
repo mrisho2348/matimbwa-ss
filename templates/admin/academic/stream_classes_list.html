@@ -3,16 +3,19 @@
 {% block title %} Stream Classes Management {% endblock title %}
 
 {% block breadcrumb %}
-    <button type="button" class="btn btn-primary" data-toggle="modal" data-target="#addStreamModal">
-        <i class="fas fa-plus"></i> Add Stream
+    <button type="button" class="btn btn-primary" data-toggle="modal" data-target="#addStreamClassModal">
+        <i class="fas fa-plus"></i> Add Stream Class
     </button>
 {% endblock breadcrumb %}
 
-{%block extra_css %}
+{% block extra_css %}
+<!-- Select2 CSS -->
+<link rel="stylesheet" href="{% static 'admin/plugins/select2/css/select2.min.css' %}">
+<link rel="stylesheet" href="{% static 'admin/plugins/select2-bootstrap4-theme/select2-bootstrap4.min.css' %}">
 <style>
     .table th {
         font-weight: 600;
-        border-top: none;
+        border-bottom-width: 2px;
     }
     .table td {
         vertical-align: middle;
@@ -24,12 +27,7 @@
     .modal-header {
         border-radius: 0;
     }
-    .btn-group .btn {
-        margin: 0 2px;
-    }
-    #table-container {
-        min-height: 300px;
-    }
+    /* DataTable Styles */
     .dataTables_wrapper .dataTables_filter {
         float: right;
         text-align: right;
@@ -41,33 +39,115 @@
         float: right;
         margin-top: 10px;
     }
-    .success-toast {
+    .success-toast, .error-toast {
         position: fixed;
         top: 20px;
         right: 20px;
         z-index: 1056;
         min-width: 300px;
     }
+    .class-level-badge {
+        background-color: #6c757d;
+        color: white;
+        padding: 3px 8px;
+        border-radius: 4px;
+        font-size: 0.8em;
+    }
+    /* Select2 in modal fix */
+    .select2-container {
+        z-index: 1056 !important;
+    }
+    .select2-dropdown {
+        z-index: 1057 !important;
+    }
+    /* Stream letter badge */
+    .stream-letter-badge {
+        background-color: #17a2b8;
+        color: white;
+        padding: 4px 10px;
+        border-radius: 4px;
+        font-size: 0.9em;
+        font-weight: bold;
+        min-width: 40px;
+        display: inline-block;
+        text-align: center;
+    }
+    /* Capacity progress */
+    .capacity-progress {
+        height: 8px;
+        margin-bottom: 5px;
+    }
+    .capacity-text {
+        font-size: 0.8em;
+        color: #6c757d;
+    }
+    /* Quick action buttons */
+    .quick-actions {
+        display: flex;
+        gap: 4px;
+        justify-content: center;
+        align-items: center;
+    }
+    .quick-action-btn {
+        width: 28px;
+        height: 28px;
+        padding: 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        border: none;
+        transition: all 0.2s ease;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+    }
+    /* Standard button colors */
+    .btn-success.quick-action-btn { background-color: #28a745; }
+    .btn-primary.quick-action-btn { background-color: #007bff; }
+    .btn-danger.quick-action-btn  { background-color: #dc3545; }
+    .btn-warning.quick-action-btn { background-color: #ffc107; }
+    .btn-info.quick-action-btn    { background-color: #17a2b8; }
+    .btn-secondary.quick-action-btn { background-color: #6c757d; }
+    /* Icon colors */
+    .quick-action-btn i {
+        font-size: 0.75rem;
+        color: #ffffff !important;
+    }
+    .btn-warning.quick-action-btn i {
+        color: #212529 !important;
+    }
+    /* Hover effects */
+    .quick-action-btn:hover {
+        transform: scale(1.1);
+        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        filter: brightness(1.05);
+    }
+    /* Full stream name */
+    .stream-full-name {
+        font-weight: 600;
+        color: #343a40;
+    }
+    /* Capacity indicator colors */
+    .capacity-low { background-color: #28a745; } /* Green for low capacity */
+    .capacity-medium { background-color: #ffc107; } /* Yellow for medium */
+    .capacity-high { background-color: #dc3545; } /* Red for high */
 </style>
 {% endblock extra_css %}
 
 {% block content %}
 <section class="content">
-    <div class="container-fluid">  
-        <!-- Success Toast Message -->
-        <div id="success-toast" class="alert alert-success alert-dismissible fade show success-toast" style="display: none;" role="alert">
+    <div class="container-fluid"> 
+        <div id="success-toast" class="alert alert-success alert-dismissible fade success-toast" style="display: none;" role="alert">
             <strong><i class="fas fa-check-circle"></i> Success!</strong> 
             <span id="success-message"></span>
-            <button type="button" class="close" onclick="$('#success-toast').fadeOut()">
+            <button type="button" class="close" onclick="$('#success-toast').fadeOut()" data-dismiss="alert" aria-label="Close">
                 <span aria-hidden="true">&times;</span>
             </button>
         </div>
 
-        <!-- Error Toast Message -->
-        <div id="error-toast" class="alert alert-danger alert-dismissible fade show success-toast" style="display: none;" role="alert">
+        <div id="error-toast" class="alert alert-danger alert-dismissible fade error-toast" style="display: none;" role="alert">
             <strong><i class="fas fa-exclamation-circle"></i> Error!</strong> 
             <span id="error-message"></span>
-            <button type="button" class="close" onclick="$('#error-toast').fadeOut()">
+            <button type="button" class="close" onclick="$('#error-toast').fadeOut()" data-dismiss="alert" aria-label="Close">
                 <span aria-hidden="true">&times;</span>
             </button>
         </div>
@@ -77,77 +157,135 @@
                 <div class="card shadow-lg">
                     <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
                         <h6 class="header-title mb-0 text-uppercase">
-                            <i class="fas fa-cube"></i> Stream Classes Management
+                            <i class="fas fa-stream"></i> Stream Classes Management
                         </h6>
-                        <span class="badge badge-light" id="total-count">Total: {{ streams|length }}</span>
+                        <div class="d-flex align-items-center">
+                            <span class="badge badge-success mr-2">
+                                <i class="fas fa-check-circle"></i> Active: <span id="active-count">{{ active_streams_count }}</span>
+                            </span>
+                            <span class="badge badge-info mr-2">
+                                <i class="fas fa-users"></i> Total Students: <span id="total-students">{{ total_students }}</span>
+                            </span>
+                            <span class="badge badge-light">
+                                Total Streams: <span id="total-count">{{ stream_classes|length }}</span>
+                            </span>
+                        </div>
                     </div>
                     <div class="card-body">
-                        <!-- Table Container -->
-                        <div class="table-responsive" id="table-container">
-                            <table class="table table-hover table-striped table-bordered" id="streams-table">
+                        <div class="table-responsive">
+                            <table class="table table-hover text-nowrap table-responsive-sm table-bordered table-striped table-sm display" id="stream-classes-table">
                                 <thead class="bg-light">
                                     <tr>
-                                        <th>Stream</th>
+                                        <th>Stream Class</th>
                                         <th>Class Level</th>
-                                        <th>Capacity</th>
                                         <th>Students</th>
+                                        <th>Capacity</th>
                                         <th>Status</th>
                                         <th class="text-center">Actions</th>
                                     </tr>
                                 </thead>
-                                <tbody id="table-body">
-                                    {% for stream in streams %}
+                                <tbody>
+                                    {% for stream in stream_classes %}
+                                    {% with student_count=stream.student_count %}
                                     <tr id="row-{{ stream.id }}">
-                                        <td><span class="badge badge-primary">{{ stream.stream_letter }}</span></td>
-                                        <td><strong>{{ stream.class_level.name }}</strong></td>
-                                        <td>{{ stream.capacity }}</td>
                                         <td>
-                                            <span class="badge badge-info">{{ stream.student_count }}</span>
+                                            <span class="stream-full-name">{{ stream.class_level.name }}{{ stream.stream_letter }}</span>
+                                            <br>
+                                            <small class="text-muted">
+                                                <span class="stream-letter-badge">{{ stream.stream_letter }}</span>
+                                            </small>
+                                        </td>
+                                        <td>
+                                            <span class="class-level-badge">{{ stream.class_level.name }}</span>
+                                            <br>
+                                            <small class="text-muted">{{ stream.class_level.educational_level.name }}</small>
+                                        </td>
+                                        <td>
+                                            <div class="d-flex flex-column">
+                                                <span class="font-weight-bold {% if student_count >= stream.capacity %}text-danger{% elif student_count >= stream.capacity|add:"-10" %}text-warning{% else %}text-success{% endif %}">
+                                                    {{ student_count }} students
+                                                </span>
+                                                <small class="text-muted">
+                                                    <i class="fas fa-user-graduate"></i> Active students
+                                                </small>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            {% with percentage=student_count|add:0|floatformat:0 %}
+                                            <div class="capacity-progress progress">
+                                                <div class="progress-bar {% if percentage < 60 %}capacity-low{% elif percentage < 85 %}capacity-medium{% else %}capacity-high{% endif %}" 
+                                                     role="progressbar" 
+                                                     style="width: {{ percentage }}%"
+                                                     aria-valuenow="{{ student_count }}" 
+                                                     aria-valuemin="0" 
+                                                     aria-valuemax="{{ stream.capacity }}">
+                                                </div>
+                                            </div>
+                                            <div class="capacity-text">
+                                                {{ student_count }} / {{ stream.capacity }} ({{ percentage }}%)
+                                            </div>
+                                            {% endwith %}
                                         </td>
                                         <td>
                                             {% if stream.is_active %}
-                                                <span class="badge badge-success"><i class="fas fa-check-circle"></i> Active</span>
+                                                <span class="badge badge-success" id="status-badge-{{ stream.id }}">
+                                                    <i class="fas fa-check-circle"></i> Active
+                                                </span>
                                             {% else %}
-                                                <span class="badge badge-secondary"><i class="fas fa-times-circle"></i> Inactive</span>
+                                                <span class="badge badge-secondary" id="status-badge-{{ stream.id }}">
+                                                    <i class="fas fa-times-circle"></i> Inactive
+                                                </span>
                                             {% endif %}
                                         </td>
                                         <td class="text-center">
-                                            <div class="btn-group" role="group">
-                                                <button class="btn btn-sm btn-primary edit-btn" 
-                                                        data-id="{{ stream.id }}"
-                                                        data-class-level-id="{{ stream.class_level.id }}"
-                                                        data-stream-letter="{{ stream.stream_letter }}"
-                                                        data-capacity="{{ stream.capacity }}">
-                                                    <i class="fas fa-edit"></i> Edit
-                                                </button>
+                                            <div class="quick-actions">
+                                                <!-- Quick Status Toggle -->
                                                 {% if stream.is_active %}
-                                                <button class="btn btn-sm btn-warning toggle-active-btn" 
+                                                <button class="btn btn-sm btn-warning quick-action-btn toggle-status-btn" 
                                                         data-id="{{ stream.id }}"
-                                                        data-stream="{{ stream }}">
-                                                    <i class="fas fa-pause"></i> Deactivate
+                                                        data-name="{{ stream.class_level.name }}{{ stream.stream_letter }}"
+                                                        data-current-status="active"
+                                                        title="Deactivate Stream">
+                                                    <i class="fas fa-toggle-off"></i>
                                                 </button>
                                                 {% else %}
-                                                <button class="btn btn-sm btn-info toggle-active-btn" 
+                                                <button class="btn btn-sm btn-success quick-action-btn toggle-status-btn" 
                                                         data-id="{{ stream.id }}"
-                                                        data-stream="{{ stream }}">
-                                                    <i class="fas fa-play"></i> Activate
+                                                        data-name="{{ stream.class_level.name }}{{ stream.stream_letter }}"
+                                                        data-current-status="inactive"
+                                                        title="Activate Stream">
+                                                    <i class="fas fa-toggle-on"></i>
                                                 </button>
                                                 {% endif %}
-                                                <button class="btn btn-sm btn-danger delete-btn" 
+                                                
+                                                <!-- Edit Button -->
+                                                <button class="btn btn-sm btn-primary quick-action-btn edit-btn" 
                                                         data-id="{{ stream.id }}"
-                                                        data-stream="{{ stream }}">
-                                                    <i class="fas fa-trash"></i> Delete
+                                                        data-class-level="{{ stream.class_level.id }}"
+                                                        data-stream-letter="{{ stream.stream_letter }}"
+                                                        data-capacity="{{ stream.capacity }}"
+                                                        data-is-active="{{ stream.is_active|yesno:'true,false' }}"
+                                                        title="Edit Stream">
+                                                    <i class="fas fa-edit"></i>
+                                                </button>
+                                                
+                                                <!-- View Students Button -->
+                                                <a href="#" class="btn btn-sm btn-info quick-action-btn" 
+                                                   title="View Students">
+                                                    <i class="fas fa-users"></i>
+                                                </a>
+                                                
+                                                <!-- Delete Button -->
+                                                <button class="btn btn-sm btn-danger quick-action-btn delete-btn" 
+                                                        data-id="{{ stream.id }}"
+                                                        data-name="{{ stream.class_level.name }}{{ stream.stream_letter }}"
+                                                        title="Delete Stream">
+                                                    <i class="fas fa-trash"></i>
                                                 </button>
                                             </div>
                                         </td>
                                     </tr>
-                                    {% empty %}
-                                    <tr id="no-data-row">
-                                        <td colspan="6" class="text-center text-muted py-4">
-                                            <i class="fas fa-inbox fa-2x mb-2"></i><br>
-                                            No streams found. Click "Add Stream" to create one.
-                                        </td>
-                                    </tr>
+                                    {% endwith %}
                                     {% endfor %}
                                 </tbody>
                             </table>
@@ -159,13 +297,13 @@
     </div>
 </section>
 
-<!-- Add Stream Modal -->
-<div class="modal fade" id="addStreamModal" tabindex="-1" role="dialog" aria-labelledby="addModalLabel" aria-hidden="true">
+<!-- Add Stream Class Modal -->
+<div class="modal fade" id="addStreamClassModal" tabindex="-1" role="dialog" aria-labelledby="addModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg" role="document">
         <div class="modal-content">
             <div class="modal-header bg-primary text-white">
                 <h5 class="modal-title" id="addModalLabel">
-                    <i class="fas fa-plus-circle"></i> Add New Stream
+                    <i class="fas fa-plus-circle"></i> Add New Stream Class
                 </h5>
                 <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
                     <span aria-hidden="true">&times;</span>
@@ -174,30 +312,58 @@
             <form id="add-form">
                 {% csrf_token %}
                 <div class="modal-body">
-                    <div class="form-group">
-                        <label for="class_level_id">Class Level <span class="text-danger">*</span></label>
-                        <select class="form-control" id="class_level_id" name="class_level_id" required>
-                            <option value="">Select Class Level</option>
-                        </select>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="class_level">Class Level <span class="text-danger">*</span></label>
+                                <select class="form-control select2bs4" id="class_level" name="class_level" required style="width: 100%;">
+                                    <option value="">Select Class Level</option>
+                                    {% for level in class_levels %}
+                                        <option value="{{ level.id }}">{{ level.name }} ({{ level.educational_level.name }})</option>
+                                    {% endfor %}
+                                </select>
+                                <small class="form-text text-muted">Select the class level for this stream</small>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="stream_letter">Stream Letter <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="stream_letter" name="stream_letter" required 
+                                       placeholder="e.g., A, B, C" maxlength="1" style="text-transform: uppercase;">
+                                <small class="form-text text-muted">Single letter for the stream (A, B, C, etc.)</small>
+                            </div>
+                        </div>
                     </div>
-                    <div class="form-group">
-                        <label for="stream_letter">Stream Letter <span class="text-danger">*</span></label>
-                        <input type="text" class="form-control" id="stream_letter" name="stream_letter" 
-                               maxlength="1" placeholder="A, B, C, etc." required>
-                        <small class="form-text text-muted">Single letter (A-Z)</small>
+                    <div class="row">
+                        <div class="col-md-12">
+                            <div class="form-group">
+                                <label for="capacity">Student Capacity <span class="text-danger">*</span></label>
+                                <input type="number" class="form-control" id="capacity" name="capacity" required 
+                                       min="10" max="200" value="50">
+                                <small class="form-text text-muted">Maximum number of students allowed in this stream</small>
+                            </div>
+                        </div>
                     </div>
-                    <div class="form-group">
-                        <label for="capacity">Capacity <span class="text-danger">*</span></label>
-                        <input type="number" class="form-control" id="capacity" name="capacity" 
-                               value="50" min="1" required>
-                        <small class="form-text text-muted">Number of students the stream can accommodate</small>
+                    <div class="row">
+                        <div class="col-md-12">
+                            <div class="form-group">
+                                <label>Status</label>
+                                <div class="custom-control custom-switch mt-2">
+                                    <input type="checkbox" class="custom-control-input" id="is_active" name="is_active" checked>
+                                    <label class="custom-control-label" for="is_active">
+                                        <span id="active-label">Active</span>
+                                    </label>
+                                    <small class="form-text text-muted d-block">Toggle to activate/deactivate the stream</small>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-dismiss="modal" id="cancel-add-btn">Cancel</button>
                     <button type="submit" class="btn btn-primary" id="save-btn">
                         <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="display: none;"></span>
-                        Save Stream
+                        Save Stream Class
                     </button>
                 </div>
             </form>
@@ -205,13 +371,13 @@
     </div>
 </div>
 
-<!-- Edit Stream Modal -->
-<div class="modal fade" id="editStreamModal" tabindex="-1" role="dialog" aria-labelledby="editModalLabel" aria-hidden="true">
+<!-- Edit Stream Class Modal -->
+<div class="modal fade" id="editStreamClassModal" tabindex="-1" role="dialog" aria-labelledby="editModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg" role="document">
         <div class="modal-content">
             <div class="modal-header bg-warning text-dark">
                 <h5 class="modal-title" id="editModalLabel">
-                    <i class="fas fa-edit"></i> Edit Stream
+                    <i class="fas fa-edit"></i> Edit Stream Class
                 </h5>
                 <button type="button" class="close" data-dismiss="modal" aria-label="Close">
                     <span aria-hidden="true">&times;</span>
@@ -221,29 +387,57 @@
                 {% csrf_token %}
                 <input type="hidden" id="edit-id" name="id">
                 <div class="modal-body">
-                    <div class="form-group">
-                        <label for="edit-class_level_id">Class Level <span class="text-danger">*</span></label>
-                        <select class="form-control" id="edit-class_level_id" name="class_level_id" required>
-                            <option value="">Select Class Level</option>
-                        </select>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="edit-class_level">Class Level <span class="text-danger">*</span></label>
+                                <select class="form-control select2bs4" id="edit-class_level" name="class_level" required style="width: 100%;">
+                                    <option value="">Select Class Level</option>
+                                    {% for level in class_levels %}
+                                        <option value="{{ level.id }}">{{ level.name }} ({{ level.educational_level.name }})</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="edit-stream_letter">Stream Letter <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="edit-stream_letter" name="stream_letter" required 
+                                       placeholder="e.g., A, B, C" maxlength="1" style="text-transform: uppercase;">
+                                <small class="form-text text-muted">Single letter for the stream</small>
+                            </div>
+                        </div>
                     </div>
-                    <div class="form-group">
-                        <label for="edit-stream_letter">Stream Letter <span class="text-danger">*</span></label>
-                        <input type="text" class="form-control" id="edit-stream_letter" name="stream_letter" 
-                               maxlength="1" required>
-                        <small class="form-text text-muted">Single letter (A-Z)</small>
+                    <div class="row">
+                        <div class="col-md-12">
+                            <div class="form-group">
+                                <label for="edit-capacity">Student Capacity <span class="text-danger">*</span></label>
+                                <input type="number" class="form-control" id="edit-capacity" name="capacity" required 
+                                       min="10" max="200">
+                                <small class="form-text text-muted">Maximum number of students allowed in this stream</small>
+                            </div>
+                        </div>
                     </div>
-                    <div class="form-group">
-                        <label for="edit-capacity">Capacity <span class="text-danger">*</span></label>
-                        <input type="number" class="form-control" id="edit-capacity" name="capacity" 
-                               min="1" required>
+                    <div class="row">
+                        <div class="col-md-12">
+                            <div class="form-group">
+                                <label>Status</label>
+                                <div class="custom-control custom-switch mt-2">
+                                    <input type="checkbox" class="custom-control-input" id="edit-is_active" name="is_active">
+                                    <label class="custom-control-label" for="edit-is_active">
+                                        <span id="edit-active-label">Inactive</span>
+                                    </label>
+                                    <small class="form-text text-muted d-block">Toggle to activate/deactivate the stream</small>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-dismiss="modal" id="cancel-edit-btn">Cancel</button>
                     <button type="submit" class="btn btn-warning" id="update-btn">
                         <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="display: none;"></span>
-                        Update Stream
+                        Update Stream Class
                     </button>
                 </div>
             </form>
@@ -251,8 +445,8 @@
     </div>
 </div>
 
-<!-- Delete Confirmation Modal -->
-<div class="modal fade" id="deleteStreamModal" tabindex="-1" role="dialog" aria-labelledby="deleteModalLabel" aria-hidden="true">
+<!-- Delete Stream Class Modal -->
+<div class="modal fade" id="deleteStreamClassModal" tabindex="-1" role="dialog" aria-labelledby="deleteModalLabel" aria-hidden="true">
     <div class="modal-dialog" role="document">
         <div class="modal-content">
             <div class="modal-header bg-danger text-white">
@@ -264,8 +458,8 @@
                 </button>
             </div>
             <div class="modal-body">
-                <p>Are you sure you want to delete stream <strong id="delete-stream-name"></strong>?</p>
-                <p class="text-danger"><small>This action cannot be undone. All students in this stream might be affected.</small></p>
+                <p>Are you sure you want to delete the stream class <strong id="delete-stream-name"></strong>?</p>
+                <p class="text-danger"><small>This action cannot be undone. All students in this stream will need to be reassigned.</small></p>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-dismiss="modal" id="cancel-delete-btn">Cancel</button>
@@ -280,10 +474,75 @@
 {% endblock content %}
 
 {% block extra_js %}
+<!-- Select2 JS -->
+<script src="{% static 'admin/plugins/select2/js/select2.full.min.js' %}"></script>
 <script>
     $(document).ready(function() {
+        // Toggle switch label updates
+        function updateSwitchLabels() {
+            // Add form
+            $('#is_active').on('change', function() {
+                $('#active-label').text($(this).is(':checked') ? 'Active' : 'Inactive');
+            });
+            
+            // Edit form
+            $('#edit-is_active').on('change', function() {
+                $('#edit-active-label').text($(this).is(':checked') ? 'Active' : 'Inactive');
+            });
+        }
+        
+        // Initialize switch labels
+        updateSwitchLabels();
+
+        // Initialize Select2
+        function initializeSelect2() {
+            $('.select2bs4').select2({
+                theme: 'bootstrap4',
+                dropdownParent: $('.modal:visible'),
+                width: '100%',
+                placeholder: 'Select an option',
+                allowClear: false
+            });
+        }
+        
+        // Initialize on page load
+        initializeSelect2();
+
+        // Reinitialize when modals are shown
+        $('#addStreamClassModal').on('shown.bs.modal', function() {
+            $('#class_level').select2({
+                theme: 'bootstrap4',
+                dropdownParent: $('#addStreamClassModal'),
+                width: '100%',
+                placeholder: 'Select Class Level',
+                allowClear: false
+            });
+        });
+
+        $('#editStreamClassModal').on('shown.bs.modal', function() {
+            $('#edit-class_level').select2({
+                theme: 'bootstrap4',
+                dropdownParent: $('#editStreamClassModal'),
+                width: '100%',
+                placeholder: 'Select Class Level',
+                allowClear: false
+            });
+        });
+
+        // Destroy Select2 when modals are hidden
+        $('#addStreamClassModal').on('hidden.bs.modal', function() {
+            $('#class_level').select2('destroy');
+            $('#add-form')[0].reset();
+            // Reset switch label
+            $('#active-label').text('Active');
+        });
+
+        $('#editStreamClassModal').on('hidden.bs.modal', function() {
+            $('#edit-class_level').select2('destroy');
+        });
+
         // Initialize DataTable
-        var table = $('#streams-table').DataTable({
+        var table = $('#stream-classes-table').DataTable({
             "dom": "<'row'<'col-sm-12 col-md-6'l><'col-sm-12 col-md-6'f>>" +
                    "<'row'<'col-sm-12'tr>>" +
                    "<'row'<'col-sm-12 col-md-5'i><'col-sm-12 col-md-7'p>>",
@@ -292,26 +551,28 @@
             "responsive": true,
             "autoWidth": false,
             "ordering": true,
-            "order": [[1, 'asc']],
-               "columnDefs": [
-                   {"targets": 5, "orderable": false, "searchable": false}
-               ],
-               "columns": [
-                   {"data": null},
-                   {"data": null},
-                   {"data": null},
-                   {"data": null},
-                   {"data": null},
-                   {"data": null}
-               ],
+            "order": [[0, 'asc']], // Sort by stream name
+            
+            "destroy": true,
+            "retrieve": true,
+            "deferRender": true,
+            
+            "columnDefs": [
+                { 
+                    "targets": 5, // Actions column
+                    "orderable": false,
+                    "searchable": false
+                }
+            ],
+            
             "language": {
-                "emptyTable": "No streams found. Click 'Add Stream' to create one.",
+                "emptyTable": "<div class='text-center py-4'><i class='fas fa-inbox fa-2x mb-2'></i><br>No stream classes found. Click \"Add Stream Class\" to create one.</div>",
                 "search": "_INPUT_",
-                "searchPlaceholder": "Search...",
-                "lengthMenu": "_MENU_ records per page",
-                "info": "Showing _START_ to _END_ of _TOTAL_ entries",
-                "infoEmpty": "Showing 0 to 0 of 0 entries",
-                "infoFiltered": "(filtered from _MAX_ total entries)",
+                "searchPlaceholder": "Search stream classes...",
+                "lengthMenu": "_MENU_ stream classes per page",
+                "info": "Showing _START_ to _END_ of _TOTAL_ stream classes",
+                "infoEmpty": "Showing 0 to 0 of 0 stream classes",
+                "infoFiltered": "(filtered from _MAX_ total stream classes)",
                 "paginate": {
                     "first": "First",
                     "last": "Last",
@@ -322,30 +583,42 @@
             "drawCallback": function(settings) {
                 var api = this.api();
                 var total = api.rows().count();
-                $('#total-count').text('Total: ' + total);
+                $('#total-count').text(total);
+                
+                // Count active streams
+                var activeCount = 0;
+                api.rows().every(function() {
+                    var data = this.data();
+                    var statusText = $(data[4]).text().toLowerCase();
+                    if (statusText.includes('active')) {
+                        activeCount++;
+                    }
+                });
+                $('#active-count').text(activeCount);
             }
         });
 
+        // CSRF token for AJAX requests
         function getCSRFToken() {
-            return document.querySelector('[name=csrfmiddlewaretoken]').value;
+            return $('input[name="csrfmiddlewaretoken"]').val();
         }
 
+        // Show toast message
         function showToast(message, type = 'success') {
-            if (type === 'success') {
-                $('#success-message').text(message);
-                $('#success-toast').fadeIn();
-                setTimeout(function() {
-                    $('#success-toast').fadeOut();
-                }, 3000);
-            } else {
-                $('#error-message').text(message);
-                $('#error-toast').fadeIn();
-                setTimeout(function() {
-                    $('#error-toast').fadeOut();
-                }, 5000);
-            }
+            const toastId = type === 'success' ? '#success-toast' : '#error-toast';
+            const messageId = type === 'success' ? '#success-message' : '#error-message';
+            
+            $(messageId).text(message);
+            $(toastId).addClass('show').fadeIn();
+            
+            setTimeout(function() {
+                $(toastId).fadeOut(function() {
+                    $(this).removeClass('show');
+                });
+            }, type === 'success' ? 3000 : 5000);
         }
 
+        // Function to reload page after delay
         function reloadPageAfterDelay(message, type = 'success') {
             showToast(message, type);
             var delay = type === 'success' ? 2000 : 3000;
@@ -354,24 +627,79 @@
             }, delay);
         }
 
+        // Function to update UI without reload
+        function updateStreamUI(streamId, data) {
+            // Update status badge
+            const statusBadge = $('#status-badge-' + streamId);
+            const statusBtn = $('.toggle-status-btn[data-id="' + streamId + '"]');
+            
+            if (data.hasOwnProperty('is_active')) {
+                if (data.is_active) {
+                    statusBadge.removeClass('badge-secondary').addClass('badge-success')
+                        .html('<i class="fas fa-check-circle"></i> Active');
+                    statusBtn.removeClass('btn-success').addClass('btn-warning')
+                        .attr('title', 'Deactivate Stream')
+                        .html('<i class="fas fa-toggle-off"></i>')
+                        .attr('data-current-status', 'active');
+                } else {
+                    statusBadge.removeClass('badge-success').addClass('badge-secondary')
+                        .html('<i class="fas fa-times-circle"></i> Inactive');
+                    statusBtn.removeClass('btn-warning').addClass('btn-success')
+                        .attr('title', 'Activate Stream')
+                        .html('<i class="fas fa-toggle-on"></i>')
+                        .attr('data-current-status', 'inactive');
+                }
+                
+                // Update active count
+                var currentActive = parseInt($('#active-count').text());
+                if (data.is_active) {
+                    $('#active-count').text(currentActive + 1);
+                } else {
+                    $('#active-count').text(currentActive - 1);
+                }
+            }
+            
+            // Update capacity if changed
+            if (data.hasOwnProperty('capacity')) {
+                // This would require more complex update since we need to recalculate percentage
+                // For now, we'll just reload
+                console.log('Capacity updated, reloading...');
+            }
+        }
+
+        // Handle modal close/cancel buttons
         $(document).on('click', '[data-dismiss="modal"]', function(e) {
             e.preventDefault();
             $(this).closest('.modal').modal('hide');
         });
 
+        // Handle cancel buttons
         $('#cancel-add-btn, #cancel-edit-btn, #cancel-delete-btn').on('click', function(e) {
             e.preventDefault();
             $(this).closest('.modal').modal('hide');
         });
 
-        // Add Stream
+        // Helper function to handle button loading state
+        function setButtonLoading(btn, isLoading) {
+            const spinner = btn.find('.spinner-border');
+            if (isLoading) {
+                btn.data('original-text', btn.html());
+                btn.prop('disabled', true);
+                spinner.show();
+                btn.html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>');
+            } else {
+                btn.prop('disabled', false);
+                spinner.hide();
+                btn.html(btn.data('original-text'));
+            }
+        }
+        
+        // Add Stream Class
         $('#add-form').on('submit', function(e) {
             e.preventDefault();
             
             const saveBtn = $('#save-btn');
-            const spinner = saveBtn.find('.spinner-border');
-            saveBtn.prop('disabled', true);
-            spinner.show();
+            setButtonLoading(saveBtn, true);
             
             const formData = new FormData(this);
             formData.append('action', 'create');
@@ -388,43 +716,56 @@
                 contentType: false,
                 success: function(data) {
                     if (data.success) {
-                        $('#addStreamModal').modal('hide');
+                        $('#addStreamClassModal').modal('hide');
                         reloadPageAfterDelay(data.message, 'success');
-                        $('#add-form')[0].reset();
                     } else {
                         showToast(data.message, 'danger');
-                        saveBtn.prop('disabled', false);
-                        spinner.hide();
+                        setButtonLoading(saveBtn, false);
                     }
                 },
                 error: function(xhr, status, error) {
                     console.error('Error:', error);
                     showToast('An error occurred while saving. Please try again.', 'danger');
-                    saveBtn.prop('disabled', false);
-                    spinner.hide();
+                    setButtonLoading(saveBtn, false);
                 }
             });
         });
 
-        // Edit Stream
+        // Edit Stream Class - Setup modal
         $(document).on('click', '.edit-btn', function() {
             const btn = $(this);
             
             $('#edit-id').val(btn.data('id'));
-            $('#edit-class_level_id').val(btn.data('class-level-id'));
-            $('#edit-stream_letter').val(btn.data('stream-letter'));
-            $('#edit-capacity').val(btn.data('capacity'));
             
-            $('#editStreamModal').modal('show');
+            // Store values
+            const classLevelId = btn.data('class-level');
+            const streamLetter = btn.data('stream-letter');
+            const capacity = btn.data('capacity');
+            const isActive = btn.data('is-active') === 'true';
+            
+            // Show modal first
+            $('#editStreamClassModal').modal('show');
+            
+            // Set values after modal is shown
+            setTimeout(function() {
+                $('#edit-class_level').val(classLevelId).trigger('change');
+                $('#edit-stream_letter').val(streamLetter);
+                $('#edit-capacity').val(capacity);
+                
+                // Set checkbox state
+                $('#edit-is_active').prop('checked', isActive);
+                
+                // Update label
+                $('#edit-active-label').text(isActive ? 'Active' : 'Inactive');
+            }, 500);
         });
 
+        // Edit Stream Class - Submit form
         $('#edit-form').on('submit', function(e) {
             e.preventDefault();
             
             const updateBtn = $('#update-btn');
-            const spinner = updateBtn.find('.spinner-border');
-            updateBtn.prop('disabled', true);
-            spinner.show();
+            setButtonLoading(updateBtn, true);
             
             const formData = new FormData(this);
             formData.append('action', 'update');
@@ -441,59 +782,64 @@
                 contentType: false,
                 success: function(data) {
                     if (data.success) {
-                        $('#editStreamModal').modal('hide');
+                        $('#editStreamClassModal').modal('hide');
                         reloadPageAfterDelay(data.message, 'success');
                     } else {
                         showToast(data.message, 'danger');
-                        updateBtn.prop('disabled', false);
-                        spinner.hide();
+                        setButtonLoading(updateBtn, false);
                     }
                 },
                 error: function(xhr, status, error) {
                     console.error('Error:', error);
                     showToast('An error occurred while updating. Please try again.', 'danger');
-                    updateBtn.prop('disabled', false);
-                    spinner.hide();
+                    setButtonLoading(updateBtn, false);
                 }
             });
         });
 
-        // Toggle Stream Active Status
-        $(document).on('click', '.toggle-active-btn', function() {
+        // Toggle Stream Class Status (Activate/Deactivate)
+        $(document).on('click', '.toggle-status-btn', function() {
             const btn = $(this);
             const streamId = btn.data('id');
-            const streamName = btn.data('stream');
+            const streamName = btn.data('name');
+            const currentStatus = btn.data('current-status');
+            const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
+            const actionText = currentStatus === 'active' ? 'deactivate' : 'activate';
             
-            const formData = new FormData();
-            formData.append('action', 'toggle_active');
-            formData.append('id', streamId);
-            formData.append('csrfmiddlewaretoken', getCSRFToken());
-            
-            $.ajax({
-                url: '{% url "admin_stream_classes_crud" %}',
-                method: 'POST',
-                headers: {
-                    'X-CSRFToken': getCSRFToken(),
-                    'X-Requested-With': 'XMLHttpRequest'
-                },
-                data: formData,
-                processData: false,
-                contentType: false,
-                success: function(data) {
-                    if (data.success) {
-                        reloadPageAfterDelay(data.message, 'success');
-                    } else {
-                        showToast(data.message, 'danger');
+            if (confirm(`Are you sure you want to ${actionText} "${streamName}"?`)) {
+                setButtonLoading(btn, true);
+                
+                $.ajax({
+                    url: '{% url "admin_stream_classes_crud" %}',
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': getCSRFToken(),
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    data: {
+                        'action': 'toggle_status',
+                        'id': streamId,
+                        'csrfmiddlewaretoken': getCSRFToken()
+                    },
+                    success: function(data) {
+                        if (data.success) {
+                            updateStreamUI(streamId, { is_active: data.is_active });
+                            showToast(data.message, 'success');
+                        } else {
+                            showToast(data.message, 'danger');
+                        }
+                        setButtonLoading(btn, false);
+                    },
+                    error: function(xhr, status, error) {
+                        console.error('Error:', error);
+                        showToast('An error occurred while updating status. Please try again.', 'danger');
+                        setButtonLoading(btn, false);
                     }
-                },
-                error: function(xhr, status, error) {
-                    console.error('Error:', error);
-                    showToast('An error occurred. Please try again.', 'danger');
-                }
-            });
+                });
+            }
         });
 
-        // Delete Stream
+        // Delete Stream Class - Setup modal
         let streamToDelete = null;
         
         $(document).on('click', '.delete-btn', function() {
@@ -501,25 +847,19 @@
             
             streamToDelete = {
                 id: btn.data('id'),
-                stream: btn.data('stream')
+                name: btn.data('name')
             };
             
-            $('#delete-stream-name').text(btn.data('stream'));
-            $('#deleteStreamModal').modal('show');
+            $('#delete-stream-name').text(btn.data('name'));
+            $('#deleteStreamClassModal').modal('show');
         });
 
+        // Delete Stream Class - Confirm
         $('#confirm-delete-btn').on('click', function() {
             if (!streamToDelete) return;
             
             const deleteBtn = $(this);
-            const spinner = deleteBtn.find('.spinner-border');
-            deleteBtn.prop('disabled', true);
-            spinner.show();
-            
-            const formData = new FormData();
-            formData.append('action', 'delete');
-            formData.append('id', streamToDelete.id);
-            formData.append('csrfmiddlewaretoken', getCSRFToken());
+            setButtonLoading(deleteBtn, true);
             
             $.ajax({
                 url: '{% url "admin_stream_classes_crud" %}',
@@ -528,34 +868,97 @@
                     'X-CSRFToken': getCSRFToken(),
                     'X-Requested-With': 'XMLHttpRequest'
                 },
-                data: formData,
-                processData: false,
-                contentType: false,
+                data: {
+                    'action': 'delete',
+                    'id': streamToDelete.id,
+                    'csrfmiddlewaretoken': getCSRFToken()
+                },
                 success: function(data) {
                     if (data.success) {
-                        $('#deleteStreamModal').modal('hide');
+                        $('#deleteStreamClassModal').modal('hide');
                         reloadPageAfterDelay(data.message, 'success');
                     } else {
                         showToast(data.message, 'danger');
-                        deleteBtn.prop('disabled', false);
-                        spinner.hide();
+                        setButtonLoading(deleteBtn, false);
                     }
                 },
                 error: function(xhr, status, error) {
                     console.error('Error:', error);
                     showToast('An error occurred while deleting. Please try again.', 'danger');
-                    deleteBtn.prop('disabled', false);
-                    spinner.hide();
+                    setButtonLoading(deleteBtn, false);
                 }
             });
         });
 
-        $('#addStreamModal').on('hidden.bs.modal', function() {
+        // Clear form and reset button state on modal close
+        $('#addStreamClassModal').on('hidden.bs.modal', function() {
             $('#add-form')[0].reset();
+            setButtonLoading($('#save-btn'), false);
         });
         
-        $('#deleteStreamModal').on('hidden.bs.modal', function() {
+        $('#editStreamClassModal').on('hidden.bs.modal', function() {
+            setButtonLoading($('#update-btn'), false);
+        });
+        
+        $('#deleteStreamClassModal').on('hidden.bs.modal', function() {
             streamToDelete = null;
+            setButtonLoading($('#confirm-delete-btn'), false);
+        });
+
+        // Manual refresh button
+        $('.btn-outline-secondary').on('click', function() {
+            if ($(this).find('.fa-sync-alt').length) {
+                location.reload();
+            }
+        });
+
+        // Form validation
+        $('#add-form, #edit-form').on('submit', function(e) {
+            const isAddForm = $(this).attr('id') === 'add-form';
+            const streamLetterInput = isAddForm ? '#stream_letter' : '#edit-stream_letter';
+            const capacityInput = isAddForm ? '#capacity' : '#edit-capacity';
+            const classLevelInput = isAddForm ? '#class_level' : '#edit-class_level';
+            
+            const streamLetter = $(streamLetterInput).val().trim().toUpperCase();
+            const capacity = parseInt($(capacityInput).val());
+            const classLevel = $(classLevelInput).val();
+            
+            // Validate stream letter
+            if (!/^[A-Z]$/.test(streamLetter)) {
+                e.preventDefault();
+                showToast('Stream letter must be a single letter (A-Z).', 'danger');
+                $(streamLetterInput).addClass('is-invalid');
+                return false;
+            }
+            
+            // Validate capacity
+            if (isNaN(capacity) || capacity < 10 || capacity > 200) {
+                e.preventDefault();
+                showToast('Capacity must be a number between 10 and 200.', 'danger');
+                $(capacityInput).addClass('is-invalid');
+                return false;
+            }
+            
+            // Validate class level
+            if (!classLevel) {
+                e.preventDefault();
+                showToast('Class level is required.', 'danger');
+                $(classLevelInput).addClass('is-invalid');
+                return false;
+            }
+            
+            return true;
+        });
+
+        // Remove validation classes on input
+        $('#stream_letter, #edit-stream_letter, #capacity, #edit-capacity, #class_level, #edit-class_level').on('input', function() {
+            $(this).removeClass('is-invalid');
+        });
+
+        // Auto-format stream letter to uppercase and single character
+        $('#stream_letter, #edit-stream_letter').on('input', function() {
+            let value = $(this).val().toUpperCase().replace(/[^A-Z]/g, '');
+            $(this).val(value.substring(0, 1));
         });
     });
 </script>

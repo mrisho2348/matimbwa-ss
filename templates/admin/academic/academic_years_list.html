@@ -8,11 +8,11 @@
     </button>
 {% endblock breadcrumb %}
 
-{%block extra_css %}
+{% block extra_css %}
 <style>
     .table th {
         font-weight: 600;
-        border-top: none;
+        border-bottom-width: 2px;
     }
     .table td {
         vertical-align: middle;
@@ -27,9 +27,7 @@
     .btn-group .btn {
         margin: 0 2px;
     }
-    #table-container {
-        min-height: 300px;
-    }
+    /* DataTable Styles */
     .dataTables_wrapper .dataTables_filter {
         float: right;
         text-align: right;
@@ -41,7 +39,7 @@
         float: right;
         margin-top: 10px;
     }
-    .success-toast {
+    .success-toast, .error-toast {
         position: fixed;
         top: 20px;
         right: 20px;
@@ -53,21 +51,19 @@
 
 {% block content %}
 <section class="content">
-    <div class="container-fluid">  
-        <!-- Success Toast Message -->
-        <div id="success-toast" class="alert alert-success alert-dismissible fade show success-toast" style="display: none;" role="alert">
+    <div class="container-fluid"> 
+        <div id="success-toast" class="alert alert-success alert-dismissible fade success-toast" style="display: none;" role="alert">
             <strong><i class="fas fa-check-circle"></i> Success!</strong> 
             <span id="success-message"></span>
-            <button type="button" class="close" onclick="$('#success-toast').fadeOut()">
+            <button type="button" class="close" onclick="$('#success-toast').fadeOut()" data-dismiss="alert" aria-label="Close">
                 <span aria-hidden="true">&times;</span>
             </button>
         </div>
 
-        <!-- Error Toast Message -->
-        <div id="error-toast" class="alert alert-danger alert-dismissible fade show success-toast" style="display: none;" role="alert">
+        <div id="error-toast" class="alert alert-danger alert-dismissible fade error-toast" style="display: none;" role="alert">
             <strong><i class="fas fa-exclamation-circle"></i> Error!</strong> 
             <span id="error-message"></span>
-            <button type="button" class="close" onclick="$('#error-toast').fadeOut()">
+            <button type="button" class="close" onclick="$('#error-toast').fadeOut()" data-dismiss="alert" aria-label="Close">
                 <span aria-hidden="true">&times;</span>
             </button>
         </div>
@@ -82,9 +78,8 @@
                         <span class="badge badge-light" id="total-count">Total: {{ academic_years|length }}</span>
                     </div>
                     <div class="card-body">
-                        <!-- Table Container -->
-                        <div class="table-responsive" id="table-container">
-                            <table class="table table-hover table-striped table-bordered" id="academic-years-table">
+                        <div class="table-responsive">
+                            <table class="table table-hover text-nowrap table-responsive-sm table-bordered table-striped table-sm display" id="academic-years-table">
                                 <thead class="bg-light">
                                     <tr>
                                         <th>Year</th>
@@ -94,7 +89,7 @@
                                         <th class="text-center">Actions</th>
                                     </tr>
                                 </thead>
-                                <tbody id="table-body">
+                                <tbody>
                                     {% for year in academic_years %}
                                     <tr id="row-{{ year.id }}">
                                         <td><strong>{{ year.name }}</strong></td>
@@ -125,17 +120,11 @@
                                                 {% endif %}
                                                 <button class="btn btn-sm btn-danger delete-btn" 
                                                         data-id="{{ year.id }}"
-                                                        data-name="{{ year.name }}">
+                                                        data-name="{{ year.name }}"
+                                                        {% if year.is_active %}disabled title="Cannot delete an active year"{% endif %}>
                                                     <i class="fas fa-trash"></i> Delete
                                                 </button>
                                             </div>
-                                        </td>
-                                    </tr>
-                                    {% empty %}
-                                    <tr id="no-data-row">
-                                        <td colspan="5" class="text-center text-muted py-4">
-                                            <i class="fas fa-inbox fa-2x mb-2"></i><br>
-                                            No academic years found. Click "Add Academic Year" to create one.
                                         </td>
                                     </tr>
                                     {% endfor %}
@@ -149,7 +138,6 @@
     </div>
 </section>
 
-<!-- Add Academic Year Modal -->
 <div class="modal fade" id="addAcademicYearModal" tabindex="-1" role="dialog" aria-labelledby="addModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg" role="document">
         <div class="modal-content">
@@ -197,7 +185,6 @@
     </div>
 </div>
 
-<!-- Edit Academic Year Modal -->
 <div class="modal fade" id="editAcademicYearModal" tabindex="-1" role="dialog" aria-labelledby="editModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg" role="document">
         <div class="modal-content">
@@ -244,7 +231,6 @@
     </div>
 </div>
 
-<!-- Delete Confirmation Modal -->
 <div class="modal fade" id="deleteAcademicYearModal" tabindex="-1" role="dialog" aria-labelledby="deleteModalLabel" aria-hidden="true">
     <div class="modal-dialog" role="document">
         <div class="modal-content">
@@ -262,7 +248,7 @@
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-dismiss="modal" id="cancel-delete-btn">Cancel</button>
-                <button type="button" class="btn btn-danger" id="confirm-delete-btn">
+                    <button type="button" class="btn btn-danger" id="confirm-delete-btn">
                     <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="display: none;"></span>
                     Delete
                 </button>
@@ -275,7 +261,7 @@
 {% block extra_js %}
 <script>
     $(document).ready(function() {
-        // Initialize DataTable
+        // Initialize DataTable with proper configuration
         var table = $('#academic-years-table').DataTable({
             "dom": "<'row'<'col-sm-12 col-md-6'l><'col-sm-12 col-md-6'f>>" +
                    "<'row'<'col-sm-12'tr>>" +
@@ -286,18 +272,23 @@
             "autoWidth": false,
             "ordering": true,
             "order": [[0, 'desc']],
-               "columnDefs": [
-                   {"targets": 4, "orderable": false, "searchable": false}
-               ],
-               "columns": [
-                   {"data": null},
-                   {"data": null},
-                   {"data": null},
-                   {"data": null},
-                   {"data": null}
-               ],
+            
+            // Critical setup for Django tables - DO NOT include columns configuration
+            "destroy": true,
+            "retrieve": true,
+            "deferRender": true,
+            
+            // Set the actions column as not orderable or searchable
+            "columnDefs": [
+                { 
+                    "targets": 4, // Target the 5th column (Actions)
+                    "orderable": false,
+                    "searchable": false
+                }
+            ],
+            
             "language": {
-                "emptyTable": "No academic years found. Click 'Add Academic Year' to create one.",
+                "emptyTable": "<div class='text-center py-4'><i class='fas fa-inbox fa-2x mb-2'></i><br>No academic years found. Click \"Add Academic Year\" to create one.</div>",
                 "search": "_INPUT_",
                 "searchPlaceholder": "Search...",
                 "lengthMenu": "_MENU_ records per page",
@@ -312,32 +303,34 @@
                 }
             },
             "drawCallback": function(settings) {
+                // Update total count
                 var api = this.api();
                 var total = api.rows().count();
                 $('#total-count').text('Total: ' + total);
             }
         });
 
+        // CSRF token for AJAX requests
         function getCSRFToken() {
-            return document.querySelector('[name=csrfmiddlewaretoken]').value;
+            return $('input[name="csrfmiddlewaretoken"]').val();
         }
 
+        // Show toast message
         function showToast(message, type = 'success') {
-            if (type === 'success') {
-                $('#success-message').text(message);
-                $('#success-toast').fadeIn();
-                setTimeout(function() {
-                    $('#success-toast').fadeOut();
-                }, 3000);
-            } else {
-                $('#error-message').text(message);
-                $('#error-toast').fadeIn();
-                setTimeout(function() {
-                    $('#error-toast').fadeOut();
-                }, 5000);
-            }
+            const toastId = type === 'success' ? '#success-toast' : '#error-toast';
+            const messageId = type === 'success' ? '#success-message' : '#error-message';
+            
+            $(messageId).text(message);
+            $(toastId).addClass('show').fadeIn();
+            
+            setTimeout(function() {
+                $(toastId).fadeOut(function() {
+                    $(this).removeClass('show');
+                });
+            }, type === 'success' ? 3000 : 5000);
         }
 
+        // Function to reload page after delay
         function reloadPageAfterDelay(message, type = 'success') {
             showToast(message, type);
             var delay = type === 'success' ? 2000 : 3000;
@@ -346,24 +339,39 @@
             }, delay);
         }
 
+        // Handle modal close/cancel buttons
         $(document).on('click', '[data-dismiss="modal"]', function(e) {
             e.preventDefault();
             $(this).closest('.modal').modal('hide');
         });
 
+        // Handle cancel buttons
         $('#cancel-add-btn, #cancel-edit-btn, #cancel-delete-btn').on('click', function(e) {
             e.preventDefault();
             $(this).closest('.modal').modal('hide');
         });
 
+        // Helper function to handle button loading state
+        function setButtonLoading(btn, isLoading) {
+            const spinner = btn.find('.spinner-border');
+            if (isLoading) {
+                btn.data('original-text', btn.html());
+                btn.prop('disabled', true);
+                spinner.show();
+                btn.html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Loading...');
+            } else {
+                btn.prop('disabled', false);
+                spinner.hide();
+                btn.html(btn.data('original-text'));
+            }
+        }
+        
         // Add Academic Year
         $('#add-form').on('submit', function(e) {
             e.preventDefault();
             
             const saveBtn = $('#save-btn');
-            const spinner = saveBtn.find('.spinner-border');
-            saveBtn.prop('disabled', true);
-            spinner.show();
+            setButtonLoading(saveBtn, true);
             
             const formData = new FormData(this);
             formData.append('action', 'create');
@@ -385,20 +393,18 @@
                         $('#add-form')[0].reset();
                     } else {
                         showToast(data.message, 'danger');
-                        saveBtn.prop('disabled', false);
-                        spinner.hide();
+                        setButtonLoading(saveBtn, false);
                     }
                 },
                 error: function(xhr, status, error) {
                     console.error('Error:', error);
                     showToast('An error occurred while saving. Please try again.', 'danger');
-                    saveBtn.prop('disabled', false);
-                    spinner.hide();
+                    setButtonLoading(saveBtn, false);
                 }
             });
         });
 
-        // Edit Academic Year
+        // Edit Academic Year - Setup modal (using event delegation)
         $(document).on('click', '.edit-btn', function() {
             const btn = $(this);
             
@@ -410,13 +416,12 @@
             $('#editAcademicYearModal').modal('show');
         });
 
+        // Edit Academic Year - Submit form
         $('#edit-form').on('submit', function(e) {
             e.preventDefault();
             
             const updateBtn = $('#update-btn');
-            const spinner = updateBtn.find('.spinner-border');
-            updateBtn.prop('disabled', true);
-            spinner.show();
+            setButtonLoading(updateBtn, true);
             
             const formData = new FormData(this);
             formData.append('action', 'update');
@@ -437,64 +442,60 @@
                         reloadPageAfterDelay(data.message, 'success');
                     } else {
                         showToast(data.message, 'danger');
-                        updateBtn.prop('disabled', false);
-                        spinner.hide();
+                        setButtonLoading(updateBtn, false);
                     }
                 },
                 error: function(xhr, status, error) {
                     console.error('Error:', error);
                     showToast('An error occurred while updating. Please try again.', 'danger');
-                    updateBtn.prop('disabled', false);
-                    spinner.hide();
+                    setButtonLoading(updateBtn, false);
                 }
             });
         });
 
         // Activate Academic Year
-        let yearToActivate = null;
-        
         $(document).on('click', '.activate-btn', function() {
             const btn = $(this);
-            yearToActivate = {
-                id: btn.data('id'),
-                name: btn.data('name')
-            };
+            const yearId = btn.data('id');
+            const yearName = btn.data('name');
             
-            // Directly activate without confirmation
-            const formData = new FormData();
-            formData.append('action', 'activate');
-            formData.append('id', yearToActivate.id);
-            formData.append('csrfmiddlewaretoken', getCSRFToken());
-            
-            $.ajax({
-                url: '{% url "admin_academic_years_crud" %}',
-                method: 'POST',
-                headers: {
-                    'X-CSRFToken': getCSRFToken(),
-                    'X-Requested-With': 'XMLHttpRequest'
-                },
-                data: formData,
-                processData: false,
-                contentType: false,
-                success: function(data) {
-                    if (data.success) {
-                        reloadPageAfterDelay(data.message, 'success');
-                    } else {
-                        showToast(data.message, 'danger');
+            if (confirm(`Are you sure you want to activate "${yearName}"? This will deactivate the current active year.`)) {
+                const formData = new FormData();
+                formData.append('action', 'activate');
+                formData.append('id', yearId);
+                
+                $.ajax({
+                    url: '{% url "admin_academic_years_crud" %}',
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': getCSRFToken(),
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    data: formData,
+                    processData: false,
+                    contentType: false,
+                    success: function(data) {
+                        if (data.success) {
+                            reloadPageAfterDelay(data.message, 'success');
+                        } else {
+                            showToast(data.message, 'danger');
+                        }
+                    },
+                    error: function(xhr, status, error) {
+                        console.error('Error:', error);
+                        showToast('An error occurred while activating. Please try again.', 'danger');
                     }
-                },
-                error: function(xhr, status, error) {
-                    console.error('Error:', error);
-                    showToast('An error occurred while activating. Please try again.', 'danger');
-                }
-            });
+                });
+            }
         });
 
-        // Delete Academic Year
+        // Delete Academic Year - Setup modal (using event delegation)
         let yearToDelete = null;
         
         $(document).on('click', '.delete-btn', function() {
             const btn = $(this);
+            
+            if (btn.prop('disabled')) return;
             
             yearToDelete = {
                 id: btn.data('id'),
@@ -505,13 +506,12 @@
             $('#deleteAcademicYearModal').modal('show');
         });
 
+        // Delete Academic Year - Confirm
         $('#confirm-delete-btn').on('click', function() {
             if (!yearToDelete) return;
             
             const deleteBtn = $(this);
-            const spinner = deleteBtn.find('.spinner-border');
-            deleteBtn.prop('disabled', true);
-            spinner.show();
+            setButtonLoading(deleteBtn, true);
             
             const formData = new FormData();
             formData.append('action', 'delete');
@@ -534,25 +534,39 @@
                         reloadPageAfterDelay(data.message, 'success');
                     } else {
                         showToast(data.message, 'danger');
-                        deleteBtn.prop('disabled', false);
-                        spinner.hide();
+                        setButtonLoading(deleteBtn, false);
                     }
                 },
                 error: function(xhr, status, error) {
                     console.error('Error:', error);
                     showToast('An error occurred while deleting. Please try again.', 'danger');
-                    deleteBtn.prop('disabled', false);
-                    spinner.hide();
+                    setButtonLoading(deleteBtn, false);
                 }
             });
         });
 
+        // Clear form on modal close
         $('#addAcademicYearModal').on('hidden.bs.modal', function() {
             $('#add-form')[0].reset();
+            setButtonLoading($('#save-btn'), false);
         });
         
+        // Reset edit button state on modal close
+        $('#editAcademicYearModal').on('hidden.bs.modal', function() {
+            setButtonLoading($('#update-btn'), false);
+        });
+        
+        // Reset delete confirmation on modal close
         $('#deleteAcademicYearModal').on('hidden.bs.modal', function() {
             yearToDelete = null;
+            setButtonLoading($('#confirm-delete-btn'), false);
+        });
+
+        // Manual refresh button (if exists)
+        $('.btn-outline-secondary').on('click', function() {
+            if ($(this).find('.fa-sync-alt').length) {
+                location.reload();
+            }
         });
     });
 </script>

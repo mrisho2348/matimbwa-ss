@@ -1,8 +1,69 @@
 {% extends 'admin/base.html' %}
-{% block title %}{{ page_title|default:'Staff Roles' }}{% endblock %}
+{% load static %}
+
+{% block title %}Staff Roles{% endblock %}
+
 {% block content %}
-<div class="container">
-  <h1>{{ page_title|default:'Staff Roles' }}</h1>
-  <p>Roles summary placeholder.</p>
+<div class="container-xxl flex-grow-1 container-p-y">
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Staff Roles Summary</h5>
+                </div>
+
+                <div class="card-body">
+                    <div class="row">
+                        {% for role in roles %}
+                        <div class="col-md-4 mb-3">
+                            <div class="card bg-light h-100">
+                                <div class="card-body">
+                                    <h6 class="card-title text-uppercase">
+                                        {% for value, label in role_choices %}
+                                            {% if value == role.role %}{{ label }}{% endif %}
+                                        {% endfor %}
+                                    </h6>
+                                    <h3 class="card-subtitle mb-3">{{ role.count }}</h3>
+                                    <a href="?role={{ role.role }}" class="btn btn-sm btn-primary">View Staff</a>
+                                </div>
+                            </div>
+                        </div>
+                        {% empty %}
+                        <div class="col-md-12">
+                            <div class="alert alert-info">
+                                No staff roles found
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+
+                    <!-- Staff by Role Table -->
+                    <div class="mt-4">
+                        <h6 class="mb-3">All Staff Members by Role</h6>
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Name</th>
+                                        <th>Role</th>
+                                        <th>Email</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td colspan="5" class="text-center text-muted py-4">
+                                            Load staff members here
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 {% endblock %}

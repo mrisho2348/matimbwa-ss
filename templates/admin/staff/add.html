@@ -1,12 +1,140 @@
 {% extends 'admin/base.html' %}
-{% block title %}{{ page_title|default:'Add Staff' }}{% endblock %}
+{% load static %}
+
+{% block title %}Add Staff Member{% endblock %}
+
 {% block content %}
-<div class="container">
-  <h1>{{ page_title|default:'Add Staff' }}</h1>
-  <form method="post">{% csrf_token %}
-    <input name="username" class="form-control mb-2" placeholder="Username">
-    <input name="email" class="form-control mb-2" placeholder="Email">
-    <button class="btn btn-primary" type="submit">Create</button>
-  </form>
+<div class="container-xxl flex-grow-1 container-p-y">
+    <div class="row">
+        <div class="col-md-8 offset-md-2">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Add New Staff Member</h5>
+                </div>
+
+                <form method="post" enctype="multipart/form-data" class="card-body">
+                    {% csrf_token %}
+
+                    <!-- User Account Section -->
+                    <div class="mb-4">
+                        <h6 class="border-bottom pb-2 mb-3">User Account Information</h6>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label" for="username">Username *</label>
+                                <input type="text" name="username" id="username" class="form-control" placeholder="Username" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label" for="email">Email *</label>
+                                <input type="email" name="email" id="email" class="form-control" placeholder="Email Address" required>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label" for="password">Password *</label>
+                                <input type="password" name="password" id="password" class="form-control" placeholder="Password" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label" for="password_confirm">Confirm Password *</label>
+                                <input type="password" name="password_confirm" id="password_confirm" class="form-control" placeholder="Confirm Password" required>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Personal Information Section -->
+                    <div class="mb-4">
+                        <h6 class="border-bottom pb-2 mb-3">Personal Information</h6>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label" for="first_name">First Name *</label>
+                                <input type="text" name="first_name" id="first_name" class="form-control" placeholder="First Name" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label" for="last_name">Last Name *</label>
+                                <input type="text" name="last_name" id="last_name" class="form-control" placeholder="Last Name" required>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label" for="middle_name">Middle Name</label>
+                                <input type="text" name="middle_name" id="middle_name" class="form-control" placeholder="Middle Name">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label" for="gender">Gender</label>
+                                <select name="gender" id="gender" class="form-control">
+                                    <option value="">Select Gender</option>
+                                    {% for value, label in gender_choices %}
+                                    <option value="{{ value }}">{{ label }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label" for="phone_number">Phone Number</label>
+                                <input type="text" name="phone_number" id="phone_number" class="form-control" placeholder="Phone Number">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label" for="date_of_birth">Date of Birth</label>
+                                <input type="date" name="date_of_birth" id="date_of_birth" class="form-control">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Professional Information Section -->
+                    <div class="mb-4">
+                        <h6 class="border-bottom pb-2 mb-3">Professional Information</h6>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label" for="role">Role *</label>
+                                <select name="role" id="role" class="form-control" required>
+                                    <option value="">Select Role</option>
+                                    {% for value, label in role_choices %}
+                                    <option value="{{ value }}">{{ label }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label" for="marital_status">Marital Status</label>
+                                <select name="marital_status" id="marital_status" class="form-control">
+                                    <option value="">Select Status</option>
+                                    <option value="single">Single</option>
+                                    <option value="married">Married</option>
+                                    <option value="divorced">Divorced</option>
+                                    <option value="widowed">Widowed</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label" for="joining_date">Joining Date</label>
+                                <input type="date" name="joining_date" id="joining_date" class="form-control">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label" for="profile_picture">Profile Picture</label>
+                                <input type="file" name="profile_picture" id="profile_picture" class="form-control" accept="image/*">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Form Actions -->
+                    <div class="mb-3">
+                        <button type="submit" class="btn btn-primary me-2">
+                            <i class="bx bx-save"></i> Add Staff Member
+                        </button>
+                        <a href="{% url 'admin_staff_list' %}" class="btn btn-secondary">
+                            <i class="bx bx-arrow-back"></i> Cancel
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
 </div>
 {% endblock %}

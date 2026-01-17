@@ -1,0 +1,643 @@
+<!-- admin/students/includes/parent_card.html -->
+<div class="col-md-6 col-lg-4 mb-4" id="parent-card-{{ parent.id }}" data-parent-id="{{ parent.id }}">
+    <div class="parent-card {% if parent.is_fee_responsible %}fee-responsible{% endif %}" 
+         data-parent-id="{{ parent.id }}">
+        
+        {% if parent.is_fee_responsible %}
+        <span class="fee-responsible-badge">
+            <i class="fas fa-money-check-alt me-1"></i>Fee Responsible
+        </span>
+        {% endif %}
+        
+        <!-- Parent Header with Actions -->
+        <div class="d-flex justify-content-between align-items-start mb-3">
+            <div>
+                <h6 class="mb-1 parent-name">{{ parent.full_name }}</h6>
+                <span class="badge bg-primary relationship-badge">
+                    <i class="fas fa-user-tag me-1"></i>{{ parent.relationship }}
+                </span>
+            </div>
+            <div class="dropdown">
+                <button class="btn btn-sm btn-light rounded-circle" type="button" 
+                        id="parentActions-{{ parent.id }}" data-toggle="dropdown" 
+                        aria-haspopup="true" aria-expanded="false">
+                    <i class="fas fa-ellipsis-v"></i>
+                </button>
+                <div class="dropdown-menu dropdown-menu-right" aria-labelledby="parentActions-{{ parent.id }}">
+                    <a class="dropdown-item edit-parent-btn" 
+                       href="{% url 'admin_edit_parent' student.id parent.id %}"
+                       data-parent-id="{{ parent.id }}">
+                        <i class="fas fa-edit text-primary me-2"></i>Edit Parent
+                    </a>
+                    <a class="dropdown-item make-fee-responsible-btn" 
+                       href="#" data-parent-id="{{ parent.id }}">
+                        <i class="fas fa-money-check-alt text-success me-2"></i>
+                        {% if parent.is_fee_responsible %}
+                            Remove Fee Responsibility
+                        {% else %}
+                            Make Fee Responsible
+                        {% endif %}
+                    </a>
+                    <div class="dropdown-divider"></div>
+                    <a class="dropdown-item delete-parent-btn text-danger" 
+                       href="#" data-parent-id="{{ parent.id }}"
+                       data-parent-name="{{ parent.full_name }}">
+                        <i class="fas fa-trash me-2"></i>Delete Parent
+                    </a>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Contact Information -->
+        <div class="parent-info">
+            <div class="info-item mb-2">
+                <div class="info-label">
+                    <i class="fas fa-phone text-muted me-2"></i>
+                    <span>Primary Phone</span>
+                </div>
+                <div class="info-value phone-number">
+                    <a href="tel:+255{{ parent.first_phone_number|slugify }}" class="text-decoration-none">
+                        +255 {{ parent.first_phone_number }}
+                    </a>
+                    <button class="btn btn-sm btn-link copy-phone-btn" 
+                            data-phone="{{ parent.first_phone_number }}"
+                            data-toggle="tooltip" title="Copy phone number">
+                        <i class="fas fa-copy"></i>
+                    </button>
+                </div>
+            </div>
+            
+            {% if parent.second_phone_number %}
+            <div class="info-item mb-2">
+                <div class="info-label">
+                    <i class="fas fa-phone-alt text-muted me-2"></i>
+                    <span>Secondary Phone</span>
+                </div>
+                <div class="info-value phone-number">
+                    <a href="tel:+255{{ parent.second_phone_number|slugify }}" class="text-decoration-none">
+                        +255 {{ parent.second_phone_number }}
+                    </a>
+                    <button class="btn btn-sm btn-link copy-phone-btn" 
+                            data-phone="{{ parent.second_phone_number }}"
+                            data-toggle="tooltip" title="Copy phone number">
+                        <i class="fas fa-copy"></i>
+                    </button>
+                </div>
+            </div>
+            {% endif %}
+            
+            {% if parent.email %}
+            <div class="info-item mb-2">
+                <div class="info-label">
+                    <i class="fas fa-envelope text-muted me-2"></i>
+                    <span>Email</span>
+                </div>
+                <div class="info-value">
+                    <a href="mailto:{{ parent.email }}" class="text-decoration-none">
+                        {{ parent.email }}
+                    </a>
+                    <button class="btn btn-sm btn-link copy-email-btn" 
+                            data-email="{{ parent.email }}"
+                            data-toggle="tooltip" title="Copy email">
+                        <i class="fas fa-copy"></i>
+                    </button>
+                </div>
+            </div>
+            {% endif %}
+            
+            <div class="info-item mb-3">
+                <div class="info-label">
+                    <i class="fas fa-home text-muted me-2"></i>
+                    <span>Address</span>
+                </div>
+                <div class="info-value">
+                    {{ parent.address|truncatechars:60 }}
+                    {% if parent.address|length > 60 %}
+                    <button class="btn btn-sm btn-link view-address-btn" 
+                            data-address="{{ parent.address }}"
+                            data-toggle="tooltip" title="View full address">
+                        <i class="fas fa-eye"></i>
+                    </button>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <!-- Additional Information -->
+        <div class="additional-info mt-3 pt-3 border-top">
+            <div class="row">
+                <div class="col-6">
+                    <small class="text-muted d-block">
+                        <i class="fas fa-calendar-plus me-1"></i>
+                        Added: {{ parent.created_at|date:"M d, Y" }}
+                    </small>
+                </div>
+                <div class="col-6 text-end">
+                    <small class="text-muted d-block">
+                        <i class="fas fa-calendar-check me-1"></i>
+                        Updated: {{ parent.updated_at|date:"M d, Y" }}
+                    </small>
+                </div>
+            </div>
+            
+            <!-- Linked Students (for future enhancement) -->
+            {% if parent.students.count > 1 %}
+            <div class="mt-2">
+                <small class="text-muted">
+                    <i class="fas fa-user-graduate me-1"></i>
+                    Also parent of {{ parent.students.count|add:"-1" }} other student{{ parent.students.count|add:"-1"|pluralize }}
+                </small>
+            </div>
+            {% endif %}
+        </div>
+        
+        <!-- Quick Actions -->
+        <div class="quick-actions mt-3 d-flex gap-2">
+            <a href="tel:+255{{ parent.first_phone_number|slugify }}" 
+               class="btn btn-sm btn-outline-primary flex-fill">
+                <i class="fas fa-phone me-1"></i> Call
+            </a>
+            <a href="https://wa.me/255{{ parent.first_phone_number|slugify }}" 
+               target="_blank" class="btn btn-sm btn-outline-success flex-fill">
+                <i class="fab fa-whatsapp me-1"></i> WhatsApp
+            </a>
+            <a href="sms:+255{{ parent.first_phone_number|slugify }}" 
+               class="btn btn-sm btn-outline-info flex-fill">
+                <i class="fas fa-sms me-1"></i> SMS
+            </a>
+        </div>
+    </div>
+</div>
+
+<style>
+.parent-card {
+    background: white;
+    border-radius: 16px;
+    padding: 20px;
+    margin-bottom: 15px;
+    border: 2px solid #e2e8f0;
+    transition: all 0.3s ease;
+    position: relative;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.parent-card:hover {
+    border-color: #667eea;
+    transform: translateY(-3px);
+    box-shadow: 0 10px 30px rgba(102, 126, 234, 0.15);
+}
+
+.parent-card.fee-responsible {
+    border-color: #48bb78;
+    background: linear-gradient(135deg, #f0fff4 0%, #f0fff4 100%);
+    border-left-width: 4px;
+    border-left-color: #48bb78;
+}
+
+.fee-responsible-badge {
+    position: absolute;
+    top: -10px;
+    right: 15px;
+    background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+    color: white;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    box-shadow: 0 4px 15px rgba(72, 187, 120, 0.3);
+    z-index: 2;
+}
+
+.parent-card h6 {
+    color: #2d3748;
+    font-weight: 700;
+    margin-bottom: 5px;
+}
+
+.relationship-badge {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    font-size: 0.75rem;
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-weight: 500;
+}
+
+.parent-info {
+    flex-grow: 1;
+}
+
+.info-item {
+    display: flex;
+    align-items: flex-start;
+    margin-bottom: 12px;
+}
+
+.info-label {
+    flex: 0 0 120px;
+    color: #718096;
+    font-size: 0.85rem;
+    display: flex;
+    align-items: center;
+}
+
+.info-label i {
+    width: 20px;
+    text-align: center;
+}
+
+.info-value {
+    flex: 1;
+    color: #2d3748;
+    font-size: 0.9rem;
+    word-break: break-word;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.info-value a {
+    color: #4299e1;
+    text-decoration: none;
+    flex: 1;
+}
+
+.info-value a:hover {
+    color: #3182ce;
+    text-decoration: underline;
+}
+
+.phone-number, .info-value {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.copy-phone-btn, .copy-email-btn, .view-address-btn {
+    color: #a0aec0;
+    padding: 2px 5px;
+    font-size: 0.8rem;
+    transition: color 0.3s ease;
+}
+
+.copy-phone-btn:hover, .copy-email-btn:hover, .view-address-btn:hover {
+    color: #667eea;
+}
+
+.additional-info {
+    font-size: 0.8rem;
+    color: #a0aec0;
+}
+
+.quick-actions {
+    margin-top: auto;
+}
+
+.quick-actions .btn {
+    padding: 6px 8px;
+    font-size: 0.8rem;
+    border-radius: 10px;
+    transition: all 0.3s ease;
+}
+
+.quick-actions .btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.dropdown-toggle::after {
+    display: none;
+}
+
+.dropdown-menu {
+    border: none;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+    border-radius: 12px;
+    padding: 8px;
+}
+
+.dropdown-item {
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 0.85rem;
+    transition: all 0.3s ease;
+}
+
+.dropdown-item:hover {
+    background: linear-gradient(135deg, #f6f8ff 0%, #f9f5ff 100%);
+    transform: translateX(5px);
+}
+
+/* Animation for new parent cards */
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+#parent-card-{{ parent.id }} {
+    animation: slideIn 0.5s ease-out;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .info-label {
+        flex: 0 0 100px;
+    }
+    
+    .quick-actions .btn {
+        font-size: 0.75rem;
+        padding: 5px;
+    }
+    
+    .parent-card {
+        padding: 15px;
+    }
+}
+
+/* Status indicators */
+.status-indicator {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+    margin-right: 5px;
+}
+
+.status-active {
+    background-color: #48bb78;
+}
+
+.status-inactive {
+    background-color: #e53e3e;
+}
+
+/* Hover effects for interactive elements */
+.btn-light:hover {
+    background-color: #f7fafc;
+    border-color: #cbd5e0;
+}
+
+/* Copy feedback */
+.copied-feedback {
+    position: absolute;
+    background: #48bb78;
+    color: white;
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    animation: fadeOut 2s ease-out;
+    z-index: 100;
+}
+
+@keyframes fadeOut {
+    0% { opacity: 1; }
+    70% { opacity: 1; }
+    100% { opacity: 0; }
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize tooltips
+    $('[data-toggle="tooltip"]').tooltip();
+    
+    // Copy phone number functionality
+    $('.copy-phone-btn').on('click', function(e) {
+        e.preventDefault();
+        const phone = $(this).data('phone');
+        const phoneWithCode = '+255' + phone.replace(/\s/g, '');
+        
+        navigator.clipboard.writeText(phoneWithCode).then(function() {
+            showCopiedFeedback($(this), 'Phone copied!');
+        }.bind(this)).catch(function(err) {
+            console.error('Failed to copy phone: ', err);
+        });
+    });
+    
+    // Copy email functionality
+    $('.copy-email-btn').on('click', function(e) {
+        e.preventDefault();
+        const email = $(this).data('email');
+        
+        navigator.clipboard.writeText(email).then(function() {
+            showCopiedFeedback($(this), 'Email copied!');
+        }.bind(this)).catch(function(err) {
+            console.error('Failed to copy email: ', err);
+        });
+    });
+    
+    // View full address
+    $('.view-address-btn').on('click', function(e) {
+        e.preventDefault();
+        const address = $(this).data('address');
+        
+        Swal.fire({
+            title: 'Full Address',
+            html: `<div class="text-left"><p class="mb-0">${address}</p></div>`,
+            icon: 'info',
+            confirmButtonText: 'Close',
+            confirmButtonColor: '#667eea'
+        });
+    });
+    
+    // Make fee responsible
+    $('.make-fee-responsible-btn').on('click', function(e) {
+        e.preventDefault();
+        const parentId = $(this).data('parent-id');
+        const isCurrentlyResponsible = $(this).closest('.parent-card').hasClass('fee-responsible');
+        
+        Swal.fire({
+            title: isCurrentlyResponsible ? 'Remove Fee Responsibility?' : 'Make Fee Responsible?',
+            text: isCurrentlyResponsible 
+                ? 'This parent will no longer be the primary fee payer.'
+                : 'This parent will become the primary fee payer.',
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonColor: '#48bb78',
+            cancelButtonColor: '#d33',
+            confirmButtonText: isCurrentlyResponsible ? 'Yes, remove' : 'Yes, make responsible'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                updateFeeResponsibility(parentId, !isCurrentlyResponsible);
+            }
+        });
+    });
+    
+    // Delete parent
+    $('.delete-parent-btn').on('click', function(e) {
+        e.preventDefault();
+        const parentId = $(this).data('parent-id');
+        const parentName = $(this).data('parent-name');
+        
+        Swal.fire({
+            title: 'Delete Parent?',
+            html: `<p>Are you sure you want to delete <strong>${parentName}</strong>?</p>
+                  <p class="text-danger"><i class="fas fa-exclamation-triangle me-2"></i>This action cannot be undone!</p>`,
+            icon: 'error',
+            showCancelButton: true,
+            confirmButtonColor: '#dc3545',
+            cancelButtonColor: '#6c757d',
+            confirmButtonText: 'Yes, delete parent',
+            cancelButtonText: 'Cancel',
+            focusCancel: true
+        }).then((result) => {
+            if (result.isConfirmed) {
+                deleteParent(parentId, parentName);
+            }
+        });
+    });
+    
+    function showCopiedFeedback(element, message) {
+        // Remove any existing feedback
+        $('.copied-feedback').remove();
+        
+        // Create and show feedback
+        const feedback = $(`<div class="copied-feedback">${message}</div>`);
+        element.after(feedback);
+        
+        // Position feedback
+        const elementRect = element[0].getBoundingClientRect();
+        feedback.css({
+            position: 'fixed',
+            top: elementRect.top - 35 + 'px',
+            left: elementRect.left + (elementRect.width / 2) - 50 + 'px',
+            width: '100px',
+            textAlign: 'center'
+        });
+        
+        // Remove after animation
+        setTimeout(() => {
+            feedback.remove();
+        }, 2000);
+    }
+    
+    function updateFeeResponsibility(parentId, makeResponsible) {
+        const csrftoken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+        
+        $.ajax({
+            url: `/admin/students/{{ student.id }}/parent/${parentId}/update-fee-responsibility/`,
+            type: 'POST',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRFToken': csrftoken
+            },
+            data: {
+                is_fee_responsible: makeResponsible
+            },
+            success: function(response) {
+                if (response.success) {
+                    // Update all parent cards
+                    $('.parent-card').removeClass('fee-responsible');
+                    $('.fee-responsible-badge').remove();
+                    
+                    if (makeResponsible) {
+                        $(`#parent-card-${parentId} .parent-card`).addClass('fee-responsible');
+                        $(`#parent-card-${parentId} .parent-card`).prepend(
+                            `<span class="fee-responsible-badge">
+                                <i class="fas fa-money-check-alt me-1"></i>Fee Responsible
+                            </span>`
+                        );
+                        
+                        // Update button text
+                        $(`#parent-card-${parentId} .make-fee-responsible-btn`).html(
+                            '<i class="fas fa-money-check-alt text-success me-2"></i>Remove Fee Responsibility'
+                        );
+                        
+                        Swal.fire({
+                            title: 'Success!',
+                            text: 'Parent is now fee responsible',
+                            icon: 'success',
+                            confirmButtonColor: '#667eea'
+                        });
+                    } else {
+                        // Update button text
+                        $(`#parent-card-${parentId} .make-fee-responsible-btn`).html(
+                            '<i class="fas fa-money-check-alt text-success me-2"></i>Make Fee Responsible'
+                        );
+                        
+                        Swal.fire({
+                            title: 'Success!',
+                            text: 'Fee responsibility removed',
+                            icon: 'success',
+                            confirmButtonColor: '#667eea'
+                        });
+                    }
+                } else {
+                    Swal.fire({
+                        title: 'Error!',
+                        text: response.message || 'Failed to update fee responsibility',
+                        icon: 'error',
+                        confirmButtonColor: '#d33'
+                    });
+                }
+            },
+            error: function() {
+                Swal.fire({
+                    title: 'Error!',
+                    text: 'An error occurred while updating fee responsibility',
+                    icon: 'error',
+                    confirmButtonColor: '#d33'
+                });
+            }
+        });
+    }
+    
+    function deleteParent(parentId, parentName) {
+        const csrftoken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+        
+        $.ajax({
+            url: `/admin/students/{{ student.id }}/parent/${parentId}/delete/`,
+            type: 'POST',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRFToken': csrftoken
+            },
+            success: function(response) {
+                if (response.success) {
+                    // Remove parent card with animation
+                    $(`#parent-card-${parentId}`).fadeOut(300, function() {
+                        $(this).remove();
+                        
+                        // Update parent count if exists
+                        const parentCountElement = $('.parent-count');
+                        if (parentCountElement.length) {
+                            const currentCount = parseInt(parentCountElement.text());
+                            parentCountElement.text(currentCount - 1);
+                        }
+                    });
+                    
+                    Swal.fire({
+                        title: 'Deleted!',
+                        text: response.message,
+                        icon: 'success',
+                        confirmButtonColor: '#667eea'
+                    });
+                } else {
+                    Swal.fire({
+                        title: 'Error!',
+                        text: response.message || 'Failed to delete parent',
+                        icon: 'error',
+                        confirmButtonColor: '#d33'
+                    });
+                }
+            },
+            error: function() {
+                Swal.fire({
+                    title: 'Error!',
+                    text: 'An error occurred while deleting the parent',
+                    icon: 'error',
+                    confirmButtonColor: '#d33'
+                });
+            }
+        });
+    }
+});
+</script>

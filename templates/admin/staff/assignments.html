@@ -1,8 +1,103 @@
 {% extends 'admin/base.html' %}
-{% block title %}{{ page_title|default:'Staff Assignments' }}{% endblock %}
+{% load static %}
+
+{% block title %}Staff Assignments{% endblock %}
+
 {% block content %}
-<div class="container">
-  <h1>{{ page_title|default:'Staff Assignments' }}</h1>
-  <p>Manage staff class assignments.</p>
+<div class="container-xxl flex-grow-1 container-p-y">
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0">Staff Class Assignments</h5>
+                    <button class="btn btn-primary" onclick="showAssignmentModal()">
+                        <i class="bx bx-plus"></i> Assign Staff to Class
+                    </button>
+                </div>
+
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Staff Name</th>
+                                    <th>Role</th>
+                                    <th>Class Level</th>
+                                    <th>Subject</th>
+                                    <th>Academic Year</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td colspan="8" class="text-center text-muted py-4">
+                                        No assignments found. Create one to get started.
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
+
+<!-- Assignment Modal -->
+<div class="modal fade" id="assignmentModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Assign Staff to Class</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="assignmentForm">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Staff Member *</label>
+                        <select name="staff_id" class="form-control" required>
+                            <option value="">Select Staff</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Class Level *</label>
+                        <select name="class_id" class="form-control" required>
+                            <option value="">Select Class</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Subject</label>
+                        <select name="subject_id" class="form-control">
+                            <option value="">Select Subject</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Academic Year *</label>
+                        <input type="text" name="academic_year" class="form-control" required>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="submit" class="btn btn-primary">Save Assignment</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function showAssignmentModal() {
+    document.getElementById('assignmentForm').reset();
+    new bootstrap.Modal(document.getElementById('assignmentModal')).show();
+}
+
+document.getElementById('assignmentForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    // Implement assignment save functionality
+    console.log('Saving assignment...');
+});
+</script>
 {% endblock %}

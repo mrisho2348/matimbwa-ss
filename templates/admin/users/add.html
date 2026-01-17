@@ -1,12 +1,93 @@
 {% extends 'admin/base.html' %}
-{% block title %}{{ page_title|default:'Add User' }}{% endblock %}
+{% load static %}
+
+{% block title %}Add User{% endblock %}
+
 {% block content %}
-<div class="container">
-  <h1>{{ page_title|default:'Add User' }}</h1>
-  <form method="post">{% csrf_token %}
-    <input name="username" class="form-control mb-2" placeholder="Username">
-    <input name="email" class="form-control mb-2" placeholder="Email">
-    <button class="btn btn-primary" type="submit">Create</button>
-  </form>
+<div class="container-xxl flex-grow-1 container-p-y">
+    <div class="row">
+        <div class="col-md-8 offset-md-2">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Add New System User</h5>
+                </div>
+
+                <form method="post" class="card-body">
+                    {% csrf_token %}
+
+                    <div class="mb-4">
+                        <h6 class="border-bottom pb-2 mb-3">User Account Information</h6>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label" for="username">Username *</label>
+                                <input type="text" name="username" id="username" class="form-control" placeholder="Username" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label" for="email">Email *</label>
+                                <input type="email" name="email" id="email" class="form-control" placeholder="Email Address" required>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label" for="password">Password *</label>
+                                <input type="password" name="password" id="password" class="form-control" placeholder="Password" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label" for="password_confirm">Confirm Password *</label>
+                                <input type="password" name="password_confirm" id="password_confirm" class="form-control" placeholder="Confirm Password" required>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label" for="first_name">First Name</label>
+                                <input type="text" name="first_name" id="first_name" class="form-control" placeholder="First Name">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label" for="last_name">Last Name</label>
+                                <input type="text" name="last_name" id="last_name" class="form-control" placeholder="Last Name">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <h6 class="border-bottom pb-2 mb-3">User Role Assignment</h6>
+                        
+                        <div class="mb-3">
+                            <label class="form-label" for="user_type">User Type *</label>
+                            <select name="user_type" id="user_type" class="form-control" required>
+                                <option value="">Select User Type</option>
+                                {% for value, label in user_type_choices %}
+                                <option value="{{ value }}">{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Form Actions -->
+                    <div class="mb-3">
+                        <button type="submit" class="btn btn-primary me-2">
+                            <i class="bx bx-save"></i> Create User
+                        </button>
+                        <a href="{% url 'admin_users_list' %}" class="btn btn-secondary">
+                            <i class="bx bx-arrow-back"></i> Cancel
+                        </a>
+                    </div>
+
+                    <!-- Error Messages -->
+                    {% if form.non_field_errors %}
+                    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                        {% for error in form.non_field_errors %}
+                        <p class="mb-0">{{ error }}</p>
+                        {% endfor %}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                    {% endif %}
+                </form>
+            </div>
+        </div>
+    </div>
 </div>
 {% endblock %}

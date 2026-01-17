@@ -1,8 +1,121 @@
 {% extends 'admin/base.html' %}
-{% block title %}{{ page_title|default:'Permissions' }}{% endblock %}
+{% load static %}
+
+{% block title %}System Permissions{% endblock %}
+
 {% block content %}
-<div class="container">
-  <h1>{{ page_title|default:'Permissions' }}</h1>
-  <p>Manage system permissions.</p>
+<div class="container-xxl flex-grow-1 container-p-y">
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">System Permissions Management</h5>
+                </div>
+
+                <div class="card-body">
+                    <!-- Permissions by Category -->
+                    <div class="row">
+                        <div class="col-md-6 mb-4">
+                            <h6 class="mb-3">Academic Management</h6>
+                            <div class="list-group">
+                                <label class="list-group-item">
+                                    <input class="form-check-input me-2" type="checkbox" checked>
+                                    View Classes
+                                </label>
+                                <label class="list-group-item">
+                                    <input class="form-check-input me-2" type="checkbox" checked>
+                                    Create Classes
+                                </label>
+                                <label class="list-group-item">
+                                    <input class="form-check-input me-2" type="checkbox" checked>
+                                    Edit Classes
+                                </label>
+                                <label class="list-group-item">
+                                    <input class="form-check-input me-2" type="checkbox">
+                                    Delete Classes
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="col-md-6 mb-4">
+                            <h6 class="mb-3">Student Management</h6>
+                            <div class="list-group">
+                                <label class="list-group-item">
+                                    <input class="form-check-input me-2" type="checkbox" checked>
+                                    View Students
+                                </label>
+                                <label class="list-group-item">
+                                    <input class="form-check-input me-2" type="checkbox" checked>
+                                    Create Students
+                                </label>
+                                <label class="list-group-item">
+                                    <input class="form-check-input me-2" type="checkbox" checked>
+                                    Edit Students
+                                </label>
+                                <label class="list-group-item">
+                                    <input class="form-check-input me-2" type="checkbox">
+                                    Delete Students
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="col-md-6 mb-4">
+                            <h6 class="mb-3">Staff Management</h6>
+                            <div class="list-group">
+                                <label class="list-group-item">
+                                    <input class="form-check-input me-2" type="checkbox" checked>
+                                    View Staff
+                                </label>
+                                <label class="list-group-item">
+                                    <input class="form-check-input me-2" type="checkbox">
+                                    Create Staff
+                                </label>
+                                <label class="list-group-item">
+                                    <input class="form-check-input me-2" type="checkbox">
+                                    Edit Staff
+                                </label>
+                                <label class="list-group-item">
+                                    <input class="form-check-input me-2" type="checkbox">
+                                    Delete Staff
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="col-md-6 mb-4">
+                            <h6 class="mb-3">Reports & Analytics</h6>
+                            <div class="list-group">
+                                <label class="list-group-item">
+                                    <input class="form-check-input me-2" type="checkbox" checked>
+                                    View Reports
+                                </label>
+                                <label class="list-group-item">
+                                    <input class="form-check-input me-2" type="checkbox">
+                                    Generate Reports
+                                </label>
+                                <label class="list-group-item">
+                                    <input class="form-check-input me-2" type="checkbox">
+                                    Export Data
+                                </label>
+                                <label class="list-group-item">
+                                    <input class="form-check-input me-2" type="checkbox">
+                                    Delete Reports
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="mt-4">
+                        <button class="btn btn-primary me-2">
+                            <i class="bx bx-save"></i> Save Permissions
+                        </button>
+                        <button class="btn btn-secondary">
+                            <i class="bx bx-reset"></i> Reset to Default
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 {% endblock %}

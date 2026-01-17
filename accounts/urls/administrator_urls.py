@@ -1,95 +1,6 @@
 # accounts/urls/admin_urls.py
 from django.urls import path
-from accounts.views.administrator_views import (
-    # Dashboard Views
-    dashboard,
-    analytics,
-    reports,
-    
-    # Academic Management
-    educational_levels,
-    educational_levels_list,
-    educational_levels_crud,
-    academic_years,
-    academic_years_list,
-    academic_years_crud,
-    terms,
-    terms_list,
-    terms_crud,
-    subjects,
-    subjects_list,
-    subjects_crud,
-    class_levels,
-    class_levels_list,
-    class_levels_crud,
-    stream_classes,
-    stream_classes_list,
-    stream_classes_crud,
-    
-    # Student Management
-    students_list,
-    students_add,
-    students_by_class,
-    student_status,
-    parents_list,
-    previous_schools,
-    
-    # Staff Management
-    staff_list,
-    staff_add,
-    staff_roles,
-    staff_assignments,
-    
-    # User Management
-    users_list,
-    users_add,
-    users_roles,
-    permissions,
-    user_activity,
-    
-    # System Settings
-    system_config,
-    email_settings,
-    sms_settings,
-    notifications,
-    backup,
-    
-    # Security & Logs
-    audit_logs,
-    login_history,
-    security_settings,
-    api_settings,
-    
-    # Reports & Analytics
-    financial_reports,
-    academic_reports,
-    attendance_reports,
-    custom_reports,
-    export_data,
-    
-    # Help & Support
-    documentation,
-    faq,
-    support_tickets,
-    system_status,
-    
-    # Profile & Account Management
-    profile_view,
-    profile_update,
-    profile_picture_update,
-    profile_security,
-    change_password,
-    two_factor_settings,
-    account_preferences,
-    session_management,
-    delete_account_request,
-    activity_logs,
-    
-    # AJAX Endpoints
-    ajax_get_streams,
-    ajax_get_student_details,
-)
-
+from accounts.views.administrator_views import *
 
 
 urlpatterns = [
@@ -114,22 +25,51 @@ urlpatterns = [
     path('academic/subjects/', subjects_list, name='admin_subjects_list'),
     path('academic/subjects/crud/', subjects_crud, name='admin_subjects_crud'),
     path('academic/subjects/legacy/', subjects, name='admin_subjects'),  # Legacy redirect
-    
+    path('ajax/students/delete/', delete_student, name='admin_delete_student'),
     path('academic/classes/', class_levels_list, name='admin_class_levels_list'),
     path('academic/classes/crud/', class_levels_crud, name='admin_class_levels_crud'),
     path('academic/classes/legacy/', class_levels, name='admin_class_levels'),  # Legacy redirect
-    
+      path('ajax/students/toggle-status/', toggle_student_status, name='admin_toggle_student_status'),
     path('academic/streams/', stream_classes_list, name='admin_stream_classes_list'),
     path('academic/streams/crud/', stream_classes_crud, name='admin_stream_classes_crud'),
     path('academic/streams/legacy/', stream_classes, name='admin_stream_classes'),  # Legacy redirect
-    
+    path('get-streams-by-class/', get_streams_by_class, name='admin_get_streams_by_class'),
+    path('admin/bulk-toggle-student-status/', bulk_toggle_student_status,   name='admin_bulk_toggle_student_status'),
+    path('get-subjects-by-education-level/', get_subjects_by_class, name='admin_get_subjects_by_class'),   
+    path('ajax/class-levels-by-education-level/', get_class_levels_by_education_level, name='admin_get_class_levels_by_education_level'),
     # Student Management URLs
     path('students/', students_list, name='admin_students_list'),
     path('students/add/', students_add, name='admin_students_add'),
-    path('students/class/', students_by_class, name='admin_students_by_class'),
+    path('students/by-class/', students_by_class, name='admin_students_by_class'),
     path('students/status/', student_status, name='admin_student_status'),
-    path('students/parents/', parents_list, name='admin_parents_list'),
-    path('students/previous-schools/', previous_schools, name='admin_previous_schools'),
+    path('students/<int:student_id>/edit/', student_edit, name='admin_student_edit'),
+    path('students/<int:id>/delete/', student_delete, name='admin_student_delete'),
+    path('students/<int:id>/detail/', student_detail, name='admin_student_detail'),
+    path('students/ajax/', students_ajax, name='students_ajax'),
+    
+    # Parent URLs
+    path('parents/', parents_list, name='admin_parents_list'),
+    path('parents/add/', add_parent, name='admin_parents_add'),
+    path('parents/<int:id>/edit/', parent_edit, name='admin_parent_edit'),
+    path('parents/<int:id>/delete/', parent_delete, name='admin_parent_delete'),
+    path('parents/ajax/', parents_ajax, name='parents_ajax'),
+    
+     # Parent management URLs
+    path('students/<int:student_id>/parents/add/', add_parent_to_student,  name='admin_add_parent_to_student'),    
+    path('<int:student_id>/parent/<int:parent_id>/update-fee-responsibility/', update_parent_fee_responsibility,  name='update_parent_fee_responsibility'),
+    path('<int:student_id>/parent/<int:parent_id>/edit/', edit_parent, name='admin_edit_parent'),
+    path('<int:student_id>/parent/<int:parent_id>/delete/', delete_parent, name='admin_delete_parent'),
+    
+    # AJAX endpoints for parent operations
+    path('<int:student_id>/parent/save/', save_parent, name='admin_save_parent'),
+    path('<int:student_id>/parent/<int:parent_id>/update/', update_parent, name='admin_update_parent'),
+    
+    # Previous Schools URLs
+    path('previous-schools/', previous_schools, name='admin_previous_schools'),
+    path('previous-schools/add/', previous_school_add, name='admin_previous_school_add'),
+    path('previous-schools/<int:id>/edit/', previous_school_edit, name='admin_previous_school_edit'),
+    path('previous-schools/<int:id>/delete/', previous_school_delete, name='admin_previous_school_delete'),
+    path('previous-schools/ajax/', previous_schools_ajax, name='previous_schools_ajax'),
     
     # Staff Management URLs
     path('staff/', staff_list, name='admin_staff_list'),

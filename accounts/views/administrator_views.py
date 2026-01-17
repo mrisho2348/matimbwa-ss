@@ -1,22 +1,30 @@
 # accounts/views/admin_views.py
-from datetime import timedelta
+from datetime import datetime, timedelta,date
+import json
 from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib.auth.decorators import login_required
+from django.urls import reverse
+from django.contrib.auth.decorators import login_required, permission_required
 from django.contrib import messages
-from django.http import JsonResponse
-from django.db.models import Count, Q
+from django.http import JsonResponse, HttpResponse
+from django.db.models import Q, Count, F
 from django.utils import timezone
 from django.contrib.auth.forms import PasswordChangeForm
 from django.contrib.auth import update_session_auth_hash
+from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
 from accounts.forms.admin_forms import AdminPreferencesForm, AdminProfileUpdateForm
-from accounts.models import CustomUser, Notification, Staffs, AdminHOD, SystemLog
+from accounts.forms.student_forms import ParentForm, PreviousSchoolForm, StudentEditForm, StudentForm
+from accounts.models import GENDER_CHOICES, CustomUser, Notification, Staffs, AdminHOD, SystemLog
 from core.models import (
     EducationalLevel, AcademicYear, Term, Subject, 
     ClassLevel, StreamClass
 )
-from students.models import Parent, PreviousSchool, Student
-
-
+from students.models import RELATIONSHIP_CHOICES, STATUS_CHOICES, Parent, PreviousSchool, Student
+from django.core.exceptions import ValidationError
+from django.utils.dateparse import parse_date
+from django.db import IntegrityError
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_POST
+from django.db import transaction
 # ============================================================================
 # DASHBOARD VIEWS
 # ============================================================================
@@ -489,7 +497,7 @@ def ajax_check_password_strength(request):
     password = request.GET.get('password', '')
     
     if not password:
-        return JsonResponse({'error': 'No password provided'}, status=400)
+        return JsonResponse({'error': 'No password provided'})
     
     # Simple password strength calculation
     strength = 0
@@ -544,7 +552,7 @@ def ajax_validate_email(request):
     email = request.GET.get('email', '')
     
     if not email:
-        return JsonResponse({'error': 'No email provided'}, status=400)
+        return JsonResponse({'error': 'No email provided'})
     
     # Check if email exists (excluding current user)
     exists = CustomUser.objects.filter(
@@ -648,14 +656,14 @@ def educational_levels_crud(request):
                     return JsonResponse({
                         'success': False,
                         'message': 'Name and Code are required.'
-                    }, status=400)
+                    })
                 
                 # Check for duplicates
                 if EducationalLevel.objects.filter(code__iexact=code).exists():
                     return JsonResponse({
                         'success': False,
                         'message': f'Educational level with code "{code}" already exists.'
-                    }, status=400)
+                    })
                 
                 level = EducationalLevel.objects.create(
                     name=name,
@@ -680,7 +688,7 @@ def educational_levels_crud(request):
                     return JsonResponse({
                         'success': False,
                         'message': 'Level ID is required.'
-                    }, status=400)
+                    })
                 
                 level = get_object_or_404(EducationalLevel, id=level_id)
                 
@@ -692,7 +700,7 @@ def educational_levels_crud(request):
                     return JsonResponse({
                         'success': False,
                         'message': 'Name and Code are required.'
-                    }, status=400)
+                    })
                 
                 # Check for duplicate code (exclude current)
                 if EducationalLevel.objects.filter(
@@ -701,7 +709,7 @@ def educational_levels_crud(request):
                     return JsonResponse({
                         'success': False,
                         'message': f'Educational level with code "{code}" already exists.'
-                    }, status=400)
+                    })
                 
                 level.name = name
                 level.code = code
@@ -725,7 +733,7 @@ def educational_levels_crud(request):
                     return JsonResponse({
                         'success': False,
                         'message': 'Level ID is required.'
-                    }, status=400)
+                    })
                 
                 level = get_object_or_404(EducationalLevel, id=level_id)
                 level_name = level.name
@@ -741,18 +749,18 @@ def educational_levels_crud(request):
                 return JsonResponse({
                     'success': False,
                     'message': 'Invalid action.'
-                }, status=400)
+                })
                 
         except Exception as e:
             return JsonResponse({
                 'success': False,
                 'message': f'Error: {str(e)}'
-            }, status=500)
+            })
     
     return JsonResponse({
         'success': False,
         'message': 'POST request required.'
-    }, status=405)
+    })
 
 
 # Legacy view - redirect to list for backward compatibility
@@ -782,21 +790,24 @@ def academic_years_crud(request):
         try:
             if action == 'create':
                 name = request.POST.get('name', '').strip()
-                start_date = request.POST.get('start_date', '').strip()
-                end_date = request.POST.get('end_date', '').strip()
+                start_date_str = request.POST.get('start_date', '').strip()
+                end_date_str = request.POST.get('end_date', '').strip()
+
+                start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+                end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
                 
                 if not name or not start_date or not end_date:
                     return JsonResponse({
                         'success': False,
                         'message': 'Name, start date, and end date are required.'
-                    }, status=400)
+                    })
                 
                 # Check for duplicates
                 if AcademicYear.objects.filter(name__iexact=name).exists():
                     return JsonResponse({
                         'success': False,
                         'message': f'Academic year "{name}" already exists.'
-                    }, status=400)
+                    })
                 
                 year = AcademicYear.objects.create(
                     name=name,
@@ -822,19 +833,22 @@ def academic_years_crud(request):
                     return JsonResponse({
                         'success': False,
                         'message': 'Year ID is required.'
-                    }, status=400)
+                    })
                 
                 year = get_object_or_404(AcademicYear, id=year_id)
                 
                 name = request.POST.get('name', '').strip()
-                start_date = request.POST.get('start_date', '').strip()
-                end_date = request.POST.get('end_date', '').strip()
+                start_date_str = request.POST.get('start_date', '').strip()
+                end_date_str = request.POST.get('end_date', '').strip()
+
+                start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+                end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
                 
                 if not name or not start_date or not end_date:
                     return JsonResponse({
                         'success': False,
                         'message': 'Name, start date, and end date are required.'
-                    }, status=400)
+                    })
                 
                 # Check for duplicate name (exclude current)
                 if AcademicYear.objects.filter(
@@ -843,7 +857,7 @@ def academic_years_crud(request):
                     return JsonResponse({
                         'success': False,
                         'message': f'Academic year "{name}" already exists.'
-                    }, status=400)
+                    })
                 
                 year.name = name
                 year.start_date = start_date
@@ -868,7 +882,7 @@ def academic_years_crud(request):
                     return JsonResponse({
                         'success': False,
                         'message': 'Year ID is required.'
-                    }, status=400)
+                    })
                 
                 year = get_object_or_404(AcademicYear, id=year_id)
                 year_name = year.name
@@ -886,7 +900,7 @@ def academic_years_crud(request):
                     return JsonResponse({
                         'success': False,
                         'message': 'Year ID is required.'
-                    }, status=400)
+                    })
                 
                 year = get_object_or_404(AcademicYear, id=year_id)
                 
@@ -911,18 +925,18 @@ def academic_years_crud(request):
                 return JsonResponse({
                     'success': False,
                     'message': 'Invalid action.'
-                }, status=400)
+                })
                 
         except Exception as e:
             return JsonResponse({
                 'success': False,
                 'message': f'Error: {str(e)}'
-            }, status=500)
+            })
     
     return JsonResponse({
         'success': False,
         'message': 'POST request required.'
-    }, status=405)
+    })
 
 
 # Legacy view - redirect to list for backward compatibility
@@ -933,14 +947,27 @@ def academic_years(request):
 
 @login_required
 def terms_list(request):
-    """Display list of terms"""
-    terms = Term.objects.select_related('academic_year').all().order_by('-academic_year', 'term_number')
-    
+    """Display list of terms with academic years"""
+
+    academic_years = AcademicYear.objects.all().order_by('-start_date')
+
+    terms = (
+        Term.objects
+        .select_related('academic_year')
+        .order_by('-academic_year__start_date', 'term_number')
+    )
+
+    active_academic_year = AcademicYear.objects.filter(is_active=True).first()
+
     context = {
         'page_title': 'Terms',
         'terms': terms,
+        'academic_years': academic_years,          # ✅ all academic years
+        'active_academic_year': active_academic_year,  # ✅ optional but useful
     }
+
     return render(request, 'admin/academic/terms_list.html', context)
+
 
 
 @login_required
@@ -951,136 +978,418 @@ def terms_crud(request):
         
         try:
             if action == 'create':
-                academic_year_id = request.POST.get('academic_year_id', '').strip()
-                term_number = request.POST.get('term_number', '').strip()
-                start_date = request.POST.get('start_date', '').strip()
-                end_date = request.POST.get('end_date', '').strip()
-                
-                if not academic_year_id or not term_number or not start_date or not end_date:
-                    return JsonResponse({
-                        'success': False,
-                        'message': 'Academic year, term number, start date, and end date are required.'
-                    }, status=400)
-                
-                academic_year = get_object_or_404(AcademicYear, id=academic_year_id)
-                
-                # Check for duplicate term
-                if Term.objects.filter(
-                    academic_year=academic_year,
-                    term_number=term_number
-                ).exists():
-                    return JsonResponse({
-                        'success': False,
-                        'message': f'Term {term_number} already exists for {academic_year.name}.'
-                    }, status=400)
-                
-                term = Term.objects.create(
-                    academic_year=academic_year,
-                    term_number=term_number,
-                    start_date=start_date,
-                    end_date=end_date
-                )
-                
-                return JsonResponse({
-                    'success': True,
-                    'message': f'Term {term_number} created successfully.',
-                    'term': {
-                        'id': term.id,
-                        'academic_year_id': term.academic_year.id,
-                        'academic_year_name': term.academic_year.name,
-                        'term_number': term.term_number,
-                        'start_date': term.start_date.strftime('%Y-%m-%d'),
-                        'end_date': term.end_date.strftime('%Y-%m-%d'),
-                    }
-                })
-                
+                return create_term(request)
             elif action == 'update':
-                term_id = request.POST.get('id')
-                if not term_id:
-                    return JsonResponse({
-                        'success': False,
-                        'message': 'Term ID is required.'
-                    }, status=400)
-                
-                term = get_object_or_404(Term, id=term_id)
-                
-                academic_year_id = request.POST.get('academic_year_id', '').strip()
-                term_number = request.POST.get('term_number', '').strip()
-                start_date = request.POST.get('start_date', '').strip()
-                end_date = request.POST.get('end_date', '').strip()
-                
-                if not academic_year_id or not term_number or not start_date or not end_date:
-                    return JsonResponse({
-                        'success': False,
-                        'message': 'Academic year, term number, start date, and end date are required.'
-                    }, status=400)
-                
-                academic_year = get_object_or_404(AcademicYear, id=academic_year_id)
-                
-                # Check for duplicate term (exclude current)
-                if Term.objects.filter(
-                    academic_year=academic_year,
-                    term_number=term_number
-                ).exclude(id=term.id).exists():
-                    return JsonResponse({
-                        'success': False,
-                        'message': f'Term {term_number} already exists for {academic_year.name}.'
-                    }, status=400)
-                
-                term.academic_year = academic_year
-                term.term_number = term_number
-                term.start_date = start_date
-                term.end_date = end_date
-                term.save()
-                
-                return JsonResponse({
-                    'success': True,
-                    'message': f'Term {term_number} updated successfully.',
-                    'term': {
-                        'id': term.id,
-                        'academic_year_id': term.academic_year.id,
-                        'academic_year_name': term.academic_year.name,
-                        'term_number': term.term_number,
-                        'start_date': term.start_date.strftime('%Y-%m-%d'),
-                        'end_date': term.end_date.strftime('%Y-%m-%d'),
-                    }
-                })
-                
+                return update_term(request)
             elif action == 'delete':
-                term_id = request.POST.get('id')
-                if not term_id:
-                    return JsonResponse({
-                        'success': False,
-                        'message': 'Term ID is required.'
-                    }, status=400)
-                
-                term = get_object_or_404(Term, id=term_id)
-                term_info = f'Term {term.term_number} ({term.academic_year.name})'
-                term.delete()
-                
-                return JsonResponse({
-                    'success': True,
-                    'message': f'{term_info} deleted successfully.',
-                    'id': term_id
-                })
-            
+                return delete_term(request)
+            elif action == 'activate':
+                return activate_term(request)
             else:
                 return JsonResponse({
                     'success': False,
-                    'message': 'Invalid action.'
-                }, status=400)
+                    'message': 'Invalid action specified.'
+                })
                 
+        except ValidationError as e:
+            return JsonResponse({
+                'success': False,
+                'message': str(e)
+            })
         except Exception as e:
             return JsonResponse({
                 'success': False,
-                'message': f'Error: {str(e)}'
-            }, status=500)
+                'message': f'An error occurred: {str(e)}'
+            })
     
     return JsonResponse({
         'success': False,
         'message': 'POST request required.'
-    }, status=405)
+    })
 
+
+def create_term(request):
+    """Create a new term"""
+    # Get and validate required fields
+    academic_year_id = request.POST.get('academic_year')
+    if not academic_year_id:
+        return JsonResponse({
+            'success': False,
+            'message': 'Academic year is required.'
+        })
+    
+    term_number = request.POST.get('term_number')
+    if not term_number:
+        return JsonResponse({
+            'success': False,
+            'message': 'Term number is required.'
+        })
+    
+    start_date_str = request.POST.get('start_date')
+    end_date_str = request.POST.get('end_date')
+    
+    if not start_date_str or not end_date_str:
+        return JsonResponse({
+            'success': False,
+            'message': 'Start date and end date are required.'
+        })
+    
+    # Parse dates
+    start_date = parse_date(start_date_str)
+    end_date = parse_date(end_date_str)
+    
+    if not start_date or not end_date:
+        return JsonResponse({
+            'success': False,
+            'message': 'Invalid date format. Please use YYYY-MM-DD format.'
+        })
+    
+    # Validate dates
+    validation_errors = validate_term_dates(start_date, end_date)
+    if validation_errors:
+        return JsonResponse({
+            'success': False,
+            'message': ' '.join(validation_errors)
+        })
+    
+    # Get academic year
+    try:
+        academic_year = AcademicYear.objects.get(id=academic_year_id)
+    except AcademicYear.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'message': 'Selected academic year does not exist.'
+        })
+    
+    # Validate term dates are within academic year
+    if start_date < academic_year.start_date:
+        return JsonResponse({
+            'success': False,
+            'message': f'Term start date cannot be before academic year start date ({academic_year.start_date}).'
+        })
+    
+    if end_date > academic_year.end_date:
+        return JsonResponse({
+            'success': False,
+            'message': f'Term end date cannot be after academic year end date ({academic_year.end_date}).'
+        })
+    
+    # Check for duplicate term in same academic year
+    if Term.objects.filter(
+        academic_year=academic_year,
+        term_number=term_number
+    ).exists():
+        return JsonResponse({
+            'success': False,
+            'message': f'Term {term_number} already exists for academic year {academic_year.name}.'
+        })
+    
+    # Check for date overlaps with existing terms in same academic year
+    overlapping_terms = Term.objects.filter(
+        academic_year=academic_year,
+        start_date__lt=end_date,
+        end_date__gt=start_date
+    )
+    
+    if overlapping_terms.exists():
+        overlapping_term = overlapping_terms.first()
+        return JsonResponse({
+            'success': False,
+            'message': f'Date range overlaps with {overlapping_term.get_term_number_display()} ({overlapping_term.start_date} to {overlapping_term.end_date}).'
+        })
+    
+    try:
+        # Create the term
+        term = Term.objects.create(
+            academic_year=academic_year,
+            term_number=term_number,
+            start_date=start_date,
+            end_date=end_date,
+            is_active=False  # New terms are inactive by default
+        )
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'{term.get_term_number_display()} created successfully for {academic_year.name}.',
+            'term': {
+                'id': term.id,
+                'academic_year_id': term.academic_year.id,
+                'academic_year_name': term.academic_year.name,
+                'term_number': term.term_number,
+                'term_display': term.get_term_number_display(),
+                'start_date': term.start_date.strftime('%Y-%m-%d'),
+                'end_date': term.end_date.strftime('%Y-%m-%d'),
+                'is_active': term.is_active
+            }
+        })
+        
+    except IntegrityError:
+        return JsonResponse({
+            'success': False,
+            'message': 'A term with these details already exists.'
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'Error creating term: {str(e)}'
+        })
+
+
+def update_term(request):
+    """Update an existing term"""
+    term_id = request.POST.get('id')
+    if not term_id:
+        return JsonResponse({
+            'success': False,
+            'message': 'Term ID is required.'
+        })
+    
+    try:
+        term = Term.objects.get(id=term_id)
+    except Term.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'message': 'Term not found.'
+        })
+    
+    # Check if term is active (prevent editing active term)
+    if term.is_active:
+        return JsonResponse({
+            'success': False,
+            'message': 'Cannot edit an active term. Deactivate it first.'
+        })
+    
+    # Get and validate required fields
+    academic_year_id = request.POST.get('academic_year')
+    term_number = request.POST.get('term_number')
+    start_date_str = request.POST.get('start_date')
+    end_date_str = request.POST.get('end_date')
+    
+    if not all([academic_year_id, term_number, start_date_str, end_date_str]):
+        return JsonResponse({
+            'success': False,
+            'message': 'All fields are required.'
+        })
+    
+    # Parse dates
+    start_date = parse_date(start_date_str)
+    end_date = parse_date(end_date_str)
+    
+    if not start_date or not end_date:
+        return JsonResponse({
+            'success': False,
+            'message': 'Invalid date format.'
+        })
+    
+    # Validate dates
+    validation_errors = validate_term_dates(start_date, end_date)
+    if validation_errors:
+        return JsonResponse({
+            'success': False,
+            'message': ' '.join(validation_errors)
+        })
+    
+    # Get academic year
+    try:
+        academic_year = AcademicYear.objects.get(id=academic_year_id)
+    except AcademicYear.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'message': 'Selected academic year does not exist.'
+        })
+    
+    # Validate term dates are within academic year
+    if start_date < academic_year.start_date:
+        return JsonResponse({
+            'success': False,
+            'message': f'Term start date cannot be before academic year start date ({academic_year.start_date}).'
+        })
+    
+    if end_date > academic_year.end_date:
+        return JsonResponse({
+            'success': False,
+            'message': f'Term end date cannot be after academic year end date ({academic_year.end_date}).'
+        })
+    
+    # Check for duplicate term in same academic year (excluding current term)
+    if Term.objects.filter(
+        academic_year=academic_year,
+        term_number=term_number
+    ).exclude(id=term.id).exists():
+        return JsonResponse({
+            'success': False,
+            'message': f'Term {term_number} already exists for academic year {academic_year.name}.'
+        })
+    
+    # Check for date overlaps with other terms in same academic year
+    overlapping_terms = Term.objects.filter(
+        academic_year=academic_year,
+        start_date__lt=end_date,
+        end_date__gt=start_date
+    ).exclude(id=term.id)
+    
+    if overlapping_terms.exists():
+        overlapping_term = overlapping_terms.first()
+        return JsonResponse({
+            'success': False,
+            'message': f'Date range overlaps with {overlapping_term.get_term_number_display()} ({overlapping_term.start_date} to {overlapping_term.end_date}).'
+        })
+    
+    try:
+        # Update the term
+        term.academic_year = academic_year
+        term.term_number = term_number
+        term.start_date = start_date
+        term.end_date = end_date
+        term.full_clean()  # Run model validation
+        term.save()
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'{term.get_term_number_display()} updated successfully.',
+            'term': {
+                'id': term.id,
+                'academic_year_id': term.academic_year.id,
+                'academic_year_name': term.academic_year.name,
+                'term_number': term.term_number,
+                'term_display': term.get_term_number_display(),
+                'start_date': term.start_date.strftime('%Y-%m-%d'),
+                'end_date': term.end_date.strftime('%Y-%m-%d'),
+                'is_active': term.is_active
+            }
+        })
+        
+    except ValidationError as e:
+        return JsonResponse({
+            'success': False,
+            'message': str(e)
+        })
+    except IntegrityError:
+        return JsonResponse({
+            'success': False,
+            'message': 'A term with these details already exists.'
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'Error updating term: {str(e)}'
+        })
+
+
+def delete_term(request):
+    """Delete a term"""
+    term_id = request.POST.get('id')
+    if not term_id:
+        return JsonResponse({
+            'success': False,
+            'message': 'Term ID is required.'
+        })
+    
+    try:
+        term = Term.objects.get(id=term_id)
+    except Term.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'message': 'Term not found.'
+        })
+    
+    # Check if term is active
+    if term.is_active:
+        return JsonResponse({
+            'success': False,
+            'message': 'Cannot delete an active term. Deactivate it first.'
+        })
+    
+    # Check if term has any associated data (optional - add your own checks)
+     # if term.exam_set.exists():
+      #  return JsonResponse({
+       # 'success': False,
+        #    'message': 'Cannot delete term with associated exams.'
+       #  })
+    
+    term_info = f'{term.get_term_number_display()} ({term.academic_year.name})'
+    
+    try:
+        term.delete()
+        return JsonResponse({
+            'success': True,
+            'message': f'{term_info} deleted successfully.',
+            'id': term_id
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'Error deleting term: {str(e)}'
+        })
+
+
+def activate_term(request):
+    """Activate a term (deactivates all other terms)"""
+    term_id = request.POST.get('id')
+    if not term_id:
+        return JsonResponse({
+            'success': False,
+            'message': 'Term ID is required.'
+        })
+    
+    try:
+        term = Term.objects.get(id=term_id)
+    except Term.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'message': 'Term not found.'
+        })
+    
+    # Check if term is already active
+    if term.is_active:
+        return JsonResponse({
+            'success': False,
+            'message': 'Term is already active.'
+        })
+    
+    # Check if term dates are valid (not in the past)
+    today = date.today()
+    if term.end_date < today:
+        return JsonResponse({
+            'success': False,
+            'message': 'Cannot activate a term that has already ended.'
+        })
+    
+    try:
+        # Activate the term (this will automatically deactivate others via save method)
+        term.is_active = True
+        term.save()
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'{term.get_term_number_display()} activated successfully. All other terms are now inactive.'
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'Error activating term: {str(e)}'
+        })
+
+
+def validate_term_dates(start_date, end_date):
+    """Validate term dates"""
+    errors = []
+    
+    # Check if start date is before end date
+    if start_date >= end_date:
+        errors.append('Start date must be before end date.')
+    
+    # Check if dates are in the same year
+    if start_date.year != end_date.year:
+        errors.append('Start date and end date must be in the same year.')
+    
+    # Check if start date is not in the past (optional)
+    today = date.today()
+    if start_date < today:
+        # Allow past dates for historical terms
+        pass
+    
+    return errors
 
 # Legacy view - redirect to list for backward compatibility
 @login_required
@@ -1088,15 +1397,22 @@ def terms(request):
     """Redirect to terms_list for backward compatibility"""
     return redirect('admin_terms_list')
 
+
 @login_required
 def subjects_list(request):
-    """Display list of subjects"""
+    """Display subjects management page"""
     subjects = Subject.objects.select_related('educational_level').all().order_by('educational_level', 'name')
+    educational_levels = EducationalLevel.objects.filter(is_active=True)
+    
+    # Count active subjects
+    active_subjects_count = subjects.filter(is_active=True).count()
     
     context = {
-        'page_title': 'Subjects',
         'subjects': subjects,
+        'educational_levels': educational_levels,
+        'active_subjects_count': active_subjects_count,
     }
+    
     return render(request, 'admin/academic/subjects_list.html', context)
 
 
@@ -1108,137 +1424,410 @@ def subjects_crud(request):
         
         try:
             if action == 'create':
-                educational_level_id = request.POST.get('educational_level_id', '').strip()
-                name = request.POST.get('name', '').strip()
-                code = request.POST.get('code', '').strip()
-                short_name = request.POST.get('short_name', '').strip()
-                is_compulsory = request.POST.get('is_compulsory') == 'true'
-                
-                if not educational_level_id or not name or not code:
-                    return JsonResponse({
-                        'success': False,
-                        'message': 'Educational level, name, and code are required.'
-                    }, status=400)
-                
-                educational_level = get_object_or_404(EducationalLevel, id=educational_level_id)
-                
-                # Check for duplicate subject code
-                if Subject.objects.filter(code__iexact=code).exists():
-                    return JsonResponse({
-                        'success': False,
-                        'message': f'Subject with code "{code}" already exists.'
-                    }, status=400)
-                
-                subject = Subject.objects.create(
-                    educational_level=educational_level,
-                    name=name,
-                    code=code,
-                    short_name=short_name,
-                    is_compulsory=is_compulsory
-                )
-                
-                return JsonResponse({
-                    'success': True,
-                    'message': f'Subject "{name}" created successfully.',
-                    'subject': {
-                        'id': subject.id,
-                        'educational_level_id': subject.educational_level.id,
-                        'educational_level_name': subject.educational_level.name,
-                        'name': subject.name,
-                        'code': subject.code,
-                        'short_name': subject.short_name,
-                        'is_compulsory': subject.is_compulsory,
-                    }
-                })
-                
+                return create_subject(request)
             elif action == 'update':
-                subject_id = request.POST.get('id')
-                if not subject_id:
-                    return JsonResponse({
-                        'success': False,
-                        'message': 'Subject ID is required.'
-                    }, status=400)
-                
-                subject = get_object_or_404(Subject, id=subject_id)
-                
-                educational_level_id = request.POST.get('educational_level_id', '').strip()
-                name = request.POST.get('name', '').strip()
-                code = request.POST.get('code', '').strip()
-                short_name = request.POST.get('short_name', '').strip()
-                is_compulsory = request.POST.get('is_compulsory') == 'true'
-                
-                if not educational_level_id or not name or not code:
-                    return JsonResponse({
-                        'success': False,
-                        'message': 'Educational level, name, and code are required.'
-                    }, status=400)
-                
-                educational_level = get_object_or_404(EducationalLevel, id=educational_level_id)
-                
-                # Check for duplicate code (exclude current)
-                if Subject.objects.filter(
-                    code__iexact=code
-                ).exclude(id=subject.id).exists():
-                    return JsonResponse({
-                        'success': False,
-                        'message': f'Subject with code "{code}" already exists.'
-                    }, status=400)
-                
-                subject.educational_level = educational_level
-                subject.name = name
-                subject.code = code
-                subject.short_name = short_name
-                subject.is_compulsory = is_compulsory
-                subject.save()
-                
-                return JsonResponse({
-                    'success': True,
-                    'message': f'Subject "{name}" updated successfully.',
-                    'subject': {
-                        'id': subject.id,
-                        'educational_level_id': subject.educational_level.id,
-                        'educational_level_name': subject.educational_level.name,
-                        'name': subject.name,
-                        'code': subject.code,
-                        'short_name': subject.short_name,
-                        'is_compulsory': subject.is_compulsory,
-                    }
-                })
-                
+                return update_subject(request)
+            elif action == 'toggle_status':
+                return toggle_subject_status(request)
+            elif action == 'toggle_compulsory':
+                return toggle_subject_compulsory(request)
             elif action == 'delete':
-                subject_id = request.POST.get('id')
-                if not subject_id:
-                    return JsonResponse({
-                        'success': False,
-                        'message': 'Subject ID is required.'
-                    }, status=400)
-                
-                subject = get_object_or_404(Subject, id=subject_id)
-                subject_name = subject.name
-                subject.delete()
-                
-                return JsonResponse({
-                    'success': True,
-                    'message': f'Subject "{subject_name}" deleted successfully.',
-                    'id': subject_id
-                })
-            
+                return delete_subject(request)
             else:
                 return JsonResponse({
                     'success': False,
-                    'message': 'Invalid action.'
-                }, status=400)
+                    'message': 'Invalid action specified.'
+                })
                 
+        except ValidationError as e:
+            return JsonResponse({
+                'success': False,
+                'message': str(e)
+            })
         except Exception as e:
             return JsonResponse({
                 'success': False,
-                'message': f'Error: {str(e)}'
-            }, status=500)
+                'message': f'An error occurred: {str(e)}'
+            })
     
     return JsonResponse({
         'success': False,
         'message': 'POST request required.'
-    }, status=405)
+    })
+
+
+def create_subject(request):
+    """Create a new subject"""
+    # Get and validate required fields
+    educational_level_id = request.POST.get('educational_level')
+    if not educational_level_id:
+        return JsonResponse({
+            'success': False,
+            'message': 'Educational level is required.'
+        })
+    
+    name = request.POST.get('name', '').strip()
+    if not name:
+        return JsonResponse({
+            'success': False,
+            'message': 'Subject name is required.'
+        })
+    
+    code = request.POST.get('code', '').strip()
+    if not code:
+        return JsonResponse({
+            'success': False,
+            'message': 'Subject code is required.'
+        })
+    
+    # Validate name and code length
+    if len(name) < 2:
+        return JsonResponse({
+            'success': False,
+            'message': 'Subject name must be at least 2 characters long.'
+        })
+    
+    if len(code) > 20:
+        return JsonResponse({
+            'success': False,
+            'message': 'Subject code cannot exceed 20 characters.'
+        })
+    
+    if len(name) > 100:
+        return JsonResponse({
+            'success': False,
+            'message': 'Subject name cannot exceed 100 characters.'
+        })
+    
+    # Validate code format
+    if not code.replace('-', '').replace('_', '').isalnum():
+        return JsonResponse({
+            'success': False,
+            'message': 'Subject code can only contain letters, numbers, hyphens, and underscores.'
+        })
+    
+    # Get educational level
+    try:
+        educational_level = EducationalLevel.objects.get(id=educational_level_id)
+    except EducationalLevel.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'message': 'Selected educational level does not exist.'
+        })
+    
+    # Check for duplicate subject code within the same educational level
+    if Subject.objects.filter(
+        educational_level=educational_level,
+        code__iexact=code
+    ).exists():
+        return JsonResponse({
+            'success': False,
+            'message': f'Subject with code "{code}" already exists for {educational_level.name}.'
+        })
+    
+    # Get optional fields
+    short_name = request.POST.get('short_name', '').strip()
+    description = request.POST.get('description', '').strip()
+    is_compulsory = request.POST.get('is_compulsory') == 'on' or request.POST.get('is_compulsory') == 'true'
+    is_active = request.POST.get('is_active') == 'on' or request.POST.get('is_active') == 'true'
+    
+    # Validate short name length if provided
+    if short_name and len(short_name) > 20:
+        return JsonResponse({
+            'success': False,
+            'message': 'Short name cannot exceed 20 characters.'
+        })
+    
+    try:
+        # Create the subject
+        subject = Subject.objects.create(
+            educational_level=educational_level,
+            name=name,
+            code=code.upper(),  # Store code in uppercase for consistency
+            short_name=short_name,
+            description=description,
+            is_compulsory=is_compulsory,
+            is_active=is_active
+        )
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'Subject "{name}" created successfully.',
+            'subject': {
+                'id': subject.id,
+                'educational_level_id': subject.educational_level.id,
+                'educational_level_name': subject.educational_level.name,
+                'name': subject.name,
+                'code': subject.code,
+                'short_name': subject.short_name,
+                'is_compulsory': subject.is_compulsory,
+                'is_active': subject.is_active,
+                'description': subject.description
+            }
+        })
+        
+    except IntegrityError as e:
+        if 'unique' in str(e).lower():
+            return JsonResponse({
+                'success': False,
+                'message': f'A subject with code "{code}" already exists for {educational_level.name}.'
+            })
+        return JsonResponse({
+            'success': False,
+            'message': f'Database error: {str(e)}'
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'Error creating subject: {str(e)}'
+        })
+
+
+def update_subject(request):
+    """Update an existing subject"""
+    subject_id = request.POST.get('id')
+    if not subject_id:
+        return JsonResponse({
+            'success': False,
+            'message': 'Subject ID is required.'
+        })
+    
+    try:
+        subject = Subject.objects.get(id=subject_id)
+    except Subject.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'message': 'Subject not found.'
+        })
+    
+    # Get and validate required fields
+    educational_level_id = request.POST.get('educational_level')
+    name = request.POST.get('name', '').strip()
+    code = request.POST.get('code', '').strip()
+    
+    if not educational_level_id or not name or not code:
+        return JsonResponse({
+            'success': False,
+            'message': 'Educational level, name, and code are required.'
+        })
+    
+    # Validate name and code length
+    if len(name) < 2:
+        return JsonResponse({
+            'success': False,
+            'message': 'Subject name must be at least 2 characters long.'
+        })
+    
+    if len(code) > 20:
+        return JsonResponse({
+            'success': False,
+            'message': 'Subject code cannot exceed 20 characters.'
+        })
+    
+    if len(name) > 100:
+        return JsonResponse({
+            'success': False,
+            'message': 'Subject name cannot exceed 100 characters.'
+        })
+    
+    # Validate code format
+    if not code.replace('-', '').replace('_', '').isalnum():
+        return JsonResponse({
+            'success': False,
+            'message': 'Subject code can only contain letters, numbers, hyphens, and underscores.'
+        })
+    
+    # Get educational level
+    try:
+        educational_level = EducationalLevel.objects.get(id=educational_level_id)
+    except EducationalLevel.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'message': 'Selected educational level does not exist.'
+        })
+    
+    # Check for duplicate subject code within the same educational level (excluding current)
+    if Subject.objects.filter(
+        educational_level=educational_level,
+        code__iexact=code
+    ).exclude(id=subject.id).exists():
+        return JsonResponse({
+            'success': False,
+            'message': f'Subject with code "{code}" already exists for {educational_level.name}.'
+        })
+    
+    # Get optional fields
+    short_name = request.POST.get('short_name', '').strip()
+    description = request.POST.get('description', '').strip()
+    is_compulsory = request.POST.get('is_compulsory') == 'on' or request.POST.get('is_compulsory') == 'true'
+    is_active = request.POST.get('is_active') == 'on' or request.POST.get('is_active') == 'true'
+    
+    # Validate short name length if provided
+    if short_name and len(short_name) > 20:
+        return JsonResponse({
+            'success': False,
+            'message': 'Short name cannot exceed 20 characters.'
+        })
+    
+    try:
+        # Update the subject
+        subject.educational_level = educational_level
+        subject.name = name
+        subject.code = code.upper()  # Store code in uppercase for consistency
+        subject.short_name = short_name
+        subject.description = description
+        subject.is_compulsory = is_compulsory
+        subject.is_active = is_active
+        subject.save()
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'Subject "{name}" updated successfully.',
+            'subject': {
+                'id': subject.id,
+                'educational_level_id': subject.educational_level.id,
+                'educational_level_name': subject.educational_level.name,
+                'name': subject.name,
+                'code': subject.code,
+                'short_name': subject.short_name,
+                'is_compulsory': subject.is_compulsory,
+                'is_active': subject.is_active,
+                'description': subject.description
+            }
+        })
+        
+    except IntegrityError as e:
+        if 'unique' in str(e).lower():
+            return JsonResponse({
+                'success': False,
+                'message': f'A subject with code "{code}" already exists for {educational_level.name}.'
+            })
+        return JsonResponse({
+            'success': False,
+            'message': f'Database error: {str(e)}'
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'Error updating subject: {str(e)}'
+        })
+
+
+def toggle_subject_status(request):
+    """Toggle subject active/inactive status"""
+    subject_id = request.POST.get('id')
+    if not subject_id:
+        return JsonResponse({
+            'success': False,
+            'message': 'Subject ID is required.'
+        })
+    
+    try:
+        subject = Subject.objects.get(id=subject_id)
+    except Subject.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'message': 'Subject not found.'
+        })
+    
+    try:
+        # Toggle the status
+        subject.is_active = not subject.is_active
+        subject.save()
+        
+        status_text = "activated" if subject.is_active else "deactivated"
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'Subject "{subject.name}" {status_text} successfully.',
+            'is_active': subject.is_active
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'Error toggling subject status: {str(e)}'
+        })
+
+
+def toggle_subject_compulsory(request):
+    """Toggle subject compulsory/optional status"""
+    subject_id = request.POST.get('id')
+    if not subject_id:
+        return JsonResponse({
+            'success': False,
+            'message': 'Subject ID is required.'
+        })
+    
+    try:
+        subject = Subject.objects.get(id=subject_id)
+    except Subject.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'message': 'Subject not found.'
+        })
+    
+    try:
+        # Toggle the compulsory status
+        subject.is_compulsory = not subject.is_compulsory
+        subject.save()
+        
+        type_text = "marked as compulsory" if subject.is_compulsory else "marked as optional"
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'Subject "{subject.name}" {type_text} successfully.',
+            'is_compulsory': subject.is_compulsory
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'Error toggling subject type: {str(e)}'
+        })
+
+
+def delete_subject(request):
+    """Delete a subject"""
+    subject_id = request.POST.get('id')
+    if not subject_id:
+        return JsonResponse({
+            'success': False,
+            'message': 'Subject ID is required.'
+        })
+    
+    try:
+        subject = Subject.objects.get(id=subject_id)
+    except Subject.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'message': 'Subject not found.'
+        })
+    
+    # Check if subject has any associated data (optional - add your own checks)
+    # Example: if subject.class_set.exists():
+    #     return JsonResponse({
+    #         'success': False,
+    #         'message': 'Cannot delete subject with associated classes.'
+    #     })
+    
+    subject_name = subject.name
+    
+    try:
+        subject.delete()
+        return JsonResponse({
+            'success': True,
+            'message': f'Subject "{subject_name}" deleted successfully.',
+            'id': subject_id
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'Error deleting subject: {str(e)}'
+        })
+
+
+# Helper function to get subjects list view (optional)
 
 
 # Legacy view - redirect to list for backward compatibility
@@ -1247,16 +1836,25 @@ def subjects(request):
     """Redirect to subjects_list for backward compatibility"""
     return redirect('admin_subjects_list')
 
+
 @login_required
 def class_levels_list(request):
-    """Display list of class levels"""
+    """Display class levels management page"""
     class_levels = ClassLevel.objects.select_related('educational_level').all().order_by('educational_level', 'name')
+    educational_levels = EducationalLevel.objects.filter(is_active=True)
+    
+    # Count active class levels
+    active_class_levels_count = class_levels.filter(is_active=True).count()
     
     context = {
-        'page_title': 'Class Levels',
         'class_levels': class_levels,
+        'educational_levels': educational_levels,
+        'active_class_levels_count': active_class_levels_count,
     }
+    
     return render(request, 'admin/academic/class_levels_list.html', context)
+
+
 
 
 @login_required
@@ -1267,131 +1865,386 @@ def class_levels_crud(request):
         
         try:
             if action == 'create':
-                educational_level_id = request.POST.get('educational_level_id', '').strip()
-                name = request.POST.get('name', '').strip()
-                code = request.POST.get('code', '').strip()
-                description = request.POST.get('description', '').strip()
-                
-                if not educational_level_id or not name or not code:
-                    return JsonResponse({
-                        'success': False,
-                        'message': 'Educational level, name, and code are required.'
-                    }, status=400)
-                
-                educational_level = get_object_or_404(EducationalLevel, id=educational_level_id)
-                
-                # Check for duplicate class level code
-                if ClassLevel.objects.filter(code__iexact=code).exists():
-                    return JsonResponse({
-                        'success': False,
-                        'message': f'Class level with code "{code}" already exists.'
-                    }, status=400)
-                
-                class_level = ClassLevel.objects.create(
-                    educational_level=educational_level,
-                    name=name,
-                    code=code,
-                    description=description
-                )
-                
-                return JsonResponse({
-                    'success': True,
-                    'message': f'Class level "{name}" created successfully.',
-                    'class_level': {
-                        'id': class_level.id,
-                        'educational_level_id': class_level.educational_level.id,
-                        'educational_level_name': class_level.educational_level.name,
-                        'name': class_level.name,
-                        'code': class_level.code,
-                        'description': class_level.description,
-                    }
-                })
-                
+                return create_class_level(request)
             elif action == 'update':
-                class_level_id = request.POST.get('id')
-                if not class_level_id:
-                    return JsonResponse({
-                        'success': False,
-                        'message': 'Class level ID is required.'
-                    }, status=400)
-                
-                class_level = get_object_or_404(ClassLevel, id=class_level_id)
-                
-                educational_level_id = request.POST.get('educational_level_id', '').strip()
-                name = request.POST.get('name', '').strip()
-                code = request.POST.get('code', '').strip()
-                description = request.POST.get('description', '').strip()
-                
-                if not educational_level_id or not name or not code:
-                    return JsonResponse({
-                        'success': False,
-                        'message': 'Educational level, name, and code are required.'
-                    }, status=400)
-                
-                educational_level = get_object_or_404(EducationalLevel, id=educational_level_id)
-                
-                # Check for duplicate code (exclude current)
-                if ClassLevel.objects.filter(
-                    code__iexact=code
-                ).exclude(id=class_level.id).exists():
-                    return JsonResponse({
-                        'success': False,
-                        'message': f'Class level with code "{code}" already exists.'
-                    }, status=400)
-                
-                class_level.educational_level = educational_level
-                class_level.name = name
-                class_level.code = code
-                class_level.description = description
-                class_level.save()
-                
-                return JsonResponse({
-                    'success': True,
-                    'message': f'Class level "{name}" updated successfully.',
-                    'class_level': {
-                        'id': class_level.id,
-                        'educational_level_id': class_level.educational_level.id,
-                        'educational_level_name': class_level.educational_level.name,
-                        'name': class_level.name,
-                        'code': class_level.code,
-                        'description': class_level.description,
-                    }
-                })
-                
+                return update_class_level(request)
+            elif action == 'toggle_status':
+                return toggle_class_level_status(request)
             elif action == 'delete':
-                class_level_id = request.POST.get('id')
-                if not class_level_id:
-                    return JsonResponse({
-                        'success': False,
-                        'message': 'Class level ID is required.'
-                    }, status=400)
-                
-                class_level = get_object_or_404(ClassLevel, id=class_level_id)
-                class_level_name = class_level.name
-                class_level.delete()
-                
-                return JsonResponse({
-                    'success': True,
-                    'message': f'Class level "{class_level_name}" deleted successfully.',
-                    'id': class_level_id
-                })
-            
+                return delete_class_level(request)
             else:
                 return JsonResponse({
                     'success': False,
-                    'message': 'Invalid action.'
-                }, status=400)
+                    'message': 'Invalid action specified.'
+                })
                 
+        except ValidationError as e:
+            return JsonResponse({
+                'success': False,
+                'message': str(e)
+            })
         except Exception as e:
             return JsonResponse({
                 'success': False,
-                'message': f'Error: {str(e)}'
-            }, status=500)
+                'message': f'An error occurred: {str(e)}'
+            })
     
     return JsonResponse({
         'success': False,
         'message': 'POST request required.'
-    }, status=405)
+    })
+
+
+def create_class_level(request):
+    """Create a new class level"""
+    # Get and validate required fields
+    educational_level_id = request.POST.get('educational_level')
+    if not educational_level_id:
+        return JsonResponse({
+            'success': False,
+            'message': 'Educational level is required.'
+        })
+    
+    name = request.POST.get('name', '').strip()
+    if not name:
+        return JsonResponse({
+            'success': False,
+            'message': 'Class level name is required.'
+        })
+    
+    code = request.POST.get('code', '').strip()
+    if not code:
+        return JsonResponse({
+            'success': False,
+            'message': 'Class level code is required.'
+        })
+    
+    order_str = request.POST.get('order', '').strip()
+    if not order_str:
+        return JsonResponse({
+            'success': False,
+            'message': 'Order is required.'
+        })
+    
+    try:
+        order = int(order_str)
+        if order < 1 or order > 100:
+            return JsonResponse({
+                'success': False,
+                'message': 'Order must be between 1 and 100.'
+            })
+    except ValueError:
+        return JsonResponse({
+            'success': False,
+            'message': 'Order must be a valid number.'
+        })
+    
+    # Validate name and code length
+    if len(name) > 50:
+        return JsonResponse({
+            'success': False,
+            'message': 'Class level name cannot exceed 50 characters.'
+        })
+    
+    if len(code) > 20:
+        return JsonResponse({
+            'success': False,
+            'message': 'Class level code cannot exceed 20 characters.'
+        })
+    
+    # Validate code format (alphanumeric)
+    if not code.isalnum():
+        return JsonResponse({
+            'success': False,
+            'message': 'Class level code can only contain letters and numbers.'
+        })
+    
+    # Get educational level
+    try:
+        educational_level = EducationalLevel.objects.get(id=educational_level_id)
+    except EducationalLevel.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'message': 'Selected educational level does not exist.'
+        })
+    
+    # Check for duplicate class level code within the same educational level
+    if ClassLevel.objects.filter(
+        educational_level=educational_level,
+        code__iexact=code
+    ).exists():
+        return JsonResponse({
+            'success': False,
+            'message': f'Class level with code "{code}" already exists for {educational_level.name}.'
+        })
+    
+    # Check for duplicate order within the same educational level
+    if ClassLevel.objects.filter(
+        educational_level=educational_level,
+        order=order
+    ).exists():
+        return JsonResponse({
+            'success': False,
+            'message': f'Another class level already has order {order} for {educational_level.name}.'
+        })
+    
+    # Get optional fields
+    is_active = request.POST.get('is_active') == 'on' or request.POST.get('is_active') == 'true'
+    
+    try:
+        # Create the class level
+        class_level = ClassLevel.objects.create(
+            educational_level=educational_level,
+            name=name,
+            code=code.upper(),  # Store code in uppercase for consistency
+            order=order,
+            is_active=is_active
+        )
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'Class level "{name}" created successfully.',
+            'class_level': {
+                'id': class_level.id,
+                'educational_level_id': class_level.educational_level.id,
+                'educational_level_name': class_level.educational_level.name,
+                'name': class_level.name,
+                'code': class_level.code,
+                'order': class_level.order,
+                'is_active': class_level.is_active
+            }
+        })
+        
+    except IntegrityError as e:
+        if 'unique' in str(e).lower():
+            return JsonResponse({
+                'success': False,
+                'message': f'A class level with code "{code}" already exists for {educational_level.name}.'
+            })
+        return JsonResponse({
+            'success': False,
+            'message': f'Database error: {str(e)}'
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'Error creating class level: {str(e)}'
+        })
+
+
+def update_class_level(request):
+    """Update an existing class level"""
+    class_level_id = request.POST.get('id')
+    if not class_level_id:
+        return JsonResponse({
+            'success': False,
+            'message': 'Class level ID is required.'
+        })
+    
+    try:
+        class_level = ClassLevel.objects.get(id=class_level_id)
+    except ClassLevel.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'message': 'Class level not found.'
+        })
+    
+    # Get and validate required fields
+    educational_level_id = request.POST.get('educational_level')
+    name = request.POST.get('name', '').strip()
+    code = request.POST.get('code', '').strip()
+    order_str = request.POST.get('order', '').strip()
+    
+    if not educational_level_id or not name or not code or not order_str:
+        return JsonResponse({
+            'success': False,
+            'message': 'Educational level, name, code, and order are required.'
+        })
+    
+    try:
+        order = int(order_str)
+        if order < 1 or order > 100:
+            return JsonResponse({
+                'success': False,
+                'message': 'Order must be between 1 and 100.'
+            })
+    except ValueError:
+        return JsonResponse({
+            'success': False,
+            'message': 'Order must be a valid number.'
+        })
+    
+    # Validate name and code length
+    if len(name) > 50:
+        return JsonResponse({
+            'success': False,
+            'message': 'Class level name cannot exceed 50 characters.'
+        })
+    
+    if len(code) > 20:
+        return JsonResponse({
+            'success': False,
+            'message': 'Class level code cannot exceed 20 characters.'
+        })
+    
+    # Validate code format (alphanumeric)
+    if not code.isalnum():
+        return JsonResponse({
+            'success': False,
+            'message': 'Class level code can only contain letters and numbers.'
+        })
+    
+    # Get educational level
+    try:
+        educational_level = EducationalLevel.objects.get(id=educational_level_id)
+    except EducationalLevel.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'message': 'Selected educational level does not exist.'
+        })
+    
+    # Check for duplicate class level code within the same educational level (excluding current)
+    if ClassLevel.objects.filter(
+        educational_level=educational_level,
+        code__iexact=code
+    ).exclude(id=class_level.id).exists():
+        return JsonResponse({
+            'success': False,
+            'message': f'Class level with code "{code}" already exists for {educational_level.name}.'
+        })
+    
+    # Check for duplicate order within the same educational level (excluding current)
+    if ClassLevel.objects.filter(
+        educational_level=educational_level,
+        order=order
+    ).exclude(id=class_level.id).exists():
+        return JsonResponse({
+            'success': False,
+            'message': f'Another class level already has order {order} for {educational_level.name}.'
+        })
+    
+    # Get optional fields
+    is_active = request.POST.get('is_active') == 'on' or request.POST.get('is_active') == 'true'
+    
+    try:
+        # Update the class level
+        class_level.educational_level = educational_level
+        class_level.name = name
+        class_level.code = code.upper()  # Store code in uppercase for consistency
+        class_level.order = order
+        class_level.is_active = is_active
+        class_level.save()
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'Class level "{name}" updated successfully.',
+            'class_level': {
+                'id': class_level.id,
+                'educational_level_id': class_level.educational_level.id,
+                'educational_level_name': class_level.educational_level.name,
+                'name': class_level.name,
+                'code': class_level.code,
+                'order': class_level.order,
+                'is_active': class_level.is_active
+            }
+        })
+        
+    except IntegrityError as e:
+        if 'unique' in str(e).lower():
+            return JsonResponse({
+                'success': False,
+                'message': f'A class level with code "{code}" already exists for {educational_level.name}.'
+            })
+        return JsonResponse({
+            'success': False,
+            'message': f'Database error: {str(e)}'
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'Error updating class level: {str(e)}'
+        })
+
+
+def toggle_class_level_status(request):
+    """Toggle class level active/inactive status"""
+    class_level_id = request.POST.get('id')
+    if not class_level_id:
+        return JsonResponse({
+            'success': False,
+            'message': 'Class level ID is required.'
+        })
+    
+    try:
+        class_level = ClassLevel.objects.get(id=class_level_id)
+    except ClassLevel.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'message': 'Class level not found.'
+        })
+    
+    try:
+        # Toggle the status
+        class_level.is_active = not class_level.is_active
+        class_level.save()
+        
+        status_text = "activated" if class_level.is_active else "deactivated"
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'Class level "{class_level.name}" {status_text} successfully.',
+            'is_active': class_level.is_active
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'Error toggling class level status: {str(e)}'
+        })
+
+
+def delete_class_level(request):
+    """Delete a class level"""
+    class_level_id = request.POST.get('id')
+    if not class_level_id:
+        return JsonResponse({
+            'success': False,
+            'message': 'Class level ID is required.'
+        })
+    
+    try:
+        class_level = ClassLevel.objects.get(id=class_level_id)
+    except ClassLevel.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'message': 'Class level not found.'
+        })
+    
+    # Check if class level has any associated data (optional - add your own checks)
+    # Example: if class_level.stream_set.exists():
+    #     return JsonResponse({
+    #         'success': False,
+    #         'message': 'Cannot delete class level with associated streams.'
+    #     })
+    
+    class_level_name = class_level.name
+    
+    try:
+        class_level.delete()
+        return JsonResponse({
+            'success': True,
+            'message': f'Class level "{class_level_name}" deleted successfully.',
+            'id': class_level_id
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'Error deleting class level: {str(e)}'
+        })
+
+
+# Helper function to get class levels list view (optional)
+
 
 
 # Legacy view - redirect to list for backward compatibility
@@ -1400,17 +2253,35 @@ def class_levels(request):
     """Redirect to class_levels_list for backward compatibility"""
     return redirect('admin_class_levels_list')
 
-
+# Helper function to get stream classes list view
 @login_required
 def stream_classes_list(request):
-    """Display list of stream classes"""
-    streams = StreamClass.objects.select_related('class_level').all().order_by('class_level', 'stream_letter')
+    """Display stream classes management page"""
+    stream_classes = StreamClass.objects.select_related(
+        'class_level',
+        'class_level__educational_level'
+    ).all()
+    
+    class_levels = ClassLevel.objects.filter(is_active=True).select_related('educational_level')
+    
+    # Count active streams
+    active_streams_count = stream_classes.filter(is_active=True).count()
+    
+    # Calculate total students across all streams
+    total_students = 0
+    for stream in stream_classes:
+        total_students += stream.student_count
     
     context = {
-        'page_title': 'Stream Classes',
-        'streams': streams,
+        'stream_classes': stream_classes,
+        'class_levels': class_levels,
+        'active_streams_count': active_streams_count,
+        'total_students': total_students,
     }
+    
     return render(request, 'admin/academic/stream_classes_list.html', context)
+
+
 
 
 @login_required
@@ -1421,191 +2292,388 @@ def stream_classes_crud(request):
         
         try:
             if action == 'create':
-                class_level_id = request.POST.get('class_level_id', '').strip()
-                stream_letter = request.POST.get('stream_letter', '').strip().upper()
-                capacity = request.POST.get('capacity', '50').strip()
-                
-                if not class_level_id or not stream_letter:
-                    return JsonResponse({
-                        'success': False,
-                        'message': 'Class level and stream letter are required.'
-                    }, status=400)
-                
-                if len(stream_letter) != 1 or not stream_letter.isalpha():
-                    return JsonResponse({
-                        'success': False,
-                        'message': 'Stream letter must be a single character (A-Z).'
-                    }, status=400)
-                
-                try:
-                    capacity = int(capacity)
-                    if capacity <= 0:
-                        raise ValueError
-                except ValueError:
-                    return JsonResponse({
-                        'success': False,
-                        'message': 'Capacity must be a positive integer.'
-                    }, status=400)
-                
-                class_level = get_object_or_404(ClassLevel, id=class_level_id)
-                
-                # Check for duplicate stream (unique_together constraint)
-                if StreamClass.objects.filter(
-                    class_level=class_level,
-                    stream_letter=stream_letter
-                ).exists():
-                    return JsonResponse({
-                        'success': False,
-                        'message': f'Stream {class_level.name}{stream_letter} already exists.'
-                    }, status=400)
-                
-                stream = StreamClass.objects.create(
-                    class_level=class_level,
-                    stream_letter=stream_letter,
-                    capacity=capacity
-                )
-                
-                return JsonResponse({
-                    'success': True,
-                    'message': f'Stream "{stream}" created successfully.',
-                    'stream': {
-                        'id': stream.id,
-                        'class_level_id': stream.class_level.id,
-                        'class_level_name': stream.class_level.name,
-                        'stream_letter': stream.stream_letter,
-                        'capacity': stream.capacity,
-                        'student_count': stream.student_count,
-                        'is_active': stream.is_active,
-                        'full_name': str(stream),
-                    }
-                })
-                
+                return create_stream_class(request)
             elif action == 'update':
-                stream_id = request.POST.get('id')
-                if not stream_id:
-                    return JsonResponse({
-                        'success': False,
-                        'message': 'Stream ID is required.'
-                    }, status=400)
-                
-                stream = get_object_or_404(StreamClass, id=stream_id)
-                
-                class_level_id = request.POST.get('class_level_id', '').strip()
-                stream_letter = request.POST.get('stream_letter', '').strip().upper()
-                capacity = request.POST.get('capacity', str(stream.capacity)).strip()
-                
-                if not class_level_id or not stream_letter:
-                    return JsonResponse({
-                        'success': False,
-                        'message': 'Class level and stream letter are required.'
-                    }, status=400)
-                
-                if len(stream_letter) != 1 or not stream_letter.isalpha():
-                    return JsonResponse({
-                        'success': False,
-                        'message': 'Stream letter must be a single character (A-Z).'
-                    }, status=400)
-                
-                try:
-                    capacity = int(capacity)
-                    if capacity <= 0:
-                        raise ValueError
-                except ValueError:
-                    return JsonResponse({
-                        'success': False,
-                        'message': 'Capacity must be a positive integer.'
-                    }, status=400)
-                
-                class_level = get_object_or_404(ClassLevel, id=class_level_id)
-                
-                # Check for duplicate stream (exclude current)
-                if StreamClass.objects.filter(
-                    class_level=class_level,
-                    stream_letter=stream_letter
-                ).exclude(id=stream.id).exists():
-                    return JsonResponse({
-                        'success': False,
-                        'message': f'Stream {class_level.name}{stream_letter} already exists.'
-                    }, status=400)
-                
-                stream.class_level = class_level
-                stream.stream_letter = stream_letter
-                stream.capacity = capacity
-                stream.save()
-                
-                return JsonResponse({
-                    'success': True,
-                    'message': f'Stream "{stream}" updated successfully.',
-                    'stream': {
-                        'id': stream.id,
-                        'class_level_id': stream.class_level.id,
-                        'class_level_name': stream.class_level.name,
-                        'stream_letter': stream.stream_letter,
-                        'capacity': stream.capacity,
-                        'student_count': stream.student_count,
-                        'is_active': stream.is_active,
-                        'full_name': str(stream),
-                    }
-                })
-                
+                return update_stream_class(request)
+            elif action == 'toggle_status':
+                return toggle_stream_class_status(request)
             elif action == 'delete':
-                stream_id = request.POST.get('id')
-                if not stream_id:
-                    return JsonResponse({
-                        'success': False,
-                        'message': 'Stream ID is required.'
-                    }, status=400)
-                
-                stream = get_object_or_404(StreamClass, id=stream_id)
-                stream_name = str(stream)
-                stream.delete()
-                
-                return JsonResponse({
-                    'success': True,
-                    'message': f'Stream "{stream_name}" deleted successfully.',
-                    'id': stream_id
-                })
-            
-            elif action == 'toggle_active':
-                stream_id = request.POST.get('id')
-                if not stream_id:
-                    return JsonResponse({
-                        'success': False,
-                        'message': 'Stream ID is required.'
-                    }, status=400)
-                
-                stream = get_object_or_404(StreamClass, id=stream_id)
-                stream.is_active = not stream.is_active
-                stream.save()
-                
-                status_text = 'activated' if stream.is_active else 'deactivated'
-                
-                return JsonResponse({
-                    'success': True,
-                    'message': f'Stream "{stream}" {status_text} successfully.',
-                    'stream': {
-                        'id': stream.id,
-                        'is_active': stream.is_active,
-                        'full_name': str(stream),
-                    }
-                })
-            
+                return delete_stream_class(request)
             else:
                 return JsonResponse({
                     'success': False,
-                    'message': 'Invalid action.'
-                }, status=400)
+                    'message': 'Invalid action specified.'
+                })
                 
+        except ValidationError as e:
+            return JsonResponse({
+                'success': False,
+                'message': str(e)
+            })
         except Exception as e:
             return JsonResponse({
                 'success': False,
-                'message': f'Error: {str(e)}'
-            }, status=500)
+                'message': f'An error occurred: {str(e)}'
+            })
     
     return JsonResponse({
         'success': False,
         'message': 'POST request required.'
-    }, status=405)
+    })
+
+
+def create_stream_class(request):
+    """Create a new stream class"""
+    # Get and validate required fields
+    class_level_id = request.POST.get('class_level')
+    if not class_level_id:
+        return JsonResponse({
+            'success': False,
+            'message': 'Class level is required.'
+        })
+    
+    stream_letter = request.POST.get('stream_letter', '').strip().upper()
+    if not stream_letter:
+        return JsonResponse({
+            'success': False,
+            'message': 'Stream letter is required.'
+        })
+    
+    capacity_str = request.POST.get('capacity', '50').strip()
+    
+    # Validate stream letter
+    if len(stream_letter) != 1 or not stream_letter.isalpha():
+        return JsonResponse({
+            'success': False,
+            'message': 'Stream letter must be a single letter (A-Z).'
+        })
+    
+    # Validate capacity
+    try:
+        capacity = int(capacity_str)
+        if capacity < 10:
+            return JsonResponse({
+                'success': False,
+                'message': 'Capacity must be at least 10 students.'
+            })
+        if capacity > 200:
+            return JsonResponse({
+                'success': False,
+                'message': 'Capacity cannot exceed 200 students.'
+            })
+    except ValueError:
+        return JsonResponse({
+            'success': False,
+            'message': 'Capacity must be a valid number.'
+        })
+    
+    # Get class level
+    try:
+        class_level = ClassLevel.objects.get(id=class_level_id, is_active=True)
+    except ClassLevel.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'message': 'Selected class level does not exist or is inactive.'
+        })
+    
+    # Check for duplicate stream letter within the same class level
+    if StreamClass.objects.filter(
+        class_level=class_level,
+        stream_letter=stream_letter
+    ).exists():
+        return JsonResponse({
+            'success': False,
+            'message': f'Stream "{stream_letter}" already exists for {class_level.name}.'
+        })
+    
+    # Get optional fields
+    is_active = request.POST.get('is_active') == 'on' or request.POST.get('is_active') == 'true'
+    
+    try:
+        # Create the stream class
+        stream = StreamClass.objects.create(
+            class_level=class_level,
+            stream_letter=stream_letter,
+            capacity=capacity,
+            is_active=is_active
+        )
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'Stream class "{stream}" created successfully.',
+            'stream': {
+                'id': stream.id,
+                'class_level_id': stream.class_level.id,
+                'class_level_name': stream.class_level.name,
+                'educational_level_name': stream.class_level.educational_level.name,
+                'stream_letter': stream.stream_letter,
+                'capacity': stream.capacity,
+                'student_count': stream.student_count,
+                'is_active': stream.is_active,
+                'full_name': str(stream)
+            }
+        })
+        
+    except IntegrityError as e:
+        if 'unique' in str(e).lower():
+            return JsonResponse({
+                'success': False,
+                'message': f'A stream with letter "{stream_letter}" already exists for {class_level.name}.'
+            })
+        return JsonResponse({
+            'success': False,
+            'message': f'Database error: {str(e)}'
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'Error creating stream class: {str(e)}'
+        })
+
+
+def update_stream_class(request):
+    """Update an existing stream class"""
+    stream_id = request.POST.get('id')
+    if not stream_id:
+        return JsonResponse({
+            'success': False,
+            'message': 'Stream class ID is required.'
+        })
+    
+    try:
+        stream = StreamClass.objects.get(id=stream_id)
+    except StreamClass.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'message': 'Stream class not found.'
+        })
+    
+    # Get and validate required fields
+    class_level_id = request.POST.get('class_level')
+    stream_letter = request.POST.get('stream_letter', '').strip().upper()
+    capacity_str = request.POST.get('capacity', str(stream.capacity)).strip()
+    
+    if not class_level_id or not stream_letter:
+        return JsonResponse({
+            'success': False,
+            'message': 'Class level and stream letter are required.'
+        })
+    
+    # Validate stream letter
+    if len(stream_letter) != 1 or not stream_letter.isalpha():
+        return JsonResponse({
+            'success': False,
+            'message': 'Stream letter must be a single letter (A-Z).'
+        })
+    
+    # Validate capacity
+    try:
+        capacity = int(capacity_str)
+        if capacity < 10:
+            return JsonResponse({
+                'success': False,
+                'message': 'Capacity must be at least 10 students.'
+            })
+        if capacity > 200:
+            return JsonResponse({
+                'success': False,
+                'message': 'Capacity cannot exceed 200 students.'
+            })
+    except ValueError:
+        return JsonResponse({
+            'success': False,
+            'message': 'Capacity must be a valid number.'
+        })
+    
+    # Get class level
+    try:
+        class_level = ClassLevel.objects.get(id=class_level_id, is_active=True)
+    except ClassLevel.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'message': 'Selected class level does not exist or is inactive.'
+        })
+    
+    # Check for duplicate stream letter within the same class level (excluding current)
+    if StreamClass.objects.filter(
+        class_level=class_level,
+        stream_letter=stream_letter
+    ).exclude(id=stream.id).exists():
+        return JsonResponse({
+            'success': False,
+            'message': f'Stream "{stream_letter}" already exists for {class_level.name}.'
+        })
+    
+    # Check if capacity is less than current student count
+    current_student_count = stream.student_count
+    if capacity < current_student_count:
+        return JsonResponse({
+            'success': False,
+            'message': f'Cannot reduce capacity below current student count ({current_student_count} students).'
+        })
+    
+    # Get optional fields
+    is_active = request.POST.get('is_active') == 'on' or request.POST.get('is_active') == 'true'
+    
+    try:
+        # Update the stream class
+        stream.class_level = class_level
+        stream.stream_letter = stream_letter
+        stream.capacity = capacity
+        stream.is_active = is_active
+        stream.save()
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'Stream class "{stream}" updated successfully.',
+            'stream': {
+                'id': stream.id,
+                'class_level_id': stream.class_level.id,
+                'class_level_name': stream.class_level.name,
+                'educational_level_name': stream.class_level.educational_level.name,
+                'stream_letter': stream.stream_letter,
+                'capacity': stream.capacity,
+                'student_count': stream.student_count,
+                'is_active': stream.is_active,
+                'full_name': str(stream)
+            }
+        })
+        
+    except IntegrityError as e:
+        if 'unique' in str(e).lower():
+            return JsonResponse({
+                'success': False,
+                'message': f'A stream with letter "{stream_letter}" already exists for {class_level.name}.'
+            })
+        return JsonResponse({
+            'success': False,
+            'message': f'Database error: {str(e)}'
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'Error updating stream class: {str(e)}'
+        })
+
+
+def toggle_stream_class_status(request):
+    """Toggle stream class active/inactive status"""
+    stream_id = request.POST.get('id')
+    if not stream_id:
+        return JsonResponse({
+            'success': False,
+            'message': 'Stream class ID is required.'
+        })
+    
+    try:
+        stream = StreamClass.objects.get(id=stream_id)
+    except StreamClass.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'message': 'Stream class not found.'
+        })
+    
+    # Check if stream has active students when trying to deactivate
+    if stream.is_active and stream.student_count > 0:
+        return JsonResponse({
+            'success': False,
+            'message': f'Cannot deactivate stream with {stream.student_count} active students. Reassign students first.'
+        })
+    
+    try:
+        # Toggle the status
+        stream.is_active = not stream.is_active
+        stream.save()
+        
+        status_text = "activated" if stream.is_active else "deactivated"
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'Stream class "{stream}" {status_text} successfully.',
+            'is_active': stream.is_active,
+            'student_count': stream.student_count
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'Error toggling stream class status: {str(e)}'
+        })
+
+
+def delete_stream_class(request):
+    """Delete a stream class"""
+    stream_id = request.POST.get('id')
+    if not stream_id:
+        return JsonResponse({
+            'success': False,
+            'message': 'Stream class ID is required.'
+        })
+    
+    try:
+        stream = StreamClass.objects.get(id=stream_id)
+    except StreamClass.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'message': 'Stream class not found.'
+        })
+    
+    # Check if stream has any students
+    if stream.student_count > 0:
+        return JsonResponse({
+            'success': False,
+            'message': f'Cannot delete stream with {stream.student_count} students. Reassign students first.'
+        })
+    
+    stream_name = str(stream)
+    
+    try:
+        stream.delete()
+        return JsonResponse({
+            'success': True,
+            'message': f'Stream class "{stream_name}" deleted successfully.',
+            'id': stream_id
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'Error deleting stream class: {str(e)}'
+        })
+
+
+# views.py - Simple version
+@login_required
+@require_POST
+def bulk_toggle_student_status(request):
+    """Simple bulk status toggle"""
+    try:
+        # Get parameters
+        student_ids = json.loads(request.POST.get('student_ids', '[]'))
+        is_active = request.POST.get('is_active', 'false').lower() == 'true'
+        
+        if not student_ids:
+            return JsonResponse({
+                'success': False,
+                'message': 'No students selected'
+            })
+        
+        # Update students
+        updated = Student.objects.filter(id__in=student_ids).update(
+            is_active=is_active,
+            status='active' if is_active else 'inactive'
+        )
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'Updated {updated} student(s)',
+            'updated': updated
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'Error: {str(e)}'
+        })
 
 
 # Legacy view - redirect to list for backward compatibility
@@ -1617,166 +2685,1760 @@ def stream_classes(request):
 # ============================================================================
 # STUDENT MANAGEMENT VIEWS
 # ============================================================================
-
+@login_required
+def get_streams_by_class(request):
+    """Get streams by class for dropdowns (AJAX)"""
+    class_id = request.GET.get('class_id')
+    
+    if class_id:
+        try:
+            streams = StreamClass.objects.filter(
+                class_level_id=class_id, 
+                is_active=True
+            ).select_related('class_level').order_by('class_level__name', 'stream_letter')
+            
+            stream_list = []
+            for stream in streams:
+                # Combine class level name with stream letter as shown in __str__ method
+                stream_name = f"{stream.class_level.name}{stream.stream_letter}"
+                stream_list.append({
+                    'id': stream.id, 
+                    'text': stream_name,
+                    'stream_letter': stream.stream_letter,
+                    'class_level_name': stream.class_level.name
+                })
+            
+            return JsonResponse({
+                'success': True,
+                'streams': stream_list
+            })
+        except Exception as e:
+            return JsonResponse({
+                'success': False,
+                'error': str(e)
+            })
+    
+    return JsonResponse({
+        'success': False,
+        'error': 'No class ID provided'
+    })
+    
 @login_required
 def students_list(request):
-    """List all students with filtering options"""
-    students = Student.objects.select_related('class_level', 'stream_class').all()
+    """Display list of students with advanced filtering"""
+    # Get filter parameters
+    search_query = request.GET.get('search', '')
+    status_filter = request.GET.get('status', '')
+    class_filter = request.GET.get('class_level', '')
     
-    # Filters
-    class_filter = request.GET.get('class')
-    status_filter = request.GET.get('status')
+    # Start with all students
+    students = Student.objects.all().select_related(
+        'class_level', 'stream_class', 'previous_school'
+    ).prefetch_related('optional_subjects', 'parents')
     
-    if class_filter:
-        students = students.filter(class_level__id=class_filter)
+    # Apply filters
+    if search_query:
+        students = students.filter(
+            Q(first_name__icontains=search_query) |
+            Q(last_name__icontains=search_query) |
+            Q(middle_name__icontains=search_query) |
+            Q(registration_number__icontains=search_query) |
+            Q(examination_number__icontains=search_query) |
+            Q(address__icontains=search_query)
+        )
+    
     if status_filter:
         students = students.filter(status=status_filter)
     
+    if class_filter:
+        students = students.filter(class_level_id=class_filter)
+    
+    # Calculate statistics
+    total_students = Student.objects.count()
+    active_students = Student.objects.filter(is_active=True).count()
+    inactive_students = Student.objects.filter(is_active=False).count()
+    male_students = Student.objects.filter(gender='male').count()
+    female_students = Student.objects.filter(gender='female').count()
+    
+    # Get all education levels
+    education_levels = EducationalLevel.objects.filter(is_active=True)
+    
+    # Get all class levels
+    class_levels = ClassLevel.objects.filter(is_active=True).select_related('educational_level')
+    
+    # Get unique admission years for filter
+    admission_years = AcademicYear.objects.all()
+    
+    # Pagination
+    page = request.GET.get('page', 1)
+    paginator = Paginator(students, 25)  # Show 25 students per page
+    
+    try:
+        students_page = paginator.page(page)
+    except PageNotAnInteger:
+        students_page = paginator.page(1)
+    except EmptyPage:
+        students_page = paginator.page(paginator.num_pages)
+    
     context = {
-        'page_title': 'Students List',
-        'students': students,
-        'class_levels': ClassLevel.objects.all(),
-        'status_choices': Student._meta.get_field('status').choices,
+        'students': students_page,
+        'total_students': total_students,
+        'active_students': active_students,
+        'inactive_students': inactive_students,
+        'male_students': male_students,
+        'female_students': female_students,
+        'education_levels': education_levels,
+        'class_levels': class_levels,
+        'admission_years': admission_years,
+        'status_choices': STATUS_CHOICES,
+        'gender_choices': GENDER_CHOICES,
+        'search_query': search_query,
+        'status_filter': status_filter,
+        'class_filter': class_filter,
     }
-    return render(request, 'admin/students/list.html', context)
+    
+    return render(request, 'admin/students/student_list.html', context)
+
+@login_required
+def get_class_levels_by_education_level(request):
+    """AJAX endpoint to get class levels by education level"""
+    education_level_id = request.GET.get('education_level_id')
+    
+    if not education_level_id:
+        return JsonResponse({'success': False, 'message': 'Education level ID required'})
+    
+    try:
+        class_levels = ClassLevel.objects.filter(
+            educational_level_id=education_level_id,
+            is_active=True
+        ).order_by('order')
+        
+        class_list = []
+        for cls in class_levels:
+            class_list.append({
+                'id': cls.id,
+                'text': f"{cls.name} ({cls.code})",
+                'name': cls.name,
+                'code': cls.code
+            })
+        
+        return JsonResponse({
+            'success': True,
+            'class_levels': class_list
+        })
+    except Exception as e:
+        return JsonResponse({'success': False, 'message': str(e)})
+
+
+@login_required
+def toggle_student_status(request):
+    """AJAX endpoint to toggle student active status"""
+    if request.method == 'POST':
+        student_id = request.POST.get('student_id')
+        
+        try:
+            student = Student.objects.get(id=student_id)
+            student.is_active = not student.is_active
+            student.save()
+            
+            action = 'activated' if student.is_active else 'deactivated'
+            
+            return JsonResponse({
+                'success': True,
+                'message': f'Student {student.full_name} {action} successfully.',
+                'is_active': student.is_active
+            })
+            
+        except Student.DoesNotExist:
+            return JsonResponse({'success': False, 'message': 'Student not found.'})
+        except Exception as e:
+            return JsonResponse({'success': False, 'message': str(e)})
+    
+    return JsonResponse({'success': False, 'message': 'Invalid request method.'})
+
+@login_required
+def delete_student(request):
+    """AJAX endpoint to delete a student"""
+    if request.method == 'POST':
+        student_id = request.POST.get('student_id')
+        
+        try:
+            student = Student.objects.get(id=student_id)
+            student_name = student.full_name
+            student.delete()
+            
+            return JsonResponse({
+                'success': True,
+                'message': f'Student {student_name} deleted successfully.'
+            })
+            
+        except Student.DoesNotExist:
+            return JsonResponse({'success': False, 'message': 'Student not found.'})
+        except Exception as e:
+            return JsonResponse({'success': False, 'message': str(e)})
+    
+    return JsonResponse({'success': False, 'message': 'Invalid request method.'})
 
 @login_required
 def students_add(request):
-    """Add new student"""
-    if request.method == 'POST':
+    """
+    Handle student creation with AJAX validation and form submission
+    """
+    # GET request - show empty form
+    if request.method == 'GET':
+        return handle_get_request(request)
+    
+    # POST request - process form submission
+    elif request.method == 'POST':
+        return handle_post_request(request)
+
+def handle_get_request(request):
+    """Handle GET request - prepare form and context"""
+    form = StudentForm()
+    
+    # Prepare context for template
+    context = {
+        'form': form,
+        'class_levels': ClassLevel.objects.filter(is_active=True).order_by('order'),
+        'stream_classes': StreamClass.objects.filter(is_active=True).order_by('class_level', 'stream_letter'),
+        'previous_schools': PreviousSchool.objects.all().order_by('name'),
+        'subjects': Subject.objects.filter(is_active=True).order_by('name'),
+        'status_choices': STATUS_CHOICES,
+        'gender_choices': GENDER_CHOICES,
+        'page_title': 'Add New Student',
+        'is_ajax_validation': False,
+    }
+    
+    return render(request, 'admin/students/student_add.html', context)
+
+def handle_post_request(request):
+    """Handle POST request - validate and save student"""
+    # Check if this is AJAX validation only
+    is_ajax_validation = (
+        request.headers.get('x-requested-with') == 'XMLHttpRequest' and 
+        request.POST.get('validate_only') == 'true'
+    )
+    
+    # Prepare form with data
+    form = StudentForm(request.POST, request.FILES)
+    
+    # Handle AJAX validation
+    if is_ajax_validation:
+        return handle_ajax_validation(form)
+    
+    # Handle regular form submission
+    return handle_form_submission(request, form)
+
+def handle_ajax_validation(form):
+    """Handle AJAX form validation"""
+    if form.is_valid():
+        return JsonResponse({
+            'success': True,
+            'message': 'Form is valid',
+            'errors': {}
+        })
+    else:
+        # Format errors for frontend
+        errors = {}
+        for field, error_list in form.errors.items():
+            if field == '__all__':
+                errors['non_field_errors'] = error_list
+            else:
+                errors[field] = error_list[0] if error_list else ''
+        
+        return JsonResponse({
+            'success': False,
+            'message': 'Please correct the errors below',
+            'errors': errors
+        }, status=400)
+
+@transaction.atomic
+def handle_form_submission(request, form):
+    """Handle regular form submission and save student"""
+    if form.is_valid():
         try:
-            # Extract form data
-            first_name = request.POST.get('first_name')
-            middle_name = request.POST.get('middle_name', '')
-            last_name = request.POST.get('last_name')
-            date_of_birth = request.POST.get('date_of_birth')
-            gender = request.POST.get('gender')
-            address = request.POST.get('address', '')
-            class_level_id = request.POST.get('class_level')
-            stream_class_id = request.POST.get('stream_class')
+            # Get optional subjects from POST data
+            optional_subjects_ids = request.POST.getlist('optional_subjects', [])
             
-            # Get related objects
-            class_level = get_object_or_404(ClassLevel, id=class_level_id) if class_level_id else None
-            stream_class = get_object_or_404(StreamClass, id=stream_class_id) if stream_class_id else None
+            # Save student instance
+            student = form.save(commit=False)
             
-            # Create student
-            student = Student.objects.create(
-                first_name=first_name,
-                middle_name=middle_name,
-                last_name=last_name,
-                date_of_birth=date_of_birth,
-                gender=gender,
-                address=address,
-                class_level=class_level,
-                stream_class=stream_class,
-                status='active'
-            )
+            # Set admission year if not provided
+            if not student.admission_year:
+                student.admission_year = datetime.now().year
             
-            messages.success(request, f'Student "{student.full_name}" added successfully.')
-            return redirect('admin:admin_students_list')
+            # Generate serial number if needed
+            if not student.serial_number:
+                last_student = Student.objects.filter(
+                    admission_year=student.admission_year
+                ).order_by('-serial_number').first()
+                student.serial_number = 1 if not last_student else last_student.serial_number + 1
+            
+            # Save the student (this will also generate registration number)
+            student.save()
+            
+            # Handle optional subjects
+            if optional_subjects_ids:
+                subjects = Subject.objects.filter(id__in=optional_subjects_ids)
+                student.optional_subjects.set(subjects)
+            
+            # Get save type to determine next action
+            save_type = request.POST.get('save_type', 'save_list')
+            
+            # Handle AJAX response
+            if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+                return JsonResponse({
+                    'success': True,
+                    'message': f'Student {student.full_name} added successfully!',
+                    'student_id': student.id,
+                    'student_name': student.full_name,
+                    'registration_number': student.registration_number,
+                    'save_type': save_type,
+                    'redirect_url': get_redirect_url(save_type, student.id)
+                })
+            
+            # Handle regular HTTP response
+            return handle_success_redirect(save_type, student.id)
             
         except Exception as e:
-            messages.error(request, f'Error adding student: {str(e)}')
+            # Log the error here if you have logging setup
+            print(f"Error saving student: {str(e)}")
+            
+            if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+                return JsonResponse({
+                    'success': False,
+                    'message': f'Error saving student: {str(e)}',
+                    'errors': {'__all__': 'An unexpected error occurred'}
+                }, status=500)
+            else:
+                # Re-render form with error
+                return render_form_with_error(request, form, str(e))
     
-    context = {
-        'page_title': 'Add Student',
-        'class_levels': ClassLevel.objects.all(),
-        'stream_classes': StreamClass.objects.all(),
-        'genders': Student._meta.get_field('gender').choices,
-    }
-    return render(request, 'admin/students/add.html', context)
+    else:
+        # Form is invalid
+        return handle_invalid_form(request, form)
 
+def get_redirect_url(save_type, student_id):
+    """Get redirect URL based on save type"""
+    if save_type == 'save_add':
+        return reverse('admin_students_add')
+    elif save_type == 'save_parent':
+        return reverse('admin_add_parent_to_student', kwargs={'student_id': student_id})
+    else:  # save_list or default
+        return reverse('admin_students_list')
+
+def handle_success_redirect(save_type, student_id):
+    """Handle redirect after successful form submission"""
+    if save_type == 'save_add':
+        return redirect('admin_students_add')
+    elif save_type == 'save_parent':
+        return redirect('admin_add_parent_to_student', student_id=student_id)
+    else:  # save_list or default
+        return redirect('admin_students_list')
+
+def handle_invalid_form(request, form):
+    """Handle invalid form submission"""
+    # Format errors for response
+    errors = {}
+    for field, error_list in form.errors.items():
+        if field == '__all__':
+            errors['non_field_errors'] = error_list
+        else:
+            errors[field] = error_list[0] if error_list else ''
+    
+    # AJAX response
+    if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+        return JsonResponse({
+            'success': False,
+            'message': 'Please correct the errors below',
+            'errors': errors
+        }, status=400)
+    
+    # Regular HTTP response - re-render form
+    context = {
+        'form': form,
+        'class_levels': ClassLevel.objects.filter(is_active=True).order_by('order'),
+        'stream_classes': StreamClass.objects.filter(is_active=True).order_by('class_level', 'stream_letter'),
+        'previous_schools': PreviousSchool.objects.all().order_by('name'),
+        'subjects': Subject.objects.filter(is_active=True).order_by('name'),
+        'status_choices': STATUS_CHOICES,
+        'gender_choices': GENDER_CHOICES,
+        'page_title': 'Add New Student',
+        'form_errors': errors,
+    }
+    
+    return render(request, 'admin/students/student_add.html', context)
+
+def render_form_with_error(request, form, error_message):
+    """Render form with error message"""
+    context = {
+        'form': form,
+        'class_levels': ClassLevel.objects.filter(is_active=True).order_by('order'),
+        'stream_classes': StreamClass.objects.filter(is_active=True).order_by('class_level', 'stream_letter'),
+        'previous_schools': PreviousSchool.objects.all().order_by('name'),
+        'subjects': Subject.objects.filter(is_active=True).order_by('name'),
+        'status_choices': STATUS_CHOICES,
+        'gender_choices': GENDER_CHOICES,
+        'page_title': 'Add New Student',
+        'error_message': error_message,
+    }
+    
+    return render(request, 'admin/students/student_add.html', context)
+
+
+
+@login_required
+def add_parent_to_student(request, student_id):
+    """
+    View for adding a new parent/guardian to a student
+    URL: /admin/students/<student_id>/parent/add/
+    """
+    student = get_object_or_404(Student, pk=student_id)
+    
+    # Check if user has access to this student
+    if not request.user.has_perm('students.view_student', student):
+        messages.error(request, 'You do not have permission to view this student.')
+        return redirect('admin_students_list')
+    
+    if request.method == 'POST':
+        form = ParentForm(request.POST)
+        
+        if form.is_valid():
+            try:
+                # Save the parent
+                parent = form.save(commit=False)
+                parent.save()
+                
+                # Link parent to student
+                parent.students.add(student)
+                
+                # If this parent is fee responsible, unset others
+                if parent.is_fee_responsible:
+                    student.parents.filter(is_fee_responsible=True).exclude(pk=parent.pk).update(is_fee_responsible=False)
+                
+                if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                    return JsonResponse({
+                        'success': True,
+                        'message': 'Parent added successfully!',
+                        'parent_id': parent.id,
+                        'parent_name': parent.full_name,
+                        'relationship': parent.relationship
+                    })
+                
+                # Handle regular form submission
+                action = request.POST.get('action_type', 'save_only')
+                
+                messages.success(request, f'Parent "{parent.full_name}" added successfully!')
+                
+                if action == 'save_and_view':
+                    return redirect('admin_student_detail', student_id=student.id)
+                elif action == 'save_and_add_another':
+                    return redirect('admin_add_parent_to_student', student_id=student.id)
+                elif action == 'save_and_edit':
+                    return redirect('admin_edit_parent', student_id=student.id, parent_id=parent.id)
+                else:  # save_only
+                    return redirect('admin_add_parent_to_student', student_id=student.id)
+                    
+            except Exception as e:
+                if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                    return JsonResponse({
+                        'success': False,
+                        'message': f'Error adding parent: {str(e)}'
+                    }, status=400)
+                else:
+                    messages.error(request, f'Error adding parent: {str(e)}')
+        else:
+            # Form has errors
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({
+                    'success': False,
+                    'message': 'Please correct the errors below',
+                    'errors': form.errors
+                }, status=400)
+            else:
+                # For non-AJAX, we'll show errors in the template
+                pass
+    else:
+        # GET request - initialize form
+        form = ParentForm()
+    
+    # Prepare context
+    context = {
+        'student': student,
+        'form': form,
+        'parent': None,  # No parent for add view
+        'RELATIONSHIP_CHOICES': RELATIONSHIP_CHOICES,
+        'page_title': f'Add Parent - {student.full_name}',
+    }
+    
+    return render(request, 'admin/students/parent_add.html', context)
+
+
+@login_required
+def edit_parent(request, student_id, parent_id):
+    """
+    View for editing an existing parent/guardian
+    URL: /admin/students/<student_id>/parent/<parent_id>/edit/
+    """
+    student = get_object_or_404(Student, pk=student_id)
+    parent = get_object_or_404(Parent, pk=parent_id, students=student)
+    
+    # Check if user has access
+    if not request.user.has_perm('students.view_student', student):
+        messages.error(request, 'You do not have permission to view this student.')
+        return redirect('admin_students_list')
+    
+    if request.method == 'POST':
+        form = ParentForm(request.POST, instance=parent)
+        
+        if form.is_valid():
+            try:
+                # Save the parent
+                parent = form.save()
+                
+                # If this parent is fee responsible, unset others
+                if parent.is_fee_responsible:
+                    student.parents.filter(is_fee_responsible=True).exclude(pk=parent.pk).update(is_fee_responsible=False)
+                
+                if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                    return JsonResponse({
+                        'success': True,
+                        'message': 'Parent updated successfully!',
+                        'parent_id': parent.id,
+                        'parent_name': parent.full_name,
+                        'relationship': parent.relationship
+                    })
+                
+                # Handle regular form submission
+                action = request.POST.get('action_type', 'save_only')
+                
+                messages.success(request, f'Parent "{parent.full_name}" updated successfully!')
+                
+                if action == 'save_and_view':
+                    return redirect('admin_student_detail', student_id=student.id)
+                elif action == 'save_and_add_another':
+                    return redirect('admin_add_parent_to_student', student_id=student.id)
+                else:  # save_only or save_and_edit
+                    return redirect('admin_edit_parent', student_id=student.id, parent_id=parent.id)
+                    
+            except Exception as e:
+                if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                    return JsonResponse({
+                        'success': False,
+                        'message': f'Error updating parent: {str(e)}'
+                    }, status=400)
+                else:
+                    messages.error(request, f'Error updating parent: {str(e)}')
+        else:
+            # Form has errors
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({
+                    'success': False,
+                    'message': 'Please correct the errors below',
+                    'errors': form.errors
+                }, status=400)
+    else:
+        # GET request - initialize form with parent data
+        form = ParentForm(instance=parent)
+    
+    # Prepare context
+    context = {
+        'student': student,
+        'parent': parent,
+        'form': form,
+        'RELATIONSHIP_CHOICES': RELATIONSHIP_CHOICES,
+        'page_title': f'Edit Parent - {parent.full_name}',
+    }
+    
+    return render(request, 'admin/students/parent_add.html', context)
+
+
+@login_required
+def delete_parent(request, student_id, parent_id):
+    """
+    View for deleting a parent/guardian
+    URL: /admin/students/<student_id>/parent/<parent_id>/delete/
+    """
+    if request.method == 'POST':
+        student = get_object_or_404(Student, pk=student_id)
+        parent = get_object_or_404(Parent, pk=parent_id, students=student)
+        
+        try:
+            parent_name = parent.full_name
+            
+            # Remove the relationship
+            parent.students.remove(student)
+            
+            # If this was the only student for this parent, delete the parent
+            if parent.students.count() == 0:
+                parent.delete()
+                message = f'Parent "{parent_name}" deleted successfully!'
+            else:
+                message = f'Parent "{parent_name}" unlinked from student successfully!'
+            
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({
+                    'success': True,
+                    'message': message
+                })
+            
+            messages.success(request, message)
+            return redirect('admin_student_detail', student_id=student.id)
+            
+        except Exception as e:
+            error_message = f'Error deleting parent: {str(e)}'
+            
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({
+                    'success': False,
+                    'message': error_message
+                }, status=400)
+            
+            messages.error(request, error_message)
+            return redirect('admin_student_detail', student_id=student.id)
+    
+    # GET request - redirect to student detail
+    return redirect('admin_student_detail', student_id=student_id)
+
+
+# AJAX-specific views for better separation
+
+@login_required
+def save_parent(request, student_id):
+    """
+    AJAX endpoint for saving a new parent
+    URL: /admin/students/<student_id>/parent/save/
+    """
+    if request.method == 'POST' and request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        student = get_object_or_404(Student, pk=student_id)
+        form = ParentForm(request.POST)
+        
+        if form.is_valid():
+            try:
+                # Save the parent
+                parent = form.save(commit=False)
+                parent.save()
+                
+                # Link parent to student
+                parent.students.add(student)
+                
+                # If this parent is fee responsible, unset others
+                if parent.is_fee_responsible:
+                    student.parents.filter(is_fee_responsible=True).exclude(pk=parent.pk).update(is_fee_responsible=False)
+                
+                return JsonResponse({
+                    'success': True,
+                    'message': 'Parent added successfully!',
+                    'parent_id': parent.id,
+                    'parent_name': parent.full_name,
+                    'relationship': parent.relationship,
+                    'html': render_parent_card(parent, student)  # Optional: return HTML for dynamic update
+                })
+                
+            except Exception as e:
+                return JsonResponse({
+                    'success': False,
+                    'message': f'Error adding parent: {str(e)}'
+                }, status=400)
+        else:
+            return JsonResponse({
+                'success': False,
+                'message': 'Please correct the errors below',
+                'errors': form.errors
+            }, status=400)
+    
+    return JsonResponse({
+        'success': False,
+        'message': 'Invalid request'
+    }, status=400)
+
+
+@login_required
+def update_parent(request, student_id, parent_id):
+    """
+    AJAX endpoint for updating an existing parent
+    URL: /admin/students/<student_id>/parent/<parent_id>/update/
+    """
+    if request.method == 'POST' and request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        student = get_object_or_404(Student, pk=student_id)
+        parent = get_object_or_404(Parent, pk=parent_id, students=student)
+        form = ParentForm(request.POST, instance=parent)
+        
+        if form.is_valid():
+            try:
+                # Save the parent
+                parent = form.save()
+                
+                # If this parent is fee responsible, unset others
+                if parent.is_fee_responsible:
+                    student.parents.filter(is_fee_responsible=True).exclude(pk=parent.pk).update(is_fee_responsible=False)
+                
+                return JsonResponse({
+                    'success': True,
+                    'message': 'Parent updated successfully!',
+                    'parent_id': parent.id,
+                    'parent_name': parent.full_name,
+                    'relationship': parent.relationship,
+                    'html': render_parent_card(parent, student)  # Optional: return HTML for dynamic update
+                })
+                
+            except Exception as e:
+                return JsonResponse({
+                    'success': False,
+                    'message': f'Error updating parent: {str(e)}'
+                }, status=400)
+        else:
+            return JsonResponse({
+                'success': False,
+                'message': 'Please correct the errors below',
+                'errors': form.errors
+            }, status=400)
+    
+    return JsonResponse({
+        'success': False,
+        'message': 'Invalid request'
+    }, status=400)
+
+
+def render_parent_card(parent, student):
+    """
+    Helper function to render parent card HTML
+    """
+    from django.template.loader import render_to_string
+    
+    return render_to_string('admin/students/parent_card.html', {
+        'parent': parent,
+        'student': student
+    })
+       
+# students/views.py
+@login_required
+@permission_required('students.manage_parent_fee', raise_exception=True)
+def update_parent_fee_responsibility(request, student_id, parent_id):
+    """
+    AJAX endpoint for updating fee responsibility
+    URL: /admin/students/<student_id>/parent/<parent_id>/update-fee-responsibility/
+    """
+    if request.method == 'POST' and request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        student = get_object_or_404(Student, pk=student_id)
+        parent = get_object_or_404(Parent, pk=parent_id, students=student)
+        
+        try:
+            is_fee_responsible = request.POST.get('is_fee_responsible') == 'true'
+            
+            # Update the parent
+            parent.is_fee_responsible = is_fee_responsible
+            parent.save()
+            
+            # If this parent is being made fee responsible, unset others
+            if is_fee_responsible:
+                student.parents.filter(is_fee_responsible=True).exclude(pk=parent.pk).update(is_fee_responsible=False)
+            
+            return JsonResponse({
+                'success': True,
+                'message': 'Fee responsibility updated successfully!',
+                'parent_id': parent.id,
+                'is_fee_responsible': parent.is_fee_responsible,
+                'html': render_parent_card(parent, student)
+            })
+            
+        except Exception as e:
+            return JsonResponse({
+                'success': False,
+                'message': f'Error updating fee responsibility: {str(e)}'
+            }, status=400)
+    
+    return JsonResponse({
+        'success': False,
+        'message': 'Invalid request'
+    }, status=400)
+    
+    
 @login_required
 def students_by_class(request):
     """View students grouped by class"""
-    class_levels = ClassLevel.objects.annotate(
-        student_count=Count('students', filter=Q(students__status='active'))
-    ).filter(student_count__gt=0)
+    class_levels = ClassLevel.objects.filter(is_active=True).annotate(
+        student_count=Count('students', filter=Q(students__is_active=True))
+    ).order_by('order')
     
-    selected_class = request.GET.get('class')
-    students = []
+    selected_class = request.GET.get('class_level', '')
+    students = Student.objects.none()
+    selected_class_obj = None
     
     if selected_class:
-        class_obj = get_object_or_404(ClassLevel, id=selected_class)
+        selected_class_obj = get_object_or_404(ClassLevel, id=selected_class, is_active=True)
         students = Student.objects.filter(
-            class_level=class_obj, 
-            status='active'
-        ).select_related('stream_class')
+            class_level_id=selected_class,
+            is_active=True
+        ).select_related('stream_class', 'class_level').prefetch_related('parents').order_by('first_name')
     
     context = {
-        'page_title': 'Students by Class',
         'class_levels': class_levels,
-        'selected_class': selected_class,
         'students': students,
+        'selected_class': selected_class,
+        'selected_class_obj': selected_class_obj,
     }
-    return render(request, 'admin/students/by_class.html', context)
+    return render(request, 'admin/students/students_by_class.html', context)
 
 @login_required
 def student_status(request):
-    """Manage student statuses (active, suspended, etc.)"""
-    if request.method == 'POST':
-        student_id = request.POST.get('student_id')
-        new_status = request.POST.get('status')
-        
-        student = get_object_or_404(Student, id=student_id)
-        old_status = student.status
-        student.status = new_status
-        student.save()
-        
-        messages.success(
-            request, 
-            f'Student {student.full_name} status changed from {old_status} to {new_status}.'
-        )
-        return redirect('admin:admin_student_status')
+    """Manage student statuses"""
+    students = Student.objects.select_related('class_level', 'stream_class').all()
     
-    students = Student.objects.all().select_related('class_level')
+    # Filters
+    status_filter = request.GET.get('status', '')
+    if status_filter:
+        students = students.filter(status=status_filter)
+    
+    # Status statistics
+    status_stats = Student.objects.values('status').annotate(
+        count=Count('id')
+    ).order_by('status')
+    
+    # Calculate age statistics
+    today = date.today()
+    age_stats = {
+        'under_10': students.filter(date_of_birth__isnull=False).filter(
+            date_of_birth__gte=date(today.year - 10, today.month, today.day)
+        ).count(),
+        '10_15': students.filter(date_of_birth__isnull=False).filter(
+            date_of_birth__lt=date(today.year - 10, today.month, today.day),
+            date_of_birth__gte=date(today.year - 15, today.month, today.day)
+        ).count(),
+        'over_15': students.filter(date_of_birth__isnull=False).filter(
+            date_of_birth__lt=date(today.year - 15, today.month, today.day)
+        ).count(),
+    }
     
     context = {
-        'page_title': 'Student Status Management',
         'students': students,
-        'status_choices': Student._meta.get_field('status').choices,
+        'status_stats': status_stats,
+        'age_stats': age_stats,
+        'status_choices': STATUS_CHOICES,
+        'status_filter': status_filter,
     }
-    return render(request, 'admin/students/status.html', context)
+    return render(request, 'admin/students/student_status.html', context)
+
+@login_required
+def student_edit(request, student_id):
+    """
+    View for editing student details with proper stream pre-population
+    """
+    student = get_object_or_404(Student, pk=student_id)
+    
+    # Get related data for the form
+    class_levels = ClassLevel.objects.filter(is_active=True).select_related('educational_level')
+    
+    # Get streams - include student's current stream even if not active
+    if student.class_level:
+        # Get active streams for student's class level
+        stream_classes = StreamClass.objects.filter(
+            class_level=student.class_level,
+            is_active=True
+        ).select_related('class_level')
+        
+        # If student has a stream that's not in active streams, include it
+        if student.stream_class and not stream_classes.filter(id=student.stream_class.id).exists():
+            stream_classes = stream_classes | StreamClass.objects.filter(id=student.stream_class.id)
+    else:
+        stream_classes = StreamClass.objects.filter(is_active=True).select_related('class_level')
+    
+    # Get subjects based on student's class level
+    if student.class_level:
+        subjects = Subject.objects.filter(
+            educational_level=student.class_level.educational_level,
+            is_active=True
+        ).select_related('educational_level')
+    else:
+        subjects = Subject.objects.filter(is_active=True).select_related('educational_level')
+    
+    previous_schools = PreviousSchool.objects.all()
+    
+    # Get student's current subjects
+    student_subjects = student.optional_subjects.all() if hasattr(student, 'optional_subjects') else []
+    student_subjects_ids = [subject.id for subject in student_subjects]
+    
+    # Get all streams for JavaScript initialization
+    all_streams = StreamClass.objects.filter(is_active=True).select_related('class_level')
+    
+    if request.method == 'POST':
+        form = StudentEditForm(request.POST, request.FILES, instance=student)
+        
+        if form.is_valid():
+            try:
+                # Get action type from form
+                action_type = request.POST.get('action_type', 'save_only')
+                
+                # Save the student
+                student = form.save()
+                
+                # Prepare response
+                response_data = {
+                    'success': True,
+                    'message': 'Student updated successfully!',
+                    'student_name': student.full_name,
+                }
+                
+                # Add profile pic URL if exists
+                if student.profile_pic:
+                    response_data['profile_pic_url'] = student.profile_pic.url
+                
+                # Handle AJAX request
+                if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                    return JsonResponse(response_data)
+                
+                # Handle regular form submission
+                messages.success(request, 'Student updated successfully!')
+                
+                # Redirect based on action type
+                if action_type == 'save_and_view':
+                    return redirect('admin_student_detail', student_id=student.id)
+                elif action_type == 'save_and_add_parent':
+                    return redirect('admin_add_parent_to_student', student_id=student.id)
+                elif action_type == 'save_and_add_another':
+                    return redirect('admin_add_student')
+                elif action_type == 'save_and_return_to_list':
+                    return redirect('admin_students_list')
+                else:  # save_only
+                    return redirect('admin_student_edit', student_id=student.id)
+                    
+            except Exception as e:
+                # Handle errors
+                if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                    return JsonResponse({
+                        'success': False,
+                        'message': f'Error updating student: {str(e)}'
+                    }, status=400)
+                else:
+                    messages.error(request, f'Error updating student: {str(e)}')
+        else:
+            # Form has errors
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({
+                    'success': False,
+                    'message': 'Please correct the errors below',
+                    'errors': form.errors
+                }, status=400)
+            else:
+                # For non-AJAX, we'll show errors in the template
+                pass
+    else:
+        # GET request - initialize form with student data
+        form = StudentEditForm(instance=student)
+        
+        # Store the current stream ID in form data for JavaScript
+        if student.stream_class:
+            form.fields['stream_class'].widget.attrs['data-current-stream-id'] = student.stream_class.id
+        
+        # Manually set initial subjects
+        if student_subjects:
+            form.fields['subjects'].initial = student_subjects
+    
+    # Prepare context
+    context = {
+        'student': student,
+        'form': form,
+        'class_levels': class_levels,
+        'stream_classes': stream_classes,  # Initial streams for current class
+        'all_streams': all_streams,  # All streams for JavaScript
+        'subjects': subjects,
+        'previous_schools': previous_schools,
+        'student_subjects': student_subjects,
+        'student_subjects_ids': student_subjects_ids,
+        'gender_choices': GENDER_CHOICES,
+        'status_choices': STATUS_CHOICES,
+        'today': date.today(),
+        'page_title': f'Edit Student - {student.full_name}',
+    }
+    
+    return render(request, 'admin/students/edit_student.html', context)
+
+
+@login_required
+def student_delete(request, id):
+    """Delete student"""
+    student = get_object_or_404(Student, id=id)
+    
+    if request.method == 'POST':
+        student_name = student.full_name
+        student.delete()
+        
+        if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+            return JsonResponse({
+                'success': True,
+                'message': f'Student {student_name} deleted successfully!'
+            })
+        return redirect('admin_students_list')
+    
+    context = {
+        'student': student
+    }
+    return render(request, 'admin/students/student_delete.html', context)
+
+@login_required
+def student_detail(request, id):
+    """View student details"""
+    student = get_object_or_404(Student, id=id)
+    
+    # Get related data
+    parents = student.parents.all()
+    optional_subjects = student.optional_subjects.all()
+    
+    # Calculate age
+    age = None
+    if student.date_of_birth:
+        today = date.today()
+        age = today.year - student.date_of_birth.year - (
+            (today.month, today.day) < (student.date_of_birth.month, student.date_of_birth.day)
+        )
+    
+    context = {
+        'student': student,
+        'parents': parents,
+        'optional_subjects': optional_subjects,
+        'age': age,
+    }
+    return render(request, 'admin/students/student_detail.html', context)
+
+
+@login_required
+@require_POST
+def students_ajax(request):
+    """Handle AJAX requests for student operations"""
+    action = request.POST.get('action')
+    
+    if action == 'delete':
+        student_id = request.POST.get('id')
+        student = get_object_or_404(Student, id=student_id)
+        student_name = student.full_name
+        student.delete()
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'Student {student_name} deleted successfully!'
+        })
+    
+    elif action == 'toggle_status':
+        student_id = request.POST.get('id')
+        student = get_object_or_404(Student, id=student_id)
+        student.is_active = not student.is_active
+        student.save()
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'Status updated for {student.full_name}',
+            'is_active': student.is_active
+        })
+    
+    elif action == 'get_student':
+        student_id = request.POST.get('id')
+        student = get_object_or_404(Student, id=student_id)
+        
+        # Calculate age
+        age = None
+        if student.date_of_birth:
+            today = date.today()
+            age = today.year - student.date_of_birth.year - (
+                (today.month, today.day) < (student.date_of_birth.month, student.date_of_birth.day)
+            )
+        
+        return JsonResponse({
+            'success': True,
+            'student': {
+                'id': student.id,
+                'full_name': student.full_name,
+                'registration_number': student.registration_number,
+                'class_level': student.class_level.name if student.class_level else '',
+                'class_level_id': student.class_level.id if student.class_level else None,
+                'stream_class': student.stream_class.name if student.stream_class else '',
+                'stream_class_id': student.stream_class.id if student.stream_class else None,
+                'status': student.status,
+                'status_display': student.get_status_display(),
+                'is_active': student.is_active,
+                'age': age,
+                'primary_contact': student.primary_contact,
+                'gender': student.get_gender_display(),
+                'date_of_birth': student.date_of_birth.strftime('%Y-%m-%d') if student.date_of_birth else '',
+                'address': student.address or '',
+                'parents': [{'id': p.id, 'name': p.full_name} for p in student.parents.all()],
+            }
+        })
+    
+    elif action == 'bulk_update':
+        # Handle bulk status update
+        student_ids = request.POST.getlist('student_ids[]')
+        new_status = request.POST.get('status')
+        
+        if not student_ids or not new_status:
+            return JsonResponse({
+                'success': False,
+                'message': 'No students selected or status not provided'
+            })
+        
+        students = Student.objects.filter(id__in=student_ids)
+        updated_count = students.update(status=new_status, is_active=(new_status == 'active'))
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'Updated status for {updated_count} students',
+            'updated_count': updated_count
+        })
+    
+    return JsonResponse({'success': False, 'message': 'Invalid action'})
+
+# ============================================
+# PARENT VIEWS
+# ============================================
 
 @login_required
 def parents_list(request):
     """List all parents"""
     parents = Parent.objects.prefetch_related('students').all()
     
+    # Filters
+    search_query = request.GET.get('search', '')
+    relationship_filter = request.GET.get('relationship', '')
+    fee_responsible_filter = request.GET.get('fee_responsible', '')
+    
+    if search_query:
+        parents = parents.filter(
+            Q(full_name__icontains=search_query) |
+            Q(first_phone_number__icontains=search_query) |
+            Q(email__icontains=search_query) |
+            Q(students__first_name__icontains=search_query) |
+            Q(students__last_name__icontains=search_query)
+        ).distinct()
+    
+    if relationship_filter:
+        parents = parents.filter(relationship=relationship_filter)
+    
+    if fee_responsible_filter:
+        if fee_responsible_filter == 'yes':
+            parents = parents.filter(is_fee_responsible=True)
+        elif fee_responsible_filter == 'no':
+            parents = parents.filter(is_fee_responsible=False)
+    
+    # Count statistics
+    total_parents = parents.count()
+    fee_responsible_count = Parent.objects.filter(is_fee_responsible=True).count()
+    
+    # Pagination
+    paginator = Paginator(parents.order_by('-created_at'), 25)
+    page = request.GET.get('page', 1)
+    parents_page = paginator.get_page(page)
+    
     context = {
-        'page_title': 'Parents List',
-        'parents': parents,
+        'parents': parents_page,
+        'relationship_choices': RELATIONSHIP_CHOICES,
+        'search_query': search_query,
+        'relationship_filter': relationship_filter,
+        'fee_responsible_filter': fee_responsible_filter,
+        'total_parents': total_parents,
+        'fee_responsible_count': fee_responsible_count,
     }
-    return render(request, 'admin/students/parents.html', context)
+    return render(request, 'admin/students/parent_list.html', context)
+
+# Parent form view
+def add_parent(request, parent_id=None):
+    """Add or edit parent"""
+    parent = None
+    if parent_id:
+        parent = get_object_or_404(Parent, id=parent_id)
+    
+    if request.method == 'POST':
+        form = ParentForm(request.POST, instance=parent)
+        if form.is_valid():
+            parent = form.save()
+            
+            # Handle students ManyToMany relationship
+            student_ids = request.POST.getlist('students')
+            parent.students.set(student_ids)
+            
+            # Determine redirect based on save_type
+            save_type = request.POST.get('save_type', 'save_list')
+            
+            messages.success(request, f"Parent '{parent.full_name}' has been {'updated' if parent_id else 'added'} successfully.")
+            
+            if save_type == 'save_list':
+                return redirect('admin_parents_list')
+            elif save_type == 'save_add':
+                return redirect('add_parent')
+            elif save_type == 'save_student':
+                return redirect('add_student')  # Assuming you have this URL
+                
+        else:
+            messages.error(request, "Please correct the errors below.")
+    else:
+        form = ParentForm(instance=parent)
+    
+    # Get relationship choices from model
+    relationship_choices = RELATIONSHIP_CHOICES
+    
+    context = {
+        'form': form,
+        'parent': parent,
+        'relationship_choices': relationship_choices,
+        'page_title': 'Edit Parent' if parent else 'Add Parent'
+    }
+    
+    return render(request, 'admin/student/add_parent.html', context)
+
+
+def search_students_ajax(request):
+    """Search students for Select2 AJAX"""
+    search_term = request.GET.get('q', '')
+    page = int(request.GET.get('page', 1))
+    page_size = 10
+    
+    # Calculate offset for pagination
+    offset = (page - 1) * page_size
+    
+    # Build query
+    query = Q()
+    if search_term:
+        query = (
+            Q(first_name__icontains=search_term) |
+            Q(middle_name__icontains=search_term) |
+            Q(last_name__icontains=search_term) |
+            Q(registration_number__icontains=search_term) |
+            Q(examination_number__icontains=search_term)
+        )
+    
+    # Get total count
+    total_count = Student.objects.filter(query).count()
+    
+    # Get paginated results
+    students = Student.objects.filter(query).select_related(
+        'class_level', 'stream_class'
+    )[offset:offset + page_size]
+    
+    # Format results for Select2
+    results = []
+    for student in students:
+        class_info = f"{student.class_level.name}"
+        if student.stream_class:
+            class_info += f" ({student.stream_class.name})"
+        
+        results.append({
+            'id': student.id,
+            'text': student.full_name,
+            'registration_number': student.registration_number,
+            'class_level': class_info,
+            'full_name': student.full_name
+        })
+    
+    return JsonResponse({
+        'results': results,
+        'count': total_count,
+        'pagination': {
+            'more': (page * page_size) < total_count
+        }
+    })
+
+def get_students_details_ajax(request):
+    """Get detailed information for selected students"""
+    student_ids = request.GET.get('student_ids', '').split(',')
+    
+    try:
+        student_ids = [int(id) for id in student_ids if id]
+        students = Student.objects.filter(id__in=student_ids).select_related(
+            'class_level', 'stream_class'
+        )
+        
+        student_details = []
+        for student in students:
+            student_details.append({
+                'id': student.id,
+                'full_name': student.full_name,
+                'first_name': student.first_name,
+                'last_name': student.last_name,
+                'registration_number': student.registration_number,
+                'class_level': student.class_level.name if student.class_level else 'N/A',
+                'stream_class': student.stream_class.name if student.stream_class else None,
+                'initials': f"{student.first_name[0] if student.first_name else ''}{student.last_name[0] if student.last_name else ''}".upper()
+            })
+        
+        return JsonResponse({
+            'success': True,
+            'students': student_details
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
+
+
+@login_required
+def parent_edit(request, id):
+    """Edit parent"""
+    parent = get_object_or_404(Parent, id=id)
+    
+    if request.method == 'POST':
+        form = ParentForm(request.POST, instance=parent)
+        if form.is_valid():
+            parent = form.save(commit=False)
+            
+            # Handle students if provided
+            students_data = request.POST.get('students', '')
+            if students_data:
+                student_ids = json.loads(students_data)
+                parent.save()  # Save first to get ID
+                parent.students.set(student_ids)
+            else:
+                parent.save()
+            
+            if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+                return JsonResponse({
+                    'success': True,
+                    'message': f'Parent {parent.full_name} updated successfully!',
+                    'redirect_url': reverse('admin_parents_list')
+                })
+            return redirect('admin_parents_list')
+        else:
+            if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+                errors = {field: error[0] for field, error in form.errors.items()}
+                return JsonResponse({
+                    'success': False,
+                    'message': 'Please correct the errors below.',
+                    'errors': errors
+                })
+    
+    # GET request - show form
+    form = ParentForm(instance=parent)
+    
+    # Get current students
+    current_students = list(parent.students.values_list('id', flat=True))
+    students = Student.objects.filter(is_active=True).order_by('first_name')
+    
+    context = {
+        'form': form,
+        'parent': parent,
+        'students': students,
+        'current_students': json.dumps(current_students),
+        'relationship_choices': Parent.RELATIONSHIP_CHOICES,
+    }
+    
+    if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+        return render(request, 'admin/students/partials/parent_form.html', context)
+    
+    return render(request, 'admin/students/parent_edit.html', context)
+
+@login_required
+def parent_delete(request, id):
+    """Delete parent"""
+    parent = get_object_or_404(Parent, id=id)
+    
+    if request.method == 'POST':
+        parent_name = parent.full_name
+        parent.delete()
+        
+        if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+            return JsonResponse({
+                'success': True,
+                'message': f'Parent {parent_name} deleted successfully!'
+            })
+        return redirect('admin_parents_list')
+    
+    context = {
+        'parent': parent
+    }
+    return render(request, 'admin/students/parent_delete.html', context)
+
+@login_required
+@require_POST
+def parents_ajax(request):
+    """Handle AJAX requests for parent operations"""
+    action = request.POST.get('action')
+    
+    if action == 'delete':
+        parent_id = request.POST.get('id')
+        parent = get_object_or_404(Parent, id=parent_id)
+        parent_name = parent.full_name
+        parent.delete()
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'Parent {parent_name} deleted successfully!'
+        })
+    
+    elif action == 'toggle_fee_responsible':
+        parent_id = request.POST.get('id')
+        parent = get_object_or_404(Parent, id=parent_id)
+        parent.is_fee_responsible = not parent.is_fee_responsible
+        parent.save()
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'Updated fee responsibility for {parent.full_name}',
+            'is_fee_responsible': parent.is_fee_responsible
+        })
+    
+    elif action == 'get_parent':
+        parent_id = request.POST.get('id')
+        parent = get_object_or_404(Parent, id=parent_id)
+        
+        return JsonResponse({
+            'success': True,
+            'parent': {
+                'id': parent.id,
+                'full_name': parent.full_name,
+                'relationship': parent.relationship,
+                'relationship_display': parent.get_relationship_display(),
+                'address': parent.address,
+                'email': parent.email,
+                'first_phone_number': parent.first_phone_number,
+                'second_phone_number': parent.second_phone_number,
+                'is_fee_responsible': parent.is_fee_responsible,
+                'students': [{'id': s.id, 'name': s.full_name} for s in parent.students.all()],
+                'student_count': parent.students.count(),
+            }
+        })
+    
+    elif action == 'search_students':
+        search_query = request.POST.get('search', '')
+        students = Student.objects.filter(is_active=True)
+        
+        if search_query:
+            students = students.filter(
+                Q(first_name__icontains=search_query) |
+                Q(last_name__icontains=search_query) |
+                Q(registration_number__icontains=search_query)
+            )
+        
+        student_list = [{'id': s.id, 'text': f'{s.full_name} ({s.registration_number})'} 
+                       for s in students[:10]]
+        
+        return JsonResponse({
+            'success': True,
+            'results': student_list
+        })
+    
+    return JsonResponse({'success': False, 'message': 'Invalid action'})
+
+# ============================================
+# PREVIOUS SCHOOL VIEWS
+# ============================================
 
 @login_required
 def previous_schools(request):
-    """Manage previous schools"""
-    schools = PreviousSchool.objects.all()
+    """List all previous schools"""
+    schools = PreviousSchool.objects.annotate(
+        student_count=Count('students'),
+        transferred_student_count=Count('transferred_students')
+    ).all()
     
-    if request.method == 'POST':
-        action = request.POST.get('action')
-        if action == 'create':
-            name = request.POST.get('name')
-            school_level = request.POST.get('school_level')
-            location = request.POST.get('location', '')
-            
-            PreviousSchool.objects.create(
-                name=name,
-                school_level=school_level,
-                location=location
-            )
-            messages.success(request, f'Previous school "{name}" added.')
-            
-        return redirect('admin:admin_previous_schools')
+    # Filters
+    search_query = request.GET.get('search', '')
+    level_filter = request.GET.get('level', '')
+    
+    if search_query:
+        schools = schools.filter(
+            Q(name__icontains=search_query) |
+            Q(location__icontains=search_query)
+        )
+    
+    if level_filter:
+        schools = schools.filter(school_level=level_filter)
+    
+    # Statistics
+    total_schools = schools.count()
+    total_students_from_schools = sum(school.student_count for school in schools)
+    
+    # Pagination
+    paginator = Paginator(schools.order_by('name'), 25)
+    page = request.GET.get('page', 1)
+    schools_page = paginator.get_page(page)
     
     context = {
-        'page_title': 'Previous Schools',
-        'schools': schools,
-        'level_choices': PreviousSchool._meta.get_field('school_level').choices,
+        'schools': schools_page,
+        'level_choices': PreviousSchool.SCHOOL_LEVEL_CHOICES,
+        'search_query': search_query,
+        'level_filter': level_filter,
+        'total_schools': total_schools,
+        'total_students_from_schools': total_students_from_schools,
     }
     return render(request, 'admin/students/previous_schools.html', context)
 
+@login_required
+def previous_school_add(request):
+    """Add new previous school"""
+    if request.method == 'POST':
+        form = PreviousSchoolForm(request.POST)
+        if form.is_valid():
+            school = form.save()
+            
+            if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+                return JsonResponse({
+                    'success': True,
+                    'message': f'School {school.name} added successfully!',
+                    'school': {
+                        'id': school.id,
+                        'name': school.name,
+                        'school_level': school.get_school_level_display(),
+                        'location': school.location,
+                        'student_count': 0,
+                    }
+                })
+            return redirect('admin_previous_schools')
+        else:
+            if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+                errors = {field: error[0] for field, error in form.errors.items()}
+                return JsonResponse({
+                    'success': False,
+                    'message': 'Please correct the errors below.',
+                    'errors': errors
+                })
+    
+    # GET request - show form
+    form = PreviousSchoolForm()
+    
+    context = {
+        'form': form,
+        'level_choices': PreviousSchool.SCHOOL_LEVEL_CHOICES,
+    }
+    
+    if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+        return render(request, 'admin/students/partials/school_form.html', context)
+    
+    return render(request, 'admin/students/previous_school_add.html', context)
+
+@login_required
+def previous_school_edit(request, id):
+    """Edit previous school"""
+    school = get_object_or_404(PreviousSchool, id=id)
+    
+    if request.method == 'POST':
+        form = PreviousSchoolForm(request.POST, instance=school)
+        if form.is_valid():
+            school = form.save()
+            
+            if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+                return JsonResponse({
+                    'success': True,
+                    'message': f'School {school.name} updated successfully!',
+                    'redirect_url': reverse('admin_previous_schools')
+                })
+            return redirect('admin_previous_schools')
+        else:
+            if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+                errors = {field: error[0] for field, error in form.errors.items()}
+                return JsonResponse({
+                    'success': False,
+                    'message': 'Please correct the errors below.',
+                    'errors': errors
+                })
+    
+    # GET request - show form
+    form = PreviousSchoolForm(instance=school)
+    
+    # Get students from this school
+    students = Student.objects.filter(
+        Q(previous_school=school) | Q(transfer_from_school=school)
+    ).distinct().count()
+    
+    context = {
+        'form': form,
+        'school': school,
+        'students_count': students,
+        'level_choices': PreviousSchool.SCHOOL_LEVEL_CHOICES,
+    }
+    
+    if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+        return render(request, 'admin/students/partials/school_form.html', context)
+    
+    return render(request, 'admin/students/previous_school_edit.html', context)
+
+@login_required
+def previous_school_delete(request, id):
+    """Delete previous school"""
+    school = get_object_or_404(PreviousSchool, id=id)
+    
+    if request.method == 'POST':
+        school_name = school.name
+        school.delete()
+        
+        if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+            return JsonResponse({
+                'success': True,
+                'message': f'School {school_name} deleted successfully!'
+            })
+        return redirect('admin_previous_schools')
+    
+    context = {
+        'school': school
+    }
+    return render(request, 'admin/students/previous_school_delete.html', context)
+
+@login_required
+@require_POST
+def previous_schools_ajax(request):
+    """Handle AJAX requests for previous school operations"""
+    action = request.POST.get('action')
+    
+    if action == 'delete':
+        school_id = request.POST.get('id')
+        school = get_object_or_404(PreviousSchool, id=school_id)
+        school_name = school.name
+        
+        # Check if school has students
+        student_count = Student.objects.filter(
+            Q(previous_school=school) | Q(transfer_from_school=school)
+        ).count()
+        
+        if student_count > 0:
+            return JsonResponse({
+                'success': False,
+                'message': f'Cannot delete {school_name}. It has {student_count} student(s) associated.'
+            })
+        
+        school.delete()
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'School {school_name} deleted successfully!'
+        })
+    
+    elif action == 'get_school':
+        school_id = request.POST.get('id')
+        school = get_object_or_404(PreviousSchool, id=school_id)
+        
+        # Get student counts
+        student_count = Student.objects.filter(previous_school=school).count()
+        transferred_count = Student.objects.filter(transfer_from_school=school).count()
+        
+        return JsonResponse({
+            'success': True,
+            'school': {
+                'id': school.id,
+                'name': school.name,
+                'school_level': school.school_level,
+                'school_level_display': school.get_school_level_display(),
+                'location': school.location,
+                'student_count': student_count,
+                'transferred_student_count': transferred_count,
+                'created_at': school.created_at.strftime('%Y-%m-%d'),
+            }
+        })
+    
+    elif action == 'search':
+        search_query = request.POST.get('search', '')
+        schools = PreviousSchool.objects.all()
+        
+        if search_query:
+            schools = schools.filter(
+                Q(name__icontains=search_query) |
+                Q(location__icontains=search_query)
+            )
+        
+        school_list = [{'id': s.id, 'text': f'{s.name} ({s.get_school_level_display()}) - {s.location}'} 
+                      for s in schools[:10]]
+        
+        return JsonResponse({
+            'success': True,
+            'results': school_list
+        })
+    
+    return JsonResponse({'success': False, 'message': 'Invalid action'})
+
+# ============================================
+# HELPER VIEWS
+# ============================================
+
+@login_required
+def get_subjects_by_class(request):
+    """
+    AJAX endpoint to return active subjects
+    based on the educational level of a given class level
+    """
+    class_id = request.GET.get('class_id')
+
+    if not class_id:
+        return JsonResponse({
+            'success': False,
+            'subjects': [],
+            'message': 'Class ID is required'
+        })
+
+    # Get class level safely
+    class_level = get_object_or_404(
+        ClassLevel,
+        id=class_id,
+        is_active=True
+    )
+
+    # Get educational level from class level
+    educational_level = class_level.educational_level
+
+    # Fetch ACTIVE subjects for that educational level
+    subjects = Subject.objects.filter(
+        educational_level=educational_level,
+        is_active=True
+    ).order_by('name')
+
+    # Prepare data for <select><option>
+    data = [
+        {
+            'id': subject.id,
+            'name': f"{subject.name} ({subject.code})"
+        }
+        for subject in subjects
+    ]
+
+    return JsonResponse({
+        'success': True,
+        'subjects': data
+    })
+
+    
+@login_required
+def student_export(request):
+    """Export students to CSV or Excel"""
+    import csv
+    from django.http import HttpResponse
+    
+    # Create the HttpResponse object with CSV header
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = 'attachment; filename="students.csv"'
+    
+    writer = csv.writer(response)
+    
+    # Write headers
+    writer.writerow([
+        'Registration Number', 'Full Name', 'Class', 'Stream', 
+        'Gender', 'Date of Birth', 'Age', 'Status', 'Address',
+        'Primary Contact', 'Parent Name', 'Parent Phone', 'Parent Email'
+    ])
+    
+    # Get students with related data
+    students = Student.objects.select_related(
+        'class_level', 'stream_class'
+    ).prefetch_related('parents').filter(is_active=True)
+    
+    for student in students:
+        # Get primary parent (fee responsible or first)
+        parent = student.parents.filter(is_fee_responsible=True).first()
+        if not parent:
+            parent = student.parents.first()
+        
+        writer.writerow([
+            student.registration_number or '',
+            student.full_name,
+            student.class_level.name if student.class_level else '',
+            student.stream_class.name if student.stream_class else '',
+            student.get_gender_display(),
+            student.date_of_birth.strftime('%Y-%m-%d') if student.date_of_birth else '',
+            student.age or '',
+            student.get_status_display(),
+            student.address or '',
+            student.primary_contact or '',
+            parent.full_name if parent else '',
+            parent.first_phone_number if parent else '',
+            parent.email if parent else '',
+        ])
+    
+    return response
 # ============================================================================
 # STAFF MANAGEMENT VIEWS
 # ============================================================================
@@ -2135,4 +4797,4 @@ def ajax_get_student_details(request):
         }
         return JsonResponse(data)
     
-    return JsonResponse({'error': 'Student ID required'}, status=400)
+    return JsonResponse({'error': 'Student ID required'})

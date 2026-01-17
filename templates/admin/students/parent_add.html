@@ -1,0 +1,1616 @@
+{% extends 'admin/base.html' %}
+{% load static %}
+{% block title %} Add/Edit Parent - {{ student.full_name }} {% endblock title %}
+
+{% block breadcrumb %}
+    <nav aria-label="breadcrumb" class="mb-4">
+        <ol class="breadcrumb bg-white rounded-3 shadow-sm p-3">
+            <li class="breadcrumb-item"><a href="{% url 'admin_dashboard' %}" class="text-decoration-none">
+                <i class="fas fa-home me-1"></i> Dashboard
+            </a></li>
+            <li class="breadcrumb-item"><a href="{% url 'admin_students_list' %}" class="text-decoration-none">
+                <i class="fas fa-users me-1"></i> Students
+            </a></li>
+            <li class="breadcrumb-item"><a href="{% url 'admin_student_detail' student.id %}" class="text-decoration-none">
+                <i class="fas fa-user-graduate me-1"></i> {{ student.full_name|truncatechars:20 }}
+            </a></li>
+            <li class="breadcrumb-item active text-primary fw-semibold" aria-current="page">
+                <i class="fas fa-user-friends me-1"></i> 
+                {% if parent %}Edit Parent{% else %}Add Parent/Guardian{% endif %}
+            </li>
+        </ol>
+    </nav>
+{% endblock breadcrumb %}
+
+{% block extra_css %}
+<style>
+    :root {
+        --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        --success-gradient: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+        --warning-gradient: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+        --info-gradient: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+        --danger-gradient: linear-gradient(135deg, #f56565 0%, #e53e3e 100%);
+    }
+    
+    .page-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 20px;
+        padding: 30px;
+        color: white;
+        margin-bottom: 30px;
+        box-shadow: 0 15px 35px rgba(102, 126, 234, 0.3);
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .page-header::before {
+        content: '';
+        position: absolute;
+        top: -50%;
+        right: -50%;
+        width: 100%;
+        height: 200%;
+        background: radial-gradient(circle, rgba(255,255,255,0.1) 1px, transparent 1px);
+        background-size: 30px 30px;
+        opacity: 0.3;
+        z-index: 0;
+    }
+    
+    .page-header-content {
+        position: relative;
+        z-index: 1;
+    }
+    
+    .student-info-card {
+        background: rgba(255, 255, 255, 0.1);
+        backdrop-filter: blur(10px);
+        border-radius: 15px;
+        padding: 20px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        margin-top: 20px;
+    }
+    
+    .form-container {
+        background: white;
+        border-radius: 20px;
+        padding: 40px;
+        margin-bottom: 30px;
+        box-shadow: 0 15px 35px rgba(0,0,0,0.1);
+        border: 1px solid rgba(0,0,0,0.05);
+    }
+    
+    .form-section {
+        margin-bottom: 40px;
+        padding-bottom: 30px;
+        border-bottom: 2px solid #f1f3f9;
+    }
+    
+    .form-section:last-child {
+        border-bottom: none;
+        margin-bottom: 0;
+        padding-bottom: 0;
+    }
+    
+    .form-section-title {
+        font-size: 1.3rem;
+        font-weight: 700;
+        color: #2c3e50;
+        margin-bottom: 25px;
+        padding-bottom: 15px;
+        border-bottom: 3px solid #e8eaf6;
+        display: flex;
+        align-items: center;
+        position: relative;
+    }
+    
+    .form-section-title i {
+        margin-right: 12px;
+        color: #667eea;
+        font-size: 1.4rem;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+    }
+    
+    .form-section-title::after {
+        content: '';
+        position: absolute;
+        bottom: -3px;
+        left: 0;
+        width: 60px;
+        height: 3px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 3px;
+    }
+    
+    .form-group {
+        margin-bottom: 1.8rem;
+    }
+    
+    .form-label {
+        font-weight: 600;
+        color: #4a5568;
+        margin-bottom: 8px;
+        font-size: 0.95rem;
+        display: flex;
+        align-items: center;
+    }
+    
+    .form-label i {
+        margin-right: 8px;
+        color: #667eea;
+        font-size: 0.9rem;
+        width: 20px;
+        text-align: center;
+    }
+    
+    .required-field::after {
+        content: " *";
+        color: #e53e3e;
+        font-weight: bold;
+        margin-left: 4px;
+    }
+    
+    .form-control, .select2-container--bootstrap4 .select2-selection {
+        border: 2px solid #e2e8f0 !important;
+        border-radius: 12px !important;
+        padding: 14px 18px !important;
+        font-size: 1rem !important;
+        transition: all 0.3s ease !important;
+        background: #f8fafc !important;
+        height: auto !important;
+        min-height: 48px !important;
+    }
+    
+    .form-control:focus, .select2-container--bootstrap4.select2-container--open .select2-selection {
+        border-color: #667eea !important;
+        box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.15) !important;
+        background: white !important;
+        transform: translateY(-2px) !important;
+    }
+    
+    .is-invalid {
+        border-color: #e53e3e !important;
+        background: #fff5f5 !important;
+    }
+    
+    .invalid-feedback {
+        color: #e53e3e;
+        font-size: 0.85rem;
+        margin-top: 8px;
+        padding-left: 10px;
+        display: flex;
+        align-items: center;
+    }
+    
+    .invalid-feedback i {
+        margin-right: 8px;
+    }
+    
+    /* Select2 customization */
+    .select2-container--bootstrap4 .select2-selection--single .select2-selection__rendered {
+        color: #4a5568 !important;
+        line-height: 48px !important;
+        padding-left: 10px !important;
+    }
+    
+    .select2-container--bootstrap4 .select2-selection--multiple {
+        padding: 10px 15px !important;
+    }
+    
+    /* Custom checkbox styling */
+    .custom-control-input:checked ~ .custom-control-label::before {
+        border-color: #667eea;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+    
+    .custom-switch .custom-control-label::before {
+        width: 60px;
+        height: 30px;
+        border-radius: 15px;
+    }
+    
+    .custom-switch .custom-control-label::after {
+        width: 26px;
+        height: 26px;
+        border-radius: 50%;
+        transform: translateX(2px);
+    }
+    
+    .custom-switch .custom-control-input:checked ~ .custom-control-label::after {
+        transform: translateX(32px);
+    }
+    
+    /* Student selection styling */
+    .student-selection-card {
+        background: #f8fafc;
+        border: 2px dashed #cbd5e0;
+        border-radius: 12px;
+        padding: 20px;
+        margin-bottom: 20px;
+        transition: all 0.3s ease;
+    }
+    
+    .student-selection-card:hover {
+        border-color: #667eea;
+        background: #f6f8ff;
+    }
+    
+    .student-avatar {
+        width: 60px;
+        height: 60px;
+        border-radius: 50%;
+        object-fit: cover;
+        border: 3px solid white;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+    }
+    
+    .student-avatar-placeholder {
+        width: 60px;
+        height: 60px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 1.5rem;
+        border: 3px solid white;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+    }
+    
+    /* Action buttons */
+    .action-buttons {
+        background: linear-gradient(135deg, #f6f8ff 0%, #f9f5ff 100%);
+        border-radius: 16px;
+        padding: 30px;
+        margin-top: 40px;
+        border: 2px solid #e8eaf6;
+        box-shadow: 0 8px 25px rgba(0,0,0,0.06);
+    }
+    
+    .btn {
+        border-radius: 12px;
+        padding: 14px 32px;
+        font-weight: 600;
+        font-size: 1rem;
+        border: none;
+        transition: all 0.3s ease;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .btn::after {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 5px;
+        height: 5px;
+        background: rgba(255, 255, 255, 0.5);
+        opacity: 0;
+        border-radius: 100%;
+        transform: scale(1, 1) translate(-50%);
+        transform-origin: 50% 50%;
+    }
+    
+    .btn:focus:not(:active)::after {
+        animation: ripple 1s ease-out;
+    }
+    
+    @keyframes ripple {
+        0% {
+            transform: scale(0, 0);
+            opacity: 0.5;
+        }
+        100% {
+            transform: scale(20, 20);
+            opacity: 0;
+        }
+    }
+    
+    .btn-primary {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        box-shadow: 0 6px 20px rgba(102, 126, 234, 0.3);
+    }
+    
+    .btn-primary:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
+    }
+    
+    .btn-success {
+        background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+        box-shadow: 0 6px 20px rgba(67, 233, 123, 0.3);
+    }
+    
+    .btn-success:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 10px 30px rgba(67, 233, 123, 0.4);
+    }
+    
+    .btn-warning {
+        background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+        box-shadow: 0 6px 20px rgba(250, 112, 154, 0.3);
+    }
+    
+    .btn-warning:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 10px 30px rgba(250, 112, 154, 0.4);
+    }
+    
+    .btn-info {
+        background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+        box-shadow: 0 6px 20px rgba(79, 172, 254, 0.3);
+    }
+    
+    .btn-info:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 10px 30px rgba(79, 172, 254, 0.4);
+    }
+    
+    .btn-secondary {
+        background: linear-gradient(135deg, #a0aec0 0%, #718096 100%);
+        box-shadow: 0 6px 20px rgba(160, 174, 192, 0.3);
+    }
+    
+    .btn-secondary:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 10px 30px rgba(160, 174, 192, 0.4);
+    }
+    
+    .btn-danger {
+        background: linear-gradient(135deg, #f56565 0%, #e53e3e 100%);
+        box-shadow: 0 6px 20px rgba(245, 101, 101, 0.3);
+    }
+    
+    .btn-danger:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 10px 30px rgba(245, 101, 101, 0.4);
+    }
+    
+    .btn i {
+        margin-right: 10px;
+        font-size: 1.1rem;
+    }
+    
+    /* Loading overlay */
+    .loading-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(255,255,255,0.95);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+        display: none;
+    }
+    
+    .spinner {
+        width: 80px;
+        height: 80px;
+        border: 6px solid #f3f3f3;
+        border-top: 6px solid #667eea;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin-bottom: 20px;
+    }
+    
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+    
+    /* Success/Error messages */
+    .alert-message {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 10000;
+        min-width: 350px;
+        max-width: 500px;
+        border-radius: 15px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+        border: none;
+        display: none;
+    }
+    
+    /* Phone input group */
+    .phone-input-group {
+        position: relative;
+    }
+    
+    .phone-prefix {
+        position: absolute;
+        left: 15px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #718096;
+        font-weight: 600;
+        z-index: 3;
+    }
+    
+    .phone-input {
+        padding-left: 70px !important;
+    }
+    
+    /* Relationship badge */
+    .relationship-badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 6px 12px;
+        border-radius: 20px;
+        font-size: 0.85rem;
+        font-weight: 600;
+        background: #f6f8ff;
+        color: #667eea;
+        border: 2px solid #e2e8f0;
+        margin-right: 8px;
+        margin-bottom: 8px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+    
+    .relationship-badge:hover {
+        background: #667eea;
+        color: white;
+        border-color: #667eea;
+        transform: translateY(-2px);
+    }
+    
+    .relationship-badge.active {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-color: #667eea;
+        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+    }
+    
+    /* Existing parents panel */
+    .existing-parents-panel {
+        background: #f8fafc;
+        border-radius: 16px;
+        padding: 25px;
+        margin-bottom: 30px;
+        border: 2px solid #e2e8f0;
+    }
+    
+    .parent-card {
+        background: white;
+        border-radius: 12px;
+        padding: 20px;
+        margin-bottom: 15px;
+        border: 2px solid #e2e8f0;
+        transition: all 0.3s ease;
+        position: relative;
+    }
+    
+    .parent-card:hover {
+        border-color: #667eea;
+        transform: translateY(-3px);
+        box-shadow: 0 8px 25px rgba(102, 126, 234, 0.1);
+    }
+    
+    .parent-card.fee-responsible {
+        border-color: #48bb78;
+        background: linear-gradient(135deg, #f0fff4 0%, #f0fff4 100%);
+    }
+    
+    .fee-responsible-badge {
+        position: absolute;
+        top: -10px;
+        right: 15px;
+        background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+        color: white;
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        box-shadow: 0 4px 15px rgba(72, 187, 120, 0.3);
+    }
+    
+    .parent-actions {
+        position: absolute;
+        bottom: 15px;
+        right: 15px;
+        display: flex;
+        gap: 8px;
+    }
+    
+    .parent-action-btn {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 0.9rem;
+        transition: all 0.3s ease;
+        border: none;
+    }
+    
+    .parent-action-btn:hover {
+        transform: scale(1.1);
+    }
+    
+    /* Responsive adjustments */
+    @media (max-width: 768px) {
+        .form-container {
+            padding: 25px;
+        }
+        
+        .page-header {
+            padding: 20px;
+        }
+        
+        .btn {
+            padding: 12px 20px;
+            font-size: 0.95rem;
+        }
+        
+        .form-control, .select2-container--bootstrap4 .select2-selection {
+            padding: 12px 15px !important;
+            min-height: 44px !important;
+        }
+    }
+    
+    /* Animation for form sections */
+    @keyframes slideIn {
+        from {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+    
+    .form-section {
+        animation: slideIn 0.5s ease-out;
+    }
+    
+    /* Form validation animation */
+    @keyframes shake {
+        0%, 100% { transform: translateX(0); }
+        10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+        20%, 40%, 60%, 80% { transform: translateX(5px); }
+    }
+    
+    .is-invalid {
+        animation: shake 0.5s ease-in-out;
+    }
+</style>
+{% endblock extra_css %}
+
+{% block content %}
+<!-- In student_detail.html or add_parent.html -->
+<div class="row" id="parentsContainer">
+    {% for parent in student.parents.all %}
+        {% include 'admin/students/parent_card.html' with parent=parent %}
+    {% empty %}
+        <div class="col-12">
+            <div class="empty-state">
+                <i class="fas fa-user-friends fa-3x text-muted mb-3"></i>
+                <h5>No Parents Added Yet</h5>
+                <p class="text-muted">This student doesn't have any parents or guardians registered.</p>
+                <a href="{% url 'add_parent_to_student' student.id %}" class="btn btn-primary">
+                    <i class="fas fa-user-plus me-2"></i>Add First Parent
+                </a>
+            </div>
+        </div>
+    {% endfor %}
+</div>
+<section class="content">
+    <div class="container-fluid">
+        <!-- Loading Overlay -->
+        <div class="loading-overlay" id="loadingOverlay">
+            <div class="spinner"></div>
+            <p class="text-primary fw-bold mt-3" id="loadingText">Processing your request...</p>
+        </div>
+
+        <!-- Success Message -->
+        <div class="alert alert-success alert-message" id="successMessage" role="alert">
+            <div class="d-flex align-items-center">
+                <i class="fas fa-check-circle me-3" style="font-size: 1.5rem;"></i>
+                <div>
+                    <h6 class="alert-heading mb-1">Success!</h6>
+                    <p class="mb-0" id="successText"></p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Error Message -->
+        <div class="alert alert-danger alert-message" id="errorMessage" role="alert" style="display: none;">
+            <div class="d-flex align-items-center">
+                <i class="fas fa-exclamation-circle me-3" style="font-size: 1.5rem;"></i>
+                <div>
+                    <h6 class="alert-heading mb-1">Error!</h6>
+                    <p class="mb-0" id="errorText"></p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Page Header -->
+        <div class="page-header">
+            <div class="page-header-content">
+                <div class="row align-items-center">
+                    <div class="col-lg-8">
+                        <h1 class="display-6 fw-bold mb-3">
+                            <i class="fas fa-user-friends me-3"></i>
+                            {% if parent %}Edit Parent{% else %}Add Parent/Guardian{% endif %}
+                        </h1>
+                        <p class="mb-0 opacity-90">
+                            <i class="fas fa-user-graduate me-2"></i>
+                            For student: <strong>{{ student.full_name }}</strong>
+                        </p>
+                    </div>
+                    <div class="col-lg-4 text-lg-end">
+                        <div class="student-info-card">
+                            <div class="d-flex align-items-center">
+                                {% if student.profile_pic %}
+                                    <img src="{{ student.profile_pic.url }}" class="student-avatar me-3" alt="Student">
+                                {% else %}
+                                    <div class="student-avatar-placeholder me-3">
+                                        <i class="fas fa-user-graduate"></i>
+                                    </div>
+                                {% endif %}
+                                <div>
+                                    <h6 class="mb-1">{{ student.full_name }}</h6>
+                                    <p class="mb-0 opacity-90">
+                                        {{ student.registration_number }}
+                                        {% if student.class_level %}
+                                            • {{ student.class_level.name }}
+                                        {% endif %}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Existing Parents (if any) -->
+        {% if student.parents.all and not parent %}
+        <div class="existing-parents-panel">
+            <h4 class="mb-4">
+                <i class="fas fa-users me-2"></i>
+                Existing Parents/Guardians ({{ student.parents.count }})
+            </h4>
+            <div class="row">
+                {% for existing_parent in student.parents.all %}
+                <div class="col-md-6 col-lg-4 mb-3">
+                    <div class="parent-card {% if existing_parent.is_fee_responsible %}fee-responsible{% endif %}">
+                        {% if existing_parent.is_fee_responsible %}
+                        <span class="fee-responsible-badge">
+                            <i class="fas fa-money-check-alt me-1"></i>Fee Responsible
+                        </span>
+                        {% endif %}
+                        
+                        <h6 class="mb-2">{{ existing_parent.full_name }}</h6>
+                        <p class="text-muted mb-2">
+                            <i class="fas fa-user-tag me-2"></i>{{ existing_parent.relationship }}
+                        </p>
+                        <p class="mb-2">
+                            <i class="fas fa-phone me-2"></i>{{ existing_parent.first_phone_number }}
+                        </p>
+                        {% if existing_parent.email %}
+                        <p class="mb-3">
+                            <i class="fas fa-envelope me-2"></i>{{ existing_parent.email }}
+                        </p>
+                        {% endif %}
+                        
+                        <div class="parent-actions">
+                            <button type="button" class="parent-action-btn" 
+                                    style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);"
+                                    onclick="editParent({{ existing_parent.id }})">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button type="button" class="parent-action-btn"
+                                    style="background: linear-gradient(135deg, #f56565 0%, #e53e3e 100%);"
+                                    onclick="deleteParent({{ existing_parent.id }}, '{{ existing_parent.full_name }}')">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Main Form -->
+        <div class="form-container">
+            <form method="post" id="parentForm" novalidate>
+                {% csrf_token %}
+                
+                {% if form.non_field_errors %}
+                <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    {% for error in form.non_field_errors %}
+                        {{ error }}
+                    {% endfor %}
+                </div>
+                {% endif %}
+                
+                <!-- Hidden fields -->
+                {% if parent %}
+                <input type="hidden" name="parent_id" value="{{ parent.id }}">
+                {% endif %}
+                
+                <!-- Personal Information Section -->
+                <div class="form-section">
+                    <h3 class="form-section-title">
+                        <i class="fas fa-user"></i> Personal Information
+                    </h3>
+                    
+                    <div class="row">
+                        <div class="col-md-12">
+                            <div class="form-group">
+                                <label for="id_full_name" class="form-label required-field">
+                                    <i class="fas fa-user"></i> Full Name
+                                </label>
+                                <input type="text" class="form-control {% if form.full_name.errors %}is-invalid{% endif %}" 
+                                       id="id_full_name" name="full_name" 
+                                       value="{% if form.full_name.value %}{{ form.full_name.value }}{% elif parent %}{{ parent.full_name }}{% endif %}"
+                                       placeholder="Enter parent/guardian full name"
+                                       required>
+                                {% if form.full_name.errors %}
+                                <div class="invalid-feedback">
+                                    <i class="fas fa-exclamation-circle"></i>
+                                    {{ form.full_name.errors.0 }}
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="id_relationship" class="form-label required-field">
+                                    <i class="fas fa-user-tag"></i> Relationship
+                                </label>
+                                <select class="form-control select2 {% if form.relationship.errors %}is-invalid{% endif %}" 
+                                        id="id_relationship" name="relationship" style="width: 100%;" required>
+                                    <option value="">Select Relationship</option>
+                                    {% for value, label in RELATIONSHIP_CHOICES %}
+                                    <option value="{{ value }}"
+                                        {% if form.relationship.value == value or parent.relationship == value %}selected{% endif %}>
+                                        {{ label }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                                {% if form.relationship.errors %}
+                                <div class="invalid-feedback">
+                                    <i class="fas fa-exclamation-circle"></i>
+                                    {{ form.relationship.errors.0 }}
+                                </div>
+                                {% endif %}
+                                
+                                <!-- Quick Relationship Selection -->
+                                <div class="mt-3">
+                                    <small class="text-muted mb-2 d-block">Quick select:</small>
+                                    <div class="d-flex flex-wrap">
+                                        {% for value, label in RELATIONSHIP_CHOICES|slice:":6" %}
+                                        <div class="relationship-badge" 
+                                             data-value="{{ value }}"
+                                             onclick="selectRelationship('{{ value }}')">
+                                            {{ label }}
+                                        </div>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="id_email" class="form-label">
+                                    <i class="fas fa-envelope"></i> Email Address
+                                </label>
+                                <input type="email" class="form-control {% if form.email.errors %}is-invalid{% endif %}" 
+                                       id="id_email" name="email" 
+                                       value="{% if form.email.value %}{{ form.email.value }}{% elif parent %}{{ parent.email }}{% endif %}"
+                                       placeholder="Enter email address">
+                                {% if form.email.errors %}
+                                <div class="invalid-feedback">
+                                    <i class="fas fa-exclamation-circle"></i>
+                                    {{ form.email.errors.0 }}
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Contact Information Section -->
+                <div class="form-section">
+                    <h3 class="form-section-title">
+                        <i class="fas fa-phone-alt"></i> Contact Information
+                    </h3>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="id_first_phone_number" class="form-label required-field">
+                                    <i class="fas fa-phone"></i> Primary Phone Number
+                                </label>
+                                <div class="phone-input-group">
+                                    <span class="phone-prefix">+255</span>
+                                    <input type="tel" class="form-control phone-input {% if form.first_phone_number.errors %}is-invalid{% endif %}" 
+                                           id="id_first_phone_number" name="first_phone_number" 
+                                           value="{% if form.first_phone_number.value %}{{ form.first_phone_number.value }}{% elif parent %}{{ parent.first_phone_number }}{% endif %}"
+                                           placeholder="e.g., 712 345 678"
+                                           pattern="[0-9]{9}"
+                                           maxlength="9"
+                                           required>
+                                </div>
+                                {% if form.first_phone_number.errors %}
+                                <div class="invalid-feedback">
+                                    <i class="fas fa-exclamation-circle"></i>
+                                    {{ form.first_phone_number.errors.0 }}
+                                </div>
+                                {% endif %}
+                                <small class="form-text text-muted">Enter 9 digits without spaces (e.g., 712345678)</small>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="id_second_phone_number" class="form-label">
+                                    <i class="fas fa-phone-alt"></i> Secondary Phone Number
+                                </label>
+                                <div class="phone-input-group">
+                                    <span class="phone-prefix">+255</span>
+                                    <input type="tel" class="form-control phone-input {% if form.second_phone_number.errors %}is-invalid{% endif %}" 
+                                           id="id_second_phone_number" name="second_phone_number" 
+                                           value="{% if form.second_phone_number.value %}{{ form.second_phone_number.value }}{% elif parent %}{{ parent.second_phone_number }}{% endif %}"
+                                           placeholder="e.g., 712 345 678"
+                                           pattern="[0-9]{9}"
+                                           maxlength="9">
+                                </div>
+                                {% if form.second_phone_number.errors %}
+                                <div class="invalid-feedback">
+                                    <i class="fas fa-exclamation-circle"></i>
+                                    {{ form.second_phone_number.errors.0 }}
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-12">
+                            <div class="form-group">
+                                <label for="id_address" class="form-label required-field">
+                                    <i class="fas fa-home"></i> Address
+                                </label>
+                                <textarea class="form-control {% if form.address.errors %}is-invalid{% endif %}" 
+                                          id="id_address" name="address" rows="4" 
+                                          placeholder="Enter complete residential address"
+                                          required>{% if form.address.value %}{{ form.address.value }}{% elif parent %}{{ parent.address }}{% endif %}</textarea>
+                                {% if form.address.errors %}
+                                <div class="invalid-feedback">
+                                    <i class="fas fa-exclamation-circle"></i>
+                                    {{ form.address.errors.0 }}
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Additional Information Section -->
+                <div class="form-section">
+                    <h3 class="form-section-title">
+                        <i class="fas fa-info-circle"></i> Additional Information
+                    </h3>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <div class="custom-control custom-switch custom-switch-lg">
+                                    <input type="checkbox" class="custom-control-input" id="id_is_fee_responsible" 
+                                           name="is_fee_responsible"
+                                           {% if form.is_fee_responsible.value or parent.is_fee_responsible %}checked{% endif %}>
+                                    <label class="custom-control-label" for="id_is_fee_responsible">
+                                        <strong>Fee Responsible Person</strong>
+                                        <p class="text-muted mb-0 small">
+                                            This person will be the primary contact for fee payments
+                                        </p>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label class="form-label">
+                                    <i class="fas fa-link"></i> Link to Students
+                                </label>
+                                <div class="student-selection-card">
+                                    <div class="d-flex align-items-center">
+                                        {% if student.profile_pic %}
+                                            <img src="{{ student.profile_pic.url }}" class="student-avatar me-3" alt="Student">
+                                        {% else %}
+                                            <div class="student-avatar-placeholder me-3">
+                                                <i class="fas fa-user-graduate"></i>
+                                            </div>
+                                        {% endif %}
+                                        <div>
+                                            <h6 class="mb-1">{{ student.full_name }}</h6>
+                                            <p class="mb-0 text-muted">
+                                                {{ student.registration_number }}
+                                                {% if student.class_level %}
+                                                    • {{ student.class_level.name }}
+                                                {% endif %}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <input type="hidden" name="students" value="{{ student.id }}">
+                                    <small class="text-muted">
+                                        <i class="fas fa-info-circle me-1"></i>
+                                        This parent will be linked to {{ student.full_name }}
+                                    </small>
+                                </div>
+                                
+                                <!-- Additional students selection (for future enhancement) -->
+                                <div class="mt-3">
+                                    <button type="button" class="btn btn-outline-primary btn-sm" 
+                                            id="addMoreStudentsBtn" disabled>
+                                        <i class="fas fa-plus me-1"></i> Add More Students
+                                    </button>
+                                    <small class="text-muted d-block mt-1">
+                                        Currently supports one student per parent
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Action Buttons -->
+                <div class="action-buttons">
+                    <div class="row">
+                        <div class="col-12">
+                            <div class="d-flex flex-wrap gap-3 justify-content-center">
+                                <button type="button" class="btn btn-secondary" id="cancelBtn">
+                                    <i class="fas fa-times"></i> Cancel
+                                </button>
+                                
+                                <div class="btn-group" role="group">
+                                    <button type="button" class="btn btn-primary dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                                        <i class="fas fa-save"></i> 
+                                        {% if parent %}Update Parent{% else %}Save Parent{% endif %}
+                                    </button>
+                                    <div class="dropdown-menu" aria-labelledby="saveDropdown">
+                                        <button class="dropdown-item" type="button" id="saveOnlyBtn">
+                                            <i class="fas fa-save text-primary me-2"></i> 
+                                            {% if parent %}Update Only{% else %}Save Only{% endif %}
+                                        </button>
+                                        <div class="dropdown-divider"></div>
+                                        <button class="dropdown-item" type="button" id="saveAndViewBtn">
+                                            <i class="fas fa-eye text-info me-2"></i> Save and View Student
+                                        </button>
+                                        <button class="dropdown-item" type="button" id="saveAndAddAnotherBtn">
+                                            <i class="fas fa-user-plus text-success me-2"></i> Save and Add Another
+                                        </button>
+                                        <button class="dropdown-item" type="button" id="saveAndEditBtn">
+                                            <i class="fas fa-edit text-warning me-2"></i> Save and Continue Editing
+                                        </button>
+                                    </div>
+                                </div>
+                                
+                                <a href="{% url 'admin_student_detail' student.id %}" class="btn btn-info">
+                                    <i class="fas fa-eye"></i> View Student
+                                </a>
+                                
+                                {% if parent %}
+                                <button type="button" class="btn btn-danger" id="deleteParentBtn">
+                                    <i class="fas fa-trash"></i> Delete Parent
+                                </button>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</section>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="deleteConfirmModal" tabindex="-1" role="dialog">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title text-danger">
+                    <i class="fas fa-exclamation-triangle me-2"></i>Delete Parent
+                </h5>
+                <button type="button" class="close" data-dismiss="modal">
+                    <span>&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-danger">
+                    <h6 class="alert-heading">Warning!</h6>
+                    <p id="deleteMessage"></p>
+                    <hr>
+                    <p class="mb-0">This action cannot be undone. All associated data will be removed.</p>
+                </div>
+                <div class="form-group">
+                    <label for="confirmDeleteInput" class="form-label">
+                        Type "DELETE" to confirm:
+                    </label>
+                    <input type="text" class="form-control" id="confirmDeleteInput" placeholder="DELETE">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirmDeleteBtn" disabled>
+                    <i class="fas fa-trash me-2"></i>Delete Parent
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // Initialize Select2 with proper error handling
+    if ($.fn.select2) {
+        $('.select2').select2({
+            theme: 'bootstrap4',
+            width: '100%',
+            placeholder: 'Select an option',
+            allowClear: true,
+            minimumResultsForSearch: 5
+        }).on('select2:open', function() {
+            // Fix for dropdown positioning
+            setTimeout(function() {
+                $('.select2-container--open .select2-dropdown').css('z-index', 9999);
+            }, 10);
+        });
+    }
+
+    // CSRF Token helper
+    function getCSRFToken() {
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]');
+        return csrfToken ? csrfToken.value : '';
+    }
+
+    // Phone number formatting and validation
+    function formatPhoneNumber(input) {
+        let value = input.value.replace(/\D/g, '');
+        if (value.length > 9) {
+            value = value.substring(0, 9);
+        }
+        
+        // Format with spaces for display
+        let formattedValue = value;
+        if (value.length > 3 && value.length <= 6) {
+            formattedValue = value.replace(/(\d{3})(\d{1,3})/, '$1 $2');
+        } else if (value.length > 6) {
+            formattedValue = value.replace(/(\d{3})(\d{3})(\d{1,3})/, '$1 $2 $3');
+        }
+        
+        input.value = formattedValue;
+        return value; // Return raw digits for validation
+    }
+
+    // Initialize phone number formatting
+    $('#id_first_phone_number, #id_second_phone_number').each(function() {
+        if (this.value) {
+            formatPhoneNumber(this);
+        }
+    }).on('input', function() {
+        formatPhoneNumber(this);
+    });
+
+    // Quick relationship selection
+    window.selectRelationship = function(relationship) {
+        const $select = $('#id_relationship');
+        $select.val(relationship).trigger('change');
+        
+        // Update badge styling
+        $('.relationship-badge').removeClass('active');
+        $(`.relationship-badge[data-value="${relationship}"]`).addClass('active');
+    };
+
+    // Initialize relationship badges
+    const currentRelationship = $('#id_relationship').val();
+    if (currentRelationship) {
+        $(`.relationship-badge[data-value="${currentRelationship}"]`).addClass('active');
+    }
+
+    // Show loading overlay
+    function showLoading(message = 'Processing your request...') {
+        $('#loadingText').text(message);
+        $('#loadingOverlay').fadeIn(300);
+        $('body').css('overflow', 'hidden');
+    }
+
+    // Hide loading overlay
+    function hideLoading() {
+        $('#loadingOverlay').fadeOut(300);
+        $('body').css('overflow', 'auto');
+    }
+
+    // Show success message
+    function showSuccess(message) {
+        $('#successText').text(message);
+        $('#successMessage').fadeIn(300);
+        setTimeout(() => {
+            $('#successMessage').fadeOut(300);
+        }, 5000);
+    }
+
+    // Show error message
+    function showError(message) {
+        $('#errorText').text(message);
+        $('#errorMessage').fadeIn(300);
+        setTimeout(() => {
+            $('#errorMessage').fadeOut(300);
+        }, 5000);
+    }
+
+    // Clear all validation errors
+    function clearValidationErrors() {
+        $('.is-invalid').removeClass('is-invalid');
+        $('.invalid-feedback').remove();
+    }
+
+    // Display form errors from server response
+    function displayFormErrors(errors) {
+        clearValidationErrors();
+        
+        for (const field in errors) {
+            const fieldId = `id_${field}`;
+            const $field = $(`#${fieldId}`);
+            const $fieldContainer = $field.closest('.form-group');
+            
+            if ($field.length) {
+                $field.addClass('is-invalid');
+                
+                // Check if there's already an error message
+                if (!$fieldContainer.find('.invalid-feedback').length) {
+                    $fieldContainer.append(
+                        `<div class="invalid-feedback">
+                            <i class="fas fa-exclamation-circle"></i>
+                            ${errors[field][0]}
+                        </div>`
+                    );
+                }
+            }
+        }
+    }
+
+    // Individual field validation
+    function validateField(field) {
+        const $field = $(field);
+        const value = $field.val().trim();
+        const fieldId = field.id;
+        let isValid = true;
+        
+        $field.removeClass('is-invalid');
+        $field.closest('.form-group').find('.invalid-feedback').remove();
+        
+        // Required field validation
+        if ($field.attr('required') && !value) {
+            $field.addClass('is-invalid');
+            $field.closest('.form-group').append(
+                `<div class="invalid-feedback">
+                    <i class="fas fa-exclamation-circle"></i>
+                    This field is required
+                </div>`
+            );
+            return false;
+        }
+        
+        // Field-specific validations
+        switch(fieldId) {
+            case 'id_first_phone_number':
+            case 'id_second_phone_number':
+                if (value) {
+                    const phoneDigits = value.replace(/\D/g, '');
+                    if (!/^\d{9}$/.test(phoneDigits)) {
+                        $field.addClass('is-invalid');
+                        $field.closest('.form-group').append(
+                            `<div class="invalid-feedback">
+                                <i class="fas fa-exclamation-circle"></i>
+                                Phone number must be 9 digits
+                            </div>`
+                        );
+                        isValid = false;
+                    }
+                }
+                break;
+                
+            case 'id_email':
+                if (value) {
+                    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                    if (!emailRegex.test(value)) {
+                        $field.addClass('is-invalid');
+                        $field.closest('.form-group').append(
+                            `<div class="invalid-feedback">
+                                <i class="fas fa-exclamation-circle"></i>
+                                Please enter a valid email address
+                            </div>`
+                        );
+                        isValid = false;
+                    }
+                }
+                break;
+                
+            case 'id_relationship':
+                if ($field.attr('required') && !value) {
+                    $field.addClass('is-invalid');
+                    $field.closest('.form-group').append(
+                        `<div class="invalid-feedback">
+                            <i class="fas fa-exclamation-circle"></i>
+                            Please select a relationship
+                        </div>`
+                    );
+                    isValid = false;
+                }
+                break;
+        }
+        
+        return isValid;
+    }
+
+    // Full form validation
+    function validateForm() {
+        clearValidationErrors();
+        let isValid = true;
+        
+        // Validate all required fields
+        const requiredFields = [
+            '#id_full_name',
+            '#id_relationship',
+            '#id_first_phone_number',
+            '#id_address'
+        ];
+        
+        requiredFields.forEach(selector => {
+            const $field = $(selector);
+            if (!$field.length) return;
+            
+            if (!validateField($field[0])) {
+                isValid = false;
+            }
+        });
+        
+        // Validate email if provided
+        const $email = $('#id_email');
+        if ($email.val().trim() && !validateField($email[0])) {
+            isValid = false;
+        }
+        
+        // Validate secondary phone if provided
+        const $secondaryPhone = $('#id_second_phone_number');
+        if ($secondaryPhone.val().trim() && !validateField($secondaryPhone[0])) {
+            isValid = false;
+        }
+        
+        return isValid;
+    }
+
+    // Prepare form data for submission
+    function prepareFormData() {
+        const formData = new FormData(document.getElementById('parentForm'));
+        
+        // Clean phone numbers before submission
+        const phoneFields = ['first_phone_number', 'second_phone_number'];
+        phoneFields.forEach(field => {
+            const value = $(`#id_${field}`).val();
+            if (value) {
+                formData.set(field, value.replace(/\D/g, ''));
+            }
+        });
+        
+        return formData;
+    }
+
+    // Submit form with specified action
+    function submitForm(action = 'save_only') {
+        if (!validateForm()) {
+            // Scroll to first error
+            const $firstError = $('.is-invalid').first();
+            if ($firstError.length) {
+                $('html, body').animate({
+                    scrollTop: $firstError.offset().top - 100
+                }, 500);
+            }
+            return false;
+        }
+        
+        showLoading('Saving parent information...');
+        
+        const formData = prepareFormData();
+        formData.append('action', action);
+        
+        // Determine URL
+        let url;
+        {% if parent %}
+        url = "{% url 'admin_update_parent' student.id parent.id %}";
+        {% else %}
+        url = "{% url 'admin_save_parent' student.id %}";
+        {% endif %}
+        
+        $.ajax({
+            url: url,
+            type: 'POST',
+            data: formData,
+            processData: false,
+            contentType: false,
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRFToken': getCSRFToken()
+            },
+            success: function(response) {
+                hideLoading();
+                
+                if (response.success) {
+                    showSuccess(response.message || 'Parent information saved successfully!');
+                    
+                    // Handle redirection based on action
+                    setTimeout(() => {
+                        switch(action) {
+                            case 'save_and_view':
+                                window.location.href = "{% url 'admin_student_detail' student.id %}";
+                                break;
+                            case 'save_and_add_another':
+                                // Reload to clear form
+                                window.location.reload();
+                                break;
+                            case 'save_and_edit':
+                                // If new parent was created, redirect to edit
+                                if (response.parent_id && !{% if parent %}true{% else %}false{% endif %}) {
+                                    window.location.href = `/admin/students/{{ student.id }}/parent/${response.parent_id}/edit/`;
+                                }
+                                break;
+                            case 'save_only':
+                            default:
+                                // If editing existing parent, just show success message
+                                if (response.parent_id) {
+                                    // Update any dynamic content if needed
+                                }
+                                break;
+                        }
+                    }, 1500);
+                } else {
+                    showError(response.message || 'An error occurred. Please try again.');
+                    if (response.errors) {
+                        displayFormErrors(response.errors);
+                        // Scroll to first error
+                        const $firstError = $('.is-invalid').first();
+                        if ($firstError.length) {
+                            $('html, body').animate({
+                                scrollTop: $firstError.offset().top - 100
+                            }, 500);
+                        }
+                    }
+                }
+            },
+            error: function(xhr, status, error) {
+                hideLoading();
+                
+                let errorMessage = 'An error occurred while saving. Please try again.';
+                
+                try {
+                    if (xhr.responseJSON && xhr.responseJSON.message) {
+                        errorMessage = xhr.responseJSON.message;
+                    } else if (xhr.responseJSON && xhr.responseJSON.errors) {
+                        errorMessage = 'Please correct the errors below.';
+                        displayFormErrors(xhr.responseJSON.errors);
+                    } else if (xhr.status === 0) {
+                        errorMessage = 'Network error. Please check your connection.';
+                    } else if (xhr.status === 403) {
+                        errorMessage = 'You do not have permission to perform this action.';
+                    } else if (xhr.status === 404) {
+                        errorMessage = 'Requested resource not found.';
+                    } else if (xhr.status === 500) {
+                        errorMessage = 'Server error. Please try again later.';
+                    }
+                } catch (e) {
+                    console.error('Error parsing response:', e);
+                }
+                
+                showError(errorMessage);
+            }
+        });
+        
+        return false; // Prevent default form submission
+    }
+
+    // Setup form submission handlers
+    function setupFormHandlers() {
+        // Prevent default form submission
+        $('#parentForm').on('submit', function(e) {
+            e.preventDefault();
+            submitForm('save_only');
+        });
+        
+        // Setup action buttons
+        $('#saveOnlyBtn').on('click', function(e) {
+            e.preventDefault();
+            submitForm('save_only');
+        });
+        
+        $('#saveAndViewBtn').on('click', function(e) {
+            e.preventDefault();
+            submitForm('save_and_view');
+        });
+        
+        $('#saveAndAddAnotherBtn').on('click', function(e) {
+            e.preventDefault();
+            submitForm('save_and_add_another');
+        });
+        
+        $('#saveAndEditBtn').on('click', function(e) {
+            e.preventDefault();
+            submitForm('save_and_edit');
+        });
+    }
+
+    // Cancel button handler
+    $('#cancelBtn').on('click', function() {
+        if ($('#parentForm')[0].checkValidity() || 
+            $('.is-invalid').length > 0 ||
+            hasFormChanges()) {
+            
+            Swal.fire({
+                title: 'Unsaved Changes',
+                text: 'You have unsaved changes. Are you sure you want to leave?',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#667eea',
+                cancelButtonColor: '#dc3545',
+                confirmButtonText: 'Yes, discard changes',
+                cancelButtonText: 'No, stay here',
+                reverseButtons: true
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    window.location.href = "{% url 'admin_student_detail' student.id %}";
+                }
+            });
+        } else {
+            window.location.href = "{% url 'admin_student_detail' student.id %}";
+        }
+    });
+
+    // Check if form has changes
+    function hasFormChanges() {
+        const $form = $('#parentForm');
+        let hasChanges = false;
+        
+        $form.find('input, select, textarea').each(function() {
+            const $element = $(this);
+            const originalValue = $element.data('original-value') || '';
+            const currentValue = $element.val() || '';
+            
+            if (currentValue !== originalValue) {
+                hasChanges = true;
+                return false; // Break loop
+            }
+        });
+        
+        return hasChanges;
+    }
+
+    // Store original form values
+    function storeOriginalValues() {
+        $('#parentForm').find('input, select, textarea').each(function() {
+            $(this).data('original-value', $(this).val());
+        });
+    }
+
+    // Delete parent confirmation
+    {% if parent %}
+    $('#deleteParentBtn').on('click', function() {
+        Swal.fire({
+            title: 'Delete Parent?',
+            html: `You are about to delete <strong>{{ parent.full_name }}</strong>. This action cannot be undone.`,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#d33',
+            cancelButtonColor: '#3085d6',
+            confirmButtonText: 'Yes, delete it!',
+            cancelButtonText: 'Cancel',
+            reverseButtons: true,
+            showLoaderOnConfirm: true,
+            preConfirm: () => {
+                return $.ajax({
+                    url: "{% url 'admin_delete_parent' student.id parent.id %}",
+                    type: 'POST',
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'X-CSRFToken': getCSRFToken()
+                    }
+                }).then(response => {
+                    return response;
+                }).catch(error => {
+                    Swal.showValidationMessage(
+                        `Request failed: ${error.statusText || 'Unknown error'}`
+                    );
+                });
+            }
+        }).then((result) => {
+            if (result.isConfirmed) {
+                if (result.value && result.value.success) {
+                    Swal.fire({
+                        title: 'Deleted!',
+                        text: result.value.message || 'Parent has been deleted.',
+                        icon: 'success',
+                        confirmButtonColor: '#667eea'
+                    }).then(() => {
+                        window.location.href = "{% url 'admin_student_detail' student.id %}";
+                    });
+                } else {
+                    Swal.fire({
+                        title: 'Error!',
+                        text: result.value ? result.value.message : 'Failed to delete parent.',
+                        icon: 'error',
+                        confirmButtonColor: '#d33'
+                    });
+                }
+            }
+        });
+    });
+    {% endif %}
+
+    // Real-time field validation on blur
+    $('input, select, textarea').on('blur', function() {
+        validateField(this);
+    });
+
+    // Auto-capitalize full name
+    $('#id_full_name').on('blur', function() {
+        const $this = $(this);
+        const value = $this.val();
+        if (value) {
+            $this.val(value.replace(/\w\S*/g, function(txt) {
+                return txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase();
+            }));
+        }
+    });
+
+    // Prevent accidental navigation when form has changes
+    $(window).on('beforeunload', function() {
+        if (hasFormChanges()) {
+            return 'You have unsaved changes. Are you sure you want to leave?';
+        }
+    });
+
+    // Remove beforeunload when form is submitted
+    $('#parentForm').on('submit', function() {
+        $(window).off('beforeunload');
+    });
+
+    // Initialize everything
+    function init() {
+        storeOriginalValues();
+        setupFormHandlers();
+        
+        // Initialize tooltips if Bootstrap is available
+        if ($.fn.tooltip) {
+            $('[data-toggle="tooltip"]').tooltip();
+        }
+        
+        console.log('Parent form initialized successfully');
+    }
+
+    // Start initialization when DOM is ready
+    init();
+});
+</script>
+{% endblock extra_js %}

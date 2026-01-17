@@ -1,8 +1,96 @@
 {% extends 'admin/base.html' %}
-{% block title %}{{ page_title|default:'Staff List' }}{% endblock %}
+{% load static %}
+
+{% block title %}Staff List{% endblock %}
+
 {% block content %}
-<div class="container">
-  <h1>{{ page_title|default:'Staff' }}</h1>
-  <p>Staff members list placeholder.</p>
+<div class="container-xxl flex-grow-1 container-p-y">
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0">Staff Members</h5>
+                    <a href="{% url 'admin_staff_add' %}" class="btn btn-primary">
+                        <i class="bx bx-plus"></i> Add New Staff
+                    </a>
+                </div>
+
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Name</th>
+                                    <th>Username</th>
+                                    <th>Email</th>
+                                    <th>Role</th>
+                                    <th>Phone</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for staff in staff_members %}
+                                <tr>
+                                    <td>{{ forloop.counter }}</td>
+                                    <td>
+                                        {% if staff.profile_picture %}
+                                        <img src="{{ staff.profile_picture.url }}" class="avatar-sm rounded-circle me-2">
+                                        {% else %}
+                                        <div class="avatar-sm rounded-circle bg-secondary me-2" style="width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; color: white;">
+                                            {{ staff.admin.first_name.0 }}
+                                        </div>
+                                        {% endif %}
+                                        {{ staff.admin.first_name }} {{ staff.admin.last_name }}
+                                    </td>
+                                    <td>{{ staff.admin.username }}</td>
+                                    <td>{{ staff.admin.email }}</td>
+                                    <td>
+                                        <span class="badge bg-primary">{{ staff.get_role_display }}</span>
+                                    </td>
+                                    <td>{{ staff.phone_number|default:"N/A" }}</td>
+                                    <td>
+                                        <span class="badge bg-{% if staff.admin.is_active %}success{% else %}danger{% endif %}">
+                                            {% if staff.admin.is_active %}Active{% else %}Inactive{% endif %}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm">
+                                            <a href="javascript:void(0);" class="btn btn-info" title="View">
+                                                <i class="bx bx-eye"></i>
+                                            </a>
+                                            <a href="javascript:void(0);" class="btn btn-warning" title="Edit">
+                                                <i class="bx bx-edit"></i>
+                                            </a>
+                                            <button onclick="deleteStaff({{ staff.id }}, '{{ staff.admin.first_name }}')" class="btn btn-danger" title="Delete">
+                                                <i class="bx bx-trash"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="8" class="text-center text-muted py-4">
+                                        No staff members found
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
+
+<script>
+function deleteStaff(staffId, staffName) {
+    if (confirm(`Are you sure you want to delete ${staffName}?`)) {
+        // Implement delete functionality
+        console.log('Delete staff:', staffId);
+    }
+}
+</script>
 {% endblock %}

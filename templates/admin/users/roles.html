@@ -1,8 +1,102 @@
 {% extends 'admin/base.html' %}
-{% block title %}{{ page_title|default:'User Roles' }}{% endblock %}
+{% load static %}
+
+{% block title %}User Roles{% endblock %}
+
 {% block content %}
-<div class="container">
-  <h1>{{ page_title|default:'User Roles' }}</h1>
-  <p>Manage user roles and permissions here.</p>
+<div class="container-xxl flex-grow-1 container-p-y">
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0">User Roles and Permissions</h5>
+                </div>
+
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6 class="mb-3">User Types</h6>
+                            <div class="list-group">
+                                <a href="#" class="list-group-item list-group-item-action">
+                                    <div class="d-flex w-100 justify-content-between">
+                                        <h6 class="mb-1">HOD</h6>
+                                        <span class="badge bg-primary">5 Users</span>
+                                    </div>
+                                    <small>Head of Department</small>
+                                </a>
+                                <a href="#" class="list-group-item list-group-item-action">
+                                    <div class="d-flex w-100 justify-content-between">
+                                        <h6 class="mb-1">Staff</h6>
+                                        <span class="badge bg-info">12 Users</span>
+                                    </div>
+                                    <small>Teaching and Non-teaching Staff</small>
+                                </a>
+                            </div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <h6 class="mb-3">Permissions Summary</h6>
+                            <div class="alert alert-info">
+                                <strong>Admin Permissions</strong>
+                                <p class="small mb-0">Full access to all system features</p>
+                            </div>
+                            <div class="alert alert-warning">
+                                <strong>Staff Permissions</strong>
+                                <p class="small mb-0">Limited access to assigned modules only</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Detailed Permissions Table -->
+                    <div class="mt-4">
+                        <h6 class="mb-3">Detailed Permissions Matrix</h6>
+                        <div class="table-responsive">
+                            <table class="table table-sm table-bordered">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Feature/Module</th>
+                                        <th>View</th>
+                                        <th>Create</th>
+                                        <th>Edit</th>
+                                        <th>Delete</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td><strong>Students</strong></td>
+                                        <td><i class="bx bx-check text-success"></i></td>
+                                        <td><i class="bx bx-check text-success"></i></td>
+                                        <td><i class="bx bx-check text-success"></i></td>
+                                        <td><i class="bx bx-check text-success"></i></td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>Staff</strong></td>
+                                        <td><i class="bx bx-check text-success"></i></td>
+                                        <td><i class="bx bx-check text-success"></i></td>
+                                        <td><i class="bx bx-check text-success"></i></td>
+                                        <td><i class="bx bx-x text-danger"></i></td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>Reports</strong></td>
+                                        <td><i class="bx bx-check text-success"></i></td>
+                                        <td><i class="bx bx-x text-danger"></i></td>
+                                        <td><i class="bx bx-x text-danger"></i></td>
+                                        <td><i class="bx bx-x text-danger"></i></td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>Settings</strong></td>
+                                        <td><i class="bx bx-check text-success"></i></td>
+                                        <td><i class="bx bx-check text-success"></i></td>
+                                        <td><i class="bx bx-check text-success"></i></td>
+                                        <td><i class="bx bx-x text-danger"></i></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 {% endblock %}

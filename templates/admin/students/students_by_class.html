@@ -1,0 +1,106 @@
+{% extends 'admin/base.html' %}
+{% load static %}
+
+{% block title %}Students by Class{% endblock %}
+
+{% block content %}
+<div class="container-xxl flex-grow-1 container-p-y">
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Students by Class</h5>
+                </div>
+
+                <div class="card-body">
+                    <!-- Class Selection -->
+                    <form method="get" class="mb-4">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Select Class Level</label>
+                                <select name="class_level" class="form-control" onchange="this.form.submit();">
+                                    <option value="">-- Choose a Class --</option>
+                                    {% for class_level in class_levels %}
+                                    <option value="{{ class_level.id }}" 
+                                            {% if selected_class == class_level.id|stringformat:"s" %}selected{% endif %}>
+                                        {{ class_level.name }} ({{ class_level.student_count }} students)
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                    </form>
+
+                    <!-- Students Table -->
+                    {% if students %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Name</th>
+                                    <th>Registration No.</th>
+                                    <th>Stream</th>
+                                    <th>Gender</th>
+                                    <th>Status</th>
+                                    <th>Parents</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for student in students %}
+                                <tr>
+                                    <td>{{ forloop.counter }}</td>
+                                    <td>
+                                        {% if student.profile_pic %}
+                                        <img src="{{ student.profile_pic.url }}" class="avatar-sm rounded-circle me-2">
+                                        {% else %}
+                                        <div class="avatar-sm rounded-circle bg-secondary me-2" style="width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; color: white;">
+                                            {{ student.first_name.0 }}
+                                        </div>
+                                        {% endif %}
+                                        {{ student.full_name }}
+                                    </td>
+                                    <td><span class="badge bg-info">{{ student.registration_number }}</span></td>
+                                    <td>{{ student.stream_class.name|default:"N/A" }}</td>
+                                    <td>{{ student.get_gender_display|default:"N/A" }}</td>
+                                    <td>
+                                        <span class="badge bg-{% if student.status == 'active' %}success{% elif student.status == 'suspended' %}warning{% elif student.status == 'withdrawn' %}danger{% else %}secondary{% endif %}">
+                                            {{ student.get_status_display }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        {% for parent in student.parents.all %}
+                                        <small>{{ parent.full_name }}<br></small>
+                                        {% endfor %}
+                                    </td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm">
+                                            <a href="javascript:void(0);" class="btn btn-info" title="View">
+                                                <i class="bx bx-eye"></i>
+                                            </a>
+                                            <a href="javascript:void(0);" class="btn btn-warning" title="Edit">
+                                                <i class="bx bx-edit"></i>
+                                            </a>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="alert alert-info">
+                        {% if selected_class %}
+                        No students found in this class.
+                        {% else %}
+                        Please select a class level to view students.
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

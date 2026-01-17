@@ -1,0 +1,1621 @@
+{% extends 'admin/base.html' %}
+{% load custom_filters %}
+{% load static %}
+{% block title %} Edit Student - {{ student.get_full_name }} {% endblock title %}
+
+{% block breadcrumb %}
+    <nav aria-label="breadcrumb" class="mb-4">
+        <ol class="breadcrumb bg-white rounded-3 shadow-sm p-3">
+            <li class="breadcrumb-item"><a href="{% url 'admin_dashboard' %}" class="text-decoration-none">
+                <i class="fas fa-home me-1"></i> Dashboard
+            </a></li>
+            <li class="breadcrumb-item"><a href="{% url 'admin_students_list' %}" class="text-decoration-none">
+                <i class="fas fa-users me-1"></i> Students
+            </a></li>
+            <li class="breadcrumb-item"><a href="{% url 'admin_student_detail' student.id %}" class="text-decoration-none">
+                <i class="fas fa-eye me-1"></i> {{ student.get_full_name|truncatechars:20 }}
+            </a></li>
+            <li class="breadcrumb-item active text-primary fw-semibold" aria-current="page">
+                <i class="fas fa-edit me-1"></i> Edit Student
+            </li>
+        </ol>
+    </nav>
+{% endblock breadcrumb %}
+
+{% block extra_css %}
+<style>
+    :root {
+        --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        --success-gradient: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+        --warning-gradient: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+        --info-gradient: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+    }
+    
+    .form-section {
+        background: #fff;
+        border-radius: 16px;
+        padding: 30px;
+        margin-bottom: 30px;
+        box-shadow: 0 8px 30px rgba(0,0,0,0.08);
+        border: 1px solid rgba(0,0,0,0.05);
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+    
+    .form-section:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 12px 40px rgba(0,0,0,0.12);
+    }
+    
+    .form-section-title {
+        font-size: 1.3rem;
+        font-weight: 700;
+        color: #2c3e50;
+        border-bottom: 3px solid #e8eaf6;
+        padding-bottom: 15px;
+        margin-bottom: 25px;
+        display: flex;
+        align-items: center;
+        position: relative;
+    }
+    
+    .form-section-title i {
+        margin-right: 12px;
+        color: #667eea;
+        font-size: 1.4rem;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+    }
+    
+    .form-section-title::after {
+        content: '';
+        position: absolute;
+        bottom: -3px;
+        left: 0;
+        width: 60px;
+        height: 3px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 3px;
+    }
+    
+    .profile-container {
+        background: linear-gradient(135deg, #f6f8ff 0%, #f9f5ff 100%);
+        border-radius: 20px;
+        padding: 25px;
+        border: 2px dashed #d1d9ff;
+        text-align: center;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    .profile-preview {
+        width: 180px;
+        height: 180px;
+        border-radius: 50%;
+        object-fit: cover;
+        border: 4px solid white;
+        box-shadow: 0 10px 25px rgba(102, 126, 234, 0.2);
+        margin-bottom: 20px;
+        transition: all 0.3s ease;
+    }
+    
+    .profile-preview:hover {
+        transform: scale(1.05);
+        box-shadow: 0 15px 35px rgba(102, 126, 234, 0.3);
+    }
+    
+    .profile-placeholder {
+        width: 180px;
+        height: 180px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border: 4px solid white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 4rem;
+        margin-bottom: 20px;
+        box-shadow: 0 10px 25px rgba(102, 126, 234, 0.2);
+        transition: all 0.3s ease;
+    }
+    
+    .profile-placeholder:hover {
+        transform: scale(1.05);
+        box-shadow: 0 15px 35px rgba(102, 126, 234, 0.3);
+    }
+    
+    .current-photo {
+        position: relative;
+        margin-bottom: 15px;
+    }
+    
+    .current-photo-label {
+        position: absolute;
+        bottom: 10px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(0,0,0,0.7);
+        color: white;
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        white-space: nowrap;
+    }
+    
+    .form-group {
+        margin-bottom: 1.8rem;
+    }
+    
+    .form-label {
+        font-weight: 600;
+        color: #4a5568;
+        margin-bottom: 8px;
+        font-size: 0.95rem;
+        display: flex;
+        align-items: center;
+    }
+    
+    .form-label i {
+        margin-right: 8px;
+        color: #667eea;
+        font-size: 0.9rem;
+    }
+    
+    .required-field::after {
+        content: " *";
+        color: #e53e3e;
+        font-weight: bold;
+        margin-left: 4px;
+    }
+    
+    .form-control, .select2-container--bootstrap4 .select2-selection {
+        border: 2px solid #e2e8f0 !important;
+        border-radius: 10px !important;
+        padding: 12px 15px !important;
+        font-size: 0.95rem !important;
+        transition: all 0.3s ease !important;
+        background: #f8fafc !important;
+        height: auto !important;
+        min-height: 44px !important;
+    }
+    
+    .form-control:focus, .select2-container--bootstrap4.select2-container--open .select2-selection {
+        border-color: #667eea !important;
+        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1) !important;
+        background: white !important;
+        transform: translateY(-1px) !important;
+    }
+    
+    /* Readonly field styling */
+    .form-control[readonly] {
+        background-color: #edf2f7 !important;
+        cursor: not-allowed;
+        opacity: 0.8;
+    }
+    
+    .form-control[readonly]:focus {
+        border-color: #e2e8f0 !important;
+        box-shadow: none !important;
+        transform: none !important;
+    }
+    
+    /* Error styling */
+    .is-invalid {
+        border-color: #e53e3e !important;
+    }
+    
+    .invalid-feedback {
+        color: #e53e3e;
+        font-size: 0.85rem;
+        margin-top: 5px;
+    }
+    
+    /* Select2 styling */
+    .select2-container--bootstrap4 .select2-selection--single .select2-selection__rendered {
+        color: #4a5568 !important;
+        line-height: 44px !important;
+        padding-left: 5px !important;
+    }
+    
+    .select2-container--bootstrap4 .select2-selection--multiple {
+        border: 2px solid #e2e8f0 !important;
+        border-radius: 10px !important;
+        background: #f8fafc !important;
+        min-height: 44px !important;
+        padding: 5px 10px !important;
+    }
+    
+    /* Required field indicator for select2 */
+    .select2-container--bootstrap4.required .select2-selection {
+        border-color: #e53e3e !important;
+        border-width: 2px !important;
+    }
+    
+    .action-buttons {
+        background: linear-gradient(135deg, #f6f8ff 0%, #f9f5ff 100%);
+        border-radius: 16px;
+        padding: 30px;
+        margin-top: 40px;
+        border: 2px solid #e8eaf6;
+        box-shadow: 0 8px 25px rgba(0,0,0,0.06);
+    }
+    
+    .btn {
+        border-radius: 10px;
+        padding: 12px 28px;
+        font-weight: 600;
+        font-size: 0.95rem;
+        border: none;
+        transition: all 0.3s ease;
+    }
+    
+    .btn-primary {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+    }
+    
+    .btn-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+    }
+    
+    .btn-success {
+        background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+        box-shadow: 0 4px 15px rgba(67, 233, 123, 0.3);
+    }
+    
+    .btn-success:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(67, 233, 123, 0.4);
+    }
+    
+    .btn-warning {
+        background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+        box-shadow: 0 4px 15px rgba(250, 112, 154, 0.3);
+    }
+    
+    .btn-warning:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(250, 112, 154, 0.4);
+    }
+    
+    .btn-info {
+        background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+        box-shadow: 0 4px 15px rgba(79, 172, 254, 0.3);
+    }
+    
+    .btn-info:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(79, 172, 254, 0.4);
+    }
+    
+    .btn-secondary {
+        background: linear-gradient(135deg, #a0aec0 0%, #718096 100%);
+        box-shadow: 0 4px 15px rgba(160, 174, 192, 0.3);
+    }
+    
+    .btn-secondary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(160, 174, 192, 0.4);
+    }
+    
+    .btn-danger {
+        background: linear-gradient(135deg, #f56565 0%, #e53e3e 100%);
+        box-shadow: 0 4px 15px rgba(245, 101, 101, 0.3);
+    }
+    
+    .btn-danger:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(245, 101, 101, 0.4);
+    }
+    
+    .btn i {
+        margin-right: 8px;
+        font-size: 1.1rem;
+    }
+    
+    /* Loading overlay */
+    .loading-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(255,255,255,0.9);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+        display: none;
+    }
+    
+    .spinner {
+        width: 70px;
+        height: 70px;
+        border: 5px solid #f3f3f3;
+        border-top: 5px solid #667eea;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin-bottom: 20px;
+    }
+    
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+    
+    /* Success message */
+    .success-message {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 10000;
+        min-width: 300px;
+        display: none;
+    }
+    
+    /* Required subjects indicator */
+    .subjects-required-info {
+        font-size: 0.85rem;
+        color: #718096;
+        margin-top: 5px;
+        padding-left: 20px;
+        position: relative;
+    }
+    
+    .subjects-required-info:before {
+        content: "•";
+        color: #e53e3e;
+        font-weight: bold;
+        position: absolute;
+        left: 8px;
+    }
+    
+    /* Student info badge */
+    .student-info-badge {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 8px 15px;
+        border-radius: 10px;
+        font-size: 0.9rem;
+        font-weight: 600;
+        display: inline-flex;
+        align-items: center;
+        margin-bottom: 10px;
+    }
+    
+    .student-info-badge i {
+        margin-right: 8px;
+    }
+    
+    /* Action buttons container */
+    .quick-actions {
+        margin-bottom: 20px;
+    }
+    
+    /* Special action button group */
+    .special-action-buttons {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        margin-bottom: 30px;
+    }
+    
+    .special-action-btn {
+        display: flex;
+        align-items: center;
+        justify-content: flex-start;
+        padding: 15px 20px;
+        border-radius: 12px;
+        border: 2px solid #e2e8f0;
+        background: white;
+        color: #4a5568;
+        font-weight: 600;
+        transition: all 0.3s ease;
+        width: 100%;
+        text-align: left;
+    }
+    
+    .special-action-btn:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        border-color: #667eea;
+        color: #667eea;
+        text-decoration: none;
+    }
+    
+    .special-action-btn i {
+        margin-right: 15px;
+        font-size: 1.3rem;
+        width: 30px;
+        text-align: center;
+    }
+    
+    .btn-group-lg .btn {
+        padding: 15px 30px;
+        font-size: 1rem;
+    }
+</style>
+{% endblock extra_css %}
+
+{% block content %}
+<section class="content">
+    <div class="container-fluid">
+        <!-- Loading Overlay -->
+        <div class="loading-overlay" id="loadingOverlay">
+            <div class="spinner"></div>
+            <p class="text-primary fw-bold">Processing your request...</p>
+        </div>
+
+        <!-- Success Message (for AJAX) -->
+        <div class="alert alert-success success-message" id="successMessage" role="alert">
+            <i class="fas fa-check-circle me-2"></i>
+            <span id="successText"></span>
+        </div>
+
+        <!-- Error Message (for AJAX) -->
+        <div class="alert alert-danger success-message" id="errorMessage" role="alert" style="display: none;">
+            <i class="fas fa-exclamation-circle me-2"></i>
+            <span id="errorText"></span>
+        </div>
+
+        <!-- Form Header -->
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-gradient-primary text-white">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h4 class="mb-0"><i class="fas fa-user-edit me-2"></i> Edit Student: {{ student.get_full_name }}</h4>
+                        <p class="mb-0 mt-1 opacity-90">Update student information and academic details</p>
+                    </div>
+                    <div class="student-info-badge">
+                        <i class="fas fa-id-card"></i> {{ student.registration_number }}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="quick-actions mb-4">
+            <div class="d-flex flex-wrap gap-2">
+                <a href="{% url 'admin_student_detail' student.id %}" class="btn btn-info">
+                    <i class="fas fa-eye"></i> View Student
+                </a>
+                <a href="{% url 'admin_add_parent_to_student' student.id %}" class="btn btn-warning">
+                    <i class="fas fa-user-friends"></i> View/Add Parents
+                </a>
+                <a href="#" class="btn btn-success">
+                    <i class="fas fa-graduation-cap"></i> Academic Records
+                </a>
+            </div>
+        </div>
+
+        <!-- Special Action Buttons -->
+        <div class="special-action-buttons">
+            <button type="button" class="special-action-btn" id="saveAndAddParentBtn">
+                <i class="fas fa-user-plus text-primary"></i>
+                <div>
+                    <div class="fw-bold">Save and Add Parent Details</div>
+                    <small class="text-muted">Save changes and proceed to add parent/guardian information</small>
+                </div>
+            </button>
+            
+            <button type="button" class="special-action-btn" id="saveAndAddAnotherBtn">
+                <i class="fas fa-user-plus text-success"></i>
+                <div>
+                    <div class="fw-bold">Save and Add Another Student</div>
+                    <small class="text-muted">Save changes and start adding a new student</small>
+                </div>
+            </button>
+            
+            <button type="button" class="special-action-btn" id="saveAndReturnToListBtn">
+                <i class="fas fa-list text-info"></i>
+                <div>
+                    <div class="fw-bold">Save and Return to Students List</div>
+                    <small class="text-muted">Save changes and go back to all students list</small>
+                </div>
+            </button>
+        </div>
+
+        <!-- Main Form -->
+        <form method="post" enctype="multipart/form-data" id="studentForm" novalidate data-ajax-url="{% url 'admin_student_edit' student.id %}">
+            {% csrf_token %}
+            
+            <!-- Hidden input for action type -->
+            <input type="hidden" name="action_type" id="action_type" value="save">
+            
+            <!-- Error summary for non-field errors -->
+            {% if form.non_field_errors %}
+                <div class="alert alert-danger">
+                    {% for error in form.non_field_errors %}
+                        <i class="fas fa-exclamation-triangle me-2"></i>{{ error }}
+                    {% endfor %}
+                </div>
+            {% endif %}
+            
+            <!-- Personal Information Section -->
+            <div class="form-section">
+                <div class="form-section-title">
+                    <i class="fas fa-user-circle"></i> Personal Information
+                </div>
+                <div class="row">
+                    <div class="col-lg-8">
+                        <div class="row">
+                            <div class="col-md-4">
+                                <div class="form-group">
+                                    <label for="id_first_name" class="form-label required-field">
+                                        <i class="fas fa-user"></i> First Name
+                                    </label>
+                                    <input type="text" class="form-control {% if form.first_name.errors %}is-invalid{% endif %}" 
+                                           id="id_first_name" name="first_name" 
+                                           value="{{ form.first_name.value|default:student.first_name|default:'' }}" required
+                                           placeholder="Enter first name">
+                                    {% if form.first_name.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {{ form.first_name.errors.0 }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="form-group">
+                                    <label for="id_middle_name" class="form-label">
+                                        <i class="fas fa-user"></i> Middle Name
+                                    </label>
+                                    <input type="text" class="form-control {% if form.middle_name.errors %}is-invalid{% endif %}" 
+                                           id="id_middle_name" name="middle_name" 
+                                           value="{{ form.middle_name.value|default:student.middle_name|default:'' }}"
+                                           placeholder="Enter middle name (optional)">
+                                    {% if form.middle_name.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {{ form.middle_name.errors.0 }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="form-group">
+                                    <label for="id_last_name" class="form-label required-field">
+                                        <i class="fas fa-user"></i> Last Name
+                                    </label>
+                                    <input type="text" class="form-control {% if form.last_name.errors %}is-invalid{% endif %}" 
+                                           id="id_last_name" name="last_name" 
+                                           value="{{ form.last_name.value|default:student.last_name|default:'' }}" required
+                                           placeholder="Enter last name">
+                                    {% if form.last_name.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {{ form.last_name.errors.0 }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="id_date_of_birth" class="form-label">
+                                        <i class="fas fa-calendar-alt"></i> Date of Birth
+                                    </label>
+                                    <input type="date" class="form-control {% if form.date_of_birth.errors %}is-invalid{% endif %}" 
+                                           id="id_date_of_birth" name="date_of_birth" 
+                                           value="{% if form.date_of_birth.value %}{{ form.date_of_birth.value|date:'Y-m-d' }}{% elif student.date_of_birth %}{{ student.date_of_birth|date:'Y-m-d' }}{% endif %}"
+                                           max="{{ today }}">
+                                    {% if form.date_of_birth.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {{ form.date_of_birth.errors.0 }}
+                                        </div>
+                                    {% endif %}
+                                    <small class="form-text text-muted">Format: YYYY-MM-DD</small>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="id_gender" class="form-label required-field">
+                                        <i class="fas fa-venus-mars"></i> Gender
+                                    </label>
+                                    <select class="form-control select2bs4 {% if form.gender.errors %}is-invalid{% endif %}" 
+                                            id="id_gender" name="gender" style="width: 100%;" required>
+                                        <option value="">Select Gender</option>
+                                        {% for gender, label in gender_choices %}
+                                            <option value="{{ gender }}" 
+                                                {% if form.gender.value == gender or student.gender == gender %}selected{% endif %}>
+                                                {{ label }}
+                                            </option>
+                                        {% endfor %}
+                                    </select>
+                                    {% if form.gender.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {{ form.gender.errors.0 }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-12">
+                                <div class="form-group">
+                                    <label for="id_address" class="form-label">
+                                        <i class="fas fa-home"></i> Address
+                                    </label>
+                                    <textarea class="form-control {% if form.address.errors %}is-invalid{% endif %}" 
+                                              id="id_address" name="address" rows="3" 
+                                              placeholder="Enter full residential address">
+                                        {{ form.address.value|default:student.address|default:'' }}
+                                    </textarea>
+                                    {% if form.address.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {{ form.address.errors.0 }}
+                                        </div>
+                                    {% endif %}
+                                    <small class="form-text text-muted">Full residential address</small>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-12">
+                                <div class="form-group">
+                                    <label for="id_physical_disabilities_condition" class="form-label">
+                                        <i class="fas fa-wheelchair"></i> Physical Disabilities/Condition
+                                    </label>
+                                    <textarea class="form-control {% if form.physical_disabilities_condition.errors %}is-invalid{% endif %}" 
+                                              id="id_physical_disabilities_condition" name="physical_disabilities_condition" 
+                                              rows="2" placeholder="Enter any physical disabilities or conditions (if any)">
+                                        {{ form.physical_disabilities_condition.value|default:student.physical_disabilities_condition|default:'' }}
+                                    </textarea>
+                                    {% if form.physical_disabilities_condition.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {{ form.physical_disabilities_condition.errors.0 }}
+                                        </div>
+                                    {% endif %}
+                                    <small class="form-text text-muted">Leave blank if none</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-lg-4">
+                        <div class="profile-container">
+                            {% if student.profile_pic %}
+                            <div class="current-photo">
+                                <img src="{{ student.profile_pic.url }}" class="profile-preview" alt="Current Profile Picture">
+                                <div class="current-photo-label">Current Photo</div>
+                            </div>
+                            {% else %}
+                            <div id="profilePreview" class="profile-placeholder">
+                                <i class="fas fa-user"></i>
+                            </div>
+                            {% endif %}
+                            <div class="form-group w-100">
+                                <label for="id_profile_pic" class="form-label">
+                                    <i class="fas fa-camera"></i> Update Profile Picture
+                                </label>
+                                <div class="custom-file">
+                                    <input type="file" class="custom-file-input {% if form.profile_pic.errors %}is-invalid{% endif %}" 
+                                           id="id_profile_pic" name="profile_pic" 
+                                           accept="image/*">
+                                    <label class="custom-file-label" for="id_profile_pic" id="fileLabel">
+                                        Choose new file
+                                    </label>
+                                </div>
+                                {% if form.profile_pic.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {{ form.profile_pic.errors.0 }}
+                                    </div>
+                                {% endif %}
+                                <small class="form-text text-muted">Max size: 5MB. JPG, PNG, GIF. Leave empty to keep current.</small>
+                                {% if student.profile_pic %}
+                                <div class="form-check mt-2">
+                                    <input class="form-check-input" type="checkbox" id="remove_profile_pic" name="remove_profile_pic">
+                                    <label class="form-check-label text-danger" for="remove_profile_pic">
+                                        <i class="fas fa-trash-alt me-1"></i> Remove current profile picture
+                                    </label>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Academic Information Section -->
+            <div class="form-section">
+                <div class="form-section-title">
+                    <i class="fas fa-graduation-cap"></i> Academic Information
+                </div>
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="id_class_level" class="form-label required-field">
+                                <i class="fas fa-layer-group"></i> Current Class Level
+                            </label>
+                            <select class="form-control select2 {% if form.class_level.errors %}is-invalid{% endif %}" 
+                                    id="id_class_level" name="class_level" style="width: 100%;" required>
+                                <option value="">Select Class Level</option>
+                                {% for class in class_levels %}
+                                    <option value="{{ class.id }}" 
+                                        {% if form.class_level.value|stringformat:"s" == class.id|stringformat:"s" or student.class_level.id|stringformat:"s" == class.id|stringformat:"s" %}selected{% endif %}>
+                                        {{ class.name }} ({{ class.code }})
+                                    </option>
+                                {% endfor %}
+                            </select>
+                            {% if form.class_level.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {{ form.class_level.errors.0 }}
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="id_stream_class" class="form-label required-field">
+                                <i class="fas fa-stream"></i> Stream/Class
+                            </label>
+                            <select class="form-control select2 {% if form.stream_class.errors %}is-invalid{% endif %}" 
+                                    id="id_stream_class" name="stream_class" style="width: 100%;" required>
+                                <option value="">Select Stream</option>
+                                {% for stream in stream_classes %}
+                                    <option value="{{ stream.id }}" 
+                                        {% if form.stream_class.value|stringformat:"s" == stream.id|stringformat:"s" or student.stream_class.id|stringformat:"s" == stream.id|stringformat:"s" %}selected{% endif %}>
+                                        {{ stream.class_level.name }}{{ stream.stream_letter }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                            {% if form.stream_class.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {{ form.stream_class.errors.0 }}
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="id_registration_number" class="form-label">
+                                <i class="fas fa-id-card"></i> Registration Number
+                            </label>
+                            <input type="text" class="form-control {% if form.registration_number.errors %}is-invalid{% endif %}" 
+                                   id="id_registration_number" name="registration_number" 
+                                   value="{{ form.registration_number.value|default:student.registration_number|default:'' }}"
+                                   placeholder="Registration Number" readonly>
+                            {% if form.registration_number.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {{ form.registration_number.errors.0 }}
+                                </div>
+                            {% endif %}
+                            <small class="form-text text-muted">Registration number cannot be changed</small>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="id_examination_number" class="form-label">
+                                <i class="fas fa-file-alt"></i> Examination Number
+                            </label>
+                            <input type="text" class="form-control {% if form.examination_number.errors %}is-invalid{% endif %}" 
+                                   id="id_examination_number" name="examination_number" 
+                                   value="{{ form.examination_number.value|default:student.examination_number|default:'' }}"
+                                   placeholder="Enter examination number">
+                            {% if form.examination_number.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {{ form.examination_number.errors.0 }}
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row">
+                    <div class="col-12">
+                        <div class="form-group">
+                            <label for="id_subjects" class="form-label required-field">
+                                <i class="fas fa-book"></i> Subjects
+                            </label>
+                            <select class="form-control select2" id="id_subjects" name="subjects" 
+                                    multiple="multiple" style="width: 100%;" required>
+                                <option value="">Select Subjects</option>
+                                {% for subject in subjects %}
+                                    <option value="{{ subject.id }}" 
+                                         {% if subject.id in student_subjects_ids or subject.id|stringformat:"s" in form.subjects.value|default:''|split_string:',' %}selected{% endif %}>
+                                         {{ subject.name }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                            {% if form.subjects.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {{ form.subjects.errors.0 }}
+                                </div>
+                            {% endif %}
+                            <div class="subjects-required-info">
+                                At least one subject must be selected
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Previous School Information -->
+            <div class="form-section">
+                <div class="form-section-title">
+                    <i class="fas fa-school"></i> Previous School Information
+                </div>
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="id_previous_school" class="form-label">
+                                <i class="fas fa-university"></i> Previous School
+                            </label>
+                            <select class="form-control select2 {% if form.previous_school.errors %}is-invalid{% endif %}" 
+                                    id="id_previous_school" name="previous_school" style="width: 100%;">
+                                <option value="">Select Previous School</option>
+                                {% for school in previous_schools %}
+                                    <option value="{{ school.id }}" 
+                                        {% if form.previous_school.value|stringformat:"s" == school.id|stringformat:"s" or student.previous_school.id|stringformat:"s" == school.id|stringformat:"s" %}selected{% endif %}>
+                                        {{ school.name }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                            {% if form.previous_school.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {{ form.previous_school.errors.0 }}
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="id_previous_class_level" class="form-label">
+                                <i class="fas fa-graduation-cap"></i> Previous Class Level
+                            </label>
+                            <select class="form-control select2 {% if form.previous_class_level.errors %}is-invalid{% endif %}" 
+                                    id="id_previous_class_level" name="previous_class_level" style="width: 100%;">
+                                <option value="">Select Previous Class Level</option>
+                                {% for class in class_levels %}
+                                    <option value="{{ class.id }}" 
+                                        {% if form.previous_class_level.value|stringformat:"s" == class.id|stringformat:"s" or student.previous_class_level.id|stringformat:"s" == class.id|stringformat:"s" %}selected{% endif %}>
+                                        {{ class.name }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                            {% if form.previous_class_level.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {{ form.previous_class_level.errors.0 }}
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="id_transfer_from_school" class="form-label">
+                                <i class="fas fa-exchange-alt"></i> Transfer From School
+                            </label>
+                            <select class="form-control select2 {% if form.transfer_from_school.errors %}is-invalid{% endif %}" 
+                                    id="id_transfer_from_school" name="transfer_from_school" style="width: 100%;">
+                                <option value="">Select Transfer School</option>
+                                {% for school in previous_schools %}
+                                    <option value="{{ school.id }}" 
+                                        {% if form.transfer_from_school.value|stringformat:"s" == school.id|stringformat:"s" or student.transfer_from_school.id|stringformat:"s" == school.id|stringformat:"s" %}selected{% endif %}>
+                                        {{ school.name }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                            {% if form.transfer_from_school.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {{ form.transfer_from_school.errors.0 }}
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="id_previously_examination_number" class="form-label">
+                                <i class="fas fa-file-alt"></i> Previous Exam Number
+                            </label>
+                            <input type="text" class="form-control {% if form.previously_examination_number.errors %}is-invalid{% endif %}" 
+                                   id="id_previously_examination_number" 
+                                   name="previously_examination_number" 
+                                   value="{{ form.previously_examination_number.value|default:student.previously_examination_number|default:'' }}"
+                                   placeholder="Enter previous examination number">
+                            {% if form.previously_examination_number.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {{ form.previously_examination_number.errors.0 }}
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Status Section -->
+            <div class="form-section">
+                <div class="form-section-title">
+                    <i class="fas fa-cogs"></i> Status & Settings
+                </div>
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="id_status" class="form-label">
+                                <i class="fas fa-tag"></i> Student Status
+                            </label>
+                            <select class="form-control select2 {% if form.status.errors %}is-invalid{% endif %}" 
+                                    id="id_status" name="status" style="width: 100%;">
+                                {% for status, label in status_choices %}
+                                    <option value="{{ status }}" 
+                                        {% if form.status.value == status or student.status == status %}selected{% endif %}>
+                                        {{ label }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                            {% if form.status.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {{ form.status.errors.0 }}
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label class="form-label">
+                                <i class="fas fa-toggle-on"></i> Active Status
+                            </label>
+                            <div class="custom-control custom-switch mt-2">
+                                <input type="checkbox" class="custom-control-input" id="id_is_active" 
+                                       name="is_active" {% if form.is_active.value or student.is_active %}checked{% endif %}>
+                                <label class="custom-control-label" for="id_is_active" style="padding-top: 2px;">
+                                    Active Student Account
+                                </label>
+                            </div>
+                            <small class="form-text text-muted">Toggle to activate/deactivate student account</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Action Buttons -->
+            <div class="action-buttons">
+                <div class="row">
+                    <div class="col-12">
+                        <div class="d-flex flex-wrap gap-3 justify-content-center">
+                            <button type="button" class="btn btn-secondary" id="cancelBtn">
+                                <i class="fas fa-times"></i> Cancel
+                            </button>
+                            
+                            <div class="btn-group" role="group">
+                                <button type="button" class="btn btn-primary dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                                    <i class="fas fa-save"></i> Save Changes
+                                </button>
+                                <div class="dropdown-menu" aria-labelledby="saveDropdown">
+                                    <button class="dropdown-item" type="button" id="saveOnlyBtn">
+                                        <i class="fas fa-save text-primary me-2"></i> Save Only
+                                    </button>
+                                    <div class="dropdown-divider"></div>
+                                    <button class="dropdown-item" type="button" id="saveAndViewBtn">
+                                        <i class="fas fa-eye text-info me-2"></i> Save and View Student
+                                    </button>
+                                    <button class="dropdown-item" type="button" id="saveAndParentBtn">
+                                        <i class="fas fa-user-friends text-warning me-2"></i> Save and Add Parent
+                                    </button>
+                                    <button class="dropdown-item" type="button" id="saveAndNewBtn">
+                                        <i class="fas fa-user-plus text-success me-2"></i> Save and Add New
+                                    </button>
+                                    <button class="dropdown-item" type="button" id="saveAndListBtn">
+                                        <i class="fas fa-list text-secondary me-2"></i> Save and Return to List
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <a href="{% url 'admin_student_detail' student.id %}" class="btn btn-info">
+                                <i class="fas fa-eye"></i> View Student
+                            </a>
+                            <button type="button" class="btn btn-danger" id="deleteBtn">
+                                <i class="fas fa-trash"></i> Delete Student
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </form>
+    </div>
+</section>
+{% endblock content %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // Initialize Select2
+    $('.select2, .select2bs4').select2({
+        theme: 'bootstrap4',
+        width: '100%',
+        placeholder: 'Select an option',
+        allowClear: true,
+        minimumResultsForSearch: 5
+    });
+
+    // Get CSRF token for AJAX requests
+    function getCSRFToken() {
+        return document.querySelector('[name=csrfmiddlewaretoken]').value;
+    }
+
+    // Profile picture preview
+    function previewImage(input) {
+        const preview = $('#profilePreview');
+        const fileLabel = $('#fileLabel');
+        
+        if (input.files && input.files[0]) {
+            const file = input.files[0];
+            fileLabel.text(file.name);
+            
+            // File size validation
+            if (file.size > 5 * 1024 * 1024) {
+                showError('File Too Large', 'Please select an image smaller than 5MB');
+                input.value = '';
+                fileLabel.text('Choose new file');
+                return;
+            }
+            
+            // File type validation
+            if (!file.type.match('image.*')) {
+                showError('Invalid File', 'Please select an image file (JPG, PNG, GIF)');
+                input.value = '';
+                fileLabel.text('Choose new file');
+                return;
+            }
+            
+            // Create preview
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                // Update or create preview
+                if (preview.hasClass('profile-placeholder')) {
+                    preview.html(`<img src="${e.target.result}" class="profile-preview" alt="Profile Preview">`);
+                } else {
+                    preview.find('img').attr('src', e.target.result);
+                }
+            };
+            reader.readAsDataURL(file);
+        }
+    }
+
+    // File input change handler
+    $('#id_profile_pic').on('change', function() {
+        previewImage(this);
+    });
+
+    // Custom file input label update
+    $('.custom-file-input').on('change', function() {
+        const fileName = $(this).val().split('\\').pop();
+        $(this).next('.custom-file-label').text(fileName || 'Choose new file');
+    });
+
+    // Remove profile picture checkbox handler
+    $('#remove_profile_pic').on('change', function() {
+        if ($(this).is(':checked')) {
+            $('#id_profile_pic').prop('disabled', true);
+            $('.custom-file-label').text('Current photo will be removed');
+        } else {
+            $('#id_profile_pic').prop('disabled', false);
+            $('.custom-file-label').text('Choose new file');
+        }
+    });
+
+    // Cancel button
+    $('#cancelBtn').on('click', function() {
+        Swal.fire({
+            title: 'Discard Changes?',
+            text: 'Any unsaved changes will be lost.',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#667eea',
+            cancelButtonColor: '#dc3545',
+            confirmButtonText: 'Yes, discard',
+            cancelButtonText: 'No, stay here'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                window.location.href = "{% url 'admin_student_detail' student.id %}";
+            }
+        });
+    });
+
+    // Delete button
+    $('#deleteBtn').on('click', function() {
+        Swal.fire({
+            title: 'Delete Student?',
+            html: `<p>Are you sure you want to delete <strong>${"{{ student.get_full_name }}"}</strong>?</p>
+                  <p class="text-danger"><i class="fas fa-exclamation-triangle me-2"></i>This action cannot be undone!</p>`,
+            icon: 'error',
+            showCancelButton: true,
+            confirmButtonColor: '#dc3545',
+            cancelButtonColor: '#6c757d',
+            confirmButtonText: 'Yes, delete student',
+            cancelButtonText: 'Cancel',
+            focusCancel: true
+        }).then((result) => {
+            if (result.isConfirmed) {
+                deleteStudent();
+            }
+        });
+    });
+
+    // Delete student function
+    function deleteStudent() {
+        showLoading();
+        
+        $.ajax({
+            url: "{% url 'admin_student_delete' student.id %}",
+            type: 'POST',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRFToken': getCSRFToken()
+            },
+            success: function(response) {
+                hideLoading();
+                
+                if (response.success) {
+                    Swal.fire({
+                        title: 'Student Deleted!',
+                        text: response.message,
+                        icon: 'success',
+                        confirmButtonColor: '#667eea',
+                        confirmButtonText: 'Go to Students List'
+                    }).then(() => {
+                        window.location.href = "{% url 'admin_students_list' %}";
+                    });
+                } else {
+                    showError('Delete Failed', response.message || 'Failed to delete student.');
+                }
+            },
+            error: function(xhr) {
+                hideLoading();
+                showError('Delete Failed', 'An error occurred while deleting the student.');
+            }
+        });
+    }
+
+    // Main form submission function (AJAX)
+    function submitForm(actionType = 'save') {
+        // Set action type
+        $('#action_type').val(actionType);
+        
+        // Validate required fields
+        if (!validateForm()) {
+            return false;
+        }
+
+        showLoading();
+        
+        const form = document.getElementById('studentForm');
+        const formData = new FormData(form);
+
+        $.ajax({
+            url: "{% url 'admin_student_edit' student.id %}",
+            type: 'POST',
+            data: formData,
+            processData: false,
+            contentType: false,
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRFToken': getCSRFToken()
+            },
+            success: function(response) {
+                hideLoading();
+                
+                if (response.success) {
+                    showSuccess(response.message || 'Student updated successfully!');
+                    
+                    // Update profile preview if new image was uploaded
+                    if (response.profile_pic_url) {
+                        const preview = $('#profilePreview');
+                        if (preview.hasClass('profile-placeholder')) {
+                            preview.html(`<img src="${response.profile_pic_url}" class="profile-preview" alt="Profile Preview">`);
+                        } else {
+                            preview.find('img').attr('src', response.profile_pic_url);
+                        }
+                    }
+                    
+                    // Handle different action types
+                    setTimeout(function() {
+                        switch(actionType) {
+                            case 'save_and_view':
+                                window.location.href = "{% url 'admin_student_detail' student.id %}";
+                                break;
+                            case 'save_and_add_parent':
+                                window.location.href = "{% url 'admin_add_parent_to_student' student.id %}";
+                                break;
+                            case 'save_and_add_another':
+                                window.location.href = "{% url 'admin_students_add' %}";
+                                break;
+                            case 'save_and_return_to_list':
+                                window.location.href = "{% url 'admin_students_list' %}";
+                                break;
+                            case 'save_only':
+                                // Stay on page
+                                break;
+                            default:
+                                // Stay on page
+                                break;
+                        }
+                    }, 1000);
+                    
+                    // Scroll to top
+                    $('html, body').animate({ scrollTop: 0 }, 500);
+                    
+                    // Update breadcrumb and header with new name if changed
+                    if (response.student_name) {
+                        $('.breadcrumb-item:last').prev().find('a').html('<i class="fas fa-eye me-1"></i> ' + response.student_name);
+                        $('.card-header h4').html('<i class="fas fa-user-edit me-2"></i> Edit Student: ' + response.student_name);
+                    }
+                } else {
+                    showError('Update Failed', response.message || 'Please correct the errors below');
+                    displayFormErrors(response.errors || {});
+                }
+            },
+            error: function(xhr, status, error) {
+                hideLoading();
+                
+                let errorMessage = 'An error occurred while updating the student.';
+                if (xhr.responseJSON && xhr.responseJSON.message) {
+                    errorMessage = xhr.responseJSON.message;
+                } else if (xhr.status === 400) {
+                    errorMessage = 'Bad request. Please check your form data.';
+                } else if (xhr.status === 403) {
+                    errorMessage = 'You do not have permission to perform this action.';
+                } else if (xhr.status === 500) {
+                    errorMessage = 'Server error. Please try again later.';
+                }
+                
+                showError('Error', errorMessage);
+                
+                // Display form errors if available
+                if (xhr.responseJSON && xhr.responseJSON.errors) {
+                    displayFormErrors(xhr.responseJSON.errors);
+                }
+            }
+        });
+    }
+
+    // Enhanced form validation (including gender as required field)
+    function validateForm() {
+        let isValid = true;
+        $('.is-invalid').removeClass('is-invalid');
+        $('.invalid-feedback').remove();
+        
+        // Check required fields
+        const requiredFields = [
+            { id: 'id_first_name', message: 'First name is required' },
+            { id: 'id_last_name', message: 'Last name is required' },
+            { id: 'id_gender', message: 'Gender is required', type: 'select' },
+            { id: 'id_class_level', message: 'Class level is required', type: 'select' },
+            { id: 'id_stream_class', message: 'Stream/Class is required', type: 'select' }
+        ];
+        
+        requiredFields.forEach(field => {
+            let element;
+            if (field.type === 'select') {
+                element = $(`.select2-selection[aria-labelledby="select2-${field.id}-container"]`).parent();
+                const selectValue = $(`#${field.id}`).val();
+                if (!selectValue) {
+                    element.addClass('is-invalid');
+                    element.parent().find('.select2-container').addClass('required');
+                    element.after(`<div class="invalid-feedback d-block">${field.message}</div>`);
+                    isValid = false;
+                }
+            } else {
+                element = $(`#${field.id}`);
+                if (!element.val().trim()) {
+                    element.addClass('is-invalid');
+                    element.after(`<div class="invalid-feedback d-block">${field.message}</div>`);
+                    isValid = false;
+                }
+            }
+            
+            // Scroll to first error
+            if (!isValid) {
+                $('html, body').animate({
+                    scrollTop: element.offset().top - 100
+                }, 500);
+            }
+        });
+        
+        // Validate subjects (at least one required)
+        const selectedSubjects = $('#id_subjects').val();
+        if (!selectedSubjects || selectedSubjects.length === 0) {
+            const subjectsElement = $('.select2-selection[aria-labelledby="select2-id_subjects-container"]').parent();
+            subjectsElement.addClass('is-invalid');
+            subjectsElement.parent().find('.select2-container').addClass('required');
+            subjectsElement.after('<div class="invalid-feedback d-block">At least one subject must be selected</div>');
+            isValid = false;
+            
+            if (isValid) {
+                $('html, body').animate({
+                    scrollTop: subjectsElement.offset().top - 100
+                }, 500);
+            }
+        }
+        
+        // Validate date of birth
+        const dob = $('#id_date_of_birth').val();
+        if (dob) {
+            const dobDate = new Date(dob);
+            const today = new Date();
+            if (dobDate > today) {
+                $('#id_date_of_birth').addClass('is-invalid');
+                $('#id_date_of_birth').after('<div class="invalid-feedback d-block">Date of birth cannot be in the future</div>');
+                isValid = false;
+            }
+        }
+        
+        return isValid;
+    }
+
+    // Display form errors from server response
+    function displayFormErrors(errors) {
+        // Clear previous errors
+        $('.is-invalid').removeClass('is-invalid');
+        $('.invalid-feedback').remove();
+        $('.select2-container').removeClass('required');
+        
+        // Remove any existing non-field error alerts
+        $('#studentForm .alert-danger').remove();
+        
+        // Display new errors
+        for (const field in errors) {
+            if (field === '__all__' || field === 'non_field_errors') {
+                // Display non-field errors at the top
+                const errorHtml = `
+                    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                        <i class="fas fa-exclamation-triangle me-2"></i>${errors[field]}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                `;
+                $('#studentForm').prepend(errorHtml);
+            } else {
+                // Display field-specific errors
+                const element = $(`#id_${field}`);
+                if (element.length) {
+                    element.addClass('is-invalid');
+                    
+                    // Handle Select2 fields
+                    if (element.hasClass('select2')) {
+                        element.parent().find('.select2-container').addClass('required');
+                    }
+                    
+                    element.after(`<div class="invalid-feedback d-block">${errors[field]}</div>`);
+                } else {
+                    // Try to find element without id_ prefix
+                    const element2 = $(`#${field}`);
+                    if (element2.length) {
+                        element2.addClass('is-invalid');
+                        element2.after(`<div class="invalid-feedback d-block">${errors[field]}</div>`);
+                    }
+                }
+            }
+        }
+        
+        // Scroll to first error
+        const firstError = $('.is-invalid').first();
+        if (firstError.length) {
+            $('html, body').animate({
+                scrollTop: firstError.offset().top - 100
+            }, 500);
+        }
+    }
+
+    // Show success message
+    function showSuccess(message) {
+        $('#successText').text(message);
+        $('#successMessage').fadeIn().delay(3000).fadeOut();
+    }
+
+    // Show error message
+    function showError(title, message) {
+        $('#errorText').text(message);
+        $('#errorMessage').fadeIn().delay(5000).fadeOut();
+    }
+
+    // Show loading overlay
+    function showLoading() {
+        $('#loadingOverlay').fadeIn(300);
+    }
+
+    // Hide loading overlay
+    function hideLoading() {
+        $('#loadingOverlay').fadeOut(300);
+    }
+
+    // Auto-format examination numbers to uppercase
+    $('#id_examination_number, #id_previously_examination_number').on('input', function() {
+        $(this).val($(this).val().toUpperCase());
+    });
+
+    // Real-time validation for date of birth
+    $('#id_date_of_birth').on('change', function() {
+        const dob = $(this).val();
+        if (dob) {
+            const dobDate = new Date(dob);
+            const today = new Date();
+            const age = today.getFullYear() - dobDate.getFullYear();
+            
+            if (dobDate > today) {
+                $(this).addClass('is-invalid');
+                $(this).next('.invalid-feedback').remove();
+                $(this).after('<div class="invalid-feedback d-block">Date of birth cannot be in the future</div>');
+            } else if (age < 3) {
+                $(this).addClass('is-invalid');
+                $(this).next('.invalid-feedback').remove();
+                $(this).after('<div class="invalid-feedback d-block">Student must be at least 3 years old</div>');
+            } else if (age > 25) {
+                $(this).addClass('is-invalid');
+                $(this).next('.invalid-feedback').remove();
+                $(this).after('<div class="invalid-feedback d-block">Student age seems unrealistic (over 25)</div>');
+            } else {
+                $(this).removeClass('is-invalid');
+                $(this).next('.invalid-feedback').remove();
+            }
+        }
+    });
+
+    // Save button handlers
+    $('#saveOnlyBtn').on('click', function() {
+        submitForm('save_only');
+    });
+
+    $('#saveAndViewBtn').on('click', function() {
+        submitForm('save_and_view');
+    });
+
+    $('#saveAndParentBtn').on('click', function() {
+        submitForm('save_and_add_parent');
+    });
+
+    $('#saveAndNewBtn').on('click', function() {
+        submitForm('save_and_add_another');
+    });
+
+    $('#saveAndListBtn').on('click', function() {
+        submitForm('save_and_return_to_list');
+    });
+
+    // Special action buttons
+    $('#saveAndAddParentBtn').on('click', function() {
+        submitForm('save_and_add_parent');
+    });
+
+    $('#saveAndAddAnotherBtn').on('click', function() {
+        submitForm('save_and_add_another');
+    });
+
+    $('#saveAndReturnToListBtn').on('click', function() {
+        submitForm('save_and_return_to_list');
+    });
+
+    // Regular form submission (fallback)
+    $('#studentForm').on('submit', function(e) {
+        e.preventDefault();
+        submitForm('save_only');
+    });
+
+    // Initialize form based on existing values
+    function initializeForm() {
+        // Make registration number readonly
+        $('#id_registration_number').prop('readonly', true);
+        
+        // Initialize any existing form errors
+        if ($('.is-invalid').length > 0) {
+            const firstError = $('.is-invalid').first();
+            $('html, body').animate({
+                scrollTop: firstError.offset().top - 100
+            }, 500);
+        }
+        
+        // Initialize profile picture preview
+        const profilePicInput = $('#id_profile_pic')[0];
+        if (profilePicInput && profilePicInput.files.length > 0) {
+            previewImage(profilePicInput);
+        }
+        
+        // Load streams when class level changes
+        $('#id_class_level').on('change', function() {
+            const classId = $(this).val();
+            const streamSelect = $('#id_stream_class');
+            
+            if (classId) {
+                $.ajax({
+                    url: "{% url 'admin_get_streams_by_class' %}",
+                    type: 'GET',
+                    dataType: 'json',
+                    data: { class_id: classId },
+                    success: function(response) {
+                        streamSelect.empty().append('<option value="">Select Stream</option>');
+                        
+                        if (response.success && Array.isArray(response.streams)) {
+                            response.streams.forEach(function(stream) {
+                                streamSelect.append(
+                                    $('<option>', {
+                                        value: stream.id,
+                                        text: stream.text
+                                    })
+                                );
+                            });
+                        }
+                        
+                        // Re-select current value if it exists in new options
+                        const currentValue = streamSelect.data('current-value');
+                        if (currentValue) {
+                            streamSelect.val(currentValue).trigger('change');
+                        }
+                    }
+                });
+            }
+        });
+        
+        // Load subjects when class level changes
+        $('#id_class_level').on('change', function() {
+            const classId = $(this).val();
+            const subjectsSelect = $('#id_subjects');
+            
+            if (classId) {
+                // Store current selected values
+                const currentValues = subjectsSelect.val();
+                subjectsSelect.data('previous-values', currentValues);
+                
+                subjectsSelect.prop('disabled', true);
+                subjectsSelect.empty().append('<option value="">Loading subjects...</option>');
+                
+                // Load subjects by class
+                $.ajax({
+                    url: "{% url 'admin_get_subjects_by_class' %}",
+                    type: 'GET',
+                    dataType: 'json',
+                    data: { class_id: classId },
+                    success: function(response) {
+                        subjectsSelect.empty().append('<option value="">Select Subjects</option>');
+                        
+                        if (response.success && Array.isArray(response.subjects) && response.subjects.length > 0) {
+                            subjectsSelect.prop('disabled', false);
+                            
+                            response.subjects.forEach(function(subject) {
+                                subjectsSelect.append(
+                                    $('<option>', {
+                                        value: subject.id,
+                                        text: subject.name
+                                    })
+                                );
+                            });
+                            
+                            // If there's a previously selected value, set it
+                            const previousValues = subjectsSelect.data('previous-values');
+                            if (previousValues && Array.isArray(previousValues)) {
+                                subjectsSelect.val(previousValues).trigger('change');
+                                subjectsSelect.removeData('previous-values');
+                            }
+                        } else {
+                            subjectsSelect.append('<option value="">No subjects available for this class</option>');
+                        }
+                        
+                        subjectsSelect.trigger('change');
+                    },
+                    error: function() {
+                        subjectsSelect
+                            .empty()
+                            .append('<option value="">Error loading subjects</option>');
+                        showError('Subject Error', 'Unable to load subjects. Please refresh and try again.');
+                    }
+                });
+            }
+        });
+    }
+
+    // Call initialization
+    initializeForm();
+});
+</script>
+{% endblock extra_js %}

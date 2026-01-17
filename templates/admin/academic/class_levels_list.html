@@ -8,11 +8,14 @@
     </button>
 {% endblock breadcrumb %}
 
-{%block extra_css %}
+{% block extra_css %}
+<!-- Select2 CSS -->
+<link rel="stylesheet" href="{% static 'admin/plugins/select2/css/select2.min.css' %}">
+<link rel="stylesheet" href="{% static 'admin/plugins/select2-bootstrap4-theme/select2-bootstrap4.min.css' %}">
 <style>
     .table th {
         font-weight: 600;
-        border-top: none;
+        border-bottom-width: 2px;
     }
     .table td {
         vertical-align: middle;
@@ -24,18 +27,7 @@
     .modal-header {
         border-radius: 0;
     }
-    .btn-group .btn {
-        margin: 0 2px;
-    }
-    #table-container {
-        min-height: 300px;
-    }
-    .truncate-text {
-        display: -webkit-box;
-        -webkit-line-clamp: 2;
-        -webkit-box-orient: vertical;
-        overflow: hidden;
-    }
+    /* DataTable Styles */
     .dataTables_wrapper .dataTables_filter {
         float: right;
         text-align: right;
@@ -47,33 +39,103 @@
         float: right;
         margin-top: 10px;
     }
-    .success-toast {
+    .success-toast, .error-toast {
         position: fixed;
         top: 20px;
         right: 20px;
         z-index: 1056;
         min-width: 300px;
     }
+    .educational-level-badge {
+        background-color: #6c757d;
+        color: white;
+        padding: 3px 8px;
+        border-radius: 4px;
+        font-size: 0.8em;
+    }
+    /* Select2 in modal fix */
+    .select2-container {
+        z-index: 1056 !important;
+    }
+    .select2-dropdown {
+        z-index: 1057 !important;
+    }
+    /* Order badge */
+    .order-badge {
+        background-color: #6c757d;
+        color: white;
+        padding: 3px 8px;
+        border-radius: 4px;
+        font-size: 0.85em;
+        font-weight: bold;
+    }
+    /* Quick action buttons */
+    .quick-actions {
+        display: flex;
+        gap: 0;
+        justify-content: center;
+        align-items: center;
+    }
+    .quick-action-btn {
+        width: 36px;
+        height: 36px;
+        padding: 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        border: none;
+        transition: all 0.2s ease;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+    }
+    /* Standard button colors */
+    .btn-success.quick-action-btn { background-color: #28a745; }
+    .btn-primary.quick-action-btn { background-color: #007bff; }
+    .btn-danger.quick-action-btn  { background-color: #dc3545; }
+    .btn-warning.quick-action-btn { background-color: #ffc107; }
+    .btn-info.quick-action-btn    { background-color: #17a2b8; }
+    .btn-secondary.quick-action-btn { background-color: #6c757d; }
+    /* Icon colors */
+    .quick-action-btn i {
+        font-size: 0.75rem;
+        color: #ffffff !important;
+    }
+    .btn-warning.quick-action-btn i {
+        color: #212529 !important;
+    }
+    /* Hover effects */
+    .quick-action-btn:hover {
+        transform: scale(1.1);
+        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        filter: brightness(1.05);
+    }
+    /* Drag handle for reordering */
+    .drag-handle {
+        cursor: move;
+        color: #6c757d;
+        padding: 5px;
+    }
+    .drag-handle:hover {
+        color: #007bff;
+    }
 </style>
 {% endblock extra_css %}
 
 {% block content %}
 <section class="content">
-    <div class="container-fluid">  
-        <!-- Success Toast Message -->
-        <div id="success-toast" class="alert alert-success alert-dismissible fade show success-toast" style="display: none;" role="alert">
+    <div class="container-fluid"> 
+        <div id="success-toast" class="alert alert-success alert-dismissible fade success-toast" style="display: none;" role="alert">
             <strong><i class="fas fa-check-circle"></i> Success!</strong> 
             <span id="success-message"></span>
-            <button type="button" class="close" onclick="$('#success-toast').fadeOut()">
+            <button type="button" class="close" onclick="$('#success-toast').fadeOut()" data-dismiss="alert" aria-label="Close">
                 <span aria-hidden="true">&times;</span>
             </button>
         </div>
 
-        <!-- Error Toast Message -->
-        <div id="error-toast" class="alert alert-danger alert-dismissible fade show success-toast" style="display: none;" role="alert">
+        <div id="error-toast" class="alert alert-danger alert-dismissible fade error-toast" style="display: none;" role="alert">
             <strong><i class="fas fa-exclamation-circle"></i> Error!</strong> 
             <span id="error-message"></span>
-            <button type="button" class="close" onclick="$('#error-toast').fadeOut()">
+            <button type="button" class="close" onclick="$('#error-toast').fadeOut()" data-dismiss="alert" aria-label="Close">
                 <span aria-hidden="true">&times;</span>
             </button>
         </div>
@@ -85,57 +147,93 @@
                         <h6 class="header-title mb-0 text-uppercase">
                             <i class="fas fa-layer-group"></i> Class Levels Management
                         </h6>
-                        <span class="badge badge-light" id="total-count">Total: {{ class_levels|length }}</span>
+                        <div class="d-flex align-items-center">
+                            <span class="badge badge-success mr-2">
+                                <i class="fas fa-check-circle"></i> Active: <span id="active-count">{{ active_class_levels_count }}</span>
+                            </span>
+                            <span class="badge badge-light">
+                                Total: <span id="total-count">{{ class_levels|length }}</span>
+                            </span>
+                        </div>
                     </div>
                     <div class="card-body">
-                        <!-- Table Container -->
-                        <div class="table-responsive" id="table-container">
-                            <table class="table table-hover table-striped table-bordered" id="class-levels-table">
+                        <div class="table-responsive">
+                            <table class="table table-hover text-nowrap table-responsive-sm table-bordered table-striped table-sm display" id="class-levels-table">
                                 <thead class="bg-light">
                                     <tr>
+                                        <th class="text-center" style="width: 50px;">Order</th>
+                                        <th>Class Level</th>
                                         <th>Code</th>
-                                        <th>Name</th>
-                                        <th>Level</th>
-                                        <th>Description</th>
+                                        <th>Educational Level</th>
+                                        <th>Status</th>
                                         <th class="text-center">Actions</th>
                                     </tr>
                                 </thead>
-                                <tbody id="table-body">
+                                <tbody>
                                     {% for class_level in class_levels %}
                                     <tr id="row-{{ class_level.id }}">
-                                        <td><span class="badge badge-info">{{ class_level.code }}</span></td>
-                                        <td><strong>{{ class_level.name }}</strong></td>
-                                        <td><span class="badge badge-secondary">{{ class_level.educational_level.name }}</span></td>
+                                        <td class="text-center">
+                                            <span class="order-badge">{{ class_level.order }}</span>
+                                        </td>
                                         <td>
-                                            {% if class_level.description %}
-                                                <span class="truncate-text">{{ class_level.description }}</span>
+                                            <strong>{{ class_level.name }}</strong>
+                                        </td>
+                                        <td><code>{{ class_level.code }}</code></td>
+                                        <td>
+                                            <span class="educational-level-badge">{{ class_level.educational_level.name }}</span>
+                                        </td>
+                                        <td>
+                                            {% if class_level.is_active %}
+                                                <span class="badge badge-success" id="status-badge-{{ class_level.id }}">
+                                                    <i class="fas fa-check-circle"></i> Active
+                                                </span>
                                             {% else %}
-                                                <span class="text-muted">-</span>
+                                                <span class="badge badge-secondary" id="status-badge-{{ class_level.id }}">
+                                                    <i class="fas fa-times-circle"></i> Inactive
+                                                </span>
                                             {% endif %}
                                         </td>
                                         <td class="text-center">
-                                            <div class="btn-group" role="group">
-                                                <button class="btn btn-sm btn-primary edit-btn" 
+                                            <div class="quick-actions">
+                                                <!-- Quick Status Toggle -->
+                                                {% if class_level.is_active %}
+                                                <button class="btn btn-sm btn-warning quick-action-btn toggle-status-btn" 
                                                         data-id="{{ class_level.id }}"
-                                                        data-educational-level-id="{{ class_level.educational_level.id }}"
-                                                        data-code="{{ class_level.code }}"
                                                         data-name="{{ class_level.name }}"
-                                                        data-description="{{ class_level.description|default:'' }}">
-                                                    <i class="fas fa-edit"></i> Edit
+                                                        data-current-status="active"
+                                                        title="Deactivate Class Level">
+                                                    <i class="fas fa-toggle-off"></i>
                                                 </button>
-                                                <button class="btn btn-sm btn-danger delete-btn" 
+                                                {% else %}
+                                                <button class="btn btn-sm btn-success quick-action-btn toggle-status-btn" 
                                                         data-id="{{ class_level.id }}"
-                                                        data-name="{{ class_level.name }}">
-                                                    <i class="fas fa-trash"></i> Delete
+                                                        data-name="{{ class_level.name }}"
+                                                        data-current-status="inactive"
+                                                        title="Activate Class Level">
+                                                    <i class="fas fa-toggle-on"></i>
+                                                </button>
+                                                {% endif %}
+                                                
+                                                <!-- Edit Button -->
+                                                <button class="btn btn-sm btn-primary quick-action-btn edit-btn" 
+                                                        data-id="{{ class_level.id }}"
+                                                        data-educational-level="{{ class_level.educational_level.id }}"
+                                                        data-name="{{ class_level.name }}"
+                                                        data-code="{{ class_level.code }}"
+                                                        data-order="{{ class_level.order }}"
+                                                        data-is-active="{{ class_level.is_active|yesno:'true,false' }}"
+                                                        title="Edit Class Level">
+                                                    <i class="fas fa-edit"></i>
+                                                </button>
+                                                
+                                                <!-- Delete Button -->
+                                                <button class="btn btn-sm btn-danger quick-action-btn delete-btn" 
+                                                        data-id="{{ class_level.id }}"
+                                                        data-name="{{ class_level.name }}"
+                                                        title="Delete Class Level">
+                                                    <i class="fas fa-trash"></i>
                                                 </button>
                                             </div>
-                                        </td>
-                                    </tr>
-                                    {% empty %}
-                                    <tr id="no-data-row">
-                                        <td colspan="5" class="text-center text-muted py-4">
-                                            <i class="fas fa-inbox fa-2x mb-2"></i><br>
-                                            No class levels found. Click "Add Class Level" to create one.
                                         </td>
                                     </tr>
                                     {% endfor %}
@@ -164,26 +262,59 @@
             <form id="add-form">
                 {% csrf_token %}
                 <div class="modal-body">
-                    <div class="form-group">
-                        <label for="educational_level_id">Educational Level <span class="text-danger">*</span></label>
-                        <select class="form-control" id="educational_level_id" name="educational_level_id" required>
-                            <option value="">Select Level</option>
-                        </select>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="educational_level">Educational Level <span class="text-danger">*</span></label>
+                                <select class="form-control select2bs4" id="educational_level" name="educational_level" required style="width: 100%;">
+                                    <option value="">Select Educational Level</option>
+                                    {% for level in educational_levels %}
+                                        <option value="{{ level.id }}">{{ level.name }} ({{ level.code }})</option>
+                                    {% endfor %}
+                                </select>
+                                <small class="form-text text-muted">Select the educational level for this class</small>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="order">Order <span class="text-danger">*</span></label>
+                                <input type="number" class="form-control" id="order" name="order" required 
+                                       min="1" max="100" placeholder="e.g., 1, 2, 3">
+                                <small class="form-text text-muted">Position in the sequence (1 = first, 2 = second, etc.)</small>
+                            </div>
+                        </div>
                     </div>
-                    <div class="form-group">
-                        <label for="code">Code <span class="text-danger">*</span></label>
-                        <input type="text" class="form-control" id="code" name="code" required 
-                               placeholder="e.g., FORM1, STD3, FORM4">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="name">Class Name <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="name" name="name" required 
+                                       placeholder="e.g., Form 1, Std 3, KG1" maxlength="50">
+                                <small class="form-text text-muted">Full name of the class level (max 50 characters)</small>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="code">Class Code <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="code" name="code" required 
+                                       placeholder="e.g., F1, STD3, KG1" maxlength="20">
+                                <small class="form-text text-muted">Short code for the class (max 20 characters)</small>
+                            </div>
+                        </div>
                     </div>
-                    <div class="form-group">
-                        <label for="name">Name <span class="text-danger">*</span></label>
-                        <input type="text" class="form-control" id="name" name="name" required 
-                               placeholder="e.g., Form One, Standard Three">
-                    </div>
-                    <div class="form-group">
-                        <label for="description">Description</label>
-                        <textarea class="form-control" id="description" name="description" 
-                                  rows="3" placeholder="Optional description"></textarea>
+                    <div class="row">
+                        <div class="col-md-12">
+                            <div class="form-group">
+                                <label>Status</label>
+                                <div class="custom-control custom-switch mt-2">
+                                    <input type="checkbox" class="custom-control-input" id="is_active" name="is_active" checked>
+                                    <label class="custom-control-label" for="is_active">
+                                        <span id="active-label">Active</span>
+                                    </label>
+                                    <small class="form-text text-muted d-block">Toggle to activate/deactivate</small>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -214,23 +345,56 @@
                 {% csrf_token %}
                 <input type="hidden" id="edit-id" name="id">
                 <div class="modal-body">
-                    <div class="form-group">
-                        <label for="edit-educational_level_id">Educational Level <span class="text-danger">*</span></label>
-                        <select class="form-control" id="edit-educational_level_id" name="educational_level_id" required>
-                            <option value="">Select Level</option>
-                        </select>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="edit-educational_level">Educational Level <span class="text-danger">*</span></label>
+                                <select class="form-control select2bs4" id="edit-educational_level" name="educational_level" required style="width: 100%;">
+                                    <option value="">Select Educational Level</option>
+                                    {% for level in educational_levels %}
+                                        <option value="{{ level.id }}">{{ level.name }} ({{ level.code }})</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="edit-order">Order <span class="text-danger">*</span></label>
+                                <input type="number" class="form-control" id="edit-order" name="order" required 
+                                       min="1" max="100" placeholder="e.g., 1, 2, 3">
+                                <small class="form-text text-muted">Position in the sequence</small>
+                            </div>
+                        </div>
                     </div>
-                    <div class="form-group">
-                        <label for="edit-code">Code <span class="text-danger">*</span></label>
-                        <input type="text" class="form-control" id="edit-code" name="code" required>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="edit-name">Class Name <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="edit-name" name="name" required 
+                                       placeholder="e.g., Form 1, Std 3, KG1" maxlength="50">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="edit-code">Class Code <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="edit-code" name="code" required 
+                                       placeholder="e.g., F1, STD3, KG1" maxlength="20">
+                            </div>
+                        </div>
                     </div>
-                    <div class="form-group">
-                        <label for="edit-name">Name <span class="text-danger">*</span></label>
-                        <input type="text" class="form-control" id="edit-name" name="name" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="edit-description">Description</label>
-                        <textarea class="form-control" id="edit-description" name="description" rows="3"></textarea>
+                    <div class="row">
+                        <div class="col-md-12">
+                            <div class="form-group">
+                                <label>Status</label>
+                                <div class="custom-control custom-switch mt-2">
+                                    <input type="checkbox" class="custom-control-input" id="edit-is_active" name="is_active">
+                                    <label class="custom-control-label" for="edit-is_active">
+                                        <span id="edit-active-label">Inactive</span>
+                                    </label>
+                                    <small class="form-text text-muted d-block">Toggle to activate/deactivate</small>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -245,7 +409,7 @@
     </div>
 </div>
 
-<!-- Delete Confirmation Modal -->
+<!-- Delete Class Level Modal -->
 <div class="modal fade" id="deleteClassLevelModal" tabindex="-1" role="dialog" aria-labelledby="deleteModalLabel" aria-hidden="true">
     <div class="modal-dialog" role="document">
         <div class="modal-content">
@@ -258,8 +422,8 @@
                 </button>
             </div>
             <div class="modal-body">
-                <p>Are you sure you want to delete the class level <strong id="delete-class-level-name"></strong>?</p>
-                <p class="text-danger"><small>This action cannot be undone. All associated streams might be affected.</small></p>
+                <p>Are you sure you want to delete the class level <strong id="delete-classlevel-name"></strong>?</p>
+                <p class="text-danger"><small>This action cannot be undone. All associated data (streams, students, etc.) might be affected.</small></p>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-dismiss="modal" id="cancel-delete-btn">Cancel</button>
@@ -274,8 +438,73 @@
 {% endblock content %}
 
 {% block extra_js %}
+<!-- Select2 JS -->
+<script src="{% static 'admin/plugins/select2/js/select2.full.min.js' %}"></script>
 <script>
     $(document).ready(function() {
+        // Toggle switch label updates
+        function updateSwitchLabels() {
+            // Add form
+            $('#is_active').on('change', function() {
+                $('#active-label').text($(this).is(':checked') ? 'Active' : 'Inactive');
+            });
+            
+            // Edit form
+            $('#edit-is_active').on('change', function() {
+                $('#edit-active-label').text($(this).is(':checked') ? 'Active' : 'Inactive');
+            });
+        }
+        
+        // Initialize switch labels
+        updateSwitchLabels();
+
+        // Initialize Select2
+        function initializeSelect2() {
+            $('.select2bs4').select2({
+                theme: 'bootstrap4',
+                dropdownParent: $('.modal:visible'),
+                width: '100%',
+                placeholder: 'Select an option',
+                allowClear: false
+            });
+        }
+        
+        // Initialize on page load
+        initializeSelect2();
+
+        // Reinitialize when modals are shown
+        $('#addClassLevelModal').on('shown.bs.modal', function() {
+            $('#educational_level').select2({
+                theme: 'bootstrap4',
+                dropdownParent: $('#addClassLevelModal'),
+                width: '100%',
+                placeholder: 'Select Educational Level',
+                allowClear: false
+            });
+        });
+
+        $('#editClassLevelModal').on('shown.bs.modal', function() {
+            $('#edit-educational_level').select2({
+                theme: 'bootstrap4',
+                dropdownParent: $('#editClassLevelModal'),
+                width: '100%',
+                placeholder: 'Select Educational Level',
+                allowClear: false
+            });
+        });
+
+        // Destroy Select2 when modals are hidden
+        $('#addClassLevelModal').on('hidden.bs.modal', function() {
+            $('#educational_level').select2('destroy');
+            $('#add-form')[0].reset();
+            // Reset switch label
+            $('#active-label').text('Active');
+        });
+
+        $('#editClassLevelModal').on('hidden.bs.modal', function() {
+            $('#edit-educational_level').select2('destroy');
+        });
+
         // Initialize DataTable
         var table = $('#class-levels-table').DataTable({
             "dom": "<'row'<'col-sm-12 col-md-6'l><'col-sm-12 col-md-6'f>>" +
@@ -286,25 +515,28 @@
             "responsive": true,
             "autoWidth": false,
             "ordering": true,
-            "order": [[2, 'asc']],
-               "columnDefs": [
-                   {"targets": 4, "orderable": false, "searchable": false}
-               ],
-               "columns": [
-                   {"data": null},
-                   {"data": null},
-                   {"data": null},
-                   {"data": null},
-                   {"data": null}
-               ],
+            "order": [[0, 'asc']], // Sort by order column
+            
+            "destroy": true,
+            "retrieve": true,
+            "deferRender": true,
+            
+            "columnDefs": [
+                { 
+                    "targets": 5, // Actions column
+                    "orderable": false,
+                    "searchable": false
+                }
+            ],
+            
             "language": {
-                "emptyTable": "No class levels found. Click 'Add Class Level' to create one.",
+                "emptyTable": "<div class='text-center py-4'><i class='fas fa-inbox fa-2x mb-2'></i><br>No class levels found. Click \"Add Class Level\" to create one.</div>",
                 "search": "_INPUT_",
-                "searchPlaceholder": "Search...",
-                "lengthMenu": "_MENU_ records per page",
-                "info": "Showing _START_ to _END_ of _TOTAL_ entries",
-                "infoEmpty": "Showing 0 to 0 of 0 entries",
-                "infoFiltered": "(filtered from _MAX_ total entries)",
+                "searchPlaceholder": "Search class levels...",
+                "lengthMenu": "_MENU_ class levels per page",
+                "info": "Showing _START_ to _END_ of _TOTAL_ class levels",
+                "infoEmpty": "Showing 0 to 0 of 0 class levels",
+                "infoFiltered": "(filtered from _MAX_ total class levels)",
                 "paginate": {
                     "first": "First",
                     "last": "Last",
@@ -315,30 +547,42 @@
             "drawCallback": function(settings) {
                 var api = this.api();
                 var total = api.rows().count();
-                $('#total-count').text('Total: ' + total);
+                $('#total-count').text(total);
+                
+                // Count active class levels
+                var activeCount = 0;
+                api.rows().every(function() {
+                    var data = this.data();
+                    var statusText = $(data[4]).text().toLowerCase();
+                    if (statusText.includes('active')) {
+                        activeCount++;
+                    }
+                });
+                $('#active-count').text(activeCount);
             }
         });
 
+        // CSRF token for AJAX requests
         function getCSRFToken() {
-            return document.querySelector('[name=csrfmiddlewaretoken]').value;
+            return $('input[name="csrfmiddlewaretoken"]').val();
         }
 
+        // Show toast message
         function showToast(message, type = 'success') {
-            if (type === 'success') {
-                $('#success-message').text(message);
-                $('#success-toast').fadeIn();
-                setTimeout(function() {
-                    $('#success-toast').fadeOut();
-                }, 3000);
-            } else {
-                $('#error-message').text(message);
-                $('#error-toast').fadeIn();
-                setTimeout(function() {
-                    $('#error-toast').fadeOut();
-                }, 5000);
-            }
+            const toastId = type === 'success' ? '#success-toast' : '#error-toast';
+            const messageId = type === 'success' ? '#success-message' : '#error-message';
+            
+            $(messageId).text(message);
+            $(toastId).addClass('show').fadeIn();
+            
+            setTimeout(function() {
+                $(toastId).fadeOut(function() {
+                    $(this).removeClass('show');
+                });
+            }, type === 'success' ? 3000 : 5000);
         }
 
+        // Function to reload page after delay
         function reloadPageAfterDelay(message, type = 'success') {
             showToast(message, type);
             var delay = type === 'success' ? 2000 : 3000;
@@ -347,24 +591,78 @@
             }, delay);
         }
 
+        // Function to update UI without reload
+        function updateClassLevelUI(classLevelId, data) {
+            // Update status badge
+            const statusBadge = $('#status-badge-' + classLevelId);
+            const statusBtn = $('.toggle-status-btn[data-id="' + classLevelId + '"]');
+            
+            if (data.hasOwnProperty('is_active')) {
+                if (data.is_active) {
+                    statusBadge.removeClass('badge-secondary').addClass('badge-success')
+                        .html('<i class="fas fa-check-circle"></i> Active');
+                    statusBtn.removeClass('btn-success').addClass('btn-warning')
+                        .attr('title', 'Deactivate Class Level')
+                        .html('<i class="fas fa-toggle-off"></i>')
+                        .attr('data-current-status', 'active');
+                } else {
+                    statusBadge.removeClass('badge-success').addClass('badge-secondary')
+                        .html('<i class="fas fa-times-circle"></i> Inactive');
+                    statusBtn.removeClass('btn-warning').addClass('btn-success')
+                        .attr('title', 'Activate Class Level')
+                        .html('<i class="fas fa-toggle-on"></i>')
+                        .attr('data-current-status', 'inactive');
+                }
+                
+                // Update active count
+                var currentActive = parseInt($('#active-count').text());
+                if (data.is_active) {
+                    $('#active-count').text(currentActive + 1);
+                } else {
+                    $('#active-count').text(currentActive - 1);
+                }
+            }
+            
+            // Update order if changed
+            if (data.hasOwnProperty('order')) {
+                const orderBadge = $('#row-' + classLevelId + ' .order-badge');
+                orderBadge.text(data.order);
+            }
+        }
+
+        // Handle modal close/cancel buttons
         $(document).on('click', '[data-dismiss="modal"]', function(e) {
             e.preventDefault();
             $(this).closest('.modal').modal('hide');
         });
 
+        // Handle cancel buttons
         $('#cancel-add-btn, #cancel-edit-btn, #cancel-delete-btn').on('click', function(e) {
             e.preventDefault();
             $(this).closest('.modal').modal('hide');
         });
 
+        // Helper function to handle button loading state
+        function setButtonLoading(btn, isLoading) {
+            const spinner = btn.find('.spinner-border');
+            if (isLoading) {
+                btn.data('original-text', btn.html());
+                btn.prop('disabled', true);
+                spinner.show();
+                btn.html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>');
+            } else {
+                btn.prop('disabled', false);
+                spinner.hide();
+                btn.html(btn.data('original-text'));
+            }
+        }
+        
         // Add Class Level
         $('#add-form').on('submit', function(e) {
             e.preventDefault();
             
             const saveBtn = $('#save-btn');
-            const spinner = saveBtn.find('.spinner-border');
-            saveBtn.prop('disabled', true);
-            spinner.show();
+            setButtonLoading(saveBtn, true);
             
             const formData = new FormData(this);
             formData.append('action', 'create');
@@ -383,42 +681,56 @@
                     if (data.success) {
                         $('#addClassLevelModal').modal('hide');
                         reloadPageAfterDelay(data.message, 'success');
-                        $('#add-form')[0].reset();
                     } else {
                         showToast(data.message, 'danger');
-                        saveBtn.prop('disabled', false);
-                        spinner.hide();
+                        setButtonLoading(saveBtn, false);
                     }
                 },
                 error: function(xhr, status, error) {
                     console.error('Error:', error);
                     showToast('An error occurred while saving. Please try again.', 'danger');
-                    saveBtn.prop('disabled', false);
-                    spinner.hide();
+                    setButtonLoading(saveBtn, false);
                 }
             });
         });
 
-        // Edit Class Level
+        // Edit Class Level - Setup modal
         $(document).on('click', '.edit-btn', function() {
             const btn = $(this);
             
             $('#edit-id').val(btn.data('id'));
-            $('#edit-educational_level_id').val(btn.data('educational-level-id'));
-            $('#edit-code').val(btn.data('code'));
-            $('#edit-name').val(btn.data('name'));
-            $('#edit-description').val(btn.data('description'));
             
+            // Store values
+            const educationalLevelId = btn.data('educational-level');
+            const name = btn.data('name');
+            const code = btn.data('code');
+            const order = btn.data('order');
+            const isActive = btn.data('is-active') === 'true';
+            
+            // Show modal first
             $('#editClassLevelModal').modal('show');
+            
+            // Set values after modal is shown
+            setTimeout(function() {
+                $('#edit-educational_level').val(educationalLevelId).trigger('change');
+                $('#edit-name').val(name);
+                $('#edit-code').val(code);
+                $('#edit-order').val(order);
+                
+                // Set checkbox state
+                $('#edit-is_active').prop('checked', isActive);
+                
+                // Update label
+                $('#edit-active-label').text(isActive ? 'Active' : 'Inactive');
+            }, 500);
         });
 
+        // Edit Class Level - Submit form
         $('#edit-form').on('submit', function(e) {
             e.preventDefault();
             
             const updateBtn = $('#update-btn');
-            const spinner = updateBtn.find('.spinner-border');
-            updateBtn.prop('disabled', true);
-            spinner.show();
+            setButtonLoading(updateBtn, true);
             
             const formData = new FormData(this);
             formData.append('action', 'update');
@@ -439,20 +751,60 @@
                         reloadPageAfterDelay(data.message, 'success');
                     } else {
                         showToast(data.message, 'danger');
-                        updateBtn.prop('disabled', false);
-                        spinner.hide();
+                        setButtonLoading(updateBtn, false);
                     }
                 },
                 error: function(xhr, status, error) {
                     console.error('Error:', error);
                     showToast('An error occurred while updating. Please try again.', 'danger');
-                    updateBtn.prop('disabled', false);
-                    spinner.hide();
+                    setButtonLoading(updateBtn, false);
                 }
             });
         });
 
-        // Delete Class Level
+        // Toggle Class Level Status (Activate/Deactivate)
+        $(document).on('click', '.toggle-status-btn', function() {
+            const btn = $(this);
+            const classLevelId = btn.data('id');
+            const className = btn.data('name');
+            const currentStatus = btn.data('current-status');
+            const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
+            const actionText = currentStatus === 'active' ? 'deactivate' : 'activate';
+            
+            if (confirm(`Are you sure you want to ${actionText} "${className}"?`)) {
+                setButtonLoading(btn, true);
+                
+                $.ajax({
+                    url: '{% url "admin_class_levels_crud" %}',
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': getCSRFToken(),
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    data: {
+                        'action': 'toggle_status',
+                        'id': classLevelId,
+                        'csrfmiddlewaretoken': getCSRFToken()
+                    },
+                    success: function(data) {
+                        if (data.success) {
+                            updateClassLevelUI(classLevelId, { is_active: data.is_active });
+                            showToast(data.message, 'success');
+                        } else {
+                            showToast(data.message, 'danger');
+                        }
+                        setButtonLoading(btn, false);
+                    },
+                    error: function(xhr, status, error) {
+                        console.error('Error:', error);
+                        showToast('An error occurred while updating status. Please try again.', 'danger');
+                        setButtonLoading(btn, false);
+                    }
+                });
+            }
+        });
+
+        // Delete Class Level - Setup modal
         let classLevelToDelete = null;
         
         $(document).on('click', '.delete-btn', function() {
@@ -463,22 +815,16 @@
                 name: btn.data('name')
             };
             
-            $('#delete-class-level-name').text(btn.data('name'));
+            $('#delete-classlevel-name').text(btn.data('name'));
             $('#deleteClassLevelModal').modal('show');
         });
 
+        // Delete Class Level - Confirm
         $('#confirm-delete-btn').on('click', function() {
             if (!classLevelToDelete) return;
             
             const deleteBtn = $(this);
-            const spinner = deleteBtn.find('.spinner-border');
-            deleteBtn.prop('disabled', true);
-            spinner.show();
-            
-            const formData = new FormData();
-            formData.append('action', 'delete');
-            formData.append('id', classLevelToDelete.id);
-            formData.append('csrfmiddlewaretoken', getCSRFToken());
+            setButtonLoading(deleteBtn, true);
             
             $.ajax({
                 url: '{% url "admin_class_levels_crud" %}',
@@ -487,34 +833,103 @@
                     'X-CSRFToken': getCSRFToken(),
                     'X-Requested-With': 'XMLHttpRequest'
                 },
-                data: formData,
-                processData: false,
-                contentType: false,
+                data: {
+                    'action': 'delete',
+                    'id': classLevelToDelete.id,
+                    'csrfmiddlewaretoken': getCSRFToken()
+                },
                 success: function(data) {
                     if (data.success) {
                         $('#deleteClassLevelModal').modal('hide');
                         reloadPageAfterDelay(data.message, 'success');
                     } else {
                         showToast(data.message, 'danger');
-                        deleteBtn.prop('disabled', false);
-                        spinner.hide();
+                        setButtonLoading(deleteBtn, false);
                     }
                 },
                 error: function(xhr, status, error) {
                     console.error('Error:', error);
                     showToast('An error occurred while deleting. Please try again.', 'danger');
-                    deleteBtn.prop('disabled', false);
-                    spinner.hide();
+                    setButtonLoading(deleteBtn, false);
                 }
             });
         });
 
+        // Clear form and reset button state on modal close
         $('#addClassLevelModal').on('hidden.bs.modal', function() {
             $('#add-form')[0].reset();
+            setButtonLoading($('#save-btn'), false);
+        });
+        
+        $('#editClassLevelModal').on('hidden.bs.modal', function() {
+            setButtonLoading($('#update-btn'), false);
         });
         
         $('#deleteClassLevelModal').on('hidden.bs.modal', function() {
             classLevelToDelete = null;
+            setButtonLoading($('#confirm-delete-btn'), false);
+        });
+
+        // Manual refresh button
+        $('.btn-outline-secondary').on('click', function() {
+            if ($(this).find('.fa-sync-alt').length) {
+                location.reload();
+            }
+        });
+
+        // Form validation
+        $('#add-form, #edit-form').on('submit', function(e) {
+            const isAddForm = $(this).attr('id') === 'add-form';
+            const nameInput = isAddForm ? '#name' : '#edit-name';
+            const codeInput = isAddForm ? '#code' : '#edit-code';
+            const orderInput = isAddForm ? '#order' : '#edit-order';
+            
+            const name = $(nameInput).val().trim();
+            const code = $(codeInput).val().trim();
+            const order = parseInt($(orderInput).val());
+            
+            // Validate name length
+            if (name.length < 1) {
+                e.preventDefault();
+                showToast('Class name is required.', 'danger');
+                $(nameInput).addClass('is-invalid');
+                return false;
+            }
+            
+            if (name.length > 50) {
+                e.preventDefault();
+                showToast('Class name cannot exceed 50 characters.', 'danger');
+                $(nameInput).addClass('is-invalid');
+                return false;
+            }
+            
+            // Validate code format
+            if (!/^[A-Za-z0-9]+$/.test(code)) {
+                e.preventDefault();
+                showToast('Class code can only contain letters and numbers.', 'danger');
+                $(codeInput).addClass('is-invalid');
+                return false;
+            }
+            
+            // Validate order
+            if (isNaN(order) || order < 1 || order > 100) {
+                e.preventDefault();
+                showToast('Order must be a number between 1 and 100.', 'danger');
+                $(orderInput).addClass('is-invalid');
+                return false;
+            }
+            
+            return true;
+        });
+
+        // Remove validation classes on input
+        $('#name, #edit-name, #code, #edit-code, #order, #edit-order').on('input', function() {
+            $(this).removeClass('is-invalid');
+        });
+
+        // Auto-format code to uppercase
+        $('#code, #edit-code').on('input', function() {
+            $(this).val($(this).val().toUpperCase());
         });
     });
 </script>
