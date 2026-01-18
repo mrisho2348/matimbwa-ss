@@ -1,86 +1,1025 @@
 {% extends 'admin/base.html' %}
 {% load static %}
 
-{% block title %}Students by Class{% endblock %}
+{% block title %}Students by Class - School Management System{% endblock %}
+
+{% block extra_css %}
+<style>
+    :root {
+        --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        --success-gradient: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+        --warning-gradient: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+        --info-gradient: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+        --danger-gradient: linear-gradient(135deg, #f56565 0%, #e53e3e 100%);
+    }
+    
+    .dashboard-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 20px;
+        padding: 30px;
+        color: white;
+        margin-bottom: 30px;
+        box-shadow: 0 15px 35px rgba(102, 126, 234, 0.3);
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .dashboard-header::before {
+        content: '';
+        position: absolute;
+        top: -50%;
+        right: -50%;
+        width: 100%;
+        height: 200%;
+        background: radial-gradient(circle, rgba(255,255,255,0.1) 1px, transparent 1px);
+        background-size: 30px 30px;
+        opacity: 0.3;
+        z-index: 0;
+    }
+    
+    .dashboard-header-content {
+        position: relative;
+        z-index: 1;
+    }
+    
+    .class-stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+        gap: 20px;
+        margin-bottom: 30px;
+    }
+    
+    .stat-card {
+        background: white;
+        border-radius: 16px;
+        padding: 25px;
+        box-shadow: 0 8px 25px rgba(0,0,0,0.08);
+        border: 1px solid rgba(0,0,0,0.05);
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+        cursor: pointer;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .stat-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 15px 35px rgba(0,0,0,0.12);
+    }
+    
+    .stat-card.selected {
+        border: 3px solid #667eea;
+        box-shadow: 0 10px 30px rgba(102, 126, 234, 0.2);
+    }
+    
+    .stat-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 5px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+    
+    .stat-icon {
+        width: 60px;
+        height: 60px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 15px;
+        font-size: 1.5rem;
+        color: white;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+    
+    .stat-number {
+        font-size: 2.5rem;
+        font-weight: 700;
+        margin-bottom: 5px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+    }
+    
+    .stat-label {
+        color: #718096;
+        font-size: 0.95rem;
+        font-weight: 600;
+        margin-bottom: 8px;
+    }
+    
+    .stat-subtext {
+        color: #a0aec0;
+        font-size: 0.85rem;
+    }
+    
+    .filter-card {
+        background: white;
+        border-radius: 16px;
+        padding: 25px;
+        margin-bottom: 30px;
+        box-shadow: 0 8px 25px rgba(0,0,0,0.08);
+        border: 1px solid rgba(0,0,0,0.05);
+    }
+    
+    .filter-group {
+        margin-bottom: 1.5rem;
+    }
+    
+    .filter-label {
+        font-weight: 600;
+        color: #4a5568;
+        margin-bottom: 8px;
+        font-size: 0.95rem;
+        display: flex;
+        align-items: center;
+    }
+    
+    .filter-label i {
+        margin-right: 8px;
+        color: #667eea;
+        font-size: 0.9rem;
+    }
+    
+    .filter-control {
+        width: 100%;
+        border: 2px solid #e2e8f0;
+        border-radius: 10px;
+        padding: 12px 15px;
+        font-size: 0.95rem;
+        transition: all 0.3s ease;
+        background: #f8fafc;
+    }
+    
+    .filter-control:focus {
+        border-color: #667eea;
+        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        background: white;
+        outline: none;
+    }
+    
+    .students-table-container {
+        background: white;
+        border-radius: 16px;
+        overflow: hidden;
+        box-shadow: 0 8px 25px rgba(0,0,0,0.08);
+        margin-bottom: 30px;
+    }
+    
+    .table-header {
+        background: linear-gradient(135deg, #f6f8ff 0%, #f9f5ff 100%);
+        padding: 20px 25px;
+        border-bottom: 2px solid #e8eaf6;
+    }
+    
+    .table-responsive {
+        overflow-x: auto;
+    }
+    
+    .data-table {
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 0;
+    }
+    
+    .data-table thead th {
+        background: #f8fafc;
+        color: #4a5568;
+        font-weight: 600;
+        font-size: 0.9rem;
+        padding: 15px 20px;
+        border-bottom: 2px solid #e2e8f0;
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        white-space: nowrap;
+    }
+    
+    .data-table tbody tr {
+        transition: all 0.3s ease;
+        border-bottom: 1px solid #f1f3f9;
+    }
+    
+    .data-table tbody tr:hover {
+        background: linear-gradient(135deg, #f6f8ff 0%, #f9f5ff 100%);
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.1);
+    }
+    
+    .data-table td {
+        padding: 15px 20px;
+        color: #4a5568;
+        font-size: 0.95rem;
+        vertical-align: middle;
+        border-bottom: 1px solid #f1f3f9;
+    }
+    
+    .student-avatar {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        object-fit: cover;
+        border: 3px solid white;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }
+    
+    .student-avatar-placeholder {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-weight: 600;
+        border: 3px solid white;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }
+    
+    .badge-status {
+        padding: 6px 12px;
+        border-radius: 20px;
+        font-size: 0.85rem;
+        font-weight: 600;
+        display: inline-flex;
+        align-items: center;
+    }
+    
+    .badge-status i {
+        margin-right: 5px;
+    }
+    
+    .badge-active {
+        background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+        color: white;
+    }
+    
+    .badge-suspended {
+        background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+        color: white;
+    }
+    
+    .badge-withdrawn {
+        background: linear-gradient(135deg, #f56565 0%, #e53e3e 100%);
+        color: white;
+    }
+    
+    .badge-completed {
+        background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+        color: white;
+    }
+    
+    .badge-inactive {
+        background: linear-gradient(135deg, #a0aec0 0%, #718096 100%);
+        color: white;
+    }
+    
+    .action-buttons {
+        display: flex;
+        gap: 8px;
+    }
+    
+    .action-btn {
+        width: 36px;
+        height: 36px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 0.9rem;
+        transition: all 0.3s ease;
+        border: none;
+        text-decoration: none;
+    }
+    
+    .action-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        text-decoration: none;
+    }
+    
+    .btn-view {
+        background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+    }
+    
+    .btn-edit {
+        background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+    }
+    
+    .btn-parents {
+        background: linear-gradient(135deg, #9f7aea 0%, #805ad5 100%);
+    }
+    
+    .btn-report {
+        background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+    }
+    
+    .empty-state {
+        text-align: center;
+        padding: 60px 20px;
+        color: #a0aec0;
+    }
+    
+    .empty-state-icon {
+        font-size: 4rem;
+        margin-bottom: 20px;
+        opacity: 0.5;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+    }
+    
+    .pagination-container {
+        background: white;
+        border-radius: 16px;
+        padding: 20px 25px;
+        margin-top: 20px;
+        box-shadow: 0 8px 25px rgba(0,0,0,0.08);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    
+    .pagination-info {
+        color: #718096;
+        font-size: 0.95rem;
+    }
+    
+    .pagination {
+        margin: 0;
+    }
+    
+    .page-link {
+        border: none;
+        color: #667eea;
+        padding: 8px 16px;
+        margin: 0 4px;
+        border-radius: 10px;
+        transition: all 0.3s ease;
+    }
+    
+    .page-link:hover {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        transform: translateY(-2px);
+    }
+    
+    .page-item.active .page-link {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+    }
+    
+    .export-buttons {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+    
+    .btn-export {
+        padding: 10px 20px;
+        border-radius: 10px;
+        font-weight: 600;
+        font-size: 0.9rem;
+        display: inline-flex;
+        align-items: center;
+        transition: all 0.3s ease;
+        text-decoration: none;
+        border: none;
+        cursor: pointer;
+    }
+    
+    .btn-export i {
+        margin-right: 8px;
+    }
+    
+    .btn-export-pdf {
+        background: linear-gradient(135deg, #f56565 0%, #e53e3e 100%);
+        color: white;
+    }
+    
+    .btn-export-excel {
+        background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+        color: white;
+    }
+    
+    .btn-export-csv {
+        background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+        color: white;
+    }
+    
+    .btn-print {
+        background: linear-gradient(135deg, #a0aec0 0%, #718096 100%);
+        color: white;
+    }
+    
+    .loading-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(255,255,255,0.9);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+        display: none;
+    }
+    
+    .spinner {
+        width: 70px;
+        height: 70px;
+        border: 5px solid #f3f3f3;
+        border-top: 5px solid #667eea;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin-bottom: 20px;
+    }
+    
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+    
+    .quick-stats {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 15px;
+        margin-bottom: 25px;
+    }
+    
+    .quick-stat {
+        flex: 1;
+        min-width: 150px;
+        background: white;
+        border-radius: 12px;
+        padding: 15px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+        border: 1px solid #e2e8f0;
+        text-align: center;
+    }
+    
+    .quick-stat-number {
+        font-size: 1.8rem;
+        font-weight: 700;
+        color: #667eea;
+        margin-bottom: 5px;
+    }
+    
+    .quick-stat-label {
+        font-size: 0.85rem;
+        color: #718096;
+        font-weight: 600;
+    }
+    
+    @media (max-width: 768px) {
+        .class-stats-grid {
+            grid-template-columns: 1fr;
+        }
+        
+        .action-buttons {
+            flex-wrap: wrap;
+        }
+        
+        .export-buttons {
+            justify-content: center;
+        }
+        
+        .pagination-container {
+            flex-direction: column;
+            gap: 15px;
+            text-align: center;
+        }
+        
+        .quick-stats {
+            flex-direction: column;
+        }
+    }
+    
+    /* Search highlight */
+    .highlight {
+        background-color: #fff3cd;
+        padding: 2px 4px;
+        border-radius: 4px;
+        font-weight: 600;
+    }
+    
+    /* Status filter chips */
+    .filter-chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-top: 10px;
+    }
+    
+    .filter-chip {
+        padding: 6px 12px;
+        border-radius: 20px;
+        font-size: 0.85rem;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        border: 2px solid #e2e8f0;
+        background: white;
+        color: #718096;
+    }
+    
+    .filter-chip:hover {
+        border-color: #667eea;
+        color: #667eea;
+    }
+    
+    .filter-chip.active {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-color: #667eea;
+    }
+    
+    /* Bulk actions */
+    .bulk-actions {
+        background: #f8fafc;
+        padding: 15px 20px;
+        border-bottom: 1px solid #e2e8f0;
+        display: none;
+    }
+    
+    .select-all-checkbox {
+        margin-right: 10px;
+    }
+    
+    /* Select2 customization */
+    .select2-container--bootstrap4 .select2-selection {
+        border: 2px solid #e2e8f0 !important;
+        border-radius: 10px !important;
+        padding: 10px 15px !important;
+        height: auto !important;
+        min-height: 44px !important;
+        background: #f8fafc !important;
+    }
+    
+    .select2-container--bootstrap4 .select2-selection--single .select2-selection__rendered {
+        color: #4a5568 !important;
+        line-height: 44px !important;
+    }
+</style>
+{% endblock extra_css %}
 
 {% block content %}
-<div class="container-xxl flex-grow-1 container-p-y">
-    <div class="row">
-        <div class="col-md-12">
-            <div class="card">
-                <div class="card-header">
-                    <h5 class="card-title mb-0">Students by Class</h5>
+<section class="content">
+    <div class="container-fluid">
+        <!-- Loading Overlay -->
+        <div class="loading-overlay" id="loadingOverlay">
+            <div class="spinner"></div>
+            <p class="text-primary fw-bold mt-3">Loading students data...</p>
+        </div>
+        
+        <!-- Dashboard Header -->
+        <div class="dashboard-header">
+            <div class="dashboard-header-content">
+                <div class="row align-items-center">
+                    <div class="col-lg-8">
+                        <h1 class="display-6 fw-bold mb-3">
+                            <i class="fas fa-users me-3"></i>Students by Class
+                        </h1>
+                        <p class="mb-0 opacity-90">
+                            Browse and manage students organized by class levels and streams
+                        </p>
+                    </div>
+                    <div class="col-lg-4 text-lg-end">
+                        <div class="export-buttons">
+                            {% if selected_class_obj and students %}
+                            <button class="btn-export btn-export-pdf" onclick="exportToPDF()">
+                                <i class="fas fa-file-pdf"></i> PDF
+                            </button>
+                            <button class="btn-export btn-export-excel" onclick="exportToExcel()">
+                                <i class="fas fa-file-excel"></i> Excel
+                            </button>
+                            <button class="btn-export btn-export-csv" onclick="exportToCSV()">
+                                <i class="fas fa-file-csv"></i> CSV
+                            </button>
+                            <button class="btn-export btn-print" onclick="printTable()">
+                                <i class="fas fa-print"></i> Print
+                            </button>
+                            {% endif %}
+                        </div>
+                    </div>
                 </div>
-
-                <div class="card-body">
-                    <!-- Class Selection -->
-                    <form method="get" class="mb-4">
-                        <div class="row g-3">
-                            <div class="col-md-6">
-                                <label class="form-label">Select Class Level</label>
-                                <select name="class_level" class="form-control" onchange="this.form.submit();">
-                                    <option value="">-- Choose a Class --</option>
-                                    {% for class_level in class_levels %}
-                                    <option value="{{ class_level.id }}" 
-                                            {% if selected_class == class_level.id|stringformat:"s" %}selected{% endif %}>
-                                        {{ class_level.name }} ({{ class_level.student_count }} students)
-                                    </option>
-                                    {% endfor %}
-                                </select>
+            </div>
+        </div>
+        
+        <!-- Quick Statistics -->
+        <div class="quick-stats">
+            <div class="quick-stat">
+                <div class="quick-stat-number">{{ total_students }}</div>
+                <div class="quick-stat-label">Total Students</div>
+            </div>
+            <div class="quick-stat">
+                <div class="quick-stat-number">{{ active_students }}</div>
+                <div class="quick-stat-label">Active Students</div>
+            </div>
+            <div class="quick-stat">
+                <div class="quick-stat-number">{{ male_students }}</div>
+                <div class="quick-stat-label">Male Students</div>
+            </div>
+            <div class="quick-stat">
+                <div class="quick-stat-number">{{ female_students }}</div>
+                <div class="quick-stat-label">Female Students</div>
+            </div>
+            <div class="quick-stat">
+                <div class="quick-stat-number">{{ classes_with_students }}</div>
+                <div class="quick-stat-label">Active Classes</div>
+            </div>
+        </div>
+        
+        <!-- Class Statistics Grid -->
+        <div class="class-stats-grid">
+            {% for class_level in class_levels %}
+            <div class="stat-card {% if selected_class == class_level.id|stringformat:'s' %}selected{% endif %}" 
+                 onclick="selectClass({{ class_level.id }})"
+                 data-class-id="{{ class_level.id }}"
+                 data-student-count="{{ class_level.student_count }}">
+                <div class="stat-icon">
+                    <i class="fas fa-graduation-cap"></i>
+                </div>
+                <div class="stat-number">{{ class_level.student_count }}</div>
+                <div class="stat-label">{{ class_level.name }}</div>
+                <div class="stat-subtext">
+                    <i class="fas fa-stream me-1"></i>
+                    {{ class_level.stream_count }} streams
+                    {% if class_level.male_count and class_level.female_count %}
+                    • <i class="fas fa-male me-1"></i>{{ class_level.male_count }} 
+                    <i class="fas fa-female ms-2 me-1"></i>{{ class_level.female_count }}
+                    {% endif %}
+                </div>
+            </div>
+            {% empty %}
+            <div class="col-12">
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i>
+                    No active class levels found.
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        
+        <!-- Main Content Area -->
+        <div class="row">
+            <!-- Filters Panel -->
+            <div class="col-lg-3">
+                <div class="filter-card">
+                    <h5 class="mb-4">
+                        <i class="fas fa-filter me-2"></i>Filters & Search
+                    </h5>
+                    
+                    <form id="filterForm" method="get">
+                        <!-- Class Level Filter -->
+                        <div class="filter-group">
+                            <label class="filter-label">
+                                <i class="fas fa-layer-group"></i> Class Level
+                            </label>
+                            <select name="class_level" class="filter-control" onchange="submitForm()">
+                                <option value="">All Classes</option>
+                                {% for class_level in class_levels %}
+                                <option value="{{ class_level.id }}" 
+                                        {% if selected_class == class_level.id|stringformat:"s" %}selected{% endif %}>
+                                    {{ class_level.name }} ({{ class_level.student_count }})
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <!-- Stream Filter -->
+                        {% if streams %}
+                        <div class="filter-group">
+                            <label class="filter-label">
+                                <i class="fas fa-stream"></i> Stream
+                            </label>
+                            <select name="stream" class="filter-control" onchange="submitForm()">
+                                <option value="">All Streams</option>
+                                {% for stream in streams %}
+                                <option value="{{ stream.id }}" 
+                                        {% if selected_stream == stream.id|stringformat:"s" %}selected{% endif %}>
+                                    {{ stream.name }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        {% endif %}
+                        
+                        <!-- Status Filter -->
+                        <div class="filter-group">
+                            <label class="filter-label">
+                                <i class="fas fa-tag"></i> Status
+                            </label>
+                            <div class="filter-chips">
+                                {% for status_code, status_name in status_choices %}
+                                <div class="filter-chip {% if selected_status == status_code %}active{% endif %}"
+                                     onclick="toggleStatusFilter('{{ status_code }}')">
+                                    {{ status_name }}
+                                </div>
+                                {% endfor %}
+                            </div>
+                            <input type="hidden" name="status" id="statusFilter" value="{{ selected_status }}">
+                        </div>
+                        
+                        <!-- Gender Filter -->
+                        <div class="filter-group">
+                            <label class="filter-label">
+                                <i class="fas fa-venus-mars"></i> Gender
+                            </label>
+                            <div class="filter-chips">
+                                {% for gender_code, gender_name in gender_choices %}
+                                <div class="filter-chip {% if selected_gender == gender_code %}active{% endif %}"
+                                     onclick="toggleGenderFilter('{{ gender_code }}')">
+                                    {{ gender_name }}
+                                </div>
+                                {% endfor %}
+                            </div>
+                            <input type="hidden" name="gender" id="genderFilter" value="{{ selected_gender }}">
+                        </div>
+                        
+                        <!-- Search Filter -->
+                        <div class="filter-group">
+                            <label class="filter-label">
+                                <i class="fas fa-search"></i> Search Students
+                            </label>
+                            <div class="input-group">
+                                <input type="text" name="search" class="filter-control" 
+                                       placeholder="Search by name, registration..." 
+                                       value="{{ search_query }}">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-search"></i>
+                                </button>
                             </div>
                         </div>
+                        
+                        <!-- Date Range Filter -->
+                        <div class="filter-group">
+                            <label class="filter-label">
+                                <i class="fas fa-calendar-alt"></i> Admission Date
+                            </label>
+                            <div class="row g-2">
+                                <div class="col-6">
+                                    <input type="date" name="date_from" class="filter-control" 
+                                           value="{{ date_from }}">
+                                </div>
+                                <div class="col-6">
+                                    <input type="date" name="date_to" class="filter-control" 
+                                           value="{{ date_to }}">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Action Buttons -->
+                        <div class="filter-group">
+                            <button type="submit" class="btn btn-primary w-100 mb-2">
+                                <i class="fas fa-filter me-2"></i> Apply Filters
+                            </button>
+                            <button type="button" onclick="resetFilters()" class="btn btn-outline-secondary w-100">
+                                <i class="fas fa-redo me-2"></i> Reset Filters
+                            </button>
+                        </div>
                     </form>
-
-                    <!-- Students Table -->
-                    {% if students %}
+                </div>
+                
+                <!-- Selected Class Info -->
+                {% if selected_class_obj %}
+                <div class="filter-card">
+                    <h6 class="mb-3">
+                        <i class="fas fa-info-circle me-2"></i> Class Information
+                    </h6>
+                    <div class="mb-2">
+                        <strong>Class:</strong> {{ selected_class_obj.name }}
+                    </div>
+                    <div class="mb-2">
+                        <strong>Educational Level:</strong> {{ selected_class_obj.educational_level.name }}
+                    </div>
+                    <div class="mb-2">
+                        <strong>Total Students:</strong> {{ students.paginator.count }}
+                    </div>
+                    {% if stream_info %}
+                    <div class="mb-2">
+                        <strong>Selected Stream:</strong> {{ stream_info.name }}
+                    </div>
+                    {% endif %}
+                    <div class="mt-3">
+                        <a href="{% url 'admin_students_add' %}?class_level={{ selected_class_obj.id }}" 
+                           class="btn btn-success w-100">
+                            <i class="fas fa-user-plus me-2"></i> Add Student to This Class
+                        </a>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+            
+            <!-- Students Table -->
+            <div class="col-lg-9">
+                <!-- Bulk Actions -->
+                <div class="bulk-actions" id="bulkActions">
+                    <div class="d-flex align-items-center">
+                        <input type="checkbox" class="select-all-checkbox" id="selectAllCheckbox">
+                        <span id="selectedCount">0 students selected</span>
+                        <div class="ms-auto">
+                            <select class="form-control form-control-sm d-inline-block w-auto me-2" 
+                                    id="bulkActionSelect">
+                                <option value="">Bulk Actions</option>
+                                <option value="export">Export Selected</option>
+                                <option value="status">Change Status</option>
+                                <option value="class">Move to Another Class</option>
+                                <option value="print">Print Selected</option>
+                            </select>
+                            <button class="btn btn-sm btn-primary" onclick="applyBulkAction()">
+                                Apply
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Students Table -->
+                <div class="students-table-container">
+                    <div class="table-header">
+                        <div class="row align-items-center">
+                            <div class="col-md-6">
+                                <h5 class="mb-0">
+                                    <i class="fas fa-user-graduate me-2"></i>
+                                    {% if selected_class_obj %}
+                                        {{ selected_class_obj.name }} Students
+                                    {% else %}
+                                        All Students
+                                    {% endif %}
+                                    <span class="badge bg-primary ms-2">{{ students.paginator.count }}</span>
+                                </h5>
+                            </div>
+                            <div class="col-md-6 text-end">
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="checkbox" id="enableBulkSelect" 
+                                           onchange="toggleBulkSelection()">
+                                    <label class="form-check-label" for="enableBulkSelect">
+                                        Bulk Select
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
                     <div class="table-responsive">
-                        <table class="table table-hover">
+                        {% if students %}
+                        <table class="data-table" id="studentsTable">
                             <thead>
                                 <tr>
-                                    <th>#</th>
-                                    <th>Name</th>
-                                    <th>Registration No.</th>
-                                    <th>Stream</th>
-                                    <th>Gender</th>
+                                    <th width="50" class="bulk-select-column" style="display: none;">
+                                        <input type="checkbox" id="selectAll" onchange="toggleSelectAll(this)">
+                                    </th>
+                                    <th width="60">#</th>
+                                    <th>Student Information</th>
+                                    <th>Class & Stream</th>
+                                    <th>Contact</th>
                                     <th>Status</th>
-                                    <th>Parents</th>
-                                    <th>Actions</th>
+                                    <th width="150">Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {% for student in students %}
-                                <tr>
-                                    <td>{{ forloop.counter }}</td>
-                                    <td>
-                                        {% if student.profile_pic %}
-                                        <img src="{{ student.profile_pic.url }}" class="avatar-sm rounded-circle me-2">
-                                        {% else %}
-                                        <div class="avatar-sm rounded-circle bg-secondary me-2" style="width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; color: white;">
-                                            {{ student.first_name.0 }}
-                                        </div>
-                                        {% endif %}
-                                        {{ student.full_name }}
+                                <tr data-student-id="{{ student.id }}" 
+                                    data-status="{{ student.status }}"
+                                    data-class-id="{% if student.class_level %}{{ student.class_level.id }}{% endif %}">
+                                    <!-- Bulk Select Checkbox -->
+                                    <td class="bulk-select-column" style="display: none;">
+                                        <input type="checkbox" class="student-checkbox" 
+                                               value="{{ student.id }}" 
+                                               onchange="updateSelectedCount()">
                                     </td>
-                                    <td><span class="badge bg-info">{{ student.registration_number }}</span></td>
-                                    <td>{{ student.stream_class.name|default:"N/A" }}</td>
-                                    <td>{{ student.get_gender_display|default:"N/A" }}</td>
+                                    
+                                    <!-- Serial Number -->
                                     <td>
-                                        <span class="badge bg-{% if student.status == 'active' %}success{% elif student.status == 'suspended' %}warning{% elif student.status == 'withdrawn' %}danger{% else %}secondary{% endif %}">
-                                            {{ student.get_status_display }}
+                                        <span class="text-muted">
+                                            {{ forloop.counter0|add:students.start_index }}
                                         </span>
                                     </td>
+                                    
+                                    <!-- Student Information -->
                                     <td>
-                                        {% for parent in student.parents.all %}
-                                        <small>{{ parent.full_name }}<br></small>
-                                        {% endfor %}
+                                        <div class="d-flex align-items-center">
+                                            {% if student.profile_pic %}
+                                            <img src="{{ student.profile_pic.url }}" 
+                                                class="student-avatar me-3" 
+                                                alt="{{ student.full_name }}">
+                                            {% else %}
+                                            <div class="student-avatar-placeholder me-3">
+                                                {{ student.first_name.0 }}
+                                            </div>
+                                            {% endif %}
+                                            <div>
+                                                <h6 class="mb-1 student-name" id="student-name-{{ student.id }}">
+                                                    {{ student.full_name }}
+                                                </h6>
+                                                <div class="text-muted small">
+                                                    <i class="fas fa-id-card me-1"></i>
+                                                    <span id="reg-no-{{ student.id }}">
+                                                        {{ student.registration_number|default:"No Reg. No." }}
+                                                    </span>
+                                                    •
+                                                    <i class="fas fa-{{ student.gender|lower }} ms-2 me-1"></i>
+                                                    {{ student.get_gender_display }}
+                                                    •
+                                                    <i class="fas fa-birthday-cake ms-2 me-1"></i>
+                                                    {% if student.age %}
+                                                        {{ student.age }}y
+                                                    {% else %}
+                                                        N/A
+                                                    {% endif %}
+                                                </div>
+                                            </div>
+                                        </div>
                                     </td>
+                                    
+                                    <!-- Class & Stream -->
                                     <td>
-                                        <div class="btn-group btn-group-sm">
-                                            <a href="javascript:void(0);" class="btn btn-info" title="View">
-                                                <i class="bx bx-eye"></i>
+                                        <div>
+                                            <strong>{% if student.class_level %}{{ student.class_level.name }}{% else %}N/A{% endif %}</strong>
+                                        </div>
+                                        <div class="text-muted small">
+                                            <i class="fas fa-stream me-1"></i>
+                                            {% if student.stream_class %}{{ student.stream_class.name }}{% else %}No Stream{% endif %}
+                                        </div>
+                                        <div class="text-muted small">
+                                            <i class="fas fa-calendar-plus me-1"></i>
+                                            {{ student.admission_year|default:"N/A" }}
+                                        </div>
+                                    </td>
+                                    
+                                    <!-- Contact Information -->
+                                    <td>
+                                        {% with student.parents.all|first as primary_parent %}
+                                        {% if primary_parent %}
+                                        <div class="small">
+                                            <i class="fas fa-user-tie me-1"></i>
+                                            {{ primary_parent.full_name }} ({{ primary_parent.relationship }})
+                                        </div>
+                                        <div class="text-muted small">
+                                            <i class="fas fa-phone me-1"></i>
+                                            {{ primary_parent.first_phone_number }}
+                                        </div>
+                                        {% if primary_parent.email %}
+                                        <div class="text-muted small">
+                                            <i class="fas fa-envelope me-1"></i>
+                                            {{ primary_parent.email|truncatechars:20 }}
+                                        </div>
+                                        {% endif %}
+                                        {% else %}
+                                        <span class="text-muted small">
+                                            <i class="fas fa-exclamation-circle me-1"></i>
+                                            No parent assigned
+                                        </span>
+                                        {% endif %}
+                                        {% endwith %}
+                                    </td>
+                                    
+                                    <!-- Status -->
+                                    <td>
+                                        <span class="badge-status badge-{{ student.status }}">
+                                            <i class="fas fa-circle me-1"></i>
+                                            {{ student.get_status_display }}
+                                        </span>
+                                        <div class="mt-1 small">
+                                            <i class="fas fa-calendar-alt me-1"></i>
+                                            {{ student.updated_at|date:"M d, Y" }}
+                                        </div>
+                                    </td>
+                                    
+                                    <!-- Actions -->
+                                    <td>
+                                        <div class="action-buttons">
+                                            <a href="{% url 'admin_student_detail' student.id %}" 
+                                               class="action-btn btn-view" 
+                                               title="View Details"
+                                               data-toggle="tooltip">
+                                                <i class="fas fa-eye"></i>
                                             </a>
-                                            <a href="javascript:void(0);" class="btn btn-warning" title="Edit">
-                                                <i class="bx bx-edit"></i>
+                                            <a href="{% url 'admin_student_edit' student.id %}" 
+                                               class="action-btn btn-edit"
+                                               title="Edit Student"
+                                               data-toggle="tooltip">
+                                                <i class="fas fa-edit"></i>
+                                            </a>
+                                            <a href="{% url 'admin_add_parent_to_student' student.id %}" 
+                                               class="action-btn btn-parents"
+                                               title="Manage Parents"
+                                               data-toggle="tooltip">
+                                                <i class="fas fa-user-friends"></i>
+                                            </a>
+                                            <a href="#" 
+                                               class="action-btn btn-report"
+                                               title="Generate Report"
+                                               data-toggle="tooltip"
+                                               onclick="generateStudentReport({{ student.id }})">
+                                                <i class="fas fa-file-alt"></i>
                                             </a>
                                         </div>
                                     </td>
@@ -88,19 +1027,808 @@
                                 {% endfor %}
                             </tbody>
                         </table>
-                    </div>
-                    {% else %}
-                    <div class="alert alert-info">
-                        {% if selected_class %}
-                        No students found in this class.
                         {% else %}
-                        Please select a class level to view students.
+                        <div class="empty-state">
+                            <div class="empty-state-icon">
+                                <i class="fas fa-user-graduate"></i>
+                            </div>
+                            <h5 class="mb-3">No Students Found</h5>
+                            <p class="text-muted mb-4">
+                                {% if selected_class %}
+                                    No students found in this class with the current filters.
+                                {% elif search_query %}
+                                    No students found matching "{{ search_query }}".
+                                {% else %}
+                                    Please select a class level to view students.
+                                {% endif %}
+                            </p>
+                            <div class="d-flex gap-2 justify-content-center">
+                                <button onclick="resetFilters()" class="btn btn-outline-secondary">
+                                    <i class="fas fa-redo me-2"></i> Reset Filters
+                                </button>
+                                <a href="{% url 'admin_students_add' %}" class="btn btn-primary">
+                                    <i class="fas fa-user-plus me-2"></i> Add New Student
+                                </a>
+                            </div>
+                        </div>
                         {% endif %}
                     </div>
-                    {% endif %}
                 </div>
+                
+                <!-- Pagination -->
+                {% if students.paginator.num_pages > 1 %}
+                <div class="pagination-container">
+                    <div class="pagination-info">
+                        Showing {{ students.start_index }} to {{ students.end_index }} of {{ students.paginator.count }} students
+                    </div>
+                    
+                    <nav aria-label="Page navigation">
+                        <ul class="pagination justify-content-center">
+                            {% if students.has_previous %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ students.previous_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">
+                                    <i class="fas fa-chevron-left"></i>
+                                </a>
+                            </li>
+                            {% endif %}
+                            
+                            {% for num in students.paginator.page_range %}
+                            {% if students.number == num %}
+                            <li class="page-item active">
+                                <span class="page-link">{{ num }}</span>
+                            </li>
+                            {% elif num > students.number|add:'-3' and num < students.number|add:'3' %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ num }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">{{ num }}</a>
+                            </li>
+                            {% endif %}
+                            {% endfor %}
+                            
+                            {% if students.has_next %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ students.next_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">
+                                    <i class="fas fa-chevron-right"></i>
+                                </a>
+                            </li>
+                            {% endif %}
+                        </ul>
+                    </nav>
+                    
+                    <div class="page-size-selector">
+                        <select class="form-control form-control-sm d-inline-block w-auto" 
+                                onchange="changePageSize(this.value)">
+                            <option value="10" {% if page_size == '10' %}selected{% endif %}>10 per page</option>
+                            <option value="25" {% if page_size == '25' %}selected{% endif %}>25 per page</option>
+                            <option value="50" {% if page_size == '50' %}selected{% endif %}>50 per page</option>
+                            <option value="100" {% if page_size == '100' %}selected{% endif %}>100 per page</option>
+                        </select>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Student Report Modal -->
+<div class="modal fade" id="studentReportModal" tabindex="-1" role="dialog">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Student Report</h5>
+                <button type="button" class="close" data-dismiss="modal">
+                    <span>&times;</span>
+                </button>
+            </div>
+            <div class="modal-body" id="reportContent">
+                <!-- Report content will be loaded here -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" onclick="printReport()">
+                    <i class="fas fa-print me-2"></i>Print Report
+                </button>
             </div>
         </div>
     </div>
 </div>
 {% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // Initialize tooltips
+    $('[data-toggle="tooltip"]').tooltip();
+    
+    // Highlight search terms
+    highlightSearchTerms();
+});
+
+// Global variables
+let selectedStudents = new Set();
+
+// Highlight search terms in the table
+function highlightSearchTerms() {
+    const searchQuery = "{{ search_query|escapejs }}";
+    
+    if (!searchQuery) return;
+    
+    // Escape special regex characters
+    const escapedSearch = searchQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(`(${escapedSearch})`, 'gi');
+    
+    // Highlight student names
+    $('.student-name').each(function() {
+        const originalText = $(this).text();
+        const highlighted = originalText.replace(
+            regex, 
+            '<span class="highlight">$1</span>'
+        );
+        if (highlighted !== originalText) {
+            $(this).html(highlighted);
+        }
+    });
+    
+    // Highlight registration numbers
+    $('[id^="reg-no-"]').each(function() {
+        const originalText = $(this).text();
+        const highlighted = originalText.replace(
+            regex, 
+            '<span class="highlight">$1</span>'
+        );
+        if (highlighted !== originalText) {
+            $(this).html(highlighted);
+        }
+    });
+}
+
+// Show loading overlay
+function showLoading(message = 'Loading...') {
+    $('#loadingText').text(message);
+    $('#loadingOverlay').fadeIn(300);
+}
+
+// Hide loading overlay
+function hideLoading() {
+    $('#loadingOverlay').fadeOut(300);
+}
+
+// Select class from grid
+function selectClass(classId) {
+    const form = $('#filterForm')[0];
+    const classSelect = form.querySelector('[name="class_level"]');
+    classSelect.value = classId;
+    submitForm();
+}
+
+// Submit filter form
+function submitForm() {
+    $('#filterForm').submit();
+}
+
+// Reset all filters
+function resetFilters() {
+    // Clear all form inputs
+    $('#filterForm')[0].reset();
+    
+    // Clear hidden inputs
+    $('#statusFilter').val('');
+    $('#genderFilter').val('');
+    
+    // Clear active chips
+    $('.filter-chip').removeClass('active');
+    
+    // Submit form
+    submitForm();
+}
+
+// Toggle status filter
+function toggleStatusFilter(status) {
+    const filterInput = $('#statusFilter');
+    if (filterInput.val() === status) {
+        filterInput.val('');
+        $(`.filter-chip[onclick*="${status}"]`).removeClass('active');
+    } else {
+        filterInput.val(status);
+        $('.filter-chip').removeClass('active');
+        $(`.filter-chip[onclick*="${status}"]`).addClass('active');
+    }
+    submitForm();
+}
+
+// Toggle gender filter
+function toggleGenderFilter(gender) {
+    const filterInput = $('#genderFilter');
+    if (filterInput.val() === gender) {
+        filterInput.val('');
+        $(`.filter-chip[onclick*="${gender}"]`).removeClass('active');
+    } else {
+        filterInput.val(gender);
+        $('.filter-chip').removeClass('active');
+        $(`.filter-chip[onclick*="${gender}"]`).addClass('active');
+    }
+    submitForm();
+}
+
+// Toggle bulk selection
+function toggleBulkSelection() {
+    const isEnabled = $('#enableBulkSelect').is(':checked');
+    $('.bulk-select-column').toggle(isEnabled);
+    $('#bulkActions').toggle(isEnabled);
+    
+    if (!isEnabled) {
+        // Clear all selections
+        $('.student-checkbox').prop('checked', false);
+        selectedStudents.clear();
+        updateSelectedCount();
+    }
+}
+
+// Toggle select all
+function toggleSelectAll(checkbox) {
+    const isChecked = checkbox.checked;
+    $('.student-checkbox').prop('checked', isChecked);
+    
+    if (isChecked) {
+        $('.student-checkbox').each(function() {
+            selectedStudents.add(parseInt($(this).val()));
+        });
+    } else {
+        selectedStudents.clear();
+    }
+    
+    updateSelectedCount();
+}
+
+// Update selected student count
+function updateSelectedCount() {
+    selectedStudents.clear();
+    $('.student-checkbox:checked').each(function() {
+        selectedStudents.add(parseInt($(this).val()));
+    });
+    
+    const count = selectedStudents.size;
+    $('#selectedCount').text(`${count} student${count !== 1 ? 's' : ''} selected`);
+    $('#selectAllCheckbox').prop('checked', count > 0 && count === $('.student-checkbox').length);
+}
+
+// Apply bulk action
+function applyBulkAction() {
+    const action = $('#bulkActionSelect').val();
+    const studentIds = Array.from(selectedStudents);
+    
+    if (studentIds.length === 0) {
+        Swal.fire({
+            title: 'No Students Selected',
+            text: 'Please select at least one student to perform bulk actions.',
+            icon: 'warning',
+            confirmButtonColor: '#667eea'
+        });
+        return;
+    }
+    
+    switch(action) {
+        case 'export':
+            exportSelectedStudents(studentIds);
+            break;
+        case 'status':
+            changeStudentsStatus(studentIds);
+            break;
+        case 'class':
+            moveStudentsToClass(studentIds);
+            break;
+        case 'print':
+            printSelectedStudents(studentIds);
+            break;
+        default:
+            Swal.fire({
+                title: 'Select Action',
+                text: 'Please select a bulk action to perform.',
+                icon: 'info',
+                confirmButtonColor: '#667eea'
+            });
+    }
+}
+
+// Export selected students
+function exportSelectedStudents(studentIds) {
+    showLoading('Preparing export...');
+    
+    // Create form data
+    const formData = new FormData();
+    formData.append('student_ids', JSON.stringify(studentIds));
+    formData.append('format', 'excel');
+    formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+    
+    // Make AJAX request
+    fetch('{% url "students_export" %}', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.blob())
+    .then(blob => {
+        hideLoading();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `students_export_${new Date().toISOString().slice(0,10)}.xlsx`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+    })
+    .catch(error => {
+        hideLoading();
+        Swal.fire({
+            title: 'Export Failed',
+            text: 'An error occurred while exporting students.',
+            icon: 'error',
+            confirmButtonColor: '#d33'
+        });
+        console.error('Export error:', error);
+    });
+}
+
+// Change students status
+function changeStudentsStatus(studentIds) {
+    Swal.fire({
+        title: 'Change Status',
+        html: `
+            <p>Select new status for ${studentIds.length} selected student${studentIds.length !== 1 ? 's' : ''}:</p>
+            <select id="statusSelect" class="form-control">
+                <option value="active">Active</option>
+                <option value="suspended">Suspended</option>
+                <option value="withdrawn">Withdrawn</option>
+                <option value="completed">Completed</option>
+                <option value="transferred">Transferred</option>
+            </select>
+        `,
+        showCancelButton: true,
+        confirmButtonText: 'Update Status',
+        confirmButtonColor: '#667eea',
+        preConfirm: () => {
+            return {
+                status: $('#statusSelect').val()
+            };
+        }
+    }).then((result) => {
+        if (result.isConfirmed) {
+            showLoading('Updating status...');
+            
+            // Create form data
+            const formData = new FormData();
+            formData.append('student_ids', JSON.stringify(studentIds));
+            formData.append('status', result.value.status);
+            formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+            
+            fetch('{% url "students_bulk_update_status" %}', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                hideLoading();
+                if (data.success) {
+                    Swal.fire({
+                        title: 'Success!',
+                        text: data.message,
+                        icon: 'success',
+                        confirmButtonColor: '#667eea'
+                    }).then(() => {
+                        location.reload();
+                    });
+                } else {
+                    Swal.fire({
+                        title: 'Error!',
+                        text: data.message,
+                        icon: 'error',
+                        confirmButtonColor: '#d33'
+                    });
+                }
+            })
+            .catch(error => {
+                hideLoading();
+                Swal.fire({
+                    title: 'Error!',
+                    text: 'An error occurred while updating status.',
+                    icon: 'error',
+                    confirmButtonColor: '#d33'
+                });
+                console.error('Status update error:', error);
+            });
+        }
+    });
+}
+
+// Move students to another class
+function moveStudentsToClass(studentIds) {
+    // Get available classes via AJAX
+    showLoading('Loading classes...');
+    
+    fetch('{% url "get_class_levels" %}')
+    .then(response => response.json())
+    .then(classes => {
+        hideLoading();
+        
+        // Create options HTML
+        let optionsHtml = '';
+        classes.forEach(cls => {
+            optionsHtml += `<option value="${cls.id}">${cls.name}</option>`;
+        });
+        
+        Swal.fire({
+            title: 'Move Students',
+            html: `
+                <p>Select new class for ${studentIds.length} selected student${studentIds.length !== 1 ? 's' : ''}:</p>
+                <select id="classSelect" class="form-control">
+                    ${optionsHtml}
+                </select>
+                <div class="mt-3">
+                    <label class="form-check">
+                        <input type="checkbox" class="form-check-input" id="keepStream">
+                        <span class="form-check-label">Keep current streams (if available)</span>
+                    </label>
+                </div>
+            `,
+            showCancelButton: true,
+            confirmButtonText: 'Move Students',
+            confirmButtonColor: '#667eea',
+            preConfirm: () => {
+                return {
+                    class_id: $('#classSelect').val(),
+                    keep_stream: $('#keepStream').is(':checked')
+                };
+            }
+        }).then((result) => {
+            if (result.isConfirmed) {
+                showLoading('Moving students...');
+                
+                const formData = new FormData();
+                formData.append('student_ids', JSON.stringify(studentIds));
+                formData.append('class_id', result.value.class_id);
+                formData.append('keep_stream', result.value.keep_stream);
+                formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+                
+                fetch('{% url "bulk_move_students" %}', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    hideLoading();
+                    if (data.success) {
+                        Swal.fire({
+                            title: 'Success!',
+                            text: data.message,
+                            icon: 'success',
+                            confirmButtonColor: '#667eea'
+                        }).then(() => {
+                            location.reload();
+                        });
+                    } else {
+                        Swal.fire({
+                            title: 'Error!',
+                            text: data.message,
+                            icon: 'error',
+                            confirmButtonColor: '#d33'
+                        });
+                    }
+                })
+                .catch(error => {
+                    hideLoading();
+                    Swal.fire({
+                        title: 'Error!',
+                        text: 'An error occurred while moving students.',
+                        icon: 'error',
+                        confirmButtonColor: '#d33'
+                    });
+                    console.error('Move error:', error);
+                });
+            }
+        });
+    })
+    .catch(error => {
+        hideLoading();
+        Swal.fire({
+            title: 'Error!',
+            text: 'Failed to load classes.',
+            icon: 'error',
+            confirmButtonColor: '#d33'
+        });
+    });
+}
+
+// Print selected students
+function printSelectedStudents(studentIds) {
+    // Get selected student data
+    const studentsData = [];
+    studentIds.forEach(studentId => {
+        const row = $(`[data-student-id="${studentId}"]`);
+        if (row.length) {
+            const name = row.find('.student-name').text().replace(/<[^>]*>/g, ''); // Remove HTML tags
+            const regNo = row.find('.text-muted.small').text().split('•')[0].trim().replace('No Reg. No.', '');
+            const classInfo = row.find('td').eq(2).find('strong').text();
+            const stream = row.find('td').eq(2).find('.text-muted.small').text().replace('No Stream', '');
+            const gender = row.find('td').eq(0).find('.text-muted.small').text().split('•')[1].trim();
+            const status = row.find('.badge-status').text().trim();
+            
+            studentsData.push({
+                name: name,
+                regNo: regNo,
+                class: classInfo,
+                stream: stream,
+                gender: gender,
+                status: status
+            });
+        }
+    });
+    
+    // Open print window
+    const printWindow = window.open('', '_blank');
+    const printContent = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Students List - {% if selected_class_obj %}{{ selected_class_obj.name }}{% else %}All Classes{% endif %}</title>
+            <style>
+                body { font-family: Arial, sans-serif; margin: 20px; }
+                h2 { text-align: center; margin-bottom: 30px; }
+                table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+                th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+                th { background-color: #f8f9fa; }
+                .print-date { text-align: right; margin-bottom: 20px; }
+                @media print {
+                    .no-print { display: none; }
+                }
+            </style>
+        </head>
+        <body>
+            <div class="print-date">Printed on: ${new Date().toLocaleDateString()}</div>
+            <h2>Students List - {% if selected_class_obj %}{{ selected_class_obj.name }}{% else %}All Classes{% endif %}</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Name</th>
+                        <th>Registration No.</th>
+                        <th>Class</th>
+                        <th>Stream</th>
+                        <th>Gender</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${studentsData.map((student, index) => `
+                        <tr>
+                            <td>${index + 1}</td>
+                            <td>${student.name}</td>
+                            <td>${student.regNo}</td>
+                            <td>${student.class}</td>
+                            <td>${student.stream}</td>
+                            <td>${student.gender}</td>
+                            <td>${student.status}</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+            <div class="no-print" style="text-align: center; margin-top: 30px;">
+                <button onclick="window.print()">Print</button>
+                <button onclick="window.close()">Close</button>
+            </div>
+        </body>
+        </html>
+    `;
+    
+    printWindow.document.write(printContent);
+    printWindow.document.close();
+}
+
+// Change page size
+function changePageSize(size) {
+    const url = new URL(window.location);
+    url.searchParams.set('page_size', size);
+    url.searchParams.set('page', '1');
+    window.location.href = url.toString();
+}
+
+// Export to PDF
+function exportToPDF() {
+    showLoading('Generating PDF...');
+    
+    // Create a temporary element for PDF generation
+    const table = document.getElementById('studentsTable').cloneNode(true);
+    
+    // Remove bulk selection columns
+    const bulkColumns = table.querySelectorAll('.bulk-select-column');
+    bulkColumns.forEach(col => col.remove());
+    
+    // Remove actions column
+    const actionHeaders = table.querySelectorAll('th:last-child');
+    actionHeaders.forEach(header => header.remove());
+    const actionCells = table.querySelectorAll('td:last-child');
+    actionCells.forEach(cell => cell.remove());
+    
+    // Create print window
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Students List - {% if selected_class_obj %}{{ selected_class_obj.name }}{% else %}All Classes{% endif %}</title>
+            <style>
+                body { font-family: Arial, sans-serif; margin: 20px; }
+                h2 { text-align: center; margin-bottom: 30px; }
+                table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+                th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                th { background-color: #f8f9fa; }
+                .print-date { text-align: right; margin-bottom: 20px; }
+            </style>
+        </head>
+        <body>
+            <div class="print-date">Generated on: ${new Date().toLocaleDateString()}</div>
+            <h2>Students List - {% if selected_class_obj %}{{ selected_class_obj.name }}{% else %}All Classes{% endif %}</h2>
+            ${table.outerHTML}
+        </body>
+        </html>
+    `);
+    printWindow.document.close();
+    
+    hideLoading();
+    printWindow.print();
+    printWindow.close();
+}
+
+// Export to Excel
+function exportToExcel() {
+    showLoading('Generating Excel...');
+    
+    // Create a simple CSV export for now
+    const rows = [];
+    
+    // Add header row
+    rows.push(['Name', 'Registration No.', 'Class', 'Stream', 'Gender', 'Status', 'Admission Year', 'Parent Name', 'Parent Phone']);
+    
+    // Add data rows
+    $('#studentsTable tbody tr').each(function() {
+        const name = $(this).find('.student-name').text().replace(/<[^>]*>/g, '');
+        const regNo = $(this).find('[id^="reg-no-"]').text();
+        const classInfo = $(this).find('td').eq(2).find('strong').text();
+        const stream = $(this).find('td').eq(2).find('.text-muted.small').eq(0).text().replace('No Stream', '');
+        const gender = $(this).find('td').eq(0).find('.text-muted.small').text().split('•')[1].trim();
+        const status = $(this).find('.badge-status').text().trim();
+        const admissionYear = $(this).find('td').eq(2).find('.text-muted.small').eq(1).text();
+        const parentName = $(this).find('td').eq(3).find('.small').text().split('(')[0].trim();
+        const parentPhone = $(this).find('td').eq(3).find('.text-muted.small').eq(0).text();
+        
+        rows.push([
+            name,
+            regNo,
+            classInfo,
+            stream,
+            gender,
+            status,
+            admissionYear,
+            parentName,
+            parentPhone
+        ]);
+    });
+    
+    // Convert to CSV
+    const csvContent = rows.map(row => 
+        row.map(cell => `"${cell.replace(/"/g, '""')}"`).join(',')
+    ).join('\n');
+    
+    // Create download link
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    
+    link.setAttribute('href', url);
+    link.setAttribute('download', `students_${new Date().toISOString().slice(0,10)}.csv`);
+    link.style.visibility = 'hidden';
+    
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    hideLoading();
+}
+
+// Export to CSV (same as Excel for now)
+function exportToCSV() {
+    exportToExcel();
+}
+
+// Print table
+function printTable() {
+    // Remove bulk selection columns
+    const table = $('#studentsTable').clone();
+    table.find('.bulk-select-column').remove();
+    table.find('th:last-child, td:last-child').remove();
+    
+    // Create print window
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Students List - {% if selected_class_obj %}{{ selected_class_obj.name }}{% else %}All Classes{% endif %}</title>
+            <style>
+                body { font-family: Arial, sans-serif; margin: 20px; }
+                h2 { text-align: center; margin-bottom: 30px; }
+                table { width: 100%; border-collapse: collapse; }
+                th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                th { background-color: #f8f9fa; }
+                @media print {
+                    @page { size: landscape; }
+                }
+            </style>
+        </head>
+        <body>
+            <h2>Students List - {% if selected_class_obj %}{{ selected_class_obj.name }}{% else %}All Classes{% endif %}</h2>
+            <p>Generated on: ${new Date().toLocaleDateString()}</p>
+            ${table[0].outerHTML}
+        </body>
+        </html>
+    `);
+    
+    printWindow.document.close();
+    printWindow.focus();
+    printWindow.print();
+}
+
+// Generate student report
+function generateStudentReport(studentId) {
+    showLoading('Generating report...');
+    
+    fetch(`/admin/students/${studentId}/report/`)
+    .then(response => response.text())
+    .then(html => {
+        hideLoading();
+        $('#reportContent').html(html);
+        $('#studentReportModal').modal('show');
+    })
+    .catch(error => {
+        hideLoading();
+        Swal.fire({
+            title: 'Error!',
+            text: 'Failed to generate student report.',
+            icon: 'error',
+            confirmButtonColor: '#d33'
+        });
+        console.error('Report error:', error);
+    });
+}
+
+// Print report
+function printReport() {
+    const printContent = document.getElementById('reportContent').innerHTML;
+    const originalContent = document.body.innerHTML;
+    
+    document.body.innerHTML = printContent;
+    window.print();
+    document.body.innerHTML = originalContent;
+}
+
+// Keyboard shortcuts
+document.addEventListener('keydown', function(e) {
+    // Ctrl+F to focus search
+    if (e.ctrlKey && e.key === 'f') {
+        e.preventDefault();
+        $('input[name="search"]').focus();
+    }
+    
+    // Ctrl+R to reset filters
+    if (e.ctrlKey && e.key === 'r') {
+        e.preventDefault();
+        resetFilters();
+    }
+    
+    // Ctrl+P to print
+    if (e.ctrlKey && e.key === 'p') {
+        e.preventDefault();
+        printTable();
+    }
+});
+</script>
+{% endblock extra_js %}

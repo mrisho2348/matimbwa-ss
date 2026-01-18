@@ -113,7 +113,7 @@
                     <span>Parents</span>
                     <span class="nav-counter">{{ parent_count|default:0 }}</span>
                 </a>
-                <a class="nav-link" href="{% url 'admin_previous_schools' %}">
+                <a class="nav-link" href="{% url 'admin_previous_schools_list' %}">
                     <i class="bi bi-building"></i>
                     <span>Previous Schools</span>
                 </a>
@@ -127,15 +127,11 @@
                 <span>Staff Management</span>
             </div>
             <div class="nav-section-content">
-                <a class="nav-link" href="{% url 'admin_staff_list' %}">
+                <a class="nav-link" href="{% url 'admin_staffs_list' %}">
                     <i class="bi bi-person-lines-fill"></i>
                     <span>All Staff</span>
                     <span class="nav-counter">{{ staff_count|default:0 }}</span>
-                </a>
-                <a class="nav-link" href="{% url 'admin_staff_add' %}">
-                    <i class="bi bi-person-plus"></i>
-                    <span>Add Staff</span>
-                </a>
+                </a>              
                 <a class="nav-link" href="{% url 'admin_staff_roles' %}">
                     <i class="bi bi-tags"></i>
                     <span>Roles Management</span>

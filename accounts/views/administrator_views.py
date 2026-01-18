@@ -6,13 +6,13 @@ from django.urls import reverse
 from django.contrib.auth.decorators import login_required, permission_required
 from django.contrib import messages
 from django.http import JsonResponse, HttpResponse
-from django.db.models import Q, Count, F
+from django.db.models import Q, Count, F, Prefetch
 from django.utils import timezone
 from django.contrib.auth.forms import PasswordChangeForm
 from django.contrib.auth import update_session_auth_hash
 from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
 from accounts.forms.admin_forms import AdminPreferencesForm, AdminProfileUpdateForm
-from accounts.forms.student_forms import ParentForm, PreviousSchoolForm, StudentEditForm, StudentForm
+from accounts.forms.student_forms import ParentForm, ParentStudentForm, PreviousSchoolForm, StudentEditForm, StudentForm,StudentFilterForm
 from accounts.models import GENDER_CHOICES, CustomUser, Notification, Staffs, AdminHOD, SystemLog
 from core.models import (
     EducationalLevel, AcademicYear, Term, Subject, 
@@ -23,8 +23,14 @@ from django.core.exceptions import ValidationError
 from django.utils.dateparse import parse_date
 from django.db import IntegrityError
 from django.views.decorators.csrf import csrf_exempt
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_POST,require_GET
 from django.db import transaction
+from django.db.models import Value
+from django.db.models.functions import Concat
+from django.db.models import CharField
+from django.contrib.auth.hashers import make_password
+from django.core.files.storage import default_storage
+import os
 # ============================================================================
 # DASHBOARD VIEWS
 # ============================================================================
@@ -3339,18 +3345,18 @@ def save_parent(request, student_id):
                 return JsonResponse({
                     'success': False,
                     'message': f'Error adding parent: {str(e)}'
-                }, status=400)
+                })
         else:
             return JsonResponse({
                 'success': False,
                 'message': 'Please correct the errors below',
                 'errors': form.errors
-            }, status=400)
+            })
     
     return JsonResponse({
         'success': False,
         'message': 'Invalid request'
-    }, status=400)
+    })
 
 
 @login_required
@@ -3413,7 +3419,6 @@ def render_parent_card(parent, student):
        
 # students/views.py
 @login_required
-@permission_required('students.manage_parent_fee', raise_exception=True)
 def update_parent_fee_responsibility(request, student_id, parent_id):
     """
     AJAX endpoint for updating fee responsibility
@@ -3456,29 +3461,678 @@ def update_parent_fee_responsibility(request, student_id, parent_id):
     
 @login_required
 def students_by_class(request):
-    """View students grouped by class"""
-    class_levels = ClassLevel.objects.filter(is_active=True).annotate(
-        student_count=Count('students', filter=Q(students__is_active=True))
-    ).order_by('order')
+    """
+    Enhanced view for browsing students by class with advanced filtering
+    """
+    # Initialize form with GET data
+    form = StudentFilterForm(request.GET or None)
     
-    selected_class = request.GET.get('class_level', '')
-    students = Student.objects.none()
-    selected_class_obj = None
+    # Get all active class levels with aggregated data using optimized queries
+    class_levels = ClassLevel.objects.filter(
+        is_active=True
+    ).select_related('educational_level').annotate(
+        student_count=Count(
+            'students',
+            filter=Q(students__is_active=True),
+            distinct=True
+        ),
+        stream_count=Count(
+            'streams',
+            filter=Q(streams__is_active=True),
+            distinct=True
+        ),
+        male_count=Count(
+            'students',
+            filter=Q(students__is_active=True, students__gender='male'),
+            distinct=True
+        ),
+        female_count=Count(
+            'students',
+            filter=Q(students__is_active=True, students__gender='female'),
+            distinct=True
+        )
+    ).order_by('educational_level__name', 'order')  # Changed from 'educational_level__order' to 'educational_level__name'
     
+    # Initialize queryset with optimized prefetching
+    students = Student.objects.filter(is_active=True).select_related(
+        'class_level',
+        'stream_class',
+        'class_level__educational_level'
+    ).prefetch_related(
+        'parents'
+    ).order_by('class_level__order', 'first_name')
+    
+    # Apply filters from form
+    if form.is_valid():
+        # Class filter
+        class_level = form.cleaned_data.get('class_level')
+        if class_level:
+            students = students.filter(class_level=class_level)
+        
+        # Stream filter
+        stream = form.cleaned_data.get('stream')
+        if stream:
+            students = students.filter(stream_class=stream)
+        
+        # Status filter
+        status = form.cleaned_data.get('status')
+        if status:
+            students = students.filter(status=status)
+        
+        # Gender filter
+        gender = form.cleaned_data.get('gender')
+        if gender:
+            students = students.filter(gender=gender)
+        
+        # Search filter
+        search_query = form.cleaned_data.get('search')
+        if search_query:
+            # Create a search vector for better performance
+            students = students.annotate(
+                full_name_search=Concat(
+                    'first_name', Value(' '), 'middle_name', Value(' '), 'last_name',
+                    output_field=CharField()
+                )
+            ).filter(
+                Q(full_name_search__icontains=search_query) |
+                Q(registration_number__icontains=search_query) |
+                Q(examination_number__icontains=search_query) |
+                Q(parents__full_name__icontains=search_query) |
+                Q(parents__first_phone_number__icontains=search_query)
+            ).distinct()
+        
+        # Date range filter
+        date_from = form.cleaned_data.get('date_from')
+        if date_from:
+            students = students.filter(created_at__date__gte=date_from)
+        
+        date_to = form.cleaned_data.get('date_to')
+        if date_to:
+            students = students.filter(created_at__date__lte=date_to)
+    
+    # Get streams for selected class
+    streams = []
+    selected_class = form.cleaned_data.get('class_level') if form.is_valid() else None
     if selected_class:
-        selected_class_obj = get_object_or_404(ClassLevel, id=selected_class, is_active=True)
-        students = Student.objects.filter(
-            class_level_id=selected_class,
+        streams = StreamClass.objects.filter(
+            class_level=selected_class,
             is_active=True
-        ).select_related('stream_class', 'class_level').prefetch_related('parents').order_by('first_name')
+        ).order_by('stream_letter')
+    
+    # Get statistics - optimized with single query where possible
+    stats_query = Student.objects.filter(is_active=True)
+    
+    # Apply same filters to statistics
+    if form.is_valid():
+        if selected_class:
+            stats_query = stats_query.filter(class_level=selected_class)
+        
+        status = form.cleaned_data.get('status')
+        if status:
+            stats_query = stats_query.filter(status=status)
+        
+        gender = form.cleaned_data.get('gender')
+        if gender:
+            stats_query = stats_query.filter(gender=gender)
+    
+    # Get statistics counts
+    total_students = stats_query.count()
+    active_students = stats_query.filter(status='active').count()
+    male_students = stats_query.filter(gender='male').count()
+    female_students = stats_query.filter(gender='female').count()
+    
+    # Count classes with students (optimized)
+    if form.is_valid() and selected_class:
+        classes_with_students = 1
+    else:
+        classes_with_students = ClassLevel.objects.filter(
+            is_active=True,
+            students__is_active=True
+        ).distinct().count()
+    
+    # Pagination
+    page_size = int(request.GET.get('page_size', 25))
+    paginator = Paginator(students, page_size)
+    page_number = request.GET.get('page', 1)
+    page_obj = paginator.get_page(page_number)
+    
+    # Get selected class and stream objects
+    selected_class_obj = selected_class
+    selected_stream_obj = form.cleaned_data.get('stream') if form.is_valid() else None
+    
+    # Prepare context
+    context = {
+        'form': form,
+        'class_levels': class_levels,
+        'students': page_obj,
+        'selected_class': selected_class.id if selected_class else '',
+        'selected_class_obj': selected_class_obj,
+        'selected_stream': selected_stream_obj.id if selected_stream_obj else '',
+        'selected_status': form.cleaned_data.get('status', '') if form.is_valid() else '',
+        'selected_gender': form.cleaned_data.get('gender', '') if form.is_valid() else '',
+        'search_query': form.cleaned_data.get('search', '') if form.is_valid() else '',
+        'date_from': form.cleaned_data.get('date_from', '') if form.is_valid() else '',
+        'date_to': form.cleaned_data.get('date_to', '') if form.is_valid() else '',
+        'page_size': str(page_size),
+        'streams': streams,
+        
+        # Statistics
+        'total_students': total_students,
+        'active_students': active_students,
+        'male_students': male_students,
+        'female_students': female_students,
+        'classes_with_students': classes_with_students,
+        
+        # Choices for filters
+        'status_choices': STATUS_CHOICES,
+        'gender_choices': GENDER_CHOICES,
+        
+        # Page title
+        'page_title': 'Students by Class',
+    }
+    
+    return render(request, 'admin/students/students_by_class.html', context)
+
+
+# Additional helper functions for bulk operations
+@login_required
+def get_students_export(request):
+    """
+    Get filtered students for export
+    """
+    if request.method == 'GET':
+        # Reuse the filtering logic from students_by_class
+        form = StudentFilterForm(request.GET or None)
+        
+        if form.is_valid():
+            students = Student.objects.filter(is_active=True).select_related(
+                'class_level', 'stream_class'
+            ).prefetch_related('parents')
+            
+            # Apply filters
+            class_level = form.cleaned_data.get('class_level')
+            if class_level:
+                students = students.filter(class_level=class_level)
+            
+            stream = form.cleaned_data.get('stream')
+            if stream:
+                students = students.filter(stream_class=stream)
+            
+            status = form.cleaned_data.get('status')
+            if status:
+                students = students.filter(status=status)
+            
+            gender = form.cleaned_data.get('gender')
+            if gender:
+                students = students.filter(gender=gender)
+            
+            search_query = form.cleaned_data.get('search')
+            if search_query:
+                students = students.annotate(
+                    full_name_search=Concat(
+                        'first_name', Value(' '), 'middle_name', Value(' '), 'last_name',
+                        output_field=CharField()
+                    )
+                ).filter(
+                    Q(full_name_search__icontains=search_query) |
+                    Q(registration_number__icontains=search_query)
+                )
+            
+            return JsonResponse({
+                'success': True,
+                'count': students.count(),
+                'filters': form.cleaned_data
+            })
+    
+    return JsonResponse({'success': False, 'message': 'Invalid request'})
+
+
+@login_required
+def get_class_statistics(request):
+    """
+    Get real-time statistics for a class
+    """
+    class_id = request.GET.get('class_id')
+    
+    if class_id:
+        try:
+            stats = Student.objects.filter(
+                class_level_id=class_id,
+                is_active=True
+            ).aggregate(
+                total=Count('id'),
+                active=Count('id', filter=Q(status='active')),
+                male=Count('id', filter=Q(gender='male')),
+                female=Count('id', filter=Q(gender='female')),
+                suspended=Count('id', filter=Q(status='suspended')),
+                withdrawn=Count('id', filter=Q(status='withdrawn')),
+            )
+            
+            return JsonResponse({
+                'success': True,
+                'stats': stats
+            })
+        except Exception as e:
+            return JsonResponse({
+                'success': False,
+                'message': str(e)
+            })
+    
+    return JsonResponse({'success': False, 'message': 'Class ID required'})
+
+@login_required
+def export_students(request):
+    """
+    Export students to Excel/CSV
+    """
+    if request.method == 'POST':
+        student_ids = request.POST.getlist('student_ids[]')
+        export_format = request.POST.get('format', 'excel')
+        
+        # Get students based on selection
+        if student_ids:
+            students = Student.objects.filter(id__in=student_ids)
+        else:
+            # Export all based on current filters (you can pass filter params)
+            students = Student.objects.filter(is_active=True)
+        
+        # Prepare data for export
+        data = []
+        for student in students.select_related('class_level', 'stream_class'):
+            parent = student.parents.first()
+            data.append({
+                'Registration Number': student.registration_number or '',
+                'Full Name': student.full_name,
+                'First Name': student.first_name,
+                'Middle Name': student.middle_name or '',
+                'Last Name': student.last_name,
+                'Date of Birth': student.date_of_birth or '',
+                'Age': student.age or '',
+                'Gender': student.get_gender_display(),
+                'Class': student.class_level.name if student.class_level else '',
+                'Stream': student.stream_class.name if student.stream_class else '',
+                'Status': student.get_status_display(),
+                'Admission Year': student.admission_year or '',
+                'Address': student.address or '',
+                'Parent Name': parent.full_name if parent else '',
+                'Parent Relationship': parent.relationship if parent else '',
+                'Parent Phone': parent.first_phone_number if parent else '',
+                'Parent Email': parent.email if parent else '',
+                'Examination Number': student.examination_number or '',
+                'Created Date': student.created_at.strftime('%Y-%m-%d'),
+            })
+        
+        # Generate Excel file
+        import pandas as pd
+        from io import BytesIO
+        
+        df = pd.DataFrame(data)
+        
+        if export_format == 'excel':
+            output = BytesIO()
+            with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                df.to_excel(writer, sheet_name='Students', index=False)
+            output.seek(0)
+            
+            response = HttpResponse(
+                output.getvalue(),
+                content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            )
+            response['Content-Disposition'] = 'attachment; filename=students_export.xlsx'
+            return response
+        
+        elif export_format == 'csv':
+            response = HttpResponse(content_type='text/csv')
+            response['Content-Disposition'] = 'attachment; filename=students_export.csv'
+            df.to_csv(response, index=False)
+            return response
+    
+    return JsonResponse({'success': False, 'message': 'Invalid request method'})
+
+
+@login_required
+def bulk_update_student_status(request):
+    """
+    Bulk update student status
+    """
+    if request.method == 'POST':
+        student_ids = request.POST.getlist('student_ids[]')
+        new_status = request.POST.get('status')
+        
+        if not student_ids or not new_status:
+            return JsonResponse({
+                'success': False,
+                'message': 'Missing parameters'
+            })
+        
+        try:
+            # Update student status
+            updated_count = Student.objects.filter(
+                id__in=student_ids,
+                is_active=True
+            ).update(status=new_status, updated_at=timezone.now())
+            
+            return JsonResponse({
+                'success': True,
+                'message': f'Updated status for {updated_count} student(s)',
+                'updated_count': updated_count
+            })
+            
+        except Exception as e:
+            return JsonResponse({
+                'success': False,
+                'message': f'Error updating status: {str(e)}'
+            })
+    
+    return JsonResponse({'success': False, 'message': 'Invalid request method'})
+
+
+@login_required
+def bulk_move_students(request):
+    """
+    Bulk move students to another class
+    """
+    if request.method == 'POST':
+        student_ids = request.POST.getlist('student_ids[]')
+        class_id = request.POST.get('class_id')
+        keep_stream = request.POST.get('keep_stream') == 'true'
+        
+        if not student_ids or not class_id:
+            return JsonResponse({
+                'success': False,
+                'message': 'Missing parameters'
+            })
+        
+        try:
+            # Get new class
+            new_class = get_object_or_404(ClassLevel, id=class_id, is_active=True)
+            
+            # Update students
+            updated_count = 0
+            students = Student.objects.filter(id__in=student_ids, is_active=True)
+            
+            for student in students:
+                student.class_level = new_class
+                
+                # Clear stream if not keeping it
+                if not keep_stream:
+                    student.stream_class = None
+                
+                student.save()
+                updated_count += 1
+            
+            return JsonResponse({
+                'success': True,
+                'message': f'Moved {updated_count} student(s) to {new_class.name}',
+                'updated_count': updated_count
+            })
+            
+        except Exception as e:
+            return JsonResponse({
+                'success': False,
+                'message': f'Error moving students: {str(e)}'
+            })
+    
+    return JsonResponse({'success': False, 'message': 'Invalid request method'})
+
+
+@login_required
+@require_GET
+def get_class_levels(request):
+    """
+    API endpoint to get all active class levels for AJAX requests.
+    Used for bulk operations like moving students between classes.    """  
+    
+    try:
+        # Get all active class levels
+        class_levels = ClassLevel.objects.filter(
+            is_active=True
+        ).select_related(
+            'educational_level'
+        ).order_by('educational_level__order', 'order')
+        
+        # Prepare response data
+        data = [
+            {
+                'id': cls.id,
+                'name': cls.name,
+                'code': cls.code,
+                'order': cls.order,
+                'educational_level': {
+                    'id': cls.educational_level.id,
+                    'name': cls.educational_level.name,
+                    'code': cls.educational_level.code
+                } if cls.educational_level else None,
+                'full_name': f"{cls.name} ({cls.educational_level.name})" if cls.educational_level else cls.name
+            }
+            for cls in class_levels
+        ]
+        
+        return JsonResponse({
+            'success': True,
+            'data': data,
+            'count': len(data)
+        })
+        
+    except Exception as e:
+        # Log error (you can use Django logging here)
+        print(f"Error fetching class levels: {str(e)}")
+        
+        return JsonResponse({
+            'success': False,
+            'message': 'Failed to load class levels',
+            'error': str(e)
+        }, status=500)
+
+
+@login_required
+def student_report(request, student_id):
+    """
+    Generate student report
+    """
+    student = get_object_or_404(Student, id=student_id)
+    
+    # Get academic history
+    academic_history = []
+    # You would query your academic history model here
+    
+    # Get attendance summary
+    attendance_summary = {}
+    # You would query attendance data here
+    
+    # Get fee information
+    fee_info = {}
+    # You would query fee data here
     
     context = {
-        'class_levels': class_levels,
-        'students': students,
-        'selected_class': selected_class,
-        'selected_class_obj': selected_class_obj,
+        'student': student,
+        'academic_history': academic_history,
+        'attendance_summary': attendance_summary,
+        'fee_info': fee_info,
     }
-    return render(request, 'admin/students/students_by_class.html', context)
+    
+    return render(request, 'admin/students/includes/student_report.html', context)
+
+@login_required
+def remove_student_subject(request, student_id):
+    if request.method == 'POST':
+        student = get_object_or_404(Student, id=student_id)
+        subject_id = request.POST.get('subject_id')
+        subject = get_object_or_404(Subject, id=subject_id)
+        
+        if subject in student.optional_subjects.all():
+            student.optional_subjects.remove(subject)
+            return JsonResponse({'success': True, 'message': 'Subject removed successfully'})
+        
+        return JsonResponse({'success': False, 'message': 'Subject not found in student\'s subjects'})
+
+
+
+@login_required
+def add_optional_subjects(request, student_id):
+    if request.method == 'POST':
+        student = get_object_or_404(Student, id=student_id)
+        subject_ids = json.loads(request.POST.get('subject_ids', '[]'))
+        
+        added_count = 0
+        for subject_id in subject_ids:
+            try:
+                subject = Subject.objects.get(id=subject_id, is_compulsory=False)
+                student.optional_subjects.add(subject)
+                added_count += 1
+            except Subject.DoesNotExist:
+                continue
+        
+        return JsonResponse({
+            'success': True, 
+            'message': f'Added {added_count} subject(s) to student'
+        })
+
+@login_required
+@require_POST
+def remove_parent_from_student(request, student_id):
+    """
+    Remove a parent from a student's parent list
+    """
+    try:
+        student = get_object_or_404(Student, id=student_id)
+        parent_id = request.POST.get('parent_id')
+        
+        if not parent_id:
+            return JsonResponse({
+                'success': False,
+                'message': 'Parent ID is required'
+            }, status=400)
+        
+        parent = get_object_or_404(Parent, id=parent_id)
+        
+        # Check if parent is associated with this student
+        if parent in student.parents.all():
+            # Remove the student from parent's students list
+            parent.students.remove(student)
+            
+            # If this was the only student for this parent, delete the parent
+            if parent.students.count() == 0:
+                parent.delete()
+                message = f'Parent {parent.full_name} has been removed and deleted since they had no other students.'
+            else:
+                message = f'Parent {parent.full_name} has been removed from this student.'
+            
+            return JsonResponse({
+                'success': True,
+                'message': message
+            })
+        else:
+            return JsonResponse({
+                'success': False,
+                'message': 'This parent is not associated with this student.'
+            }, status=400)
+            
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'An error occurred: {str(e)}'
+        }, status=500)
+
+
+@login_required
+def add_student_to_parent(request, parent_id):
+    """
+    Add a student to a parent's assigned students
+    """
+    parent = get_object_or_404(Parent, id=parent_id)
+    
+    if request.method == 'POST':
+        student_id = request.POST.get('student_id')
+        
+        if not student_id:
+            messages.error(request, "Please select a student.")
+            return redirect('admin_view_parent', parent_id=parent_id)
+        
+        try:
+            student = get_object_or_404(Student, id=student_id, is_active=True)
+            
+            with transaction.atomic():
+                # Check if student is already assigned to this parent
+                if student in parent.students.all():
+                    messages.warning(request, f"Student '{student.full_name}' is already assigned to '{parent.full_name}'.")
+                else:
+                    # Get the student's existing parents
+                    existing_parents = student.parents.all()
+                    
+                    # Check if force assignment is requested
+                    force_assignment = request.POST.get('force_assignment') == 'on'
+                    
+                    if existing_parents.exists() and not force_assignment:
+                        # Student already has other parents
+                        existing_parent_names = [p.full_name for p in existing_parents]
+                        messages.error(request, 
+                            f"Student '{student.full_name}' is already assigned to other parent(s): "
+                            f"{', '.join(existing_parent_names)}. "
+                            f"Use 'Force assignment' to assign anyway."
+                        )
+                        return redirect('admin_view_parent', parent_id=parent_id)
+                    
+                    # If force assignment, we'll just add the parent (Django ManyToMany handles duplicates)
+                    # Add the student to parent
+                    parent.students.add(student)
+                    
+                    # Handle fee responsibility if parent is fee responsible
+                    if parent.is_fee_responsible:
+                        # Make this parent fee responsible for this student
+                        # Since it's a ManyToMany, we need to update through model if it exists
+                        # or handle it differently based on your model structure
+                        pass
+                    
+                    messages.success(request, f"Student '{student.full_name}' has been successfully assigned to '{parent.full_name}'.")
+            
+        except Student.DoesNotExist:
+            messages.error(request, "Selected student not found or is inactive.")
+        except Exception as e:
+            messages.error(request, f"Error assigning student: {str(e)}")
+        
+        return redirect('admin_view_parent', parent_id=parent_id)
+    
+    # If GET request, redirect to parent detail page
+    return redirect('admin_view_parent', parent_id=parent_id)
+
+
+@login_required
+def remove_student_from_parent(request, parent_id, student_id):
+    """
+    Remove a student from a parent's assigned students
+    """
+    if request.method == 'POST':
+        parent = get_object_or_404(Parent, id=parent_id)
+        student = get_object_or_404(Student, id=student_id)
+        
+        try:
+            # Check if the student is actually assigned to this parent
+            if student in parent.students.all():
+                # Remove the relationship
+                parent.students.remove(student)
+                
+                # Update parent's fee responsibility if needed
+                if parent.is_fee_responsible and student.parents.filter(is_fee_responsible=True).exists():
+                    # Another fee responsible parent exists for this student
+                    pass
+                elif parent.is_fee_responsible and not student.parents.filter(is_fee_responsible=True).exists():
+                    # This was the only fee responsible parent
+                    # You might want to handle this case - perhaps set another parent as fee responsible
+                    pass
+                
+                messages.success(request, f"Student '{student.full_name}' has been removed from '{parent.full_name}'.")
+            else:
+                messages.warning(request, f"Student '{student.full_name}' is not assigned to '{parent.full_name}'.")
+                
+        except Exception as e:
+            messages.error(request, f"Error removing student: {str(e)}")
+        
+        return redirect('admin_view_parent', parent_id=parent_id)
+    
+    # If not POST request, redirect to parent detail page
+    return redirect('admin_view_parent', parent_id=parent_id)
+
 
 @login_required
 def student_status(request):
@@ -3675,7 +4329,7 @@ def student_delete(request, id):
     }
     return render(request, 'admin/students/student_delete.html', context)
 
-@login_required
+
 def student_detail(request, id):
     """View student details"""
     student = get_object_or_404(Student, id=id)
@@ -3683,6 +4337,19 @@ def student_detail(request, id):
     # Get related data
     parents = student.parents.all()
     optional_subjects = student.optional_subjects.all()
+    
+    # Get all available optional subjects for student's class level
+    available_subjects = []
+    if student.class_level:
+        # Get subjects from student's educational level that are not compulsory
+        educational_level = student.class_level.educational_level
+        available_subjects = Subject.objects.filter(
+            educational_level=educational_level,
+            is_compulsory=False,
+            is_active=True
+        ).exclude(
+            id__in=optional_subjects.values_list('id', flat=True)
+        )
     
     # Calculate age
     age = None
@@ -3692,11 +4359,28 @@ def student_detail(request, id):
             (today.month, today.day) < (student.date_of_birth.month, student.date_of_birth.day)
         )
     
+    # Get compulsory subjects count
+    compulsory_count = 0
+    if student.class_level and student.class_level.educational_level:
+        compulsory_count = Subject.objects.filter(
+            educational_level=student.class_level.educational_level,
+            is_compulsory=True,
+            is_active=True
+        ).count()
+    
+    # Get current academic year
+    current_academic_year = AcademicYear.objects.filter(is_active=True).first()
+    
     context = {
         'student': student,
         'parents': parents,
         'optional_subjects': optional_subjects,
+        'available_subjects': available_subjects,
+        'compulsory_count': compulsory_count,
+        'optional_count': optional_subjects.count(),
         'age': age,
+        'current_academic_year': current_academic_year,
+        'student_subjects': list(optional_subjects),  # All subjects for this student
     }
     return render(request, 'admin/students/student_detail.html', context)
 
@@ -3838,509 +4522,594 @@ def parents_list(request):
     }
     return render(request, 'admin/students/parent_list.html', context)
 
-# Parent form view
-def add_parent(request, parent_id=None):
-    """Add or edit parent"""
-    parent = None
-    if parent_id:
-        parent = get_object_or_404(Parent, id=parent_id)
+
+@login_required
+def add_parent(request):
+    """
+    Add a new parent/guardian with ability to assign multiple students
+    """
+    # Get all active students for the select field
+    available_students = Student.objects.filter(
+        is_active=True
+    ).select_related('class_level').order_by('first_name', 'last_name')
     
     if request.method == 'POST':
-        form = ParentForm(request.POST, instance=parent)
+        form = ParentStudentForm(request.POST)
+        action = request.POST.get('action', 'save')
+        
         if form.is_valid():
-            parent = form.save()
+            try:
+                with transaction.atomic():
+                    # Check for duplicate phone number
+                    phone = form.cleaned_data['first_phone_number']
+                    email = form.cleaned_data.get('email', '').strip()
+                    
+                    # Check if parent with same primary phone already exists
+                    existing_parent = Parent.objects.filter(
+                        Q(first_phone_number=phone) | 
+                        Q(second_phone_number=phone)
+                    ).first()
+                    
+                    if existing_parent:
+                        # Update existing parent
+                        existing_parent.full_name = form.cleaned_data['full_name']
+                        existing_parent.relationship = form.cleaned_data['relationship']
+                        existing_parent.address = form.cleaned_data['address']
+                        existing_parent.email = email
+                        existing_parent.second_phone_number = form.cleaned_data.get('second_phone_number', '')
+                        existing_parent.save()
+                        parent = existing_parent
+                        message = f"Parent '{parent.full_name}' updated successfully!"
+                    else:
+                        # Create new parent
+                        parent = form.save()
+                        message = f"Parent '{parent.full_name}' created successfully!"
+                    
+                    # Get selected student IDs from POST data
+                    student_ids = request.POST.getlist('students')
+                    
+                    if student_ids:
+                        # Get student objects
+                        students = Student.objects.filter(id__in=student_ids, is_active=True)
+                        
+                        # Check for force assignment
+                        force_assignment = request.POST.get('force_assign', 'false') == 'true'
+                        
+                        for student in students:
+                            # Check if student already has this parent
+                            existing_relationship = Parent.objects.filter(
+                                student=student,
+                                parent=parent
+                            ).first()
+                            
+                            if existing_relationship:
+                                # Update existing relationship
+                                existing_relationship.relationship = parent.relationship
+                                existing_relationship.is_fee_responsible = form.cleaned_data.get('is_fee_responsible', False)
+                                existing_relationship.save()
+                            else:
+                                # Check if student has other parents
+                                existing_parents = Parent.objects.filter(
+                                    student=student
+                                ).exclude(parent=parent)
+                                
+                                if existing_parents.exists() and not force_assignment:
+                                    # Get existing parent names
+                                    existing_parent_names = existing_parents.values_list('parent__full_name', flat=True)
+                                    form.add_error(None, 
+                                        f"Student '{student.full_name}' is already assigned to other parent(s): "
+                                        f"{', '.join(existing_parent_names)}. "
+                                        f"Use 'Force assignment' to reassign."
+                                    )
+                                    return render(request, 'admin/students/add_parent.html', {
+                                        'form': form,
+                                        'relationship_choices': RELATIONSHIP_CHOICES,
+                                        'available_students': available_students,
+                                    })
+                                
+                                # If force assignment or no existing parents, create new relationship
+                                if force_assignment:
+                                    # Remove all existing relationships for this student
+                                    existing_parents.delete()
+                                
+                                # Create new relationship
+                                Parent.objects.create(
+                                    student=student,
+                                    parent=parent,
+                                    relationship=parent.relationship,
+                                    is_fee_responsible=form.cleaned_data.get('is_fee_responsible', False)
+                                )
+                    
+                    # Handle fee responsibility
+                    if form.cleaned_data.get('is_fee_responsible', False):
+                        # If this parent is fee responsible, update all their relationships
+                        Parent.objects.filter(parent=parent).update(
+                            is_fee_responsible=True
+                        )
+                    
+                    messages.success(request, message)
+                    
+                    # Handle different actions
+                    if action == 'save_and_view':
+                        return redirect('admin_view_parent', parent_id=parent.id)
+                    elif action == 'save_and_add_another':
+                        return redirect('admin_add_parent')
+                    else:
+                        return redirect('admin_parents_list')
             
-            # Handle students ManyToMany relationship
-            student_ids = request.POST.getlist('students')
-            parent.students.set(student_ids)
-            
-            # Determine redirect based on save_type
-            save_type = request.POST.get('save_type', 'save_list')
-            
-            messages.success(request, f"Parent '{parent.full_name}' has been {'updated' if parent_id else 'added'} successfully.")
-            
-            if save_type == 'save_list':
-                return redirect('admin_parents_list')
-            elif save_type == 'save_add':
-                return redirect('add_parent')
-            elif save_type == 'save_student':
-                return redirect('add_student')  # Assuming you have this URL
-                
-        else:
-            messages.error(request, "Please correct the errors below.")
-    else:
-        form = ParentForm(instance=parent)
+            except ValidationError as e:
+                form.add_error(None, str(e))
+            except Exception as e:
+                form.add_error(None, f"An error occurred: {str(e)}")
     
-    # Get relationship choices from model
-    relationship_choices = RELATIONSHIP_CHOICES
+    else:
+        form = ParentStudentForm()
     
     context = {
         'form': form,
-        'parent': parent,
-        'relationship_choices': relationship_choices,
-        'page_title': 'Edit Parent' if parent else 'Add Parent'
+        'relationship_choices': RELATIONSHIP_CHOICES,
+        'available_students': available_students,
     }
     
-    return render(request, 'admin/student/add_parent.html', context)
+    return render(request, 'admin/students/add_parent.html', context)
 
 
-def search_students_ajax(request):
-    """Search students for Select2 AJAX"""
-    search_term = request.GET.get('q', '')
-    page = int(request.GET.get('page', 1))
-    page_size = 10
+@login_required
+def parent_detail(request, parent_id):
+    """
+    View detailed information about a parent/guardian
+    """
+    parent = get_object_or_404(Parent, id=parent_id)
     
-    # Calculate offset for pagination
-    offset = (page - 1) * page_size
+    # Get all students not assigned to this parent
+    assigned_student_ids = parent.students.values_list('id', flat=True)
+    all_students = Student.objects.filter(
+        is_active=True
+    ).exclude(id__in=assigned_student_ids).order_by('first_name')
     
-    # Build query
-    query = Q()
-    if search_term:
-        query = (
-            Q(first_name__icontains=search_term) |
-            Q(middle_name__icontains=search_term) |
-            Q(last_name__icontains=search_term) |
-            Q(registration_number__icontains=search_term) |
-            Q(examination_number__icontains=search_term)
-        )
+    # Calculate active students count
+    active_students_count = parent.students.filter(is_active=True).count()
     
-    # Get total count
-    total_count = Student.objects.filter(query).count()
+    # Get related parents (parents sharing the same students)
+    related_parents = set()
+    for student in parent.students.all():
+        for other_parent in student.parents.all():
+            if other_parent != parent:
+                related_parents.add(other_parent)
     
-    # Get paginated results
-    students = Student.objects.filter(query).select_related(
-        'class_level', 'stream_class'
-    )[offset:offset + page_size]
+    # Count related parents
+    related_parents_count = len(related_parents)
     
-    # Format results for Select2
-    results = []
-    for student in students:
-        class_info = f"{student.class_level.name}"
-        if student.stream_class:
-            class_info += f" ({student.stream_class.name})"
-        
-        results.append({
-            'id': student.id,
-            'text': student.full_name,
-            'registration_number': student.registration_number,
-            'class_level': class_info,
-            'full_name': student.full_name
-        })
+    context = {
+        'parent': parent,
+        'all_students': all_students,
+        'active_students_count': active_students_count,
+        'related_parents': list(related_parents),
+        'related_parents_count': related_parents_count,
+    }
     
-    return JsonResponse({
-        'results': results,
-        'count': total_count,
-        'pagination': {
-            'more': (page * page_size) < total_count
-        }
+    return render(request, 'admin/students/parent_detail.html', context)
+
+
+@login_required
+def parent_edit(request, parent_id):
+    parent = get_object_or_404(Parent, id=parent_id)
+
+    available_students = Student.objects.filter(
+        is_active=True
+    ).select_related('class_level').order_by('first_name', 'last_name')
+
+    current_students = parent.students.all()
+
+    if request.method == 'POST':
+        form = ParentStudentForm(request.POST, instance=parent)
+        action = request.POST.get('action', 'save')
+
+        if form.is_valid():
+            try:
+                with transaction.atomic():
+
+                    phone = form.cleaned_data['first_phone_number']
+                    email = form.cleaned_data.get('email', '').strip()
+
+                    # 🔹 Check duplicate phone number
+                    existing_parent = Parent.objects.filter(
+                        Q(first_phone_number=phone) | Q(second_phone_number=phone)
+                    ).exclude(id=parent.id).first()
+
+                    if existing_parent:
+                        # Merge parents
+                        existing_parent.full_name = form.cleaned_data['full_name']
+                        existing_parent.relationship = form.cleaned_data['relationship']
+                        existing_parent.address = form.cleaned_data['address']
+                        existing_parent.email = email
+                        existing_parent.second_phone_number = form.cleaned_data.get('second_phone_number', '')
+                        existing_parent.is_fee_responsible = form.cleaned_data.get('is_fee_responsible', False)
+                        existing_parent.save()
+
+                        # Move students
+                        existing_parent.students.add(*current_students)
+                        parent.delete()
+                        parent = existing_parent
+
+                        message = f"Parent merged with existing record '{parent.full_name}'."
+                    else:
+                        parent = form.save()
+                        message = f"Parent '{parent.full_name}' updated successfully."
+
+                    # 🔹 Handle students
+                    student_ids = request.POST.getlist('students')
+                    selected_students = Student.objects.filter(id__in=student_ids, is_active=True)
+
+                    force_assignment = request.POST.get('force_assign') == 'true'
+
+                    for student in selected_students:
+                        other_parents = student.parents.exclude(id=parent.id)
+
+                        if other_parents.exists() and not force_assignment:
+                            names = ", ".join(other_parents.values_list('full_name', flat=True))
+                            raise ValidationError(
+                                f"Student '{student.full_name}' already assigned to: {names}. "
+                                f"Use force assignment to override."
+                            )
+
+                        if force_assignment:
+                            student.parents.clear()
+
+                        parent.students.add(student)
+
+                    # 🔹 Remove unchecked students
+                    for student in current_students:
+                        if str(student.id) not in student_ids:
+                            parent.students.remove(student)
+
+                    messages.success(request, message)
+
+                    if action == 'save_and_view':
+                        return redirect('admin_view_parent', parent_id=parent.id)
+                    elif action == 'save_and_add_another':
+                        return redirect('admin_add_parent')
+                    else:
+                        return redirect('admin_parents_list')
+
+            except ValidationError as e:
+                form.add_error(None, e.message)
+            except Exception as e:
+                form.add_error(None, f"Unexpected error: {str(e)}")
+
+    else:
+        form = ParentStudentForm(instance=parent)
+
+    return render(request, 'admin/students/edit_parent.html', {
+        'form': form,
+        'parent': parent,
+        'current_students': current_students,
+        'relationship_choices': RELATIONSHIP_CHOICES,
+        'available_students': available_students,
     })
 
-def get_students_details_ajax(request):
-    """Get detailed information for selected students"""
-    student_ids = request.GET.get('student_ids', '').split(',')
-    
-    try:
-        student_ids = [int(id) for id in student_ids if id]
-        students = Student.objects.filter(id__in=student_ids).select_related(
-            'class_level', 'stream_class'
-        )
-        
-        student_details = []
-        for student in students:
-            student_details.append({
-                'id': student.id,
-                'full_name': student.full_name,
-                'first_name': student.first_name,
-                'last_name': student.last_name,
-                'registration_number': student.registration_number,
-                'class_level': student.class_level.name if student.class_level else 'N/A',
-                'stream_class': student.stream_class.name if student.stream_class else None,
-                'initials': f"{student.first_name[0] if student.first_name else ''}{student.last_name[0] if student.last_name else ''}".upper()
-            })
-        
-        return JsonResponse({
-            'success': True,
-            'students': student_details
-        })
-        
-    except Exception as e:
-        return JsonResponse({
-            'success': False,
-            'error': str(e)
-        }, status=500)
 
 
-@login_required
-def parent_edit(request, id):
-    """Edit parent"""
-    parent = get_object_or_404(Parent, id=id)
-    
+
+
+def parent_delete(request):
+    """
+    AJAX view for deleting a parent
+    """
     if request.method == 'POST':
-        form = ParentForm(request.POST, instance=parent)
-        if form.is_valid():
-            parent = form.save(commit=False)
-            
-            # Handle students if provided
-            students_data = request.POST.get('students', '')
-            if students_data:
-                student_ids = json.loads(students_data)
-                parent.save()  # Save first to get ID
-                parent.students.set(student_ids)
-            else:
-                parent.save()
-            
-            if request.headers.get('x-requested-with') == 'XMLHttpRequest':
-                return JsonResponse({
-                    'success': True,
-                    'message': f'Parent {parent.full_name} updated successfully!',
-                    'redirect_url': reverse('admin_parents_list')
-                })
-            return redirect('admin_parents_list')
-        else:
-            if request.headers.get('x-requested-with') == 'XMLHttpRequest':
-                errors = {field: error[0] for field, error in form.errors.items()}
-                return JsonResponse({
-                    'success': False,
-                    'message': 'Please correct the errors below.',
-                    'errors': errors
-                })
-    
-    # GET request - show form
-    form = ParentForm(instance=parent)
-    
-    # Get current students
-    current_students = list(parent.students.values_list('id', flat=True))
-    students = Student.objects.filter(is_active=True).order_by('first_name')
-    
-    context = {
-        'form': form,
-        'parent': parent,
-        'students': students,
-        'current_students': json.dumps(current_students),
-        'relationship_choices': Parent.RELATIONSHIP_CHOICES,
-    }
-    
-    if request.headers.get('x-requested-with') == 'XMLHttpRequest':
-        return render(request, 'admin/students/partials/parent_form.html', context)
-    
-    return render(request, 'admin/students/parent_edit.html', context)
-
-@login_required
-def parent_delete(request, id):
-    """Delete parent"""
-    parent = get_object_or_404(Parent, id=id)
-    
-    if request.method == 'POST':
-        parent_name = parent.full_name
-        parent.delete()
-        
-        if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+        parent_id = request.POST.get('parent_id')
+        try:
+            parent = Parent.objects.get(id=parent_id)
+            parent_name = parent.full_name
+            parent.delete()
             return JsonResponse({
                 'success': True,
-                'message': f'Parent {parent_name} deleted successfully!'
+                'message': f'Parent "{parent_name}" has been deleted successfully.'
             })
-        return redirect('admin_parents_list')
+        except Parent.DoesNotExist:
+            return JsonResponse({
+                'success': False,
+                'message': 'Parent not found.'
+            })
     
-    context = {
-        'parent': parent
-    }
-    return render(request, 'admin/students/parent_delete.html', context)
-
-@login_required
-@require_POST
-def parents_ajax(request):
-    """Handle AJAX requests for parent operations"""
-    action = request.POST.get('action')
+    return JsonResponse({
+        'success': False,
+        'message': 'Invalid request method.'
+    }) 
     
-    if action == 'delete':
-        parent_id = request.POST.get('id')
-        parent = get_object_or_404(Parent, id=parent_id)
-        parent_name = parent.full_name
-        parent.delete()
-        
-        return JsonResponse({
-            'success': True,
-            'message': f'Parent {parent_name} deleted successfully!'
-        })
     
-    elif action == 'toggle_fee_responsible':
-        parent_id = request.POST.get('id')
-        parent = get_object_or_404(Parent, id=parent_id)
-        parent.is_fee_responsible = not parent.is_fee_responsible
-        parent.save()
-        
-        return JsonResponse({
-            'success': True,
-            'message': f'Updated fee responsibility for {parent.full_name}',
-            'is_fee_responsible': parent.is_fee_responsible
-        })
-    
-    elif action == 'get_parent':
-        parent_id = request.POST.get('id')
-        parent = get_object_or_404(Parent, id=parent_id)
-        
-        return JsonResponse({
-            'success': True,
-            'parent': {
-                'id': parent.id,
-                'full_name': parent.full_name,
-                'relationship': parent.relationship,
-                'relationship_display': parent.get_relationship_display(),
-                'address': parent.address,
-                'email': parent.email,
-                'first_phone_number': parent.first_phone_number,
-                'second_phone_number': parent.second_phone_number,
-                'is_fee_responsible': parent.is_fee_responsible,
-                'students': [{'id': s.id, 'name': s.full_name} for s in parent.students.all()],
-                'student_count': parent.students.count(),
-            }
-        })
-    
-    elif action == 'search_students':
-        search_query = request.POST.get('search', '')
-        students = Student.objects.filter(is_active=True)
-        
-        if search_query:
-            students = students.filter(
-                Q(first_name__icontains=search_query) |
-                Q(last_name__icontains=search_query) |
-                Q(registration_number__icontains=search_query)
-            )
-        
-        student_list = [{'id': s.id, 'text': f'{s.full_name} ({s.registration_number})'} 
-                       for s in students[:10]]
-        
-        return JsonResponse({
-            'success': True,
-            'results': student_list
-        })
-    
-    return JsonResponse({'success': False, 'message': 'Invalid action'})
 
 # ============================================
 # PREVIOUS SCHOOL VIEWS
 # ============================================
 
 @login_required
-def previous_schools(request):
-    """List all previous schools"""
-    schools = PreviousSchool.objects.annotate(
-        student_count=Count('students'),
-        transferred_student_count=Count('transferred_students')
-    ).all()
+def previous_schools_list(request):
+    """Display previous schools management page"""
+    schools = PreviousSchool.objects.all().order_by('name')
     
-    # Filters
-    search_query = request.GET.get('search', '')
-    level_filter = request.GET.get('level', '')
-    
-    if search_query:
-        schools = schools.filter(
-            Q(name__icontains=search_query) |
-            Q(location__icontains=search_query)
-        )
-    
-    if level_filter:
-        schools = schools.filter(school_level=level_filter)
-    
-    # Statistics
-    total_schools = schools.count()
-    total_students_from_schools = sum(school.student_count for school in schools)
-    
-    # Pagination
-    paginator = Paginator(schools.order_by('name'), 25)
-    page = request.GET.get('page', 1)
-    schools_page = paginator.get_page(page)
+    # Get school level choices from model
+    school_level_choices = PreviousSchool.SCHOOL_LEVEL_CHOICES
     
     context = {
-        'schools': schools_page,
-        'level_choices': PreviousSchool.SCHOOL_LEVEL_CHOICES,
-        'search_query': search_query,
-        'level_filter': level_filter,
-        'total_schools': total_schools,
-        'total_students_from_schools': total_students_from_schools,
+        'schools': schools,
+        'school_level_choices': school_level_choices,
     }
-    return render(request, 'admin/students/previous_schools.html', context)
+    
+    return render(request, 'admin/students/previous_schools_list.html', context)
+
 
 @login_required
-def previous_school_add(request):
-    """Add new previous school"""
+def previous_schools_crud(request):
+    """Handle AJAX CRUD operations for previous schools"""
     if request.method == 'POST':
-        form = PreviousSchoolForm(request.POST)
-        if form.is_valid():
-            school = form.save()
-            
-            if request.headers.get('x-requested-with') == 'XMLHttpRequest':
-                return JsonResponse({
-                    'success': True,
-                    'message': f'School {school.name} added successfully!',
-                    'school': {
-                        'id': school.id,
-                        'name': school.name,
-                        'school_level': school.get_school_level_display(),
-                        'location': school.location,
-                        'student_count': 0,
-                    }
-                })
-            return redirect('admin_previous_schools')
-        else:
-            if request.headers.get('x-requested-with') == 'XMLHttpRequest':
-                errors = {field: error[0] for field, error in form.errors.items()}
+        action = request.POST.get('action', '').lower()
+        
+        try:
+            if action == 'create':
+                return create_previous_school(request)
+            elif action == 'update':
+                return update_previous_school(request)
+            elif action == 'delete':
+                return delete_previous_school(request)
+            else:
                 return JsonResponse({
                     'success': False,
-                    'message': 'Please correct the errors below.',
-                    'errors': errors
+                    'message': 'Invalid action specified.'
                 })
-    
-    # GET request - show form
-    form = PreviousSchoolForm()
-    
-    context = {
-        'form': form,
-        'level_choices': PreviousSchool.SCHOOL_LEVEL_CHOICES,
-    }
-    
-    if request.headers.get('x-requested-with') == 'XMLHttpRequest':
-        return render(request, 'admin/students/partials/school_form.html', context)
-    
-    return render(request, 'admin/students/previous_school_add.html', context)
-
-@login_required
-def previous_school_edit(request, id):
-    """Edit previous school"""
-    school = get_object_or_404(PreviousSchool, id=id)
-    
-    if request.method == 'POST':
-        form = PreviousSchoolForm(request.POST, instance=school)
-        if form.is_valid():
-            school = form.save()
-            
-            if request.headers.get('x-requested-with') == 'XMLHttpRequest':
-                return JsonResponse({
-                    'success': True,
-                    'message': f'School {school.name} updated successfully!',
-                    'redirect_url': reverse('admin_previous_schools')
-                })
-            return redirect('admin_previous_schools')
-        else:
-            if request.headers.get('x-requested-with') == 'XMLHttpRequest':
-                errors = {field: error[0] for field, error in form.errors.items()}
-                return JsonResponse({
-                    'success': False,
-                    'message': 'Please correct the errors below.',
-                    'errors': errors
-                })
-    
-    # GET request - show form
-    form = PreviousSchoolForm(instance=school)
-    
-    # Get students from this school
-    students = Student.objects.filter(
-        Q(previous_school=school) | Q(transfer_from_school=school)
-    ).distinct().count()
-    
-    context = {
-        'form': form,
-        'school': school,
-        'students_count': students,
-        'level_choices': PreviousSchool.SCHOOL_LEVEL_CHOICES,
-    }
-    
-    if request.headers.get('x-requested-with') == 'XMLHttpRequest':
-        return render(request, 'admin/students/partials/school_form.html', context)
-    
-    return render(request, 'admin/students/previous_school_edit.html', context)
-
-@login_required
-def previous_school_delete(request, id):
-    """Delete previous school"""
-    school = get_object_or_404(PreviousSchool, id=id)
-    
-    if request.method == 'POST':
-        school_name = school.name
-        school.delete()
-        
-        if request.headers.get('x-requested-with') == 'XMLHttpRequest':
-            return JsonResponse({
-                'success': True,
-                'message': f'School {school_name} deleted successfully!'
-            })
-        return redirect('admin_previous_schools')
-    
-    context = {
-        'school': school
-    }
-    return render(request, 'admin/students/previous_school_delete.html', context)
-
-@login_required
-@require_POST
-def previous_schools_ajax(request):
-    """Handle AJAX requests for previous school operations"""
-    action = request.POST.get('action')
-    
-    if action == 'delete':
-        school_id = request.POST.get('id')
-        school = get_object_or_404(PreviousSchool, id=school_id)
-        school_name = school.name
-        
-        # Check if school has students
-        student_count = Student.objects.filter(
-            Q(previous_school=school) | Q(transfer_from_school=school)
-        ).count()
-        
-        if student_count > 0:
+                
+        except ValidationError as e:
             return JsonResponse({
                 'success': False,
-                'message': f'Cannot delete {school_name}. It has {student_count} student(s) associated.'
+                'message': str(e)
             })
-        
-        school.delete()
-        
+        except Exception as e:
+            return JsonResponse({
+                'success': False,
+                'message': f'An error occurred: {str(e)}'
+            })
+    
+    return JsonResponse({
+        'success': False,
+        'message': 'POST request required.'
+    })
+
+
+def create_previous_school(request):
+    """Create a new previous school"""
+    # Get and validate required fields
+    name = request.POST.get('name', '').strip()
+    if not name:
         return JsonResponse({
-            'success': True,
-            'message': f'School {school_name} deleted successfully!'
+            'success': False,
+            'message': 'School name is required.'
         })
     
-    elif action == 'get_school':
-        school_id = request.POST.get('id')
-        school = get_object_or_404(PreviousSchool, id=school_id)
+    school_level = request.POST.get('school_level', '').strip()
+    if not school_level:
+        return JsonResponse({
+            'success': False,
+            'message': 'School level is required.'
+        })
+    
+    # Validate school level choice
+    valid_levels = [choice[0] for choice in PreviousSchool.SCHOOL_LEVEL_CHOICES]
+    if school_level not in valid_levels:
+        return JsonResponse({
+            'success': False,
+            'message': 'Invalid school level selected.'
+        })
+    
+    # Validate name length
+    if len(name) < 2:
+        return JsonResponse({
+            'success': False,
+            'message': 'School name must be at least 2 characters long.'
+        })
+    
+    if len(name) > 200:
+        return JsonResponse({
+            'success': False,
+            'message': 'School name cannot exceed 200 characters.'
+        })
+    
+    # Get optional field
+    location = request.POST.get('location', '').strip()
+    
+    # Validate location length if provided
+    if location and len(location) > 200:
+        return JsonResponse({
+            'success': False,
+            'message': 'Location cannot exceed 200 characters.'
+        })
+    
+    try:
+        # Check for duplicate school name (case-insensitive)
+        if PreviousSchool.objects.filter(name__iexact=name).exists():
+            return JsonResponse({
+                'success': False,
+                'message': f'A school with name "{name}" already exists.'
+            })
         
-        # Get student counts
-        student_count = Student.objects.filter(previous_school=school).count()
-        transferred_count = Student.objects.filter(transfer_from_school=school).count()
+        # Create the school
+        school = PreviousSchool.objects.create(
+            name=name,
+            school_level=school_level,
+            location=location if location else None
+        )
         
         return JsonResponse({
             'success': True,
+            'message': f'Previous school "{name}" created successfully.',
             'school': {
                 'id': school.id,
                 'name': school.name,
                 'school_level': school.school_level,
                 'school_level_display': school.get_school_level_display(),
                 'location': school.location,
-                'student_count': student_count,
-                'transferred_student_count': transferred_count,
-                'created_at': school.created_at.strftime('%Y-%m-%d'),
+                'created_at': school.created_at.strftime('%Y-%m-%d')
             }
         })
+        
+    except IntegrityError as e:
+        if 'unique' in str(e).lower():
+            return JsonResponse({
+                'success': False,
+                'message': f'A school with name "{name}" already exists.'
+            })
+        return JsonResponse({
+            'success': False,
+            'message': f'Database error: {str(e)}'
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'Error creating school: {str(e)}'
+        })
+
+
+def update_previous_school(request):
+    """Update an existing previous school"""
+    school_id = request.POST.get('id')
+    if not school_id:
+        return JsonResponse({
+            'success': False,
+            'message': 'School ID is required.'
+        })
     
-    elif action == 'search':
-        search_query = request.POST.get('search', '')
-        schools = PreviousSchool.objects.all()
+    try:
+        school = PreviousSchool.objects.get(id=school_id)
+    except PreviousSchool.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'message': 'School not found.'
+        })
+    
+    # Get and validate required fields
+    name = request.POST.get('name', '').strip()
+    school_level = request.POST.get('school_level', '').strip()
+    
+    if not name or not school_level:
+        return JsonResponse({
+            'success': False,
+            'message': 'School name and level are required.'
+        })
+    
+    # Validate school level choice
+    valid_levels = [choice[0] for choice in PreviousSchool.SCHOOL_LEVEL_CHOICES]
+    if school_level not in valid_levels:
+        return JsonResponse({
+            'success': False,
+            'message': 'Invalid school level selected.'
+        })
+    
+    # Validate name length
+    if len(name) < 2:
+        return JsonResponse({
+            'success': False,
+            'message': 'School name must be at least 2 characters long.'
+        })
+    
+    if len(name) > 200:
+        return JsonResponse({
+            'success': False,
+            'message': 'School name cannot exceed 200 characters.'
+        })
+    
+    # Get optional field
+    location = request.POST.get('location', '').strip()
+    
+    # Validate location length if provided
+    if location and len(location) > 200:
+        return JsonResponse({
+            'success': False,
+            'message': 'Location cannot exceed 200 characters.'
+        })
+    
+    try:
+        # Check for duplicate school name (case-insensitive, excluding current)
+        if PreviousSchool.objects.filter(name__iexact=name).exclude(id=school.id).exists():
+            return JsonResponse({
+                'success': False,
+                'message': f'A school with name "{name}" already exists.'
+            })
         
-        if search_query:
-            schools = schools.filter(
-                Q(name__icontains=search_query) |
-                Q(location__icontains=search_query)
-            )
-        
-        school_list = [{'id': s.id, 'text': f'{s.name} ({s.get_school_level_display()}) - {s.location}'} 
-                      for s in schools[:10]]
+        # Update the school
+        school.name = name
+        school.school_level = school_level
+        school.location = location if location else None
+        school.save()
         
         return JsonResponse({
             'success': True,
-            'results': school_list
+            'message': f'Previous school "{name}" updated successfully.',
+            'school': {
+                'id': school.id,
+                'name': school.name,
+                'school_level': school.school_level,
+                'school_level_display': school.get_school_level_display(),
+                'location': school.location,
+                'created_at': school.created_at.strftime('%Y-%m-%d')
+            }
+        })
+        
+    except IntegrityError as e:
+        if 'unique' in str(e).lower():
+            return JsonResponse({
+                'success': False,
+                'message': f'A school with name "{name}" already exists.'
+            })
+        return JsonResponse({
+            'success': False,
+            'message': f'Database error: {str(e)}'
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'Error updating school: {str(e)}'
+        })
+
+
+def delete_previous_school(request):
+    """Delete a previous school"""
+    school_id = request.POST.get('id')
+    if not school_id:
+        return JsonResponse({
+            'success': False,
+            'message': 'School ID is required.'
         })
     
-    return JsonResponse({'success': False, 'message': 'Invalid action'})
+    try:
+        school = PreviousSchool.objects.get(id=school_id)
+        school_name = school.name
+        
+        # Check if school is referenced by any student
+
+        if school.students.exists() or school.transferred_students.exists():
+            student_count = school.students.count() + school.transferred_students.count()
+            return JsonResponse({
+                'success': False,
+                'message': f'Cannot delete school "{school_name}". It is referenced by {student_count} student(s).'
+            })
+        
+        # Delete the school
+        school.delete()
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'Previous school "{school_name}" deleted successfully.'
+        })
+        
+    except PreviousSchool.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'message': 'School not found.'
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'Error deleting school: {str(e)}'
+        })
 
 # ============================================
 # HELPER VIEWS
@@ -4444,61 +5213,589 @@ def student_export(request):
 # ============================================================================
 
 @login_required
-def staff_list(request):
-    """List all staff members"""
-    staff_members = Staffs.objects.select_related('admin').all()
+def staffs_list(request):
+    """Display staff management page"""
+    staffs = Staffs.objects.select_related('admin').all().order_by('admin__last_name', 'admin__first_name')
+    
+    # Count active staff
+    active_staff_count = staffs.filter(admin__is_active=True).count()
     
     context = {
-        'page_title': 'Staff List',
-        'staff_members': staff_members,
+        'staffs': staffs,
+        'active_staff_count': active_staff_count,
     }
-    return render(request, 'admin/staff/list.html', context)
+    
+    return render(request, 'admin/staff/staffs_list.html', context)
+
 
 @login_required
-def staff_add(request):
-    """Add new staff member"""
+def staffs_crud(request):
+    """Handle AJAX CRUD operations for staff"""
     if request.method == 'POST':
+        action = request.POST.get('action', '').lower()
+        
         try:
-            # Create user first
-            username = request.POST.get('username')
-            email = request.POST.get('email')
-            first_name = request.POST.get('first_name')
-            last_name = request.POST.get('last_name')
-            password = request.POST.get('password')
-            
-            user = CustomUser.objects.create_user(
+            if action == 'create':
+                return create_staff(request)
+            elif action == 'update':
+                return update_staff(request)
+            elif action == 'toggle_status':
+                return toggle_staff_status(request)
+            elif action == 'delete':
+                return delete_staff(request)
+            else:
+                return JsonResponse({
+                    'success': False,
+                    'message': 'Invalid action specified.'
+                })
+                
+        except ValidationError as e:
+            return JsonResponse({
+                'success': False,
+                'message': str(e)
+            })
+        except Exception as e:
+            return JsonResponse({
+                'success': False,
+                'message': f'An error occurred: {str(e)}'
+            })
+    
+    return JsonResponse({
+        'success': False,
+        'message': 'POST request required.'
+    })
+
+
+def create_staff(request):
+    """Create a new staff member"""
+    # Get and validate required fields
+    first_name = request.POST.get('first_name', '').strip()
+    last_name = request.POST.get('last_name', '').strip()
+    username = request.POST.get('username', '').strip()
+    email = request.POST.get('email', '').strip()
+    password = request.POST.get('password', '').strip()
+    confirm_password = request.POST.get('confirm_password', '').strip()
+    user_type = request.POST.get('user_type', '').strip()
+    
+    # Validate required fields
+    required_fields = {
+        'first_name': first_name,
+        'last_name': last_name,
+        'username': username,
+        'email': email,
+        'password': password,
+        'user_type': user_type
+    }
+    
+    for field_name, value in required_fields.items():
+        if not value:
+            return JsonResponse({
+                'success': False,
+                'message': f'{field_name.replace("_", " ").title()} is required.'
+            })
+    
+    # Validate name length
+    if len(first_name) < 2 or len(last_name) < 2:
+        return JsonResponse({
+            'success': False,
+            'message': 'First name and last name must be at least 2 characters long.'
+        })
+    
+    if len(first_name) > 50 or len(last_name) > 50:
+        return JsonResponse({
+            'success': False,
+            'message': 'First name and last name cannot exceed 50 characters.'
+        })
+    
+    # Validate username
+    if len(username) < 3 or len(username) > 150:
+        return JsonResponse({
+            'success': False,
+            'message': 'Username must be 3-150 characters long.'
+        })
+    
+    # Validate email
+    if '@' not in email or '.' not in email:
+        return JsonResponse({
+            'success': False,
+            'message': 'Please enter a valid email address.'
+        })
+    
+    # Validate password
+    if password != confirm_password:
+        return JsonResponse({
+            'success': False,
+            'message': 'Passwords do not match.'
+        })
+    
+    if len(password) < 8:
+        return JsonResponse({
+            'success': False,
+            'message': 'Password must be at least 8 characters long.'
+        })
+    
+    # Validate user_type
+    if user_type not in ['1', '2']:
+        return JsonResponse({
+            'success': False,
+            'message': 'Invalid user type selected.'
+        })
+    
+    # Check for existing username
+    if CustomUser.objects.filter(username=username).exists():
+        return JsonResponse({
+            'success': False,
+            'message': 'Username already exists.'
+        })
+    
+    # Check for existing email
+    if CustomUser.objects.filter(email=email).exists():
+        return JsonResponse({
+            'success': False,
+            'message': 'Email already exists.'
+        })
+    
+    # Get optional fields
+    middle_name = request.POST.get('middle_name', '').strip()
+    gender = request.POST.get('gender', '').strip()
+    date_of_birth = request.POST.get('date_of_birth', '').strip()
+    phone_number = request.POST.get('phone_number', '').strip()
+    marital_status = request.POST.get('marital_status', '').strip()
+    role = request.POST.get('role', '').strip()
+    work_place = request.POST.get('work_place', '').strip()
+    joining_date = request.POST.get('joining_date', '').strip()
+    is_active = request.POST.get('is_active') == 'on' or request.POST.get('is_active') == 'true'
+    
+    # Validate phone number if provided
+    if phone_number and len(phone_number) > 14:
+        return JsonResponse({
+            'success': False,
+            'message': 'Phone number cannot exceed 14 digits.'
+        })
+    
+    # Parse dates
+    date_of_birth_obj = None
+    if date_of_birth:
+        try:
+            date_of_birth_obj = datetime.strptime(date_of_birth, '%Y-%m-%d').date()
+        except ValueError:
+            return JsonResponse({
+                'success': False,
+                'message': 'Invalid date of birth format. Use YYYY-MM-DD.'
+            })
+    
+    joining_date_obj = None
+    if joining_date:
+        try:
+            joining_date_obj = datetime.strptime(joining_date, '%Y-%m-%d').date()
+        except ValueError:
+            return JsonResponse({
+                'success': False,
+                'message': 'Invalid joining date format. Use YYYY-MM-DD.'
+            })
+    
+    try:
+        with transaction.atomic():
+            # Create CustomUser
+            user = CustomUser.objects.create(
                 username=username,
                 email=email,
-                password=password,
-                user_type=2,  # Staff user type
                 first_name=first_name,
-                last_name=last_name
+                last_name=last_name,
+                password=make_password(password),
+                user_type=user_type,
+                is_active=is_active
             )
             
-            # Create staff profile
-            middle_name = request.POST.get('middle_name', '')
-            gender = request.POST.get('gender')
-            role = request.POST.get('role')
-            
-            Staffs.objects.create(
+            # Create Staffs
+            staff = Staffs.objects.create(
                 admin=user,
                 middle_name=middle_name,
                 gender=gender,
-                role=role
+                date_of_birth=date_of_birth_obj or datetime(2000, 1, 1).date(),
+                phone_number=phone_number,
+                marital_status=marital_status,
+                role=role,
+                work_place=work_place,
+                joining_date=joining_date_obj
             )
             
-            messages.success(request, f'Staff member "{first_name} {last_name}" added successfully.')
-            return redirect('admin:admin_staff_list')
+            # Handle file uploads
+            if 'profile_picture' in request.FILES:
+                profile_picture = request.FILES['profile_picture']
+                if profile_picture.size > 2 * 1024 * 1024:  # 2MB
+                    raise ValidationError('Profile picture size should not exceed 2MB.')
+                
+                # Validate file extension
+                valid_extensions = ['.jpg', '.jpeg', '.png', '.gif']
+                ext = os.path.splitext(profile_picture.name)[1].lower()
+                if ext not in valid_extensions:
+                    raise ValidationError('Invalid file type for profile picture. Allowed: JPG, PNG, GIF.')
+                
+                # Save the file
+                file_name = f'staff_{staff.id}_profile{ext}'
+                file_path = default_storage.save(f'profile_pictures/{file_name}', profile_picture)
+                staff.profile_picture = file_path
             
-        except Exception as e:
-            messages.error(request, f'Error adding staff: {str(e)}')
+            if 'signature' in request.FILES:
+                signature = request.FILES['signature']
+                if signature.size > 1 * 1024 * 1024:  # 1MB
+                    raise ValidationError('Signature size should not exceed 1MB.')
+                
+                # Validate file extension
+                valid_extensions = ['.jpg', '.jpeg', '.png']
+                ext = os.path.splitext(signature.name)[1].lower()
+                if ext not in valid_extensions:
+                    raise ValidationError('Invalid file type for signature. Allowed: JPG, PNG.')
+                
+                # Save the file
+                file_name = f'staff_{staff.id}_signature{ext}'
+                file_path = default_storage.save(f'signatures/{file_name}', signature)
+                staff.signature = file_path
+            
+            staff.save()
+            
+            return JsonResponse({
+                'success': True,
+                'message': f'Staff member "{staff.get_full_name()}" created successfully.',
+                'staff': {
+                    'id': staff.id,
+                    'full_name': staff.get_full_name(),
+                    'username': staff.admin.username,
+                    'email': staff.admin.email,
+                    'is_active': staff.admin.is_active
+                }
+            })
+            
+    except IntegrityError as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'Database error: {str(e)}'
+        })
+    except ValidationError as e:
+        return JsonResponse({
+            'success': False,
+            'message': str(e)
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'Error creating staff: {str(e)}'
+        })
+
+
+def update_staff(request):
+    """Update an existing staff member"""
+    staff_id = request.POST.get('id')
+    if not staff_id:
+        return JsonResponse({
+            'success': False,
+            'message': 'Staff ID is required.'
+        })
+    
+    try:
+        staff = Staffs.objects.get(id=staff_id)
+    except Staffs.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'message': 'Staff member not found.'
+        })
+    
+    # Get and validate required fields
+    first_name = request.POST.get('first_name', '').strip()
+    last_name = request.POST.get('last_name', '').strip()
+    username = request.POST.get('username', '').strip()
+    email = request.POST.get('email', '').strip()
+    user_type = request.POST.get('user_type', '').strip()
+    
+    # Validate required fields
+    if not all([first_name, last_name, username, email, user_type]):
+        return JsonResponse({
+            'success': False,
+            'message': 'First name, last name, username, email, and user type are required.'
+        })
+    
+    # Validate name length
+    if len(first_name) < 2 or len(last_name) < 2:
+        return JsonResponse({
+            'success': False,
+            'message': 'First name and last name must be at least 2 characters long.'
+        })
+    
+    # Validate username
+    if len(username) < 3 or len(username) > 150:
+        return JsonResponse({
+            'success': False,
+            'message': 'Username must be 3-150 characters long.'
+        })
+    
+    # Validate email
+    if '@' not in email or '.' not in email:
+        return JsonResponse({
+            'success': False,
+            'message': 'Please enter a valid email address.'
+        })
+    
+    # Validate user_type
+    if user_type not in ['1', '2']:
+        return JsonResponse({
+            'success': False,
+            'message': 'Invalid user type selected.'
+        })
+    
+    # Check for existing username (excluding current)
+    if CustomUser.objects.filter(username=username).exclude(id=staff.admin.id).exists():
+        return JsonResponse({
+            'success': False,
+            'message': 'Username already exists.'
+        })
+    
+    # Check for existing email (excluding current)
+    if CustomUser.objects.filter(email=email).exclude(id=staff.admin.id).exists():
+        return JsonResponse({
+            'success': False,
+            'message': 'Email already exists.'
+        })
+    
+    # Handle password change
+    password = request.POST.get('password', '').strip()
+    confirm_password = request.POST.get('confirm_password', '').strip()
+    
+    if password:
+        if password != confirm_password:
+            return JsonResponse({
+                'success': False,
+                'message': 'Passwords do not match.'
+            })
+        
+        if len(password) < 8:
+            return JsonResponse({
+                'success': False,
+                'message': 'Password must be at least 8 characters long.'
+            })
+    
+    # Get optional fields
+    middle_name = request.POST.get('middle_name', '').strip()
+    gender = request.POST.get('gender', '').strip()
+    date_of_birth = request.POST.get('date_of_birth', '').strip()
+    phone_number = request.POST.get('phone_number', '').strip()
+    marital_status = request.POST.get('marital_status', '').strip()
+    role = request.POST.get('role', '').strip()
+    work_place = request.POST.get('work_place', '').strip()
+    joining_date = request.POST.get('joining_date', '').strip()
+    is_active = request.POST.get('is_active') == 'on' or request.POST.get('is_active') == 'true'
+    
+    # Validate phone number if provided
+    if phone_number and len(phone_number) > 14:
+        return JsonResponse({
+            'success': False,
+            'message': 'Phone number cannot exceed 14 digits.'
+        })
+    
+    # Parse dates
+    date_of_birth_obj = None
+    if date_of_birth:
+        try:
+            date_of_birth_obj = datetime.strptime(date_of_birth, '%Y-%m-%d').date()
+        except ValueError:
+            return JsonResponse({
+                'success': False,
+                'message': 'Invalid date of birth format. Use YYYY-MM-DD.'
+            })
+    
+    joining_date_obj = None
+    if joining_date:
+        try:
+            joining_date_obj = datetime.strptime(joining_date, '%Y-%m-%d').date()
+        except ValueError:
+            return JsonResponse({
+                'success': False,
+                'message': 'Invalid joining date format. Use YYYY-MM-DD.'
+            })
+    
+    try:
+        with transaction.atomic():
+            # Update CustomUser
+            user = staff.admin
+            user.username = username
+            user.email = email
+            user.first_name = first_name
+            user.last_name = last_name
+            user.user_type = user_type
+            user.is_active = is_active
+            
+            if password:
+                user.password = make_password(password)
+            
+            user.save()
+            
+            # Update Staffs
+            staff.middle_name = middle_name
+            staff.gender = gender
+            if date_of_birth_obj:
+                staff.date_of_birth = date_of_birth_obj
+            staff.phone_number = phone_number
+            staff.marital_status = marital_status
+            staff.role = role
+            staff.work_place = work_place
+            if joining_date_obj:
+                staff.joining_date = joining_date_obj
+            
+            # Handle file uploads
+            if 'profile_picture' in request.FILES:
+                profile_picture = request.FILES['profile_picture']
+                if profile_picture.size > 2 * 1024 * 1024:  # 2MB
+                    raise ValidationError('Profile picture size should not exceed 2MB.')
+                
+                # Validate file extension
+                valid_extensions = ['.jpg', '.jpeg', '.png', '.gif']
+                ext = os.path.splitext(profile_picture.name)[1].lower()
+                if ext not in valid_extensions:
+                    raise ValidationError('Invalid file type for profile picture. Allowed: JPG, PNG, GIF.')
+                
+                # Delete old file if exists
+                if staff.profile_picture:
+                    default_storage.delete(staff.profile_picture.name)
+                
+                # Save new file
+                file_name = f'staff_{staff.id}_profile{ext}'
+                file_path = default_storage.save(f'profile_pictures/{file_name}', profile_picture)
+                staff.profile_picture = file_path
+            
+            if 'signature' in request.FILES:
+                signature = request.FILES['signature']
+                if signature.size > 1 * 1024 * 1024:  # 1MB
+                    raise ValidationError('Signature size should not exceed 1MB.')
+                
+                # Validate file extension
+                valid_extensions = ['.jpg', '.jpeg', '.png']
+                ext = os.path.splitext(signature.name)[1].lower()
+                if ext not in valid_extensions:
+                    raise ValidationError('Invalid file type for signature. Allowed: JPG, PNG.')
+                
+                # Delete old file if exists
+                if staff.signature:
+                    default_storage.delete(staff.signature.name)
+                
+                # Save new file
+                file_name = f'staff_{staff.id}_signature{ext}'
+                file_path = default_storage.save(f'signatures/{file_name}', signature)
+                staff.signature = file_path
+            
+            staff.save()
+            
+            return JsonResponse({
+                'success': True,
+                'message': f'Staff member "{staff.get_full_name()}" updated successfully.',
+                'staff': {
+                    'id': staff.id,
+                    'full_name': staff.get_full_name(),
+                    'username': staff.admin.username,
+                    'email': staff.admin.email,
+                    'is_active': staff.admin.is_active
+                }
+            })
+            
+    except IntegrityError as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'Database error: {str(e)}'
+        })
+    except ValidationError as e:
+        return JsonResponse({
+            'success': False,
+            'message': str(e)
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'Error updating staff: {str(e)}'
+        })
+
+
+def toggle_staff_status(request):
+    """Toggle staff active status"""
+    staff_id = request.POST.get('id')
+    if not staff_id:
+        return JsonResponse({
+            'success': False,
+            'message': 'Staff ID is required.'
+        })
+    
+    try:
+        staff = Staffs.objects.get(id=staff_id)
+        staff.admin.is_active = not staff.admin.is_active
+        staff.admin.save()
+        
+        status_text = 'activated' if staff.admin.is_active else 'deactivated'
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'Staff member "{staff.get_full_name()}" {status_text} successfully.',
+            'is_active': staff.admin.is_active
+        })
+        
+    except Staffs.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'message': 'Staff member not found.'
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'Error updating staff status: {str(e)}'
+        })
+
+
+def delete_staff(request):
+    """Delete a staff member"""
+    staff_id = request.POST.get('id')
+    if not staff_id:
+        return JsonResponse({
+            'success': False,
+            'message': 'Staff ID is required.'
+        })
+    
+    try:
+        staff = Staffs.objects.get(id=staff_id)
+        full_name = staff.get_full_name()
+        
+        # Delete associated files
+        if staff.profile_picture:
+            default_storage.delete(staff.profile_picture.name)
+        if staff.signature:
+            default_storage.delete(staff.signature.name)
+        
+        # Delete the CustomUser (will cascade to Staffs due to OneToOne relationship)
+        staff.admin.delete()
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'Staff member "{full_name}" deleted successfully.'
+        })
+        
+    except Staffs.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'message': 'Staff member not found.'
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'Error deleting staff: {str(e)}'
+        })
+
+
+@login_required
+def view_staff(request, staff_id):
+    """View staff details"""
+    staff = get_object_or_404(Staffs, id=staff_id)
     
     context = {
-        'page_title': 'Add Staff Member',
-        'role_choices': Staffs._meta.get_field('role').choices,
-        'gender_choices': Staffs._meta.get_field('gender').choices,
+        'staff': staff,
     }
-    return render(request, 'admin/staff/add.html', context)
+    
+    return render(request, 'admin/staff/view_staff.html', context)
 
 @login_required
 def staff_roles(request):

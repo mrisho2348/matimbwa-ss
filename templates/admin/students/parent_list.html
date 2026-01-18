@@ -1,165 +1,956 @@
 {% extends 'admin/base.html' %}
 {% load static %}
 
-{% block title %}Parents List{% endblock %}
+{% block title %}Parents Management{% endblock %}
+
+{% block extra_css %}
+<style>
+    :root {
+        --primary-color: #4361ee;
+        --success-color: #06d6a0;
+        --warning-color: #ffd166;
+        --danger-color: #ef476f;
+        --info-color: #118ab2;
+    }
+
+    .page-content {
+        padding: 15px;
+        background: #f8f9fa;
+        min-height: calc(100vh - 70px);
+    }
+
+    /* Filter Section */
+    .filter-section {
+        background: white;
+        border-radius: 12px;
+        padding: 20px;
+        margin-bottom: 25px;
+        box-shadow: 0 3px 10px rgba(0,0,0,0.08);
+    }
+
+    .filter-grid {
+        display: grid;
+        grid-template-columns: 2fr 1fr auto;
+        gap: 15px;
+        align-items: end;
+    }
+
+    .filter-group {
+        min-width: 0;
+    }
+
+    .filter-group label {
+        display: block;
+        margin-bottom: 6px;
+        font-weight: 500;
+        color: #495057;
+        font-size: 0.9rem;
+    }
+
+    .search-input-container {
+        position: relative;
+        width: 100%;
+    }
+
+    .search-input-container .form-control {
+        width: 100%;
+        padding-left: 40px;
+        font-size: 0.95rem;
+        height: 42px;
+        border-radius: 8px;
+        border: 1px solid #dee2e6;
+        transition: all 0.3s ease;
+    }
+
+    .search-input-container .form-control:focus {
+        border-color: var(--primary-color);
+        box-shadow: 0 0 0 0.2rem rgba(67, 97, 238, 0.25);
+    }
+
+    .search-icon {
+        position: absolute;
+        left: 12px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #6c757d;
+        z-index: 10;
+    }
+
+    /* Badges */
+    .badge-custom {
+        display: inline-flex;
+        align-items: center;
+        padding: 4px 10px;
+        border-radius: 20px;
+        font-weight: 600;
+        font-size: 0.75rem;
+        white-space: nowrap;
+        gap: 4px;
+    }
+
+    .badge-relationship {
+        background: #e3f2fd;
+        color: #1976d2;
+        border: 1px solid #bbdefb;
+    }
+
+    .badge-fee-responsible {
+        background: #e8f5e9;
+        color: #388e3c;
+        border: 1px solid #c8e6c9;
+    }
+
+    .badge-student-count {
+        background: #f3e5f5;
+        color: #7b1fa2;
+        border: 1px solid #e1bee7;
+    }
+
+    /* Table */
+    .table-container {
+        background: white;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 3px 10px rgba(0,0,0,0.08);
+        overflow-x: auto;
+    }
+
+    #parentsTable_wrapper {
+        padding: 20px;
+    }
+
+    .dataTables_length,
+    .dataTables_filter {
+        margin-bottom: 15px;
+    }
+
+    .dataTables_length select,
+    .dataTables_filter input {
+        border-radius: 8px;
+        padding: 8px 12px;
+        border: 1px solid #dee2e6;
+        font-size: 0.9rem;
+    }
+
+    .dataTables_filter input {
+        width: 100% !important;
+        max-width: 300px;
+    }
+
+    /* Table Row Styles */
+    .avatar-initial {
+        width: 36px;
+        height: 36px;
+        flex-shrink: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        color: white;
+        font-weight: bold;
+        font-size: 1rem;
+        background: var(--primary-color);
+    }
+
+    .parent-info {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        min-width: 0;
+    }
+
+    .parent-details {
+        min-width: 0;
+    }
+
+    .parent-name {
+        font-weight: 600;
+        color: #2c3e50;
+        margin-bottom: 2px;
+        font-size: 0.95rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .parent-id {
+        font-size: 0.8rem;
+        color: #6c757d;
+    }
+
+    .contact-info {
+        font-size: 0.85rem;
+    }
+
+    .contact-item {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin-bottom: 3px;
+        white-space: nowrap;
+    }
+
+    .contact-item i {
+        width: 16px;
+        text-align: center;
+    }
+
+    .email-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        color: var(--primary-color);
+        text-decoration: none;
+        font-size: 0.85rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 200px;
+    }
+
+    .email-link:hover {
+        text-decoration: underline;
+    }
+
+    .action-btn-group {
+        display: flex;
+        gap: 5px;
+        flex-wrap: nowrap;
+    }
+
+    .action-btn-group .btn {
+        padding: 5px 8px;
+        font-size: 0.8rem;
+        min-width: 32px;
+        height: 32px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    /* Loading Overlay */
+    .loading-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(255, 255, 255, 0.95);
+        z-index: 9999;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        backdrop-filter: blur(3px);
+        opacity: 0;
+        visibility: hidden;
+        transition: all 0.3s ease;
+    }
+
+    .loading-overlay.active {
+        opacity: 1;
+        visibility: visible;
+    }
+
+    .spinner {
+        width: 50px;
+        height: 50px;
+        border: 4px solid #f3f3f3;
+        border-top: 4px solid var(--primary-color);
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin-bottom: 15px;
+    }
+
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+
+    /* Mobile Optimizations */
+    @media (max-width: 992px) {
+        .filter-grid {
+            grid-template-columns: 1fr auto;
+        }
+        
+        .filter-group:first-child {
+            grid-column: span 2;
+        }
+    }
+
+    @media (max-width: 768px) {
+        .page-content {
+            padding: 10px;
+        }
+        
+        .page-header {
+            flex-direction: column;
+            gap: 15px;
+            align-items: stretch;
+        }
+        
+        .page-header > div {
+            width: 100%;
+        }
+        
+        .breadcrumb {
+            font-size: 0.85rem;
+            margin-bottom: 0;
+        }
+        
+        .filter-section {
+            padding: 15px;
+        }
+        
+        .filter-grid {
+            grid-template-columns: 1fr;
+            gap: 10px;
+        }
+        
+        .filter-group:first-child {
+            grid-column: 1;
+        }
+        
+        #parentsTable_wrapper {
+            padding: 15px;
+        }
+        
+        .dataTables_wrapper .dataTables_length,
+        .dataTables_wrapper .dataTables_filter {
+            float: none;
+            text-align: left;
+            margin-bottom: 10px;
+        }
+        
+        .dataTables_wrapper .dataTables_filter input {
+            max-width: 100%;
+        }
+        
+        table.dataTable {
+            font-size: 0.85rem;
+        }
+        
+        .parent-info {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 6px;
+        }
+        
+        .avatar-initial {
+            width: 32px;
+            height: 32px;
+            font-size: 0.9rem;
+        }
+        
+        .action-btn-group {
+            flex-direction: column;
+            gap: 3px;
+        }
+        
+        .action-btn-group .btn {
+            width: 100%;
+            justify-content: center;
+            min-width: 28px;
+            height: 28px;
+            padding: 4px 6px;
+        }
+        
+        .contact-item {
+            flex-wrap: wrap;
+        }
+        
+        .email-link {
+            max-width: 150px;
+        }
+    }
+
+    @media (max-width: 576px) {
+        .search-input-container .form-control {
+            font-size: 0.9rem;
+            height: 38px;
+        }
+        
+        .filter-section {
+            padding: 12px;
+        }
+        
+        .action-btn-group {
+            flex-direction: row;
+            justify-content: center;
+        }
+        
+        .action-btn-group .btn {
+            flex: 1;
+            max-width: 80px;
+        }
+        
+        .btn-primary {
+            width: 100%;
+            justify-content: center;
+        }
+        
+        .badge-custom {
+            font-size: 0.7rem;
+            padding: 3px 8px;
+        }
+        
+        #parentsTable_wrapper {
+            padding: 10px;
+        }
+        
+        .dataTables_length,
+        .dataTables_filter {
+            width: 100%;
+        }
+        
+        .dataTables_length select {
+            width: 100%;
+            margin-bottom: 10px;
+        }
+    }
+
+    @media (max-width: 380px) {
+        .action-btn-group {
+            flex-direction: column;
+            gap: 3px;
+        }
+        
+        .action-btn-group .btn {
+            width: 100%;
+            max-width: none;
+        }
+        
+        .parent-info {
+            align-items: center;
+        }
+        
+        .avatar-initial {
+            width: 28px;
+            height: 28px;
+            font-size: 0.8rem;
+        }
+    }
+
+    /* Print Styles */
+    @media print {
+        .page-content {
+            background: white;
+            padding: 0;
+        }
+        
+        .filter-section,
+        .action-btn-group,
+        .dataTables_length,
+        .dataTables_filter,
+        .dataTables_paginate,
+        .page-header > div:last-child {
+            display: none !important;
+        }
+        
+        .table-container {
+            box-shadow: none;
+            border: 1px solid #dee2e6;
+        }
+        
+        table {
+            width: 100% !important;
+        }
+        
+        th, td {
+            padding: 8px !important;
+        }
+    }
+
+    /* Delete Modal Custom Styles */
+    .delete-modal .modal-content {
+        border: none;
+        border-radius: 15px;
+        overflow: hidden;
+    }
+    
+    .delete-modal .modal-header {
+        background: linear-gradient(135deg, #ef476f 0%, #d90429 100%);
+        color: white;
+        border-bottom: none;
+        padding: 1.5rem;
+    }
+    
+    .delete-modal .modal-body {
+        padding: 2rem;
+        text-align: center;
+    }
+    
+    .delete-modal .modal-footer {
+        border-top: none;
+        padding: 1.5rem;
+        justify-content: center;
+        gap: 10px;
+    }
+    
+    .warning-icon {
+        font-size: 4rem;
+        color: #ef476f;
+        margin-bottom: 1rem;
+        animation: pulse 2s infinite;
+    }
+    
+    @keyframes pulse {
+        0% { transform: scale(1); }
+        50% { transform: scale(1.1); }
+        100% { transform: scale(1); }
+    }
+    
+    .parent-name-highlight {
+        background: #fff3cd;
+        padding: 5px 10px;
+        border-radius: 5px;
+        font-weight: bold;
+        color: #856404;
+        border: 1px solid #ffeaa7;
+        display: inline-block;
+        margin: 5px 0;
+    }
+</style>
+{% endblock %}
 
 {% block content %}
-<div class="container-xxl flex-grow-1 container-p-y">
-    <div class="row">
-        <div class="col-md-12">
-            <div class="card">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5 class="card-title mb-0">Parents Management</h5>
-                    <div>
-                        <span class="badge bg-primary">{{ parent_count }} Parents</span>
+<section class="page-content">
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="spinner"></div>
+        <p class="text-primary fw-bold mt-3">Loading...</p>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div class="modal fade delete-modal" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="deleteModalLabel">
+                        <i class="fas fa-exclamation-triangle me-2"></i>Confirm Deletion
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="warning-icon">
+                        <i class="fas fa-exclamation-circle"></i>
+                    </div>
+                    <h4 class="mb-3">Are you sure?</h4>
+                    <p class="text-muted mb-4">
+                        You are about to delete parent: 
+                        <span id="parentNameToDelete" class="parent-name-highlight"></span>
+                    </p>
+                    <div class="alert alert-danger" role="alert">
+                        <i class="fas fa-radiation me-2"></i>
+                        <strong>Warning:</strong> This action cannot be undone. All associated data will be permanently deleted.
                     </div>
                 </div>
-
-                <!-- Filter Section -->
-                <div class="card-body border-bottom">
-                    <form method="get" class="row g-3">
-                        <div class="col-md-4">
-                            <input type="text" name="search" class="form-control" placeholder="Search by name, phone, or email..." 
-                                   value="{{ search_query }}">
-                        </div>
-                        <div class="col-md-3">
-                            <select name="relationship" class="form-control">
-                                <option value="">All Relationships</option>
-                                {% for value, label in relationship_choices %}
-                                <option value="{{ value }}" {% if relationship_filter == value %}selected{% endif %}>
-                                    {{ label }}
-                                </option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        <div class="col-md-2">
-                            <button type="submit" class="btn btn-info w-100">Filter</button>
-                        </div>
-                    </form>
-                </div>
-
-                <!-- Parents Table -->
-                <div class="card-body">
-                    <div class="table-responsive">
-                        <table class="table table-hover">
-                            <thead>
-                                <tr>
-                                    <th>#</th>
-                                    <th>Name</th>
-                                    <th>Relationship</th>
-                                    <th>Phone</th>
-                                    <th>Email</th>
-                                    <th>Students</th>
-                                    <th>Fee Responsible</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for parent in parents %}
-                                <tr>
-                                    <td>{{ forloop.counter }}</td>
-                                    <td>{{ parent.full_name }}</td>
-                                    <td>
-                                        <span class="badge bg-primary">{{ parent.get_relationship_display }}</span>
-                                    </td>
-                                    <td>{{ parent.first_phone_number }}</td>
-                                    <td>{{ parent.email|default:"N/A" }}</td>
-                                    <td>
-                                        <span class="badge bg-info">{{ parent.students.count }}</span>
-                                    </td>
-                                    <td>
-                                        <span class="badge bg-{% if parent.is_fee_responsible %}success{% else %}secondary{% endif %}">
-                                            {% if parent.is_fee_responsible %}Yes{% else %}No{% endif %}
-                                        </span>
-                                    </td>
-                                    <td>
-                                        <div class="btn-group btn-group-sm">
-                                            <a href="javascript:void(0);" onclick="viewParent({{ parent.id }})" class="btn btn-info" title="View">
-                                                <i class="bx bx-eye"></i>
-                                            </a>
-                                            <a href="javascript:void(0);" onclick="editParent({{ parent.id }})" class="btn btn-warning" title="Edit">
-                                                <i class="bx bx-edit"></i>
-                                            </a>
-                                            <button onclick="deleteParent({{ parent.id }}, '{{ parent.full_name }}')" class="btn btn-danger" title="Delete">
-                                                <i class="bx bx-trash"></i>
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
-                                {% empty %}
-                                <tr>
-                                    <td colspan="8" class="text-center text-muted py-4">
-                                        No parents found
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-
-                    <!-- Pagination -->
-                    {% if parents.has_other_pages %}
-                    <nav aria-label="Page navigation" class="mt-3">
-                        <ul class="pagination justify-content-center">
-                            {% if parents.has_previous %}
-                            <li class="page-item">
-                                <a class="page-link" href="?page=1">First</a>
-                            </li>
-                            <li class="page-item">
-                                <a class="page-link" href="?page={{ parents.previous_page_number }}">Previous</a>
-                            </li>
-                            {% endif %}
-
-                            {% for num in parents.paginator.page_range %}
-                            <li class="page-item {% if parents.number == num %}active{% endif %}">
-                                <a class="page-link" href="?page={{ num }}">{{ num }}</a>
-                            </li>
-                            {% endfor %}
-
-                            {% if parents.has_next %}
-                            <li class="page-item">
-                                <a class="page-link" href="?page={{ parents.next_page_number }}">Next</a>
-                            </li>
-                            <li class="page-item">
-                                <a class="page-link" href="?page={{ parents.paginator.num_pages }}">Last</a>
-                            </li>
-                            {% endif %}
-                        </ul>
-                    </nav>
-                    {% endif %}
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="fas fa-times me-2"></i>Cancel
+                    </button>
+                    <button type="button" class="btn btn-danger" id="confirmDeleteBtn">
+                        <i class="fas fa-trash me-2"></i>Delete Parent
+                    </button>
                 </div>
             </div>
         </div>
     </div>
-</div>
 
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center flex-wrap page-header mb-4">
+        <div>
+            <h3 class="fw-bold mb-2">Parents Management</h3>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb mb-0">
+                    <li class="breadcrumb-item"><a href="{% url 'admin_dashboard' %}">Dashboard</a></li>
+                    <li class="breadcrumb-item active" aria-current="page">Parents</li>
+                </ol>
+            </nav>
+        </div>
+        <div>
+            <a href="{% url 'admin_parents_add' %}" class="btn btn-primary">
+                <i class="fas fa-user-plus me-2"></i>Add New Parent
+            </a>
+        </div>
+    </div>
+
+    <!-- Filter Section -->
+    <div class="filter-section">
+        <div class="filter-grid">
+            <div class="filter-group">
+                <label for="searchInput">Search Parents</label>
+                <div class="search-input-container">
+                    <i class="fas fa-search search-icon"></i>
+                    <input type="text" id="searchInput" class="form-control" 
+                           placeholder="Search by name, phone, email, or any details..." 
+                           aria-label="Search parents">
+                </div>
+            </div>
+            <div class="filter-group">
+                <label for="feeResponsibleFilter">Fee Responsible</label>
+                <select id="feeResponsibleFilter" class="form-control" aria-label="Filter by fee responsibility">
+                    <option value="">All Parents</option>
+                    <option value="Yes">Fee Responsible Only</option>
+                    <option value="No">Not Fee Responsible</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <button type="button" class="btn btn-secondary w-100 h-100" onclick="resetFilters()" 
+                        style="height: 42px;" aria-label="Reset filters">
+                    <i class="fas fa-redo me-2"></i>Reset Filters
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Parents Table -->
+    <div class="table-container">
+        <div id="parentsTable_wrapper" class="table-responsive">
+            <table id="parentsTable" class="table table-hover text-nowrap table-bordered table-striped display" style="width: 100%">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Relationship</th>
+                        <th>Contact</th>
+                        <th>Email</th>
+                        <th>Students</th>
+                        <th>Fee Responsible</th>
+                        <th>Created</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for parent in parents %}
+                    <tr>
+                        <td>
+                            <div class="parent-info">
+                                <div class="avatar-initial">
+                                    {{ parent.full_name|first|upper }}
+                                </div>
+                                <div class="parent-details">
+                                    <div class="parent-name">{{ parent.full_name }}</div>
+                                    <div class="parent-id">ID: {{ parent.id }}</div>
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            <span class="badge-custom badge-relationship">
+                                {{ parent.get_relationship_display }}
+                            </span>
+                        </td>
+                        <td>
+                            <div class="contact-info">
+                                <div class="contact-item">
+                                    <i class="fas fa-phone text-success"></i>
+                                    <span>{{ parent.first_phone_number }}</span>
+                                </div>
+                                {% if parent.second_phone_number %}
+                                <div class="contact-item">
+                                    <i class="fas fa-phone-alt text-secondary"></i>
+                                    <span>{{ parent.second_phone_number }}</span>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </td>
+                        <td>
+                            {% if parent.email %}
+                            <a href="mailto:{{ parent.email }}" class="email-link" aria-label="Email {{ parent.email }}">
+                                <i class="fas fa-envelope"></i>
+                                <span>{{ parent.email|truncatechars:25 }}</span>
+                            </a>
+                            {% else %}
+                            <span class="text-muted">N/A</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <span class="badge-custom badge-student-count">
+                                <i class="fas fa-user-graduate"></i>
+                                {{ parent.students.count }}
+                            </span>
+                        </td>
+                        <td>
+                            <span class="badge-custom badge-fee-responsible">
+                                {% if parent.is_fee_responsible %}
+                                <i class="fas fa-check-circle"></i>Yes
+                                {% else %}
+                                <i class="fas fa-times-circle"></i>No
+                                {% endif %}
+                            </span>
+                        </td>
+                        <td>
+                            <small class="text-muted" data-order="{{ parent.created_at|date:'U' }}">
+                                {{ parent.created_at|date:"M d, Y" }}
+                            </small>
+                        </td>
+                        <td>
+                            <div class="action-btn-group">
+                                <a href="{% url 'admin_view_parent' parent.id %}" 
+                                   class="btn btn-info btn-sm" 
+                                   title="View Details"
+                                   data-bs-toggle="tooltip"
+                                   aria-label="View {{ parent.full_name }} details">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                                <a href="{% url 'admin_parent_edit' parent.id %}" 
+                                   class="btn btn-warning btn-sm" 
+                                   title="Edit"
+                                   data-bs-toggle="tooltip"
+                                   aria-label="Edit {{ parent.full_name }}">
+                                    <i class="fas fa-edit"></i>
+                                </a>
+                                <button type="button" 
+                                        class="btn btn-danger btn-sm" 
+                                        onclick="showDeleteModal({{ parent.id }}, '{{ parent.full_name|escapejs }}')"
+                                        title="Delete"
+                                        data-bs-toggle="tooltip"
+                                        aria-label="Delete {{ parent.full_name }}">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="8" class="text-center text-muted py-5">
+                            <i class="fas fa-users fa-3x mb-3" style="opacity: 0.3;"></i>
+                            <h5 class="mb-2">No Parents Found</h5>
+                            <p class="mb-3">Get started by adding your first parent</p>
+                            <a href="{% url 'admin_parents_add' %}" class="btn btn-primary">
+                                <i class="fas fa-user-plus me-2"></i>Add First Parent
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
 <script>
-function viewParent(parentId) {
-    console.log('Viewing parent:', parentId);
-}
-
-function editParent(parentId) {
-    console.log('Editing parent:', parentId);
-}
-
-function deleteParent(parentId, parentName) {
-    if (confirm(`Are you sure you want to delete ${parentName}?`)) {
-        $.ajax({
-            type: 'POST',
-            url: '{% url "admin_parents_list" %}',
-            data: {
-                action: 'delete',
-                id: parentId,
-                csrfmiddlewaretoken: $('[name=csrfmiddlewaretoken]').val()
-            },
-            success: function(response) {
-                if (response.success) {
-                    alert(response.message);
-                    location.reload();
+    $(document).ready(function() {
+        // Hide loading overlay immediately since page is loaded
+        $('#loadingOverlay').removeClass('active');
+        
+        // Initialize DataTable with enhanced options
+        var table = $('#parentsTable').DataTable({
+            "responsive": true,
+            "pageLength": 25,
+            "lengthMenu": [[10, 25, 50, 100, -1], [10, 25, 50, 100, "All"]],
+            "order": [[0, 'asc']],
+            "language": {
+                "lengthMenu": "Show _MENU_ entries",
+                "zeroRecords": "No parents found",
+                "info": "Showing _START_ to _END_ of _TOTAL_ parents",
+                "infoEmpty": "No parents available",
+                "infoFiltered": "(filtered from _MAX_ total parents)",
+                "search": "Search:",
+                "paginate": {
+                    "first": "First",
+                    "last": "Last",
+                    "next": "Next",
+                    "previous": "Previous"
                 }
+            },
+            "columnDefs": [
+                {
+                    "targets": [7], // Actions column
+                    "orderable": false,
+                    "searchable": false
+                },
+                {
+                    "targets": [0, 1, 2, 3, 4, 5, 6], // All columns except actions
+                    "orderable": true
+                },
+                {
+                    "targets": [6], // Created date column
+                    "type": "date",
+                    "render": function(data) {
+                        return data;
+                    }
+                }
+            ],
+            "initComplete": function(settings, json) {
+                // Initialize tooltips after table is fully loaded
+                setTimeout(function() {
+                    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+                    var tooltipList = tooltipTriggerList.map(function(tooltipTriggerEl) {
+                        return new bootstrap.Tooltip(tooltipTriggerEl);
+                    });
+                }, 100);
+            },
+            "drawCallback": function(settings) {
+                // Re-initialize tooltips after table redraw
+                setTimeout(function() {
+                    $('[data-bs-toggle="tooltip"]').tooltip('dispose');
+                    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+                    var tooltipList = tooltipTriggerList.map(function(tooltipTriggerEl) {
+                        return new bootstrap.Tooltip(tooltipTriggerEl);
+                    });
+                }, 100);
             }
         });
-    }
-}
+
+        // Custom search function for all columns
+        $('#searchInput').on('keyup', function() {
+            table.search(this.value).draw();
+        });
+
+        // Fee Responsible filter only
+        $('#feeResponsibleFilter').on('change', function() {
+            var filterValue = $(this).val();
+            if (filterValue === 'Yes') {
+                table.column(5).search('Yes', true, false).draw();
+            } else if (filterValue === 'No') {
+                table.column(5).search('No', true, false).draw();
+            } else {
+                table.column(5).search('').draw();
+            }
+        });
+
+        // Store delete information
+        var deleteParentId = null;
+        var deleteParentName = null;
+
+        // Initialize Bootstrap modal
+        var deleteModal = new bootstrap.Modal(document.getElementById('deleteModal'));
+
+        // Export functions to global scope
+        window.showDeleteModal = function(parentId, parentName) {
+            deleteParentId = parentId;
+            deleteParentName = parentName;
+            $('#parentNameToDelete').text(parentName);
+            deleteModal.show();
+        };
+
+        window.resetFilters = function() {
+            $('#searchInput').val('');
+            $('#feeResponsibleFilter').val('');
+            
+            // Clear all DataTable filters
+            table.search('').columns().search('').draw();
+            
+            // Show success message
+            showToast('Filters reset successfully!', 'success');
+        };
+
+        // Handle delete confirmation
+        $('#confirmDeleteBtn').on('click', function() {
+            if (deleteParentId) {
+                deleteParent(deleteParentId);
+            }
+        });
+
+        // Show toast notifications
+        function showToast(message, type = 'info') {
+            // Remove existing toasts
+            $('.toast').remove();
+            
+            var toastClass = 'bg-info';
+            var icon = 'fas fa-info-circle';
+            
+            if (type === 'success') {
+                toastClass = 'bg-success';
+                icon = 'fas fa-check-circle';
+            } else if (type === 'error') {
+                toastClass = 'bg-danger';
+                icon = 'fas fa-exclamation-circle';
+            } else if (type === 'warning') {
+                toastClass = 'bg-warning';
+                icon = 'fas fa-exclamation-triangle';
+            }
+            
+            var toastHtml = `
+                <div class="toast align-items-center text-white ${toastClass} border-0" 
+                     role="alert" aria-live="assertive" aria-atomic="true">
+                    <div class="d-flex">
+                        <div class="toast-body">
+                            <i class="${icon} me-2"></i>${message}
+                        </div>
+                        <button type="button" class="btn-close btn-close-white me-2 m-auto" 
+                                data-bs-dismiss="toast" aria-label="Close"></button>
+                    </div>
+                </div>
+            `;
+            
+            $('body').append(toastHtml);
+            
+            var toastElement = $('.toast').last()[0];
+            var toast = new bootstrap.Toast(toastElement, {
+                animation: true,
+                autohide: true,
+                delay: 3000
+            });
+            
+            toast.show();
+        }
+
+        // Delete parent function
+        function deleteParent(parentId) {
+            $('#loadingOverlay').addClass('active');
+            
+            $.ajax({
+                url: '{% url "admin_parent_delete" %}',
+                type: 'POST',
+                data: {
+                    'parent_id': parentId,
+                    'csrfmiddlewaretoken': '{{ csrf_token }}'
+                },
+                success: function(response) {
+                    if (response.success) {
+                        // Find and remove the row
+                        table.rows().every(function(rowIdx, tableLoop, rowLoop) {
+                            var $row = $(this.node());
+                            var rowParentId = $row.find('.parent-id').text().replace('ID: ', '');
+                            if (rowParentId == parentId) {
+                                this.remove();
+                                return false; // Exit loop
+                            }
+                        });
+                        
+                        table.draw();
+                        
+                        // Show success message
+                        showToast('Parent deleted successfully!', 'success');
+                    } else {
+                        showToast(response.error || 'Failed to delete parent', 'error');
+                    }
+                },
+                error: function(xhr, status, error) {
+                    showToast('An error occurred while deleting the parent.', 'error');
+                    console.error('Delete error:', error);
+                },
+                complete: function() {
+                    $('#loadingOverlay').removeClass('active');
+                    deleteModal.hide();
+                }
+            });
+        }
+
+        // Handle page load errors
+        $(window).on('load', function() {
+            $('#loadingOverlay').removeClass('active');
+        });
+
+        // Fallback in case of errors
+        setTimeout(function() {
+            $('#loadingOverlay').removeClass('active');
+        }, 2000);
+
+        // Handle DataTable errors
+        $.fn.dataTable.ext.errMode = 'none';
+        
+        table.on('error.dt', function(e, settings, techNote, message) {
+            console.error('DataTables error: ', message);
+            $('#loadingOverlay').removeClass('active');
+            showToast('Error loading table data. Please refresh the page.', 'error');
+        });
+
+        // Focus search input on page load
+        $('#searchInput').focus();
+    });
 </script>
 {% endblock %}

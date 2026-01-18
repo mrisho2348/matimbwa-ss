@@ -24,13 +24,15 @@
                     <i class="fas fa-ellipsis-v"></i>
                 </button>
                 <div class="dropdown-menu dropdown-menu-right" aria-labelledby="parentActions-{{ parent.id }}">
+                    {% url 'admin_edit_parent' student_id=student.id parent_id=parent.id as edit_parent_url %}
                     <a class="dropdown-item edit-parent-btn" 
-                       href="{% url 'admin_edit_parent' student.id parent.id %}"
+                       href="{{ edit_parent_url }}"
                        data-parent-id="{{ parent.id }}">
                         <i class="fas fa-edit text-primary me-2"></i>Edit Parent
                     </a>
                     <a class="dropdown-item make-fee-responsible-btn" 
-                       href="#" data-parent-id="{{ parent.id }}">
+                       href="#" data-parent-id="{{ parent.id }}"
+                       data-url="{% url 'admin_update_parent_fee_responsibility' student_id=student.id parent_id=parent.id %}">
                         <i class="fas fa-money-check-alt text-success me-2"></i>
                         {% if parent.is_fee_responsible %}
                             Remove Fee Responsibility
@@ -39,9 +41,11 @@
                         {% endif %}
                     </a>
                     <div class="dropdown-divider"></div>
+                    {% url 'admin_parent_delete' student_id=student.id parent_id=parent.id as delete_parent_url %}
                     <a class="dropdown-item delete-parent-btn text-danger" 
                        href="#" data-parent-id="{{ parent.id }}"
-                       data-parent-name="{{ parent.full_name }}">
+                       data-parent-name="{{ parent.full_name }}"
+                       data-url="{{ delete_parent_url }}">
                         <i class="fas fa-trash me-2"></i>Delete Parent
                     </a>
                 </div>
@@ -362,23 +366,6 @@
     }
 }
 
-/* Status indicators */
-.status-indicator {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    display: inline-block;
-    margin-right: 5px;
-}
-
-.status-active {
-    background-color: #48bb78;
-}
-
-.status-inactive {
-    background-color: #e53e3e;
-}
-
 /* Hover effects for interactive elements */
 .btn-light:hover {
     background-color: #f7fafc;
@@ -452,6 +439,7 @@ document.addEventListener('DOMContentLoaded', function() {
     $('.make-fee-responsible-btn').on('click', function(e) {
         e.preventDefault();
         const parentId = $(this).data('parent-id');
+        const updateUrl = $(this).data('url');
         const isCurrentlyResponsible = $(this).closest('.parent-card').hasClass('fee-responsible');
         
         Swal.fire({
@@ -466,7 +454,7 @@ document.addEventListener('DOMContentLoaded', function() {
             confirmButtonText: isCurrentlyResponsible ? 'Yes, remove' : 'Yes, make responsible'
         }).then((result) => {
             if (result.isConfirmed) {
-                updateFeeResponsibility(parentId, !isCurrentlyResponsible);
+                updateFeeResponsibility(parentId, !isCurrentlyResponsible, updateUrl);
             }
         });
     });
@@ -476,6 +464,7 @@ document.addEventListener('DOMContentLoaded', function() {
         e.preventDefault();
         const parentId = $(this).data('parent-id');
         const parentName = $(this).data('parent-name');
+        const deleteUrl = $(this).data('url');
         
         Swal.fire({
             title: 'Delete Parent?',
@@ -490,7 +479,7 @@ document.addEventListener('DOMContentLoaded', function() {
             focusCancel: true
         }).then((result) => {
             if (result.isConfirmed) {
-                deleteParent(parentId, parentName);
+                deleteParent(parentId, parentName, deleteUrl);
             }
         });
     });
@@ -519,11 +508,11 @@ document.addEventListener('DOMContentLoaded', function() {
         }, 2000);
     }
     
-    function updateFeeResponsibility(parentId, makeResponsible) {
+    function updateFeeResponsibility(parentId, makeResponsible, updateUrl) {
         const csrftoken = document.querySelector('[name=csrfmiddlewaretoken]').value;
         
         $.ajax({
-            url: `/admin/students/{{ student.id }}/parent/${parentId}/update-fee-responsibility/`,
+            url: updateUrl,
             type: 'POST',
             headers: {
                 'X-Requested-With': 'XMLHttpRequest',
@@ -590,11 +579,11 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    function deleteParent(parentId, parentName) {
+    function deleteParent(parentId, parentName, deleteUrl) {
         const csrftoken = document.querySelector('[name=csrfmiddlewaretoken]').value;
         
         $.ajax({
-            url: `/admin/students/{{ student.id }}/parent/${parentId}/delete/`,
+            url: deleteUrl,
             type: 'POST',
             headers: {
                 'X-Requested-With': 'XMLHttpRequest',

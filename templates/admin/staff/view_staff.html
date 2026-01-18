@@ -1,0 +1,1123 @@
+{% extends 'admin/base.html' %}
+{% load static %}
+{% block title %} Staff Details - {{ staff.get_full_name }} {% endblock title %}
+
+{% block breadcrumb %}
+    <a href="{% url 'admin_staffs_list' %}" class="btn btn-secondary">
+        <i class="fas fa-arrow-left"></i> Back to Staff List
+    </a>
+{% endblock breadcrumb %}
+
+{% block extra_css %}
+
+<style>
+    /* Profile Header */
+    .profile-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 10px;
+        padding: 30px;
+        color: white;
+        position: relative;
+        overflow: hidden;
+    }
+    .profile-header::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.1);
+    }
+    .profile-image {
+        width: 150px;
+        height: 150px;
+        border-radius: 50%;
+        border: 5px solid white;
+        object-fit: cover;
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+    }
+    .profile-image-placeholder {
+        width: 150px;
+        height: 150px;
+        border-radius: 50%;
+        border: 5px solid white;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 48px;
+        color: white;
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+    }
+    
+    /* Info Cards */
+    .info-card {
+        border-radius: 10px;
+        border: none;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        transition: transform 0.3s ease;
+        height: 100%;
+    }
+    .info-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 5px 20px rgba(0, 0, 0, 0.15);
+    }
+    .info-card .card-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 10px 10px 0 0 !important;
+        border: none;
+    }
+    .info-card .card-body {
+        padding: 20px;
+    }
+    
+    /* Info Items */
+    .info-item {
+        padding: 10px 0;
+        border-bottom: 1px solid #f0f0f0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .info-item:last-child {
+        border-bottom: none;
+    }
+    .info-label {
+        font-weight: 600;
+        color: #555;
+        flex: 1;
+    }
+    .info-value {
+        flex: 2;
+        text-align: right;
+        color: #333;
+    }
+    .info-value .badge {
+        font-size: 0.8em;
+        padding: 5px 10px;
+    }
+    
+    /* Status Badges */
+    .status-active {
+        background-color: #28a745;
+        color: white;
+    }
+    .status-inactive {
+        background-color: #6c757d;
+        color: white;
+    }
+    .role-hod {
+        background-color: #dc3545;
+        color: white;
+    }
+    .role-teacher {
+        background-color: #17a2b8;
+        color: white;
+    }
+    .role-staff {
+        background-color: #28a745;
+        color: white;
+    }
+    .gender-male {
+        background-color: #007bff;
+        color: white;
+    }
+    .gender-female {
+        background-color: #e83e8c;
+        color: white;
+    }
+    .gender-other {
+        background-color: #6c757d;
+        color: white;
+    }
+    
+    /* Signature Display */
+    .signature-container {
+        border: 2px dashed #dee2e6;
+        border-radius: 5px;
+        padding: 20px;
+        text-align: center;
+        min-height: 150px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .signature-img {
+        max-width: 100%;
+        max-height: 200px;
+        object-fit: contain;
+    }
+    
+    /* Action Buttons */
+    .action-buttons {
+        background: white;
+        padding: 20px;
+        border-radius: 10px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        margin-top: 30px;
+    }
+    
+    /* Toast Container */
+    .toast-container {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 9999;
+        min-width: 300px;
+    }
+    
+    /* Modal Styles */
+    .modal-header.bg-warning {
+        background: linear-gradient(135deg, #f0ad4e 0%, #ec971f 100%) !important;
+    }
+    .modal-header.bg-danger {
+        background: linear-gradient(135deg, #d9534f 0%, #c9302c 100%) !important;
+        color: white;
+    }
+    
+    /* Loading Spinner */
+    .loading-spinner {
+        display: inline-block;
+        width: 20px;
+        height: 20px;
+        border: 3px solid rgba(255,255,255,.3);
+        border-radius: 50%;
+        border-top-color: #fff;
+        animation: spin 1s ease-in-out infinite;
+    }
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+    
+    /* Select2 custom styling */
+    .select2-container--bootstrap4 .select2-selection--single {
+        height: calc(2.25rem + 2px) !important;
+        padding: 0.375rem 0.75rem !important;
+        font-size: 1rem !important;
+        line-height: 1.5 !important;
+        border: 1px solid #ced4da !important;
+        border-radius: 0.25rem !important;
+    }
+    .select2-container--bootstrap4 .select2-selection--single .select2-selection__rendered {
+        padding-left: 0 !important;
+        color: #495057 !important;
+    }
+    .select2-container--bootstrap4 .select2-selection--single .select2-selection__arrow {
+        height: calc(2.25rem + 2px) !important;
+    }
+    .select2-container--bootstrap4 .select2-selection--multiple {
+        min-height: calc(2.25rem + 2px) !important;
+        border: 1px solid #ced4da !important;
+        border-radius: 0.25rem !important;
+    }
+</style>
+{% endblock extra_css %}
+
+{% block content %}
+<!-- Toast Container -->
+<div class="toast-container"></div>
+
+<section class="content">
+    <div class="container-fluid">
+        <!-- Profile Header -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="profile-header">
+                    <div class="row align-items-center">
+                        <div class="col-md-3 text-center text-md-left">
+                            {% if staff.profile_picture %}
+                                <img src="{{ staff.profile_picture.url }}" alt="{{ staff.get_full_name }}" class="profile-image" id="profile-image-preview">
+                            {% else %}
+                                <div class="profile-image-placeholder">
+                                    <i class="fas fa-user"></i>
+                                </div>
+                            {% endif %}
+                        </div>
+                        <div class="col-md-9 text-center text-md-left mt-3 mt-md-0">
+                            <h2 class="mb-2">{{ staff.get_full_name }}</h2>
+                            <div class="d-flex flex-wrap justify-content-center justify-content-md-start gap-2 mb-3">
+                                {% if staff.admin.user_type == '1' %}
+                                    <span class="badge role-hod">
+                                        <i class="fas fa-user-shield"></i> HOD
+                                    </span>
+                                {% elif staff.role == 'teacher' %}
+                                    <span class="badge role-teacher">
+                                        <i class="fas fa-chalkboard-teacher"></i> Teacher
+                                    </span>
+                                {% elif staff.role == 'admin' %}
+                                    <span class="badge role-hod">
+                                        <i class="fas fa-user-cog"></i> Administrator
+                                    </span>
+                                {% elif staff.role == 'support' %}
+                                    <span class="badge role-staff">
+                                        <i class="fas fa-headset"></i> Support Staff
+                                    </span>
+                                {% elif staff.role == 'other' %}
+                                    <span class="badge role-staff">
+                                        <i class="fas fa-user-tie"></i> Staff
+                                    </span>
+                                {% else %}
+                                    <span class="badge role-staff">
+                                        <i class="fas fa-user-tie"></i> Staff
+                                    </span>
+                                {% endif %}
+                                
+                                {% if staff.gender %}
+                                    <span class="badge gender-{{ staff.gender }}">
+                                        <i class="fas fa-{% if staff.gender == 'male' %}male{% elif staff.gender == 'female' %}female{% else %}user{% endif %}"></i>
+                                        {{ staff.gender|title }}
+                                    </span>
+                                {% endif %}
+                                
+                                <span class="badge {% if staff.admin.is_active %}status-active{% else %}status-inactive{% endif %}">
+                                    <i class="fas fa-{% if staff.admin.is_active %}check-circle{% else %}times-circle{% endif %}"></i>
+                                    {% if staff.admin.is_active %}Active{% else %}Inactive{% endif %}
+                                </span>
+                                
+                                {% if staff.work_place %}
+                                    <span class="badge badge-info">
+                                        <i class="fas fa-building"></i> 
+                                        {% if staff.work_place == 'main_campus' %}Main Campus
+                                        {% elif staff.work_place == 'branch_office' %}Branch Office
+                                        {% elif staff.work_place == 'remote' %}Remote
+                                        {% elif staff.work_place == 'other' %}Other
+                                        {% else %}{{ staff.work_place|title }}{% endif %}
+                                    </span>
+                                {% endif %}
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <p class="mb-1">
+                                        <i class="fas fa-envelope"></i> {{ staff.admin.email }}
+                                    </p>
+                                </div>
+                                <div class="col-md-6">
+                                    {% if staff.phone_number %}
+                                        <p class="mb-1">
+                                            <i class="fas fa-phone"></i> {{ staff.phone_number }}
+                                        </p>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Information -->
+        <div class="row">
+            <!-- Personal Information -->
+            <div class="col-md-6 mb-4">
+                <div class="card info-card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-user-circle"></i> Personal Information
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="info-item">
+                            <span class="info-label">Full Name:</span>
+                            <span class="info-value" id="full-name-display">{{ staff.get_full_name }}</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Username:</span>
+                            <span class="info-value" id="username-display">{{ staff.admin.username }}</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Email:</span>
+                            <span class="info-value" id="email-display">
+                                <a href="mailto:{{ staff.admin.email }}">{{ staff.admin.email }}</a>
+                            </span>
+                        </div>
+                        {% if staff.phone_number %}
+                        <div class="info-item">
+                            <span class="info-label">Phone Number:</span>
+                            <span class="info-value" id="phone-display">
+                                <a href="tel:{{ staff.phone_number }}">{{ staff.phone_number }}</a>
+                            </span>
+                        </div>
+                        {% endif %}
+                        <div class="info-item">
+                            <span class="info-label">Gender:</span>
+                            <span class="info-value" id="gender-display">
+                                {% if staff.gender %}
+                                    <span class="badge gender-{{ staff.gender }}">
+                                        {{ staff.gender|title }}
+                                    </span>
+                                {% else %}
+                                    <span class="text-muted">Not specified</span>
+                                {% endif %}
+                            </span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Date of Birth:</span>
+                            <span class="info-value" id="dob-display">
+                                {% if staff.date_of_birth %}
+                                    {{ staff.date_of_birth|date:"F d, Y" }}
+                                {% else %}
+                                    <span class="text-muted">Not specified</span>
+                                {% endif %}
+                            </span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Marital Status:</span>
+                            <span class="info-value" id="marital-status-display">
+                                {% if staff.marital_status %}
+                                    {{ staff.marital_status|title }}
+                                {% else %}
+                                    <span class="text-muted">Not specified</span>
+                                {% endif %}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Employment Information -->
+            <div class="col-md-6 mb-4">
+                <div class="card info-card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-briefcase"></i> Employment Information
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="info-item">
+                            <span class="info-label">User Type:</span>
+                            <span class="info-value" id="user-type-display">
+                                {% if staff.admin.user_type == '1' %}
+                                    <span class="badge role-hod">Head of Department</span>
+                                {% else %}
+                                    <span class="badge role-staff">Staff</span>
+                                {% endif %}
+                            </span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Role:</span>
+                            <span class="info-value" id="role-display">
+                                {% if staff.role == 'teacher' %}
+                                    Teacher
+                                {% elif staff.role == 'admin' %}
+                                    Administrator
+                                {% elif staff.role == 'support' %}
+                                    Support Staff
+                                {% elif staff.role == 'other' %}
+                                    Other
+                                {% elif staff.role %}
+                                    {{ staff.role|title }}
+                                {% else %}
+                                    <span class="text-muted">Not specified</span>
+                                {% endif %}
+                            </span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Work Place:</span>
+                            <span class="info-value" id="workplace-display">
+                                {% if staff.work_place == 'main_campus' %}
+                                    Main Campus
+                                {% elif staff.work_place == 'branch_office' %}
+                                    Branch Office
+                                {% elif staff.work_place == 'remote' %}
+                                    Remote
+                                {% elif staff.work_place == 'other' %}
+                                    Other
+                                {% elif staff.work_place %}
+                                    {{ staff.work_place|title }}
+                                {% else %}
+                                    <span class="text-muted">Not specified</span>
+                                {% endif %}
+                            </span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Joining Date:</span>
+                            <span class="info-value" id="joining-date-display">
+                                {% if staff.joining_date %}
+                                    {{ staff.joining_date|date:"F d, Y" }}
+                                {% else %}
+                                    <span class="text-muted">Not specified</span>
+                                {% endif %}
+                            </span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Account Status:</span>
+                            <span class="info-value" id="status-display">
+                                {% if staff.admin.is_active %}
+                                    <span class="badge status-active">
+                                        <i class="fas fa-check-circle"></i> Active
+                                    </span>
+                                {% else %}
+                                    <span class="badge status-inactive">
+                                        <i class="fas fa-times-circle"></i> Inactive
+                                    </span>
+                                {% endif %}
+                            </span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Account Created:</span>
+                            <span class="info-value">
+                                {{ staff.admin.date_joined|date:"F d, Y" }}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="action-buttons">
+            <div class="row">
+                <div class="col-md-12">
+                    <div class="d-flex flex-column flex-md-row justify-content-between gap-3">
+                        <div class="d-flex flex-column flex-md-row gap-2">
+                            <a href="{% url 'admin_staffs_list' %}" class="btn btn-secondary">
+                                <i class="fas fa-arrow-left"></i> Back to List
+                            </a>
+                            <button type="button" class="btn btn-warning" id="editStaffBtn" 
+                                    data-staff-id="{{ staff.id }}"
+                                    data-first-name="{{ staff.admin.first_name }}"
+                                    data-middle-name="{{ staff.middle_name|default:'' }}"
+                                    data-last-name="{{ staff.admin.last_name }}"
+                                    data-username="{{ staff.admin.username }}"
+                                    data-email="{{ staff.admin.email }}"
+                                    data-gender="{{ staff.gender|default:'' }}"
+                                    data-date-of-birth="{{ staff.date_of_birth|date:'Y-m-d' }}"
+                                    data-phone-number="{{ staff.phone_number|default:'' }}"
+                                    data-marital-status="{{ staff.marital_status|default:'' }}"
+                                    data-role="{{ staff.role|default:'' }}"
+                                    data-work-place="{{ staff.work_place|default:'' }}"
+                                    data-joining-date="{{ staff.joining_date|date:'Y-m-d' }}"
+                                    data-user-type="{{ staff.admin.user_type }}"
+                                    data-is-active="{{ staff.admin.is_active }}">
+                                <i class="fas fa-edit"></i> Edit Staff
+                            </button>
+                        </div>
+                        <div class="d-flex flex-column flex-md-row gap-2">
+                            {% if staff.admin.is_active %}
+                                <button class="btn btn-danger" id="toggleStatusBtn" data-action="deactivate">
+                                    <i class="fas fa-toggle-off"></i> Deactivate
+                                </button>
+                            {% else %}
+                                <button class="btn btn-success" id="toggleStatusBtn" data-action="activate">
+                                    <i class="fas fa-toggle-on"></i> Activate
+                                </button>
+                            {% endif %}
+                            <button class="btn btn-outline-danger" id="deleteStaffBtn">
+                                <i class="fas fa-trash"></i> Delete Staff
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Edit Staff Modal -->
+<div class="modal fade" id="editStaffModal" tabindex="-1" role="dialog" aria-labelledby="editStaffModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <form id="editStaffForm" method="post" enctype="multipart/form-data">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="update">
+                <input type="hidden" name="id" id="staff_id" value="{{ staff.id }}">
+                
+                <div class="modal-header bg-warning text-white">
+                    <h5 class="modal-title" id="editStaffModalLabel">
+                        <i class="fas fa-edit"></i> Edit Staff: <span id="modalStaffName">{{ staff.get_full_name }}</span>
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <div class="form-group">
+                                <label for="first_name" class="form-label">First Name *</label>
+                                <input type="text" class="form-control" id="first_name" name="first_name" required>
+                                <div class="invalid-feedback">Please enter first name.</div>
+                            </div>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <div class="form-group">
+                                <label for="middle_name" class="form-label">Middle Name</label>
+                                <input type="text" class="form-control" id="middle_name" name="middle_name">
+                            </div>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <div class="form-group">
+                                <label for="last_name" class="form-label">Last Name *</label>
+                                <input type="text" class="form-control" id="last_name" name="last_name" required>
+                                <div class="invalid-feedback">Please enter last name.</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <div class="form-group">
+                                <label for="username" class="form-label">Username *</label>
+                                <input type="text" class="form-control" id="username" name="username" required>
+                                <div class="invalid-feedback">Please enter username.</div>
+                            </div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <div class="form-group">
+                                <label for="email" class="form-label">Email *</label>
+                                <input type="email" class="form-control" id="email" name="email" required>
+                                <div class="invalid-feedback">Please enter valid email.</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <div class="form-group">
+                                <label for="gender" class="form-label">Gender</label>
+                                <select class="form-control select2bs4" id="gender" name="gender" style="width: 100%;">
+                                    <option value="">Select Gender</option>
+                                    <option value="male">Male</option>
+                                    <option value="female">Female</option>
+                                    <option value="other">Other</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <div class="form-group">
+                                <label for="date_of_birth" class="form-label">Date of Birth</label>
+                                <input type="date" class="form-control" id="date_of_birth" name="date_of_birth">
+                            </div>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <div class="form-group">
+                                <label for="phone_number" class="form-label">Phone Number</label>
+                                <input type="tel" class="form-control" id="phone_number" name="phone_number">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <div class="form-group">
+                                <label for="marital_status" class="form-label">Marital Status</label>
+                                <select class="form-control select2bs4" id="marital_status" name="marital_status" style="width: 100%;">
+                                    <option value="">Select Status</option>
+                                    <option value="single">Single</option>
+                                    <option value="married">Married</option>
+                                    <option value="divorced">Divorced</option>
+                                    <option value="widowed">Widowed</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <div class="form-group">
+                                <label for="role" class="form-label">Role</label>
+                                <select class="form-control select2bs4" id="role" name="role" style="width: 100%;">
+                                    <option value="">Select Role</option>
+                                    <option value="teacher">Teacher</option>
+                                    <option value="admin">Administrator</option>
+                                    <option value="support">Support Staff</option>
+                                    <option value="other">Other</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <div class="form-group">
+                                <label for="work_place" class="form-label">Work Place</label>
+                                <select class="form-control select2bs4" id="work_place" name="work_place" style="width: 100%;">
+                                    <option value="">Select Work Place</option>
+                                    <option value="main_campus">Main Campus</option>
+                                    <option value="branch_office">Branch Office</option>
+                                    <option value="remote">Remote</option>
+                                    <option value="other">Other</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <div class="form-group">
+                                <label for="user_type" class="form-label">User Type *</label>
+                                <select class="form-control select2bs4" id="user_type" name="user_type" required style="width: 100%;">
+                                    <option value="">Select Type</option>
+                                    <option value="1">HOD (Head of Department)</option>
+                                    <option value="2">Staff</option>
+                                </select>
+                                <div class="invalid-feedback">Please select user type.</div>
+                            </div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <div class="form-group">
+                                <label for="joining_date" class="form-label">Joining Date</label>
+                                <input type="date" class="form-control" id="joining_date" name="joining_date">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <div class="form-group">
+                                <label for="profile_picture" class="form-label">Profile Picture</label>
+                                <input type="file" class="form-control" id="profile_picture" name="profile_picture" accept="image/*">
+                                <small class="text-muted">Leave empty to keep current image. Max size: 2MB</small>
+                            </div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <div class="form-group">
+                                <label for="signature" class="form-label">Digital Signature</label>
+                                <input type="file" class="form-control" id="signature" name="signature" accept="image/*">
+                                <small class="text-muted">Max size: 1MB</small>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <div class="form-group">
+                                <label for="password" class="form-label">Password</label>
+                                <input type="password" class="form-control" id="password" name="password">
+                                <small class="text-muted">Leave blank to keep current password</small>
+                            </div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <div class="form-group">
+                                <label for="confirm_password" class="form-label">Confirm Password</label>
+                                <input type="password" class="form-control" id="confirm_password" name="confirm_password">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox" id="is_active" name="is_active">
+                        <label class="form-check-label" for="is_active">
+                            Account Active
+                        </label>
+                    </div>
+                </div>
+                
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-warning" id="saveChangesBtn">
+                        <span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+                        Save Changes
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="deleteConfirmModal" tabindex="-1" role="dialog" aria-labelledby="deleteConfirmModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="deleteConfirmModalLabel">
+                    <i class="fas fa-exclamation-triangle"></i> Confirm Delete
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete <strong>{{ staff.get_full_name }}</strong>?</p>
+                <p class="text-danger"><small>This action cannot be undone. All associated data will be permanently removed.</small></p>
+                
+                <div class="alert alert-warning mt-3">
+                    <i class="fas fa-info-circle"></i>
+                    <strong>Warning:</strong> Deleting this staff member will:
+                    <ul class="mb-0 mt-2">
+                        <li>Remove their account permanently</li>
+                        <li>Delete all associated records</li>
+                        <li>Cannot be recovered</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirmDeleteBtn">
+                    <span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+                    Delete Permanently
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Status Confirmation Modal -->
+<div class="modal fade" id="statusConfirmModal" tabindex="-1" role="dialog" aria-labelledby="statusConfirmModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-warning">
+                <h5 class="modal-title" id="statusConfirmModalLabel">
+                    <i class="fas fa-info-circle"></i> Confirm Status Change
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p id="statusConfirmMessage"></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-warning" id="confirmStatusBtn">
+                    <span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+                    Confirm
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+<!-- Select2 JS -->
+<script src="{% static 'admin/plugins/select2/js/select2.full.min.js' %}"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize Bootstrap modals
+    const editModal = new bootstrap.Modal(document.getElementById('editStaffModal'));
+    const deleteModal = new bootstrap.Modal(document.getElementById('deleteConfirmModal'));
+    const statusModal = new bootstrap.Modal(document.getElementById('statusConfirmModal'));
+    
+    // Toast notification function
+    function showToast(message, type = 'success') {
+        const toastId = 'toast-' + Date.now();
+        const toastClass = type === 'success' ? 'bg-success' : 'bg-danger';
+        const icon = type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle';
+        
+        const toastHTML = `
+            <div id="${toastId}" class="toast align-items-center text-white ${toastClass} border-0" role="alert">
+                <div class="d-flex">
+                    <div class="toast-body">
+                        <i class="fas ${icon} me-2"></i> ${message}
+                    </div>
+                    <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+                </div>
+            </div>
+        `;
+        
+        document.querySelector('.toast-container').insertAdjacentHTML('beforeend', toastHTML);
+        const toastElement = document.getElementById(toastId);
+        const toast = new bootstrap.Toast(toastElement);
+        toast.show();
+        
+        toastElement.addEventListener('hidden.bs.toast', function() {
+            this.remove();
+        });
+    }
+    
+    // Edit button click handler
+    document.getElementById('editStaffBtn').addEventListener('click', function() {
+        const btn = this;
+        
+        // Populate form fields from data attributes
+        document.getElementById('staff_id').value = "{{ staff.id }}";
+        document.getElementById('first_name').value = btn.dataset.firstName;
+        document.getElementById('middle_name').value = btn.dataset.middleName;
+        document.getElementById('last_name').value = btn.dataset.lastName;
+        document.getElementById('username').value = btn.dataset.username;
+        document.getElementById('email').value = btn.dataset.email;
+        
+        // Set values for Select2 fields
+        const gender = btn.dataset.gender || '';
+        const maritalStatus = btn.dataset.maritalStatus || '';
+        const role = btn.dataset.role || '';
+        const workPlace = btn.dataset.workPlace || '';
+        const userType = btn.dataset.userType || '';
+        
+        document.getElementById('gender').value = gender;
+        document.getElementById('marital_status').value = maritalStatus;
+        document.getElementById('role').value = role;
+        document.getElementById('work_place').value = workPlace;
+        document.getElementById('user_type').value = userType;
+        
+        // Set other fields
+        document.getElementById('date_of_birth').value = btn.dataset.dateOfBirth;
+        document.getElementById('phone_number').value = btn.dataset.phoneNumber;
+        document.getElementById('joining_date').value = btn.dataset.joiningDate;
+        document.getElementById('is_active').checked = btn.dataset.isActive === 'True';
+        
+        // Clear password fields
+        document.getElementById('password').value = '';
+        document.getElementById('confirm_password').value = '';
+        
+        // Initialize Select2 dropdowns
+        initializeSelect2();
+        
+        // Show modal
+        editModal.show();
+    });
+    
+    // Initialize Select2 dropdowns
+    function initializeSelect2() {
+        // Destroy existing Select2 instances
+        $('.select2bs4').select2('destroy');
+        
+        // Initialize Select2 for all dropdowns
+        $('.select2bs4').each(function() {
+            $(this).select2({
+                theme: 'bootstrap4',
+                width: '100%',
+                placeholder: $(this).find('option:first').text(),
+                allowClear: true
+            });
+        });
+        
+        // Trigger change to update UI
+        $('#gender').trigger('change');
+        $('#marital_status').trigger('change');
+        $('#role').trigger('change');
+        $('#work_place').trigger('change');
+        $('#user_type').trigger('change');
+    }
+    
+    // Edit form submission
+    document.getElementById('editStaffForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const form = this;
+        const saveBtn = document.getElementById('saveChangesBtn');
+        const spinner = saveBtn.querySelector('.spinner-border');
+        const originalText = saveBtn.innerHTML;
+        
+        // Validate passwords match
+        const password = form.password.value;
+        const confirmPassword = form.confirm_password.value;
+        
+        if (password && password !== confirmPassword) {
+            showToast('Passwords do not match!', 'error');
+            form.confirm_password.focus();
+            return;
+        }
+        
+        // Validate required fields
+        if (!form.first_name.value.trim() || !form.last_name.value.trim() || 
+            !form.username.value.trim() || !form.email.value.trim() || !form.user_type.value) {
+            showToast('Please fill all required fields!', 'error');
+            return;
+        }
+        
+        // Show loading state
+        spinner.classList.remove('d-none');
+        saveBtn.disabled = true;
+        saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Saving...';
+        
+        // Create FormData object
+        const formData = new FormData(form);
+        
+        // Send AJAX request
+        fetch('{% url "admin_staffs_crud" %}', {
+            method: 'POST',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRFToken': '{{ csrf_token }}'
+            },
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showToast(data.message || 'Staff updated successfully!', 'success');
+                
+                // Close modal after delay
+                setTimeout(() => {
+                    editModal.hide();
+                    location.reload(); // Reload to ensure all data is fresh
+                }, 1500);
+            } else {
+                showToast(data.message || 'Failed to update staff!', 'error');
+                saveBtn.disabled = false;
+                saveBtn.innerHTML = originalText;
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showToast('An error occurred. Please try again.', 'error');
+            saveBtn.disabled = false;
+            saveBtn.innerHTML = originalText;
+        })
+        .finally(() => {
+            spinner.classList.add('d-none');
+        });
+    });
+    
+    // Toggle status button
+    document.getElementById('toggleStatusBtn').addEventListener('click', function() {
+        const action = this.dataset.action;
+        const actionText = action === 'activate' ? 'activate' : 'deactivate';
+        const staffName = "{{ staff.get_full_name }}";
+        
+        document.getElementById('statusConfirmMessage').textContent = 
+            `Are you sure you want to ${actionText} ${staffName}?`;
+        
+        statusModal.show();
+    });
+    
+    // Confirm status change
+    document.getElementById('confirmStatusBtn').addEventListener('click', function() {
+        const btn = this;
+        const spinner = btn.querySelector('.spinner-border');
+        const originalText = btn.innerHTML;
+        
+        // Show loading
+        spinner.classList.remove('d-none');
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Processing...';
+        
+        fetch('{% url "admin_staffs_crud" %}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRFToken': '{{ csrf_token }}'
+            },
+            body: new URLSearchParams({
+                'action': 'toggle_status',
+                'id': "{{ staff.id }}",
+                'csrfmiddlewaretoken': '{{ csrf_token }}'
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showToast(data.message || 'Status updated successfully!', 'success');
+                setTimeout(() => {
+                    location.reload();
+                }, 1000);
+            } else {
+                showToast(data.message || 'Failed to update status!', 'error');
+            }
+            statusModal.hide();
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showToast('An error occurred. Please try again.', 'error');
+            statusModal.hide();
+        })
+        .finally(() => {
+            spinner.classList.add('d-none');
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+        });
+    });
+    
+    // Delete button click
+    document.getElementById('deleteStaffBtn').addEventListener('click', function() {
+        deleteModal.show();
+    });
+    
+    // Confirm delete
+    document.getElementById('confirmDeleteBtn').addEventListener('click', function() {
+        const btn = this;
+        const spinner = btn.querySelector('.spinner-border');
+        const originalText = btn.innerHTML;
+        
+        // Show loading
+        spinner.classList.remove('d-none');
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Deleting...';
+        
+        fetch('{% url "admin_staffs_crud" %}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRFToken': '{{ csrf_token }}'
+            },
+            body: new URLSearchParams({
+                'action': 'delete',
+                'id': "{{ staff.id }}",
+                'csrfmiddlewaretoken': '{{ csrf_token }}'
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showToast(data.message || 'Staff deleted successfully!', 'success');
+                setTimeout(() => {
+                    window.location.href = '{% url "admin_staffs_list" %}';
+                }, 1500);
+            } else {
+                showToast(data.message || 'Failed to delete staff!', 'error');
+                deleteModal.hide();
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showToast('An error occurred. Please try again.', 'error');
+            deleteModal.hide();
+        })
+        .finally(() => {
+            spinner.classList.add('d-none');
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+        });
+    });
+    
+    // Form validation
+    document.getElementById('editStaffForm').addEventListener('input', function(e) {
+        if (e.target.required && !e.target.value.trim()) {
+            e.target.classList.add('is-invalid');
+        } else {
+            e.target.classList.remove('is-invalid');
+        }
+    });
+    
+    // Password validation
+    document.getElementById('password').addEventListener('input', function() {
+        const confirmPassword = document.getElementById('confirm_password');
+        if (this.value && confirmPassword.value && this.value !== confirmPassword.value) {
+            confirmPassword.classList.add('is-invalid');
+        } else {
+            confirmPassword.classList.remove('is-invalid');
+        }
+    });
+    
+    document.getElementById('confirm_password').addEventListener('input', function() {
+        const password = document.getElementById('password');
+        if (password.value && this.value && password.value !== this.value) {
+            this.classList.add('is-invalid');
+        } else {
+            this.classList.remove('is-invalid');
+        }
+    });
+    
+    // Profile picture preview
+    document.getElementById('profile_picture').addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (file) {
+            if (file.size > 2 * 1024 * 1024) { // 2MB limit
+                showToast('File size exceeds 2MB limit!', 'error');
+                e.target.value = '';
+                return;
+            }
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = document.getElementById('profile-image-preview');
+                if (img) {
+                    img.src = e.target.result;
+                }
+            };
+            reader.readAsDataURL(file);
+        }
+    });
+    
+    // Initialize Select2 when modal is shown
+    document.getElementById('editStaffModal').addEventListener('shown.bs.modal', function() {
+        // Small delay to ensure DOM is ready
+        setTimeout(() => {
+            initializeSelect2();
+        }, 100);
+    });
+    
+    // Cleanup Select2 when modal is hidden
+    document.getElementById('editStaffModal').addEventListener('hidden.bs.modal', function() {
+        // Destroy Select2 instances
+        $('.select2bs4').select2('destroy');
+    });
+});
+</script>
+{% endblock extra_js %}

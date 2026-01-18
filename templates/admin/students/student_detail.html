@@ -498,6 +498,42 @@
         opacity: 0.5;
     }
     
+    .remove-subject-btn {
+        background: #fee;
+        color: #dc3545;
+        border: 1px solid #fcc;
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 0.8rem;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+    
+    .remove-subject-btn:hover {
+        background: #fdd;
+        color: #c82333;
+    }
+    
+    .add-subject-btn {
+        background: #e7f5ff;
+        color: #007bff;
+        border: 2px dashed #90caf9;
+        padding: 12px 15px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.3s ease;
+        cursor: pointer;
+        text-decoration: none !important;
+    }
+    
+    .add-subject-btn:hover {
+        background: #d1ecff;
+        border-color: #007bff;
+        transform: translateY(-2px);
+    }
+    
     @media (max-width: 768px) {
         .subjects-grid {
             grid-template-columns: 1fr;
@@ -572,12 +608,6 @@
                             <div class="d-flex justify-content-lg-end gap-2 flex-wrap">
                                 <a href="{% url 'admin_student_edit' student.id %}" class="btn btn-light btn-sm">
                                     <i class="fas fa-edit me-1"></i> Edit Profile
-                                </a>
-                                <a href="#" class="btn btn-light btn-sm" data-toggle="modal" data-target="#printModal">
-                                    <i class="fas fa-print me-1"></i> Print Profile
-                                </a>
-                                <a href="#" class="btn btn-light btn-sm">
-                                    <i class="fas fa-download me-1"></i> Export Data
                                 </a>
                             </div>
                             <small class="text-white opacity-75">
@@ -714,8 +744,8 @@
                     <div class="info-item">
                         <div class="info-label"><i class="fas fa-phone"></i> Primary Contact</div>
                         <div class="info-value">
-                            {% if student.parent.primary_contact %}
-                                {{ student.parent.primary_contact }}
+                            {% if student.parents.first %}
+                                {{ student.parents.first.first_phone_number|default:"Not available" }}
                             {% else %}
                                 <span class="info-value-empty">Not available</span>
                             {% endif %}
@@ -724,8 +754,8 @@
                     <div class="info-item">
                         <div class="info-label"><i class="fas fa-phone-alt"></i> Emergency Contact</div>
                         <div class="info-value">
-                            {% if student.parent.emergency_contact %}
-                                {{ student.parent.emergency_contact }}
+                            {% if student.parents.first %}
+                                {{ student.parents.first.second_phone_number|default:"Not available" }}
                             {% else %}
                                 <span class="info-value-empty">Not available</span>
                             {% endif %}
@@ -741,408 +771,418 @@
                 </div>
             </div>
 
-           <!-- Right Column: Detailed Information -->
-<div class="col-lg-8">
-    <!-- Navigation Tabs -->
-    <ul class="nav nav-tabs nav-tabs-custom mb-4" id="studentTabs" role="tablist">
-        <li class="nav-item" role="presentation">
-            <button class="nav-link active" id="academic-tab" data-bs-toggle="tab" data-bs-target="#academic" type="button" role="tab" aria-controls="academic" aria-selected="true">
-                <i class="fas fa-graduation-cap me-2"></i> Academic Info
-            </button>
-        </li>
-        <li class="nav-item" role="presentation">
-            <button class="nav-link" id="subjects-tab" data-bs-toggle="tab" data-bs-target="#subjects" type="button" role="tab" aria-controls="subjects" aria-selected="false">
-                <i class="fas fa-book me-2"></i> Subjects
-            </button>
-        </li>
-        <li class="nav-item" role="presentation">
-            <button class="nav-link" id="parents-tab" data-bs-toggle="tab" data-bs-target="#parents" type="button" role="tab" aria-controls="parents" aria-selected="false">
-                <i class="fas fa-users me-2"></i> Parents/Guardians
-            </button>
-        </li>
-        <li class="nav-item" role="presentation">
-            <button class="nav-link" id="history-tab" data-bs-toggle="tab" data-bs-target="#history" type="button" role="tab" aria-controls="history" aria-selected="false">
-                <i class="fas fa-history me-2"></i> History
-            </button>
-        </li>
-    </ul>
+            <!-- Right Column: Detailed Information -->
+            <div class="col-lg-8">
+                <!-- Navigation Tabs -->
+                <ul class="nav nav-tabs nav-tabs-custom mb-4" id="studentTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="academic-tab" data-bs-toggle="tab" data-bs-target="#academic" type="button" role="tab" aria-controls="academic" aria-selected="true">
+                            <i class="fas fa-graduation-cap me-2"></i> Academic Info
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="subjects-tab" data-bs-toggle="tab" data-bs-target="#subjects" type="button" role="tab" aria-controls="subjects" aria-selected="false">
+                            <i class="fas fa-book me-2"></i> Subjects
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="parents-tab" data-bs-toggle="tab" data-bs-target="#parents" type="button" role="tab" aria-controls="parents" aria-selected="false">
+                            <i class="fas fa-users me-2"></i> Parents/Guardians
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="history-tab" data-bs-toggle="tab" data-bs-target="#history" type="button" role="tab" aria-controls="history" aria-selected="false">
+                            <i class="fas fa-history me-2"></i> History
+                        </button>
+                    </li>
+                </ul>
 
-    <div class="tab-content" id="studentTabsContent">
-        <!-- Academic Information Tab -->
-        <div class="tab-pane fade show active" id="academic" role="tabpanel" aria-labelledby="academic-tab">
-            <div class="row">
-                <div class="col-md-6">
-                    <div class="info-card">
-                        <div class="info-card-header">
-                            <div class="info-card-icon" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
-                                <i class="fas fa-school"></i>
-                            </div>
-                            <h4 class="info-card-title">Current Academic Details</h4>
-                        </div>
-                        <div class="info-item">
-                            <div class="info-label"><i class="fas fa-layer-group"></i> Class Level</div>
-                            <div class="info-value">
-                                {% if student.class_level %}
-                                    {{ student.class_level.name }} ({{ student.class_level.code }})
-                                {% else %}
-                                    <span class="info-value-empty">Not assigned</span>
-                                {% endif %}
-                            </div>
-                        </div>
-                        <div class="info-item">
-                            <div class="info-label"><i class="fas fa-stream"></i> Stream/Class</div>
-                            <div class="info-value">
-                                {% if student.stream_class %}
-                                    {{ student.stream_class }}
-                                    {% if student.stream_class.capacity %}
-                                        <small class="text-muted ms-2">
-                                            ({{ student.stream_class.student_count }}/{{ student.stream_class.capacity }})
-                                        </small>
-                                    {% endif %}
-                                {% else %}
-                                    <span class="info-value-empty">Not assigned</span>
-                                {% endif %}
-                            </div>
-                        </div>
-                        <div class="info-item">
-                            <div class="info-label"><i class="fas fa-user-tie"></i> Class Teacher</div>
-                            <div class="info-value">
-                                {% if student.stream_class.class_teacher %}
-                                    {{ student.stream_class.class_teacher.get_full_name }}
-                                {% else %}
-                                    <span class="info-value-empty">Not assigned</span>
-                                {% endif %}
-                            </div>
-                        </div>
-                        <div class="info-item">
-                            <div class="info-label"><i class="fas fa-calendar-day"></i> Academic Year</div>
-                            <div class="info-value">
-                                {% if current_academic_year %}
-                                    {{ current_academic_year.name }}
-                                {% else %}
-                                    <span class="info-value-empty">Not set</span>
-                                {% endif %}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-md-6">
-                    <div class="info-card">
-                        <div class="info-card-header">
-                            <div class="info-card-icon" style="background: linear-gradient(135deg, #ed8936 0%, #ed8936 100%);">
-                                <i class="fas fa-university"></i>
-                            </div>
-                            <h4 class="info-card-title">Previous School Information</h4>
-                        </div>
-                        <div class="info-item">
-                            <div class="info-label"><i class="fas fa-school"></i> Previous School</div>
-                            <div class="info-value">
-                                {% if student.previous_school %}
-                                    {{ student.previous_school.name }}
-                                {% else %}
-                                    <span class="info-value-empty">Not specified</span>
-                                {% endif %}
-                            </div>
-                        </div>
-                        <div class="info-item">
-                            <div class="info-label"><i class="fas fa-graduation-cap"></i> Previous Class</div>
-                            <div class="info-value">
-                                {% if student.previous_class_level %}
-                                    {{ student.previous_class_level.name }}
-                                {% else %}
-                                    <span class="info-value-empty">Not specified</span>
-                                {% endif %}
-                            </div>
-                        </div>
-                        <div class="info-item">
-                            <div class="info-label"><i class="fas fa-exchange-alt"></i> Transfer From</div>
-                            <div class="info-value">
-                                {% if student.transfer_from_school %}
-                                    {{ student.transfer_from_school.name }}
-                                {% else %}
-                                    <span class="info-value-empty">Not specified</span>
-                                {% endif %}
-                            </div>
-                        </div>
-                        <div class="info-item">
-                            <div class="info-label"><i class="fas fa-file-alt"></i> Previous Exam No.</div>
-                            <div class="info-value">
-                                {% if student.previously_examination_number %}
-                                    {{ student.previously_examination_number }}
-                                {% else %}
-                                    <span class="info-value-empty">Not specified</span>
-                                {% endif %}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Examination Information -->
-            <div class="info-card">
-                <div class="info-card-header">
-                    <div class="info-card-icon" style="background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);">
-                        <i class="fas fa-file-certificate"></i>
-                    </div>
-                    <h4 class="info-card-title">Examination Information</h4>
-                </div>
-                <div class="row">
-                    <div class="col-md-6">
-                        <div class="info-item">
-                            <div class="info-label"><i class="fas fa-file-alt"></i> Current Exam Number</div>
-                            <div class="info-value">
-                                {% if student.examination_number %}
-                                    {{ student.examination_number }}
-                                {% else %}
-                                    <span class="info-value-empty">Not assigned</span>
-                                {% endif %}
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-6">
-                        <div class="info-item">
-                            <div class="info-label"><i class="fas fa-calendar-check"></i> Last Exam Date</div>
-                            <div class="info-value">
-                                {% if last_exam_date %}
-                                    {{ last_exam_date|date:"F d, Y" }}
-                                {% else %}
-                                    <span class="info-value-empty">No exams taken</span>
-                                {% endif %}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Subjects Tab -->
-        <div class="tab-pane fade" id="subjects" role="tabpanel" aria-labelledby="subjects-tab">
-            <div class="info-card">
-                <div class="info-card-header">
-                    <div class="info-card-icon" style="background: linear-gradient(135deg, #f56565 0%, #e53e3e 100%);">
-                        <i class="fas fa-book-open"></i>
-                    </div>
-                    <h4 class="info-card-title">Enrolled Subjects</h4>
-                    <div class="ms-auto">
-                        <span class="badge-pill-custom badge-primary-gradient">
-                            {% if student_subjects %}
-                                {{ student_subjects|length }} Subjects
-                            {% else %}
-                                No Subjects
-                            {% endif %}
-                        </span>
-                    </div>
-                </div>
-                
-                {% if student_subjects %}
-                    <div class="subjects-grid">
-                        {% for subject in student_subjects %}
-                            <div class="subject-badge">
-                                <div class="subject-name">{{ subject.name }}</div>
-                                <div class="subject-{% if subject.is_compulsory %}compulsory{% else %}optional{% endif %}">
-                                    {% if subject.is_compulsory %}
-                                        <i class="fas fa-star me-1"></i>Compulsory
-                                    {% else %}
-                                        <i class="fas fa-plus-circle me-1"></i>Optional
-                                    {% endif %}
+                <div class="tab-content" id="studentTabsContent">
+                    <!-- Academic Information Tab -->
+                    <div class="tab-pane fade show active" id="academic" role="tabpanel" aria-labelledby="academic-tab">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="info-card">
+                                    <div class="info-card-header">
+                                        <div class="info-card-icon" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                                            <i class="fas fa-school"></i>
+                                        </div>
+                                        <h4 class="info-card-title">Current Academic Details</h4>
+                                    </div>
+                                    <div class="info-item">
+                                        <div class="info-label"><i class="fas fa-layer-group"></i> Class Level</div>
+                                        <div class="info-value">
+                                            {% if student.class_level %}
+                                                {{ student.class_level.name }} ({{ student.class_level.code }})
+                                            {% else %}
+                                                <span class="info-value-empty">Not assigned</span>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    <div class="info-item">
+                                        <div class="info-label"><i class="fas fa-stream"></i> Stream/Class</div>
+                                        <div class="info-value">
+                                            {% if student.stream_class %}
+                                                {{ student.stream_class }}
+                                                {% if student.stream_class.capacity %}
+                                                    <small class="text-muted ms-2">
+                                                        ({{ student.stream_class.student_count }}/{{ student.stream_class.capacity }})
+                                                    </small>
+                                                {% endif %}
+                                            {% else %}
+                                                <span class="info-value-empty">Not assigned</span>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    <div class="info-item">
+                                        <div class="info-label"><i class="fas fa-user-tie"></i> Class Teacher</div>
+                                        <div class="info-value">
+                                            {% if student.stream_class.class_teacher %}
+                                                {{ student.stream_class.class_teacher.get_full_name }}
+                                            {% else %}
+                                                <span class="info-value-empty">Not assigned</span>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    <div class="info-item">
+                                        <div class="info-label"><i class="fas fa-calendar-day"></i> Academic Year</div>
+                                        <div class="info-value">
+                                            {% if current_academic_year %}
+                                                {{ current_academic_year.name }}
+                                            {% else %}
+                                                <span class="info-value-empty">Not set</span>
+                                            {% endif %}
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
-                        {% endfor %}
-                    </div>
-                    
-                    <!-- Subject Summary -->
-                    <div class="row mt-4 pt-3 border-top">
-                        <div class="col-md-6">
-                            <div class="info-item">
-                                <div class="info-label"><i class="fas fa-star"></i> Compulsory Subjects</div>
-                                <div class="info-value">
-                                    {{ compulsory_count }} subjects
+                            <div class="col-md-6">
+                                <div class="info-card">
+                                    <div class="info-card-header">
+                                        <div class="info-card-icon" style="background: linear-gradient(135deg, #ed8936 0%, #ed8936 100%);">
+                                            <i class="fas fa-university"></i>
+                                        </div>
+                                        <h4 class="info-card-title">Previous School Information</h4>
+                                    </div>
+                                    <div class="info-item">
+                                        <div class="info-label"><i class="fas fa-school"></i> Previous School</div>
+                                        <div class="info-value">
+                                            {% if student.previous_school %}
+                                                {{ student.previous_school.name }}
+                                            {% else %}
+                                                <span class="info-value-empty">Not specified</span>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    <div class="info-item">
+                                        <div class="info-label"><i class="fas fa-graduation-cap"></i> Previous Class</div>
+                                        <div class="info-value">
+                                            {% if student.previous_class_level %}
+                                                {{ student.previous_class_level.name }}
+                                            {% else %}
+                                                <span class="info-value-empty">Not specified</span>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    <div class="info-item">
+                                        <div class="info-label"><i class="fas fa-exchange-alt"></i> Transfer From</div>
+                                        <div class="info-value">
+                                            {% if student.transfer_from_school %}
+                                                {{ student.transfer_from_school.name }}
+                                            {% else %}
+                                                <span class="info-value-empty">Not specified</span>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    <div class="info-item">
+                                        <div class="info-label"><i class="fas fa-file-alt"></i> Previous Exam No.</div>
+                                        <div class="info-value">
+                                            {% if student.previously_examination_number %}
+                                                {{ student.previously_examination_number }}
+                                            {% else %}
+                                                <span class="info-value-empty">Not specified</span>
+                                            {% endif %}
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
-                        <div class="col-md-6">
-                            <div class="info-item">
-                                <div class="info-label"><i class="fas fa-plus-circle"></i> Optional Subjects</div>
-                                <div class="info-value">
-                                    {{ optional_count }} subjects
+
+                        <!-- Examination Information -->
+                        <div class="info-card">
+                            <div class="info-card-header">
+                                <div class="info-card-icon" style="background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);">
+                                    <i class="fas fa-file-certificate"></i>
+                                </div>
+                                <h4 class="info-card-title">Examination Information</h4>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="info-item">
+                                        <div class="info-label"><i class="fas fa-file-alt"></i> Current Exam Number</div>
+                                        <div class="info-value">
+                                            {% if student.examination_number %}
+                                                {{ student.examination_number }}
+                                            {% else %}
+                                                <span class="info-value-empty">Not assigned</span>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="info-item">
+                                        <div class="info-label"><i class="fas fa-calendar-check"></i> Last Exam Date</div>
+                                        <div class="info-value">
+                                            {% if last_exam_date %}
+                                                {{ last_exam_date|date:"F d, Y" }}
+                                            {% else %}
+                                                <span class="info-value-empty">No exams taken</span>
+                                            {% endif %}
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     </div>
-                {% else %}
-                    <div class="empty-state">
-                        <div class="empty-state-icon">
-                            <i class="fas fa-book"></i>
-                        </div>
-                        <h5 class="mb-3">No Subjects Enrolled</h5>
-                        <p class="text-muted mb-4">This student hasn't been enrolled in any subjects yet.</p>
-                        <a href="{% url 'admin_student_edit' student.id %}" class="btn btn-primary">
-                            <i class="fas fa-plus-circle me-2"></i> Enroll Subjects
-                        </a>
-                    </div>
-                {% endif %}
-            </div>
-        </div>
 
-        <!-- Parents/Guardians Tab -->
-        <div class="tab-pane fade" id="parents" role="tabpanel" aria-labelledby="parents-tab">
-            <div class="info-card">
-                <div class="info-card-header">
-                    <div class="info-card-icon" style="background: linear-gradient(135deg, #9f7aea 0%, #805ad5 100%);">
-                        <i class="fas fa-users"></i>
-                    </div>
-                    <h4 class="info-card-title">Parents & Guardians</h4>
-                    <div class="ms-auto">
-                        <a href="{% url 'admin_add_parent_to_student' student.id %}" class="btn btn-sm btn-primary">
-                            <i class="fas fa-user-plus me-1"></i> Add Parent
-                        </a>
-                    </div>
-                </div>
-                
-                {% if student.parents.all %}
-                    <div class="row">
-                        {% for parent in student.parents.all %}
-                            <div class="col-md-6 mb-4">
-                                <div class="parent-card {% if parent.is_fee_responsible %}parent-fee-responsible{% endif %}">
-                                    <div class="d-flex justify-content-between align-items-start mb-3">
-                                        <h5 class="mb-0">{{ parent.full_name }}</h5>
-                                        {% if parent.is_fee_responsible %}
-                                            <span class="badge-pill-custom badge-success-gradient">
-                                                <i class="fas fa-money-check-alt me-1"></i>Fee Responsible
-                                            </span>
+                    <!-- Subjects Tab -->
+                    <div class="tab-pane fade" id="subjects" role="tabpanel" aria-labelledby="subjects-tab">
+                        <div class="info-card">
+                            <div class="info-card-header">
+                                <div class="info-card-icon" style="background: linear-gradient(135deg, #f56565 0%, #e53e3e 100%);">
+                                    <i class="fas fa-book-open"></i>
+                                </div>
+                                <h4 class="info-card-title">Enrolled Subjects</h4>
+                                <div class="ms-auto">
+                                    <span class="badge-pill-custom badge-primary-gradient">
+                                        {% if student_subjects %}
+                                            {{ student_subjects|length }} Subjects
+                                        {% else %}
+                                            No Subjects
                                         {% endif %}
-                                    </div>
-                                    <div class="info-item mb-2">
-                                        <div class="info-label"><i class="fas fa-user-tag"></i> Relationship</div>
-                                        <div class="info-value">{{ parent.relationship }}</div>
-                                    </div>
-                                    <div class="info-item mb-2">
-                                        <div class="info-label"><i class="fas fa-phone"></i> Primary Phone</div>
-                                        <div class="info-value">{{ parent.first_phone_number }}</div>
-                                    </div>
-                                    {% if parent.second_phone_number %}
-                                    <div class="info-item mb-2">
-                                        <div class="info-label"><i class="fas fa-phone-alt"></i> Secondary Phone</div>
-                                        <div class="info-value">{{ parent.second_phone_number }}</div>
-                                    </div>
-                                    {% endif %}
-                                    {% if parent.email %}
-                                    <div class="info-item mb-2">
-                                        <div class="info-label"><i class="fas fa-envelope"></i> Email</div>
-                                        <div class="info-value">{{ parent.email }}</div>
-                                    </div>
-                                    {% endif %}
-                                    <div class="info-item mb-3">
-                                        <div class="info-label"><i class="fas fa-home"></i> Address</div>
-                                        <div class="info-value">{{ parent.address }}</div>
-                                    </div>
-                                    <div class="d-flex gap-2">
-                                        <a href="#" class="btn btn-sm btn-outline-primary flex-fill">
-                                            <i class="fas fa-edit me-1"></i> Edit
-                                        </a>
-                                        <a href="#" class="btn btn-sm btn-outline-danger flex-fill">
-                                            <i class="fas fa-trash me-1"></i> Remove
-                                        </a>
-                                    </div>
+                                    </span>
                                 </div>
                             </div>
-                        {% endfor %}
-                    </div>
-                {% else %}
-                    <div class="empty-state">
-                        <div class="empty-state-icon">
-                            <i class="fas fa-user-friends"></i>
+                            
+                            {% if student_subjects %}
+                                <div class="subjects-grid">
+                                    {% for subject in student_subjects %}
+                                        <div class="subject-badge">
+                                            <div class="subject-name">{{ subject.name }}</div>
+                                            <div class="subject-{% if subject.is_compulsory %}compulsory{% else %}optional{% endif %}">
+                                                {% if subject.is_compulsory %}
+                                                    <i class="fas fa-star me-1"></i>Compulsory
+                                                {% else %}
+                                                    <i class="fas fa-plus-circle me-1"></i>Optional
+                                                    <button class="remove-subject-btn ms-2" data-subject-id="{{ subject.id }}" data-subject-name="{{ subject.name }}">
+                                                        <i class="fas fa-times"></i> Remove
+                                                    </button>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                    {% endfor %}
+                                    <!-- Add Subject Button -->
+                                    <a href="#" class="add-subject-btn" data-toggle="modal" data-target="#addSubjectModal">
+                                        <i class="fas fa-plus-circle me-2"></i> Add Optional Subject
+                                    </a>
+                                </div>
+                                
+                                <!-- Subject Summary -->
+                                <div class="row mt-4 pt-3 border-top">
+                                    <div class="col-md-6">
+                                        <div class="info-item">
+                                            <div class="info-label"><i class="fas fa-star"></i> Compulsory Subjects</div>
+                                            <div class="info-value">
+                                                {{ compulsory_count }} subjects
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="info-item">
+                                            <div class="info-label"><i class="fas fa-plus-circle"></i> Optional Subjects</div>
+                                            <div class="info-value">
+                                                {{ optional_count }} subjects
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            {% else %}
+                                <div class="empty-state">
+                                    <div class="empty-state-icon">
+                                        <i class="fas fa-book"></i>
+                                    </div>
+                                    <h5 class="mb-3">No Subjects Enrolled</h5>
+                                    <p class="text-muted mb-4">This student hasn't been enrolled in any subjects yet.</p>
+                                    <a href="{% url 'admin_student_edit' student.id %}" class="btn btn-primary me-2">
+                                        <i class="fas fa-edit me-2"></i> Edit Subjects
+                                    </a>
+                                    <a href="#" class="btn btn-success" data-toggle="modal" data-target="#addSubjectModal">
+                                        <i class="fas fa-plus-circle me-2"></i> Add Subject
+                                    </a>
+                                </div>
+                            {% endif %}
                         </div>
-                        <h5 class="mb-3">No Parents/Guardians Added</h5>
-                        <p class="text-muted mb-4">This student doesn't have any parents or guardians registered yet.</p>
-                        <a href="{% url 'admin_add_parent_to_student' student.id %}" class="btn btn-primary">
-                            <i class="fas fa-user-plus me-2"></i> Add Parent/Guardian
-                        </a>
                     </div>
-                {% endif %}
-            </div>
-        </div>
 
-        <!-- History Tab -->
-        <div class="tab-pane fade" id="history" role="tabpanel" aria-labelledby="history-tab">
-            <div class="info-card">
-                <div class="info-card-header">
-                    <div class="info-card-icon" style="background: linear-gradient(135deg, #718096 0%, #4a5568 100%);">
-                        <i class="fas fa-history"></i>
-                    </div>
-                    <h4 class="info-card-title">Student History</h4>
-                </div>
-                
-                <div class="timeline">
-                    <div class="timeline-item">
-                        <div class="timeline-date">Admission Date</div>
-                        <div class="timeline-content">
-                            <strong>Student was admitted</strong><br>
-                            Admission Year: {{ student.admission_year }}<br>
-                            Serial Number: {{ student.serial_number }}<br>
-                            Registration Number: {{ student.registration_number }}
-                        </div>
-                    </div>
-                    
-                    {% if student.created_at %}
-                    <div class="timeline-item">
-                        <div class="timeline-date">{{ student.created_at|date:"F d, Y" }}</div>
-                        <div class="timeline-content">
-                            <strong>Student record created</strong><br>
-                            Initial status: {{ student.get_status_display }}<br>
-                            Created in the system
-                        </div>
-                    </div>
-                    {% endif %}
-                    
-                    {% if student.updated_at %}
-                    <div class="timeline-item">
-                        <div class="timeline-date">{{ student.updated_at|date:"F d, Y" }}</div>
-                        <div class="timeline-content">
-                            <strong>Last updated</strong><br>
-                            Profile information was last modified
-                        </div>
-                    </div>
-                    {% endif %}
-                    
-                    {% if academic_history %}
-                        {% for record in academic_history %}
-                        <div class="timeline-item">
-                            <div class="timeline-date">{{ record.date|date:"F d, Y" }}</div>
-                            <div class="timeline-content">
-                                <strong>{{ record.title }}</strong><br>
-                                {{ record.description }}
+                    <!-- Parents/Guardians Tab -->
+                    <div class="tab-pane fade" id="parents" role="tabpanel" aria-labelledby="parents-tab">
+                        <div class="info-card">
+                            <div class="info-card-header">
+                                <div class="info-card-icon" style="background: linear-gradient(135deg, #9f7aea 0%, #805ad5 100%);">
+                                    <i class="fas fa-users"></i>
+                                </div>
+                                <h4 class="info-card-title">Parents & Guardians</h4>
+                                <div class="ms-auto">
+                                    <a href="{% url 'admin_add_parent_to_student' student.id %}" class="btn btn-sm btn-primary">
+                                        <i class="fas fa-user-plus me-1"></i> Add Parent
+                                    </a>
+                                </div>
                             </div>
+                            
+                            {% if student.parents.all %}
+                                <div class="row">
+                                    {% for parent in student.parents.all %}
+                                        <div class="col-md-6 mb-4">
+                                            <div class="parent-card {% if parent.is_fee_responsible %}parent-fee-responsible{% endif %}">
+                                                <div class="d-flex justify-content-between align-items-start mb-3">
+                                                    <h5 class="mb-0">{{ parent.full_name }}</h5>
+                                                    {% if parent.is_fee_responsible %}
+                                                        <span class="badge-pill-custom badge-success-gradient">
+                                                            <i class="fas fa-money-check-alt me-1"></i>Fee Responsible
+                                                        </span>
+                                                    {% endif %}
+                                                </div>
+                                                <div class="info-item mb-2">
+                                                    <div class="info-label"><i class="fas fa-user-tag"></i> Relationship</div>
+                                                    <div class="info-value">{{ parent.relationship }}</div>
+                                                </div>
+                                                <div class="info-item mb-2">
+                                                    <div class="info-label"><i class="fas fa-phone"></i> Primary Phone</div>
+                                                    <div class="info-value">{{ parent.first_phone_number }}</div>
+                                                </div>
+                                                {% if parent.second_phone_number %}
+                                                <div class="info-item mb-2">
+                                                    <div class="info-label"><i class="fas fa-phone-alt"></i> Secondary Phone</div>
+                                                    <div class="info-value">{{ parent.second_phone_number }}</div>
+                                                </div>
+                                                {% endif %}
+                                                {% if parent.email %}
+                                                <div class="info-item mb-2">
+                                                    <div class="info-label"><i class="fas fa-envelope"></i> Email</div>
+                                                    <div class="info-value">{{ parent.email }}</div>
+                                                </div>
+                                                {% endif %}
+                                                <div class="info-item mb-3">
+                                                    <div class="info-label"><i class="fas fa-home"></i> Address</div>
+                                                    <div class="info-value">{{ parent.address }}</div>
+                                                </div>
+                                                <div class="d-flex gap-2">
+                                                    <a href="{% url 'admin_edit_parent' student.id parent.id %}" class="btn btn-sm btn-outline-primary flex-fill">
+                                                        <i class="fas fa-edit me-1"></i> Edit
+                                                    </a>
+                                                    <button class="btn btn-sm btn-outline-danger flex-fill remove-parent-btn" data-parent-id="{{ parent.id }}" data-parent-name="{{ parent.full_name }}">
+                                                        <i class="fas fa-trash me-1"></i> Remove
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    {% endfor %}
+                                </div>
+                            {% else %}
+                                <div class="empty-state">
+                                    <div class="empty-state-icon">
+                                        <i class="fas fa-user-friends"></i>
+                                    </div>
+                                    <h5 class="mb-3">No Parents/Guardians Added</h5>
+                                    <p class="text-muted mb-4">This student doesn't have any parents or guardians registered yet.</p>
+                                    <a href="{% url 'admin_add_parent_to_student' student.id %}" class="btn btn-primary">
+                                        <i class="fas fa-user-plus me-2"></i> Add Parent/Guardian
+                                    </a>
+                                </div>
+                            {% endif %}
                         </div>
-                        {% endfor %}
-                    {% endif %}
-                    
-                    {% if student.status_changes %}
-                        {% for change in student.status_changes %}
-                        <div class="timeline-item">
-                            <div class="timeline-date">{{ change.date|date:"F d, Y" }}</div>
-                            <div class="timeline-content">
-                                <strong>Status changed to: {{ change.new_status }}</strong><br>
-                                {% if change.reason %}{{ change.reason }}{% endif %}
-                            </div>
-                        </div>
-                        {% endfor %}
-                    {% endif %}
-                </div>
-                
-                {% if not academic_history and not student.status_changes %}
-                    <div class="empty-state">
-                        <div class="empty-state-icon">
-                            <i class="fas fa-history"></i>
-                        </div>
-                        <h5 class="mb-3">No History Available</h5>
-                        <p class="text-muted">No historical records found for this student.</p>
                     </div>
-                {% endif %}
+
+                    <!-- History Tab -->
+                    <div class="tab-pane fade" id="history" role="tabpanel" aria-labelledby="history-tab">
+                        <div class="info-card">
+                            <div class="info-card-header">
+                                <div class="info-card-icon" style="background: linear-gradient(135deg, #718096 0%, #4a5568 100%);">
+                                    <i class="fas fa-history"></i>
+                                </div>
+                                <h4 class="info-card-title">Student History</h4>
+                            </div>
+                            
+                            <div class="timeline">
+                                <div class="timeline-item">
+                                    <div class="timeline-date">Admission Date</div>
+                                    <div class="timeline-content">
+                                        <strong>Student was admitted</strong><br>
+                                        Admission Year: {{ student.admission_year }}<br>
+                                        Serial Number: {{ student.serial_number }}<br>
+                                        Registration Number: {{ student.registration_number }}
+                                    </div>
+                                </div>
+                                
+                                {% if student.created_at %}
+                                <div class="timeline-item">
+                                    <div class="timeline-date">{{ student.created_at|date:"F d, Y" }}</div>
+                                    <div class="timeline-content">
+                                        <strong>Student record created</strong><br>
+                                        Initial status: {{ student.get_status_display }}<br>
+                                        Created in the system
+                                    </div>
+                                </div>
+                                {% endif %}
+                                
+                                {% if student.updated_at %}
+                                <div class="timeline-item">
+                                    <div class="timeline-date">{{ student.updated_at|date:"F d, Y" }}</div>
+                                    <div class="timeline-content">
+                                        <strong>Last updated</strong><br>
+                                        Profile information was last modified
+                                    </div>
+                                </div>
+                                {% endif %}
+                                
+                                {% if academic_history %}
+                                    {% for record in academic_history %}
+                                    <div class="timeline-item">
+                                        <div class="timeline-date">{{ record.date|date:"F d, Y" }}</div>
+                                        <div class="timeline-content">
+                                            <strong>{{ record.title }}</strong><br>
+                                            {{ record.description }}
+                                        </div>
+                                    </div>
+                                    {% endfor %}
+                                {% endif %}
+                                
+                                {% if student.status_changes %}
+                                    {% for change in student.status_changes %}
+                                    <div class="timeline-item">
+                                        <div class="timeline-date">{{ change.date|date:"F d, Y" }}</div>
+                                        <div class="timeline-content">
+                                            <strong>Status changed to: {{ change.new_status }}</strong><br>
+                                            {% if change.reason %}{{ change.reason }}{% endif %}
+                                        </div>
+                                    </div>
+                                    {% endfor %}
+                                {% endif %}
+                            </div>
+                            
+                            {% if not academic_history and not student.status_changes %}
+                                <div class="empty-state">
+                                    <div class="empty-state-icon">
+                                        <i class="fas fa-history"></i>
+                                    </div>
+                                    <h5 class="mb-3">No History Available</h5>
+                                    <p class="text-muted">No historical records found for this student.</p>
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
             </div>
-        </div>
-    </div>
-</div>
         </div>
 
         <!-- Floating Action Buttons -->
@@ -1157,58 +1197,70 @@
                 <span class="tooltip-text">Add Parent</span>
             </button>
             
-            <button type="button" class="floating-action-btn floating-action-btn-warning" id="printBtn">
-                <i class="fas fa-print"></i>
-                <span class="tooltip-text">Print Profile</span>
-            </button>
-            
             <button type="button" class="floating-action-btn floating-action-btn-danger" id="deleteBtn" data-toggle="modal" data-target="#deleteModal">
                 <i class="fas fa-trash"></i>
                 <span class="tooltip-text">Delete Student</span>
             </button>
         </div>
 
-        <!-- Print Modal -->
-        <div class="modal fade" id="printModal" tabindex="-1" role="dialog">
-            <div class="modal-dialog" role="document">
+        <!-- Add Subject Modal -->
+        <div class="modal fade" id="addSubjectModal" tabindex="-1" role="dialog">
+            <div class="modal-dialog modal-lg" role="document">
                 <div class="modal-content">
                     <div class="modal-header">
-                        <h5 class="modal-title">Print Student Profile</h5>
+                        <h5 class="modal-title">Add Optional Subjects</h5>
                         <button type="button" class="close" data-dismiss="modal">
                             <span>&times;</span>
                         </button>
                     </div>
                     <div class="modal-body">
-                        <p>Select what you want to print:</p>
-                        <div class="form-check mb-2">
-                            <input class="form-check-input" type="checkbox" id="printBasic" checked>
-                            <label class="form-check-label" for="printBasic">Basic Information</label>
-                        </div>
-                        <div class="form-check mb-2">
-                            <input class="form-check-input" type="checkbox" id="printAcademic" checked>
-                            <label class="form-check-label" for="printAcademic">Academic Information</label>
-                        </div>
-                        <div class="form-check mb-2">
-                            <input class="form-check-input" type="checkbox" id="printSubjects">
-                            <label class="form-check-label" for="printSubjects">Subjects</label>
-                        </div>
-                        <div class="form-check mb-2">
-                            <input class="form-check-input" type="checkbox" id="printParents">
-                            <label class="form-check-label" for="printParents">Parents/Guardians</label>
-                        </div>
-                        <div class="form-check mb-3">
-                            <input class="form-check-input" type="checkbox" id="printPhoto">
-                            <label class="form-check-label" for="printPhoto">Include Photo</label>
-                        </div>
                         <div class="alert alert-info">
                             <i class="fas fa-info-circle me-2"></i>
-                            The printout will be optimized for A4 paper.
+                            Select optional subjects to enroll this student in.
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-12">
+                                <div class="form-group">
+                                    <label for="subjectSearch">Search Subjects</label>
+                                    <input type="text" class="form-control" id="subjectSearch" placeholder="Type to search subjects...">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="available-subjects-container">
+                            <h6 class="mb-3">Available Optional Subjects</h6>
+                            <div class="subjects-grid" id="availableSubjectsGrid">
+                                <!-- Subjects loaded from view context -->
+                                {% for subject in available_subjects %}
+                                <div class="subject-badge selectable-subject" data-subject-id="{{ subject.id }}">
+                                    <div class="subject-name">{{ subject.name }}</div>
+                                    <div class="subject-optional">
+                                        <i class="fas fa-plus-circle me-1"></i>Optional
+                                    </div>
+                                </div>
+                                {% empty %}
+                                <div class="col-12">
+                                    <div class="alert alert-info">
+                                        <i class="fas fa-info-circle me-2"></i>
+                                        No available optional subjects found for this student's class level.
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        
+                        <div class="selected-subjects-container mt-4">
+                            <h6 class="mb-3">Selected Subjects</h6>
+                            <div class="selected-subjects-list" id="selectedSubjectsList">
+                                <!-- Selected subjects will appear here -->
+                            </div>
                         </div>
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
-                        <button type="button" class="btn btn-primary" onclick="printProfile()">
-                            <i class="fas fa-print me-2"></i>Print
+                        <button type="button" class="btn btn-primary" id="saveSubjectsBtn" disabled>
+                            <i class="fas fa-save me-2"></i>Save Changes
                         </button>
                     </div>
                 </div>
@@ -1257,181 +1309,36 @@
 {% block extra_js %}
 <script>
 $(document).ready(function() {
-    // Get CSRF token for AJAX requests
+    // Debug logging
+    console.log('Student detail page initializing...');
+    
+    // Get CSRF token from cookies (alternative method)
     function getCSRFToken() {
-        return document.querySelector('[name=csrfmiddlewaretoken]').value;
-    }
-
-    // Floating action buttons
-    $('#editStudentBtn').on('click', function() {
-        window.location.href = "{% url 'admin_student_edit' student.id %}";
-    });
-
-    $('#addParentBtn').on('click', function() {
-        window.location.href = "{% url 'admin_add_parent_to_student' student.id %}";
-    });
-
-    $('#printBtn').on('click', function() {
-        $('#printModal').modal('show');
-    });
-
-    // Delete confirmation
-    $('#confirmDeleteText').on('input', function() {
-        const confirmBtn = $('#confirmDeleteBtn');
-        if ($(this).val().toUpperCase() === 'DELETE') {
-            confirmBtn.prop('disabled', false);
-        } else {
-            confirmBtn.prop('disabled', true);
+        let csrfToken = '';
+        // Try from meta tag first
+        const csrfMeta = document.querySelector('meta[name="csrf-token"]');
+        if (csrfMeta) {
+            csrfToken = csrfMeta.getAttribute('content');
         }
-    });
-
-    $('#confirmDeleteBtn').on('click', function() {
-        if ($('#confirmDeleteText').val().toUpperCase() === 'DELETE') {
-            deleteStudent();
-        }
-    });
-
-    function deleteStudent() {
-        showLoading();
-        
-        $.ajax({
-            url: "{% url 'admin_student_delete' student.id %}",
-            type: 'POST',
-            headers: {
-                'X-Requested-With': 'XMLHttpRequest',
-                'X-CSRFToken': getCSRFToken()
-            },
-            success: function(response) {
-                hideLoading();
-                $('#deleteModal').modal('hide');
-                
-                if (response.success) {
-                    Swal.fire({
-                        title: 'Student Deleted!',
-                        text: response.message,
-                        icon: 'success',
-                        confirmButtonColor: '#667eea',
-                        confirmButtonText: 'Go to Students List'
-                    }).then(() => {
-                        window.location.href = "{% url 'admin_students_list' %}";
-                    });
-                } else {
-                    Swal.fire({
-                        title: 'Delete Failed',
-                        text: response.message || 'Failed to delete student.',
-                        icon: 'error',
-                        confirmButtonColor: '#dc3545'
-                    });
-                }
-            },
-            error: function(xhr) {
-                hideLoading();
-                Swal.fire({
-                    title: 'Error',
-                    text: 'An error occurred while deleting the student.',
-                    icon: 'error',
-                    confirmButtonColor: '#dc3545'
-                });
+        // Try from hidden input
+        if (!csrfToken) {
+            const csrfInput = document.querySelector('[name=csrfmiddlewaretoken]');
+            if (csrfInput) {
+                csrfToken = csrfInput.value;
             }
-        });
+        }
+        // Try from cookies as last resort
+        if (!csrfToken) {
+            const cookieValue = document.cookie
+                .split('; ')
+                .find(row => row.startsWith('csrftoken='))
+                ?.split('=')[1];
+            csrfToken = cookieValue || '';
+        }
+        
+        console.log('CSRF Token found:', csrfToken ? 'Yes' : 'No');
+        return csrfToken;
     }
-
-    // Print function
-    function printProfile() {
-        const printWindow = window.open('', '_blank');
-        const printContent = `
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <title>Student Profile - {{ student.full_name }}</title>
-                <style>
-                    body { font-family: Arial, sans-serif; margin: 20px; }
-                    .header { text-align: center; border-bottom: 2px solid #333; padding-bottom: 20px; margin-bottom: 30px; }
-                    .student-name { font-size: 24px; font-weight: bold; margin-bottom: 10px; }
-                    .section { margin-bottom: 30px; page-break-inside: avoid; }
-                    .section-title { font-size: 18px; font-weight: bold; margin-bottom: 15px; border-bottom: 1px solid #ccc; padding-bottom: 5px; }
-                    .info-row { margin-bottom: 10px; }
-                    .info-label { font-weight: bold; display: inline-block; width: 200px; }
-                    .subjects-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
-                    .subject-item { background: #f5f5f5; padding: 8px; border-radius: 4px; }
-                    @media print {
-                        .no-print { display: none; }
-                    }
-                </style>
-            </head>
-            <body>
-                <div class="header">
-                    <h1 class="student-name">{{ student.full_name }}</h1>
-                    <p>Registration No: {{ student.registration_number }}</p>
-                    <p>Printed on: ${new Date().toLocaleDateString()}</p>
-                </div>
-                
-                <div class="section">
-                    <h3 class="section-title">Basic Information</h3>
-                    <div class="info-row"><span class="info-label">Date of Birth:</span> {% if student.date_of_birth %}{{ student.date_of_birth|date:"F d, Y" }}{% else %}Not specified{% endif %}</div>
-                    <div class="info-row"><span class="info-label">Gender:</span> {{ student.get_gender_display|default:"Not specified" }}</div>
-                    <div class="info-row"><span class="info-label">Address:</span> {% if student.address %}{{ student.address }}{% else %}Not specified{% endif %}</div>
-                </div>
-                
-                <div class="section">
-                    <h3 class="section-title">Academic Information</h3>
-                    <div class="info-row"><span class="info-label">Class Level:</span> {% if student.class_level %}{{ student.class_level.name }}{% else %}Not assigned{% endif %}</div>
-                    <div class="info-row"><span class="info-label">Stream/Class:</span> {% if student.stream_class %}{{ student.stream_class }}{% else %}Not assigned{% endif %}</div>
-                    <div class="info-row"><span class="info-label">Status:</span> {{ student.get_status_display }}</div>
-                </div>
-                
-                {% if student_subjects %}
-                <div class="section">
-                    <h3 class="section-title">Enrolled Subjects ({{ student_subjects|length }})</h3>
-                    <div class="subjects-grid">
-                        {% for subject in student_subjects %}
-                        <div class="subject-item">
-                            {{ subject.name }}
-                            {% if subject.is_compulsory %}(Compulsory){% else %}(Optional){% endif %}
-                        </div>
-                        {% endfor %}
-                    </div>
-                </div>
-                {% endif %}
-                
-                {% if student.parents.all %}
-                <div class="section">
-                    <h3 class="section-title">Parents/Guardians</h3>
-                    {% for parent in student.parents.all %}
-                    <div style="margin-bottom: 20px; padding: 10px; border: 1px solid #ddd; border-radius: 4px;">
-                        <strong>{{ parent.full_name }}</strong> ({{ parent.relationship }})<br>
-                        Phone: {{ parent.first_phone_number }}{% if parent.second_phone_number %}, {{ parent.second_phone_number }}{% endif %}<br>
-                        {% if parent.email %}Email: {{ parent.email }}<br>{% endif %}
-                        Address: {{ parent.address }}
-                        {% if parent.is_fee_responsible %}<br><em>Fee Responsible</em>{% endif %}
-                    </div>
-                    {% endfor %}
-                </div>
-                {% endif %}
-            </body>
-            </html>
-        `;
-        
-        printWindow.document.write(printContent);
-        printWindow.document.close();
-        printWindow.focus();
-        
-        setTimeout(function() {
-            printWindow.print();
-            printWindow.close();
-        }, 500);
-        
-        $('#printModal').modal('hide');
-    }
-
-    // Tab functionality
-    $('#studentTabs button').on('click', function(e) {
-        e.preventDefault();
-        $(this).tab('show');
-    });
-
-    // Initialize tooltips
-    $('[data-toggle="tooltip"]').tooltip();
 
     // Show loading overlay
     function showLoading() {
@@ -1443,14 +1350,487 @@ $(document).ready(function() {
         $('#loadingOverlay').fadeOut(300);
     }
 
-    // Auto-refresh subjects count
-    function updateSubjectsCount() {
-        const subjectCount = $('#subjects .subject-badge').length;
-        $('#subjects .badge-pill-custom').text(subjectCount + ' Subjects');
+    // Show success message
+    function showSuccess(message) {
+        return Swal.fire({
+            title: 'Success!',
+            text: message,
+            icon: 'success',
+            confirmButtonColor: '#667eea',
+            timer: 2000
+        });
     }
 
-    // Initial update
+    // Show error message
+    function showError(message) {
+        return Swal.fire({
+            title: 'Error!',
+            text: message,
+            icon: 'error',
+            confirmButtonColor: '#dc3545'
+        });
+    }
+
+    // Show confirmation dialog
+    function showConfirm(title, text, confirmText = 'Yes, proceed!') {
+        return Swal.fire({
+            title: title,
+            text: text,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#dc3545',
+            cancelButtonColor: '#6c757d',
+            confirmButtonText: confirmText,
+            cancelButtonText: 'Cancel'
+        });
+    }
+
+    // Initialize tooltips
+    if ($.fn.tooltip) {
+        $('[data-toggle="tooltip"]').tooltip();
+    }
+
+    // ============= FLOATING ACTION BUTTONS =============
+    $('#editStudentBtn').on('click', function() {
+        window.location.href = "{% url 'admin_student_edit' student.id %}";
+    });
+
+    $('#addParentBtn').on('click', function() {
+        window.location.href = "{% url 'admin_add_parent_to_student' student.id %}";
+    });
+
+    // ============= DELETE STUDENT FUNCTIONALITY =============
+    $('#confirmDeleteText').on('input', function() {
+        const confirmBtn = $('#confirmDeleteBtn');
+        confirmBtn.prop('disabled', $(this).val().toUpperCase() !== 'DELETE');
+    });
+
+    $('#confirmDeleteBtn').on('click', function() {
+        if ($('#confirmDeleteText').val().toUpperCase() === 'DELETE') {
+            deleteStudent();
+        }
+    });
+
+    async function deleteStudent() {
+        const result = await showConfirm(
+            'Delete Student?',
+            `Are you sure you want to permanently delete "${student.full_name}"? This action cannot be undone.`,
+            'Yes, delete student!'
+        );
+        
+        if (!result.isConfirmed) return;
+        
+        showLoading();
+        
+        try {
+            const response = await $.ajax({
+                url: "{% url 'admin_student_delete' student.id %}",
+                type: 'POST',
+                data: {
+                    csrfmiddlewaretoken: getCSRFToken()
+                },
+                dataType: 'json'
+            });
+            
+            hideLoading();
+            $('#deleteModal').modal('hide');
+            
+            if (response.success) {
+                await showSuccess(response.message || 'Student deleted successfully.');
+                window.location.href = "{% url 'admin_students_list' %}";
+            } else {
+                await showError(response.message || 'Failed to delete student.');
+            }
+        } catch (error) {
+            hideLoading();
+            console.error('Delete error:', error);
+            await showError('An error occurred while deleting the student.');
+        }
+    }
+
+    // ============= SUBJECT MANAGEMENT =============
+    let selectedSubjects = [];
+    
+    // Remove optional subject
+    $(document).on('click', '.remove-subject-btn', async function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        const subjectId = $(this).data('subject-id');
+        const subjectName = $(this).data('subject-name');
+        
+        const result = await showConfirm(
+            'Remove Subject?',
+            `Are you sure you want to remove "${subjectName}" from this student's subjects?`,
+            'Yes, remove it!'
+        );
+        
+        if (!result.isConfirmed) return;
+        
+        await removeSubject(subjectId, subjectName);
+    });
+
+    async function removeSubject(subjectId, subjectName) {
+        showLoading();
+        
+        try {
+            const response = await $.ajax({
+                url: "{% url 'admin_remove_student_subject' student.id %}",
+                type: 'POST',
+                data: {
+                    subject_id: subjectId,
+                    csrfmiddlewaretoken: getCSRFToken()
+                },
+                dataType: 'json'
+            });
+            
+            hideLoading();
+            
+            if (response.success) {
+                await showSuccess(`"${subjectName}" has been removed from student's subjects.`);
+                // Update the UI without full page reload
+                $(`.remove-subject-btn[data-subject-id="${subjectId}"]`).closest('.subject-badge').fadeOut(300, function() {
+                    $(this).remove();
+                    updateSubjectsCount();
+                    updateSubjectStats();
+                });
+            } else {
+                await showError(response.message || 'Failed to remove subject.');
+            }
+        } catch (error) {
+            hideLoading();
+            console.error('Remove subject error:', error);
+            await showError('An error occurred while removing the subject.');
+        }
+    }
+
+    // Update subject statistics
+    function updateSubjectStats() {
+        const optionalCount = $('.subject-badge .subject-optional').length;
+        const compulsoryCount = $('.subject-badge .subject-compulsory').length;
+        
+        // Update counts in the summary section
+        $('.info-value').filter(function() {
+            return $(this).text().includes('subjects') && $(this).prev().find('i.fa-star').length > 0;
+        }).text(compulsoryCount + ' subjects');
+        
+        $('.info-value').filter(function() {
+            return $(this).text().includes('subjects') && $(this).prev().find('i.fa-plus-circle').length > 0;
+        }).text(optionalCount + ' subjects');
+    }
+
+    // ============= ADD SUBJECT MODAL FUNCTIONALITY =============
+    // Open modal and initialize subjects
+    $(document).on('click', '.add-subject-btn', function(e) {
+        e.preventDefault();
+        selectedSubjects = [];
+        $('#addSubjectModal').modal('show');
+        initializeSubjectModal();
+    });
+
+    // Initialize subject modal with available subjects from context
+    function initializeSubjectModal() {
+        // Clear previous selections
+        selectedSubjects = [];
+        updateSelectedSubjectsList();
+        $('#saveSubjectsBtn').prop('disabled', true);
+        
+        // Remove any existing badges and reset search
+        $('.selectable-subject .badge.bg-success').remove();
+        $('.selectable-subject').removeClass('selected');
+        
+        // Initialize search functionality
+        $('#subjectSearch').off('input').on('input', function() {
+            const searchTerm = $(this).val().toLowerCase();
+            $('.selectable-subject').each(function() {
+                const subjectName = $(this).find('.subject-name').text().toLowerCase();
+                $(this).toggle(subjectName.includes(searchTerm));
+            });
+        });
+        
+        // Focus on search input
+        setTimeout(() => {
+            $('#subjectSearch').focus();
+        }, 500);
+    }
+
+    // Handle subject selection in modal
+    $(document).on('click', '.selectable-subject', function() {
+        const subjectId = $(this).data('subject-id');
+        const subjectName = $(this).find('.subject-name').text();
+        
+        const subjectIndex = selectedSubjects.findIndex(s => s.id == subjectId);
+        
+        if (subjectIndex === -1) {
+            // Add to selected
+            selectedSubjects.push({ id: subjectId, name: subjectName });
+            $(this).addClass('selected');
+            $(this).find('.subject-optional').append('<span class="badge bg-success ms-2">Selected</span>');
+        } else {
+            // Remove from selected
+            selectedSubjects.splice(subjectIndex, 1);
+            $(this).removeClass('selected');
+            $(this).find('.badge.bg-success').remove();
+        }
+        
+        updateSelectedSubjectsList();
+    });
+
+    // Update selected subjects list display
+    function updateSelectedSubjectsList() {
+        const selectedList = $('#selectedSubjectsList');
+        selectedList.empty();
+        
+        if (selectedSubjects.length > 0) {
+            selectedSubjects.forEach(subject => {
+                const subjectHtml = `
+                    <div class="selected-subject-item mb-2 p-3 bg-light rounded border">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <strong>${subject.name}</strong>
+                            </div>
+                            <button class="btn btn-sm btn-outline-danger remove-selected-subject" 
+                                    data-subject-id="${subject.id}">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                    </div>
+                `;
+                selectedList.append(subjectHtml);
+            });
+            
+            // Enable save button
+            $('#saveSubjectsBtn').prop('disabled', false);
+        } else {
+            selectedList.html(`
+                <div class="text-center text-muted py-4">
+                    <i class="fas fa-info-circle me-2"></i>
+                    No subjects selected. Click on subjects above to select them.
+                </div>
+            `);
+            
+            // Disable save button
+            $('#saveSubjectsBtn').prop('disabled', true);
+        }
+    }
+
+    // Remove selected subject from list
+    $(document).on('click', '.remove-selected-subject', function(e) {
+        e.stopPropagation();
+        
+        const subjectId = $(this).data('subject-id');
+        const subjectIndex = selectedSubjects.findIndex(s => s.id == subjectId);
+        
+        if (subjectIndex > -1) {
+            selectedSubjects.splice(subjectIndex, 1);
+            $(`.selectable-subject[data-subject-id="${subjectId}"]`)
+                .removeClass('selected')
+                .find('.badge.bg-success').remove();
+            updateSelectedSubjectsList();
+        }
+    });
+
+    // Save selected subjects
+    $('#saveSubjectsBtn').on('click', async function() {
+        if (selectedSubjects.length === 0) {
+            await showError('Please select at least one subject to add.');
+            return;
+        }
+
+        showLoading();
+        
+        const subjectIds = selectedSubjects.map(subject => subject.id);
+        
+        try {
+            const response = await $.ajax({
+                url: "{% url 'admin_add_optional_subjects' student.id %}",
+                type: 'POST',
+                data: {
+                    subject_ids: JSON.stringify(subjectIds),
+                    csrfmiddlewaretoken: getCSRFToken()
+                },
+                dataType: 'json'
+            });
+            
+            hideLoading();
+            
+            if (response.success) {
+                $('#addSubjectModal').modal('hide');
+                await showSuccess(`${selectedSubjects.length} subject(s) have been added to student.`);
+                // Refresh the page to show updated subjects
+                setTimeout(() => {
+                    location.reload();
+                }, 1500);
+            } else {
+                await showError(response.message || 'Failed to add subjects.');
+            }
+        } catch (error) {
+            hideLoading();
+            console.error('Add subjects error:', error);
+            if (error.status === 403) {
+                await showError('CSRF token missing or invalid. Please refresh the page and try again.');
+            } else {
+                await showError('An error occurred while adding subjects.');
+            }
+        }
+    });
+
+    // ============= PARENT MANAGEMENT =============
+    $(document).on('click', '.remove-parent-btn', async function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        const parentId = $(this).data('parent-id');
+        const parentName = $(this).data('parent-name');
+        
+        const result = await showConfirm(
+            'Remove Parent?',
+            `Are you sure you want to remove "${parentName}" from this student's parents/guardians?`,
+            'Yes, remove them!'
+        );
+        
+        if (!result.isConfirmed) return;
+        
+        await removeParent(parentId, parentName);
+    });
+
+    async function removeParent(parentId, parentName) {
+        showLoading();
+        
+        try {
+            const response = await $.ajax({
+                url: "{% url 'admin_remove_parent_from_student' student.id %}",
+                type: 'POST',
+                data: {
+                    parent_id: parentId,
+                    csrfmiddlewaretoken: getCSRFToken()
+                },
+                dataType: 'json'
+            });
+            
+            hideLoading();
+            
+            if (response.success) {
+                await showSuccess(response.message || 'Parent has been removed from student.');
+                // Remove parent card from UI
+                $(`.remove-parent-btn[data-parent-id="${parentId}"]`).closest('.col-md-6').fadeOut(300, function() {
+                    $(this).remove();
+                    updateParentsCount();
+                    
+                    // If no parents left, show empty state
+                    if ($('.parent-card').length === 0) {
+                        showEmptyParentsState();
+                    }
+                });
+            } else {
+                await showError(response.message || 'Failed to remove parent.');
+            }
+        } catch (error) {
+            hideLoading();
+            console.error('Remove parent error:', error);
+            if (error.status === 403) {
+                await showError('CSRF token missing or invalid. Please refresh the page and try again.');
+            } else {
+                await showError('An error occurred while removing the parent.');
+            }
+        }
+    }
+
+    // Show empty parents state
+    function showEmptyParentsState() {
+        const parentsTabContent = $('#parents .info-card .row');
+        parentsTabContent.html(`
+            <div class="col-12">
+                <div class="empty-state">
+                    <div class="empty-state-icon">
+                        <i class="fas fa-user-friends"></i>
+                    </div>
+                    <h5 class="mb-3">No Parents/Guardians Added</h5>
+                    <p class="text-muted mb-4">This student doesn't have any parents or guardians registered yet.</p>
+                    <a href="{% url 'admin_add_parent_to_student' student.id %}" class="btn btn-primary">
+                        <i class="fas fa-user-plus me-2"></i> Add Parent/Guardian
+                    </a>
+                </div>
+            </div>
+        `);
+    }
+
+    // Update parents count
+    function updateParentsCount() {
+        const parentCount = $('.parent-card').length;
+        $('.stat-number').filter(function() {
+            return $(this).next('.stat-label').text() === 'Parents';
+        }).text(parentCount);
+    }
+
+    // ============= TAB FUNCTIONALITY =============
+    $('#studentTabs button').on('click', function(e) {
+        e.preventDefault();
+        $(this).tab('show');
+    });
+
+    // ============= INITIAL SETUP =============
+    // Update subjects count on page load
+    function updateSubjectsCount() {
+        const subjectCount = $('#subjects .subject-badge:not(.add-subject-btn)').length;
+        $('#subjects .badge-pill-custom').text(subjectCount + ' Subject' + (subjectCount !== 1 ? 's' : ''));
+    }
+
+    // Initialize on page load
     updateSubjectsCount();
+    updateSubjectStats();
+    
+    // Initialize modal events
+    $('#addSubjectModal').on('shown.bs.modal', function() {
+        $('#subjectSearch').focus();
+    }).on('hidden.bs.modal', function() {
+        selectedSubjects = [];
+        $('#subjectSearch').val('');
+        $('#saveSubjectsBtn').prop('disabled', true);
+    });
+
+    // Initialize delete modal
+    $('#deleteModal').on('shown.bs.modal', function() {
+        $('#confirmDeleteText').focus();
+    }).on('hidden.bs.modal', function() {
+        $('#confirmDeleteText').val('');
+        $('#confirmDeleteBtn').prop('disabled', true);
+    });
+
+    // Test CSRF token
+    console.log('CSRF Token:', getCSRFToken() ? 'Available' : 'Missing');
+    
+    // Add CSRF token to all AJAX requests
+    $.ajaxSetup({
+        beforeSend: function(xhr, settings) {
+            if (!/^(GET|HEAD|OPTIONS|TRACE)$/i.test(settings.type) && !this.crossDomain) {
+                xhr.setRequestHeader("X-CSRFToken", getCSRFToken());
+            }
+        }
+    });
+
+    // Error handling for AJAX
+    $(document).ajaxError(function(event, jqxhr, settings, thrownError) {
+        console.error('AJAX Error:', {
+            status: jqxhr.status,
+            statusText: jqxhr.statusText,
+            responseText: jqxhr.responseText,
+            url: settings.url,
+            type: settings.type
+        });
+        
+        if (jqxhr.status === 403) {
+            showError('Session expired or CSRF token invalid. Please refresh the page and try again.');
+        } else if (jqxhr.status === 404) {
+            showError('The requested resource was not found. URL: ' + settings.url);
+        } else if (jqxhr.status >= 500) {
+            showError('Server error occurred. Please try again later.');
+        } else if (jqxhr.status === 0) {
+            showError('Network error. Please check your internet connection.');
+        }
+    });
+
+    console.log('Student detail page initialized successfully.');
 });
 </script>
 {% endblock extra_js %}

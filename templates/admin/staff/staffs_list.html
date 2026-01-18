@@ -1,0 +1,1454 @@
+{% extends 'admin/base.html' %}
+{% load static %}
+{% block title %} Staff Management {% endblock title %}
+
+{% block breadcrumb %}
+    <button type="button" class="btn btn-primary" data-toggle="modal" data-target="#addStaffModal">
+        <i class="fas fa-plus"></i> Add Staff
+    </button>
+{% endblock breadcrumb %}
+
+{% block extra_css %}
+
+<style>
+    /* General Table Styles */
+    .table th {
+        font-weight: 600;
+        border-bottom-width: 2px;
+    }
+    .table td {
+        vertical-align: middle;
+    }
+    .badge {
+        font-size: 0.85em;
+        padding: 0.4em 0.8em;
+    }
+    
+    /* Profile Picture */
+    .profile-picture {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        object-fit: cover;
+        border: 2px solid #dee2e6;
+    }
+    
+    /* Modal Fixes */
+    .modal-dialog {
+        max-height: 90vh;
+        display: flex;
+        flex-direction: column;
+    }
+    .modal-content {
+        max-height: 90vh;
+        display: flex;
+        flex-direction: column;
+    }
+    .modal-header {
+        flex-shrink: 0;
+    }
+    .modal-body {
+        overflow-y: auto;
+        flex: 1 1 auto;
+        max-height: calc(90vh - 140px);
+        padding-right: 15px;
+        padding-left: 15px;
+    }
+    .modal-footer {
+        flex-shrink: 0;
+    }
+    
+    /* Fix Select2 dropdown z-index in modals */
+    .select2-container--open {
+        z-index: 1060 !important;
+    }
+    .select2-dropdown {
+        z-index: 1060 !important;
+    }
+    
+    /* DataTable Styles */
+    .dataTables_wrapper .dataTables_filter {
+        float: right;
+        text-align: right;
+    }
+    .dataTables_wrapper .dataTables_length {
+        float: left;
+    }
+    .dataTables_wrapper .dataTables_paginate {
+        float: right;
+        margin-top: 10px;
+    }
+    
+    /* Toast Messages */
+    .success-toast, .error-toast {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 9999;
+        min-width: 300px;
+    }
+    
+    /* Role badges */
+    .hod-badge {
+        background-color: #dc3545;
+        color: white;
+    }
+    .staff-badge {
+        background-color: #28a745;
+        color: white;
+    }
+    .teacher-badge {
+        background-color: #17a2b8;
+        color: white;
+    }
+    
+    /* Gender badges */
+    .male-badge {
+        background-color: #007bff;
+        color: white;
+    }
+    .female-badge {
+        background-color: #e83e8c;
+        color: white;
+    }
+    
+    /* Action buttons */
+    .action-btn-sm {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.75rem;
+        border-radius: 0.2rem;
+    }
+    
+    /* Quick actions container */
+    .quick-actions {
+        display: flex;
+        gap: 4px;
+        justify-content: center;
+        align-items: center;
+    }
+    
+    /* Quick action buttons */
+    .quick-action-btn {
+        width: 28px;
+        height: 28px;
+        padding: 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        border: none;
+        transition: all 0.2s ease;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+    }
+    .quick-action-btn i {
+        font-size: 0.75rem;
+        color: #ffffff !important;
+    }
+    .btn-warning.quick-action-btn i {
+        color: #212529 !important;
+    }
+    .quick-action-btn:hover {
+        transform: scale(1.1);
+        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        filter: brightness(1.05);
+    }
+    .btn-success.quick-action-btn { background-color: #28a745; }
+    .btn-primary.quick-action-btn { background-color: #007bff; }
+    .btn-danger.quick-action-btn  { background-color: #dc3545; }
+    .btn-warning.quick-action-btn { background-color: #ffc107; }
+    .btn-info.quick-action-btn    { background-color: #17a2b8; }
+    .btn-secondary.quick-action-btn { background-color: #6c757d; }
+    
+    /* Form validation */
+    .is-invalid {
+        border-color: #dc3545 !important;
+    }
+    .invalid-feedback {
+        display: none;
+        width: 100%;
+        margin-top: 0.25rem;
+        font-size: 80%;
+        color: #dc3545;
+    }
+    .was-validated .form-control:invalid ~ .invalid-feedback {
+        display: block;
+    }
+    
+    /* Custom file input */
+    .custom-file-label::after {
+        content: "Browse";
+    }
+    
+    /* Ensure modal backdrop covers everything */
+    .modal-backdrop {
+        z-index: 1040;
+    }
+    .modal {
+        z-index: 1050;
+    }
+    
+    /* Scrollbar styling for modal */
+    .modal-body::-webkit-scrollbar {
+        width: 8px;
+    }
+    .modal-body::-webkit-scrollbar-track {
+        background: #f1f1f1;
+        border-radius: 4px;
+    }
+    .modal-body::-webkit-scrollbar-thumb {
+        background: #888;
+        border-radius: 4px;
+    }
+    .modal-body::-webkit-scrollbar-thumb:hover {
+        background: #555;
+    }
+</style>
+{% endblock extra_css %}
+
+{% block content %}
+<section class="content">
+    <div class="container-fluid"> 
+        <!-- Success Toast -->
+        <div id="success-toast" class="alert alert-success alert-dismissible fade success-toast" style="display: none;" role="alert">
+            <strong><i class="fas fa-check-circle"></i> Success!</strong> 
+            <span id="success-message"></span>
+            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                <span aria-hidden="true">&times;</span>
+            </button>
+        </div>
+
+        <!-- Error Toast -->
+        <div id="error-toast" class="alert alert-danger alert-dismissible fade error-toast" style="display: none;" role="alert">
+            <strong><i class="fas fa-exclamation-circle"></i> Error!</strong> 
+            <span id="error-message"></span>
+            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                <span aria-hidden="true">&times;</span>
+            </button>
+        </div>
+
+        <div class="row">
+            <div class="col-lg-12">
+                <div class="card shadow-lg">
+                    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                        <h6 class="header-title mb-0 text-uppercase">
+                            <i class="fas fa-users"></i> Staff Management
+                        </h6>
+                        <div class="d-flex align-items-center">
+                            <span class="badge badge-success mr-2">
+                                <i class="fas fa-check-circle"></i> Active: <span id="active-count">{{ active_staff_count }}</span>
+                            </span>
+                            <span class="badge badge-light">
+                                Total: <span id="total-count">{{ staffs|length }}</span>
+                            </span>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover text-nowrap table-responsive-sm table-bordered table-striped table-sm display" id="staffs-table">
+                                <thead class="bg-light">
+                                    <tr>
+                                        <th>Profile</th>
+                                        <th>Full Name</th>
+                                        <th>Username</th>
+                                        <th>Email</th>
+                                        <th>Role</th>
+                                        <th>Gender</th>
+                                        <th>Phone</th>
+                                        <th>Status</th>
+                                        <th class="text-center">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for staff in staffs %}
+                                    <tr id="row-{{ staff.id }}">
+                                        <td class="text-center">
+                                            {% if staff.profile_picture %}
+                                                <img src="{{ staff.profile_picture.url }}" alt="{{ staff.get_full_name }}" class="profile-picture">
+                                            {% else %}
+                                                <div class="profile-picture bg-secondary d-flex align-items-center justify-content-center">
+                                                    <i class="fas fa-user text-white"></i>
+                                                </div>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <strong>{{ staff.get_full_name }}</strong>
+                                            {% if staff.work_place %}
+                                            <br>
+                                            <small class="text-muted">{{ staff.work_place }}</small>
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ staff.admin.username }}</td>
+                                        <td>{{ staff.admin.email }}</td>
+                                        <td>
+                                            {% if staff.admin.user_type == '1' %}
+                                                <span class="badge hod-badge">
+                                                    <i class="fas fa-user-shield"></i> HOD
+                                                </span>
+                                            {% elif staff.role == 'teacher' %}
+                                                <span class="badge teacher-badge">
+                                                    <i class="fas fa-chalkboard-teacher"></i> Teacher
+                                                </span>
+                                            {% else %}
+                                                <span class="badge staff-badge">
+                                                    <i class="fas fa-user-tie"></i> Staff
+                                                </span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if staff.gender == 'male' %}
+                                                <span class="badge male-badge">
+                                                    <i class="fas fa-male"></i> Male
+                                                </span>
+                                            {% elif staff.gender == 'female' %}
+                                                <span class="badge female-badge">
+                                                    <i class="fas fa-female"></i> Female
+                                                </span>
+                                            {% else %}
+                                                <span class="badge badge-secondary">
+                                                    <i class="fas fa-question"></i> Not Specified
+                                                </span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if staff.phone_number %}
+                                                <a href="tel:{{ staff.phone_number }}" class="text-decoration-none">
+                                                    <i class="fas fa-phone-alt"></i> {{ staff.phone_number }}
+                                                </a>
+                                            {% else %}
+                                                <span class="text-muted">-</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if staff.admin.is_active %}
+                                                <span class="badge badge-success" id="status-badge-{{ staff.id }}">
+                                                    <i class="fas fa-check-circle"></i> Active
+                                                </span>
+                                            {% else %}
+                                                <span class="badge badge-secondary" id="status-badge-{{ staff.id }}">
+                                                    <i class="fas fa-times-circle"></i> Inactive
+                                                </span>
+                                            {% endif %}
+                                        </td>
+                                        <td class="text-center">
+                                            <div class="quick-actions">
+                                                <!-- Quick Status Toggle -->
+                                                {% if staff.admin.is_active %}
+                                                <button class="btn btn-sm btn-warning quick-action-btn toggle-status-btn" 
+                                                        data-id="{{ staff.id }}"
+                                                        data-name="{{ staff.get_full_name }}"
+                                                        data-current-status="active"
+                                                        title="Deactivate Staff">
+                                                    <i class="fas fa-toggle-off"></i>
+                                                </button>
+                                                {% else %}
+                                                <button class="btn btn-sm btn-success quick-action-btn toggle-status-btn" 
+                                                        data-id="{{ staff.id }}"
+                                                        data-name="{{ staff.get_full_name }}"
+                                                        data-current-status="inactive"
+                                                        title="Activate Staff">
+                                                    <i class="fas fa-toggle-on"></i>
+                                                </button>
+                                                {% endif %}
+                                                
+                                                <!-- View Details Button -->
+                                                <a href="{% url 'admin_view_staff' staff.id %}" class="btn btn-sm btn-info quick-action-btn" title="View Details">
+                                                    <i class="fas fa-eye"></i>
+                                                </a>
+                                                
+                                                <!-- Edit Button -->
+                                                <button class="btn btn-sm btn-primary quick-action-btn edit-btn" 
+                                                        data-id="{{ staff.id }}"
+                                                        data-first-name="{{ staff.admin.first_name }}"
+                                                        data-middle-name="{{ staff.middle_name }}"
+                                                        data-last-name="{{ staff.admin.last_name }}"
+                                                        data-username="{{ staff.admin.username }}"
+                                                        data-email="{{ staff.admin.email }}"
+                                                        data-gender="{{ staff.gender }}"
+                                                        data-date-of-birth="{{ staff.date_of_birth|date:'Y-m-d' }}"
+                                                        data-phone-number="{{ staff.phone_number }}"
+                                                        data-marital-status="{{ staff.marital_status }}"
+                                                        data-role="{{ staff.role }}"
+                                                        data-work-place="{{ staff.work_place }}"
+                                                        data-joining-date="{{ staff.joining_date|date:'Y-m-d' }}"
+                                                        data-user-type="{{ staff.admin.user_type }}"
+                                                        data-is-active="{{ staff.admin.is_active|yesno:'true,false' }}"
+                                                        title="Edit Staff">
+                                                    <i class="fas fa-edit"></i>
+                                                </button>
+                                                
+                                                <!-- Delete Button -->
+                                                <button class="btn btn-sm btn-danger quick-action-btn delete-btn" 
+                                                        data-id="{{ staff.id }}"
+                                                        data-name="{{ staff.get_full_name }}"
+                                                        title="Delete Staff">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>                                  
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Add Staff Modal -->
+<div class="modal fade" id="addStaffModal" tabindex="-1" role="dialog" aria-labelledby="addModalLabel" aria-hidden="true" data-backdrop="static" data-keyboard="false">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="addModalLabel">
+                    <i class="fas fa-user-plus"></i> Add New Staff Member
+                </h5>
+                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <form id="add-form" enctype="multipart/form-data" novalidate>
+                {% csrf_token %}
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label for="first_name">First Name <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="first_name" name="first_name" required 
+                                       placeholder="e.g., John" minlength="2" maxlength="50">
+                                <div class="invalid-feedback">Please enter a valid first name (2-50 characters).</div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label for="middle_name">Middle Name</label>
+                                <input type="text" class="form-control" id="middle_name" name="middle_name" 
+                                       placeholder="e.g., David" maxlength="50">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label for="last_name">Last Name <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="last_name" name="last_name" required 
+                                       placeholder="e.g., Smith" minlength="2" maxlength="50">
+                                <div class="invalid-feedback">Please enter a valid last name (2-50 characters).</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="username">Username <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="username" name="username" required 
+                                       placeholder="e.g., john.smith" minlength="3" maxlength="150">
+                                <div class="invalid-feedback">Username must be 3-150 characters long and unique.</div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="email">Email Address <span class="text-danger">*</span></label>
+                                <input type="email" class="form-control" id="email" name="email" required 
+                                       placeholder="e.g., john.smith@example.com">
+                                <div class="invalid-feedback">Please enter a valid email address.</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="password">Password <span class="text-danger">*</span></label>
+                                <input type="password" class="form-control" id="password" name="password" required 
+                                       placeholder="Enter password" minlength="8">
+                                <div class="invalid-feedback">Password must be at least 8 characters long.</div>
+                                <small class="form-text text-muted">Minimum 8 characters</small>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="confirm_password">Confirm Password <span class="text-danger">*</span></label>
+                                <input type="password" class="form-control" id="confirm_password" name="confirm_password" required 
+                                       placeholder="Confirm password">
+                                <div class="invalid-feedback">Passwords do not match.</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label for="gender">Gender</label>
+                                <select class="form-control select2bs4" id="gender" name="gender" style="width: 100%;">
+                                    <option value="">Select Gender</option>
+                                    <option value="male">Male</option>
+                                    <option value="female">Female</option>
+                                    <option value="other">Other</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label for="date_of_birth">Date of Birth</label>
+                                <input type="date" class="form-control datepicker" id="date_of_birth" name="date_of_birth" 
+                                       placeholder="YYYY-MM-DD">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label for="phone_number">Phone Number</label>
+                                <input type="text" class="form-control" id="phone_number" name="phone_number" 
+                                       placeholder="e.g., +255 123 456 789" maxlength="14">
+                                <div class="invalid-feedback">Please enter a valid phone number (max 14 digits).</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label for="marital_status">Marital Status</label>
+                                <select class="form-control select2bs4" id="marital_status" name="marital_status" style="width: 100%;">
+                                    <option value="">Select Status</option>
+                                    <option value="single">Single</option>
+                                    <option value="married">Married</option>
+                                    <option value="divorced">Divorced</option>
+                                    <option value="widowed">Widowed</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label for="role">Role</label>
+                                <select class="form-control select2bs4" id="role" name="role" style="width: 100%;">
+                                    <option value="">Select Role</option>
+                                    <option value="teacher">Teacher</option>
+                                    <option value="admin">Administrator</option>
+                                    <option value="support">Support Staff</option>
+                                    <option value="other">Other</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label for="user_type">User Type <span class="text-danger">*</span></label>
+                                <select class="form-control select2bs4" id="user_type" name="user_type" required style="width: 100%;">
+                                    <option value="">Select User Type</option>
+                                    <option value="1">HOD (Head of Department)</option>
+                                    <option value="2" selected>Staff</option>
+                                </select>
+                                <div class="invalid-feedback">Please select a user type.</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="work_place">Work Place</label>
+                                <select class="form-control select2bs4" id="work_place" name="work_place" style="width: 100%;">
+                                    <option value="">Select Work Place</option>
+                                    <option value="main_campus">Main Campus</option>
+                                    <option value="branch_office">Branch Office</option>
+                                    <option value="remote">Remote</option>
+                                    <option value="other">Other</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="joining_date">Joining Date</label>
+                                <input type="date" class="form-control datepicker" id="joining_date" name="joining_date" >
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="profile_picture">Profile Picture</label>
+                                <div class="custom-file">
+                                    <input type="file" class="custom-file-input" id="profile_picture" name="profile_picture" 
+                                           accept="image/*">
+                                    <label class="custom-file-label" for="profile_picture">Choose file</label>
+                                    <small class="form-text text-muted">Max size: 2MB. Allowed: JPG, PNG, GIF</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="signature">Digital Signature</label>
+                                <div class="custom-file">
+                                    <input type="file" class="custom-file-input" id="signature" name="signature" 
+                                           accept="image/*">
+                                    <label class="custom-file-label" for="signature">Choose file</label>
+                                    <small class="form-text text-muted">Max size: 1MB. Allowed: JPG, PNG</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-12">
+                            <div class="form-group">
+                                <label>Status</label>
+                                <div class="custom-control custom-switch mt-2">
+                                    <input type="checkbox" class="custom-control-input" id="is_active" name="is_active" checked>
+                                    <label class="custom-control-label" for="is_active">
+                                        <span id="active-label">Active</span>
+                                    </label>
+                                    <small class="form-text text-muted d-block">Toggle to activate/deactivate staff account</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal" id="cancel-add-btn">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="save-btn">
+                        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="display: none;"></span>
+                        Save Staff
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Staff Modal -->
+<div class="modal fade" id="editStaffModal" tabindex="-1" role="dialog" aria-labelledby="editModalLabel" aria-hidden="true" data-backdrop="static" data-keyboard="false">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-warning text-dark">
+                <h5 class="modal-title" id="editModalLabel">
+                    <i class="fas fa-user-edit"></i> Edit Staff Member
+                </h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <form id="edit-form" enctype="multipart/form-data" novalidate>
+                {% csrf_token %}
+                <input type="hidden" id="edit-id" name="id">
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label for="edit-first_name">First Name <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="edit-first_name" name="first_name" required 
+                                       placeholder="e.g., John" minlength="2" maxlength="50">
+                                <div class="invalid-feedback">Please enter a valid first name (2-50 characters).</div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label for="edit-middle_name">Middle Name</label>
+                                <input type="text" class="form-control" id="edit-middle_name" name="middle_name" 
+                                       placeholder="e.g., David" maxlength="50">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label for="edit-last_name">Last Name <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="edit-last_name" name="last_name" required 
+                                       placeholder="e.g., Smith" minlength="2" maxlength="50">
+                                <div class="invalid-feedback">Please enter a valid last name (2-50 characters).</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="edit-username">Username <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="edit-username" name="username" required 
+                                       placeholder="e.g., john.smith" minlength="3" maxlength="150">
+                                <div class="invalid-feedback">Username must be 3-150 characters long.</div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="edit-email">Email Address <span class="text-danger">*</span></label>
+                                <input type="email" class="form-control" id="edit-email" name="email" required 
+                                       placeholder="e.g., john.smith@example.com">
+                                <div class="invalid-feedback">Please enter a valid email address.</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="edit-password">Password (Leave blank to keep unchanged)</label>
+                                <input type="password" class="form-control" id="edit-password" name="password" 
+                                       placeholder="Enter new password" minlength="8">
+                                <small class="form-text text-muted">Minimum 8 characters</small>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="edit-confirm_password">Confirm Password</label>
+                                <input type="password" class="form-control" id="edit-confirm_password" name="confirm_password" 
+                                       placeholder="Confirm new password">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label for="edit-gender">Gender</label>
+                                <select class="form-control select2bs4" id="edit-gender" name="gender" style="width: 100%;">
+                                    <option value="">Select Gender</option>
+                                    <option value="male">Male</option>
+                                    <option value="female">Female</option>
+                                    <option value="other">Other</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label for="edit-date_of_birth">Date of Birth</label>
+                                <input type="date" class="form-control datepicker" id="edit-date_of_birth" name="date_of_birth" 
+                                       placeholder="YYYY-MM-DD">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label for="edit-phone_number">Phone Number</label>
+                                <input type="text" class="form-control" id="edit-phone_number" name="phone_number" 
+                                       placeholder="e.g., +255 123 456 789" maxlength="14">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label for="edit-marital_status">Marital Status</label>
+                                <select class="form-control select2bs4" id="edit-marital_status" name="marital_status" style="width: 100%;">
+                                    <option value="">Select Status</option>
+                                    <option value="single">Single</option>
+                                    <option value="married">Married</option>
+                                    <option value="divorced">Divorced</option>
+                                    <option value="widowed">Widowed</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label for="edit-role">Role</label>
+                                <select class="form-control select2bs4" id="edit-role" name="role" style="width: 100%;">
+                                    <option value="">Select Role</option>
+                                    <option value="teacher">Teacher</option>
+                                    <option value="admin">Administrator</option>
+                                    <option value="support">Support Staff</option>
+                                    <option value="other">Other</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label for="edit-user_type">User Type <span class="text-danger">*</span></label>
+                                <select class="form-control select2bs4" id="edit-user_type" name="user_type" required style="width: 100%;">
+                                    <option value="">Select User Type</option>
+                                    <option value="1">HOD (Head of Department)</option>
+                                    <option value="2" selected>Staff</option>
+                                </select>
+                                <div class="invalid-feedback">Please select a user type.</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="edit-work_place">Work Place</label>
+                                <select class="form-control select2bs4" id="edit-work_place" name="work_place" style="width: 100%;">
+                                    <option value="">Select Work Place</option>
+                                    <option value="main_campus">Main Campus</option>
+                                    <option value="branch_office">Branch Office</option>
+                                    <option value="remote">Remote</option>
+                                    <option value="other">Other</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="edit-joining_date">Joining Date</label>
+                                <input type="date" class="form-control datepicker" id="edit-joining_date" name="joining_date" 
+                                       placeholder="YYYY-MM-DD">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="edit-profile_picture">Profile Picture</label>
+                                <div class="custom-file">
+                                    <input type="file" class="custom-file-input" id="edit-profile_picture" name="profile_picture" 
+                                           accept="image/*">
+                                    <label class="custom-file-label" for="edit-profile_picture">Choose file</label>
+                                    <small class="form-text text-muted">Max size: 2MB. Allowed: JPG, PNG, GIF</small>
+                                </div>
+                                <div class="mt-2" id="current-profile-picture"></div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="edit-signature">Digital Signature</label>
+                                <div class="custom-file">
+                                    <input type="file" class="custom-file-input" id="edit-signature" name="signature" 
+                                           accept="image/*">
+                                    <label class="custom-file-label" for="edit-signature">Choose file</label>
+                                    <small class="form-text text-muted">Max size: 1MB. Allowed: JPG, PNG</small>
+                                </div>
+                                <div class="mt-2" id="current-signature"></div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-12">
+                            <div class="form-group">
+                                <label>Status</label>
+                                <div class="custom-control custom-switch mt-2">
+                                    <input type="checkbox" class="custom-control-input" id="edit-is_active" name="is_active">
+                                    <label class="custom-control-label" for="edit-is_active">
+                                        <span id="edit-active-label">Inactive</span>
+                                    </label>
+                                    <small class="form-text text-muted d-block">Toggle to activate/deactivate staff account</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal" id="cancel-edit-btn">Cancel</button>
+                    <button type="submit" class="btn btn-warning" id="update-btn">
+                        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="display: none;"></span>
+                        Update Staff
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Staff Modal -->
+<div class="modal fade" id="deleteStaffModal" tabindex="-1" role="dialog" aria-labelledby="deleteModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="deleteModalLabel">
+                    <i class="fas fa-exclamation-triangle"></i> Confirm Deletion
+                </h5>
+                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete staff member <strong id="delete-staff-name"></strong>?</p>
+                <p class="text-danger"><small>This action cannot be undone. All associated data will be permanently deleted.</small></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal" id="cancel-delete-btn">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirm-delete-btn">
+                    <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="display: none;"></span>
+                    Delete
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+
+<script>
+    $(document).ready(function() {      
+
+        // Toggle switch label updates
+        function updateSwitchLabels() {
+            $('#is_active').on('change', function() {
+                $('#active-label').text($(this).is(':checked') ? 'Active' : 'Inactive');
+            });
+            
+            $('#edit-is_active').on('change', function() {
+                $('#edit-active-label').text($(this).is(':checked') ? 'Active' : 'Inactive');
+            });
+        }
+        
+        // Initialize switch labels
+        updateSwitchLabels();
+
+        // Select2 initialization with proper modal handling
+        function initializeSelect2() {
+            $('.select2bs4').each(function() {
+                $(this).select2({
+                    theme: 'bootstrap4',
+                    dropdownParent: $(this).closest('.modal'),
+                    width: '100%',
+                    placeholder: $(this).attr('placeholder') || 'Select an option',
+                    allowClear: false
+                });
+            });
+        }
+        
+        // Reinitialize Select2 when modals are shown
+        $('#addStaffModal').on('shown.bs.modal', function() {
+            $('#addStaffModal .select2bs4').each(function() {
+                if ($(this).hasClass('select2-hidden-accessible')) {
+                    $(this).select2('destroy');
+                }
+                $(this).select2({
+                    theme: 'bootstrap4',
+                    dropdownParent: $('#addStaffModal'),
+                    width: '100%',
+                    placeholder: $(this).attr('placeholder') || 'Select an option',
+                    allowClear: false
+                });
+            });
+            
+            // Reset form
+            $('#add-form')[0].reset();
+            $('#add-form').find('.is-invalid').removeClass('is-invalid');
+            $('#add-form').find('.invalid-feedback').hide();
+            $('#add-form .custom-file-label').html('Choose file');
+            $('#active-label').text('Active');
+            $('#is_active').prop('checked', true);
+        });
+
+        $('#editStaffModal').on('shown.bs.modal', function() {
+            $('#editStaffModal .select2bs4').each(function() {
+                if ($(this).hasClass('select2-hidden-accessible')) {
+                    $(this).select2('destroy');
+                }
+                $(this).select2({
+                    theme: 'bootstrap4',
+                    dropdownParent: $('#editStaffModal'),
+                    width: '100%',
+                    placeholder: $(this).attr('placeholder') || 'Select an option',
+                    allowClear: false
+                });
+            });
+        });
+
+        // Destroy Select2 when modals are hidden
+        $('#addStaffModal').on('hidden.bs.modal', function() {
+            $('#addStaffModal .select2bs4').select2('destroy');
+        });
+
+        $('#editStaffModal').on('hidden.bs.modal', function() {
+            $('#editStaffModal .select2bs4').select2('destroy');
+            $('#edit-form')[0].reset();
+            $('#edit-form').find('.is-invalid').removeClass('is-invalid');
+            $('#edit-form').find('.invalid-feedback').hide();
+            $('#edit-form .custom-file-label').html('Choose file');
+            setButtonLoading($('#update-btn'), false);
+        });
+
+        // Custom file input
+        $('.custom-file-input').on('change', function() {
+            let fileName = $(this).val().split('\\').pop();
+            $(this).next('.custom-file-label').addClass("selected").html(fileName);
+        });
+
+        // Initialize DataTable
+        var table = $('#staffs-table').DataTable({
+            "dom": "<'row'<'col-sm-12 col-md-6'l><'col-sm-12 col-md-6'f>>" +
+                   "<'row'<'col-sm-12'tr>>" +
+                   "<'row'<'col-sm-12 col-md-5'i><'col-sm-12 col-md-7'p>>",
+            "lengthMenu": [[10, 25, 50, -1], [10, 25, 50, "All"]],
+            "pageLength": 10,
+            "responsive": true,
+            "autoWidth": false,
+            "ordering": true,
+            "order": [[1, 'asc']], // Sort by full name
+            
+            "destroy": true,
+            "retrieve": true,
+            "deferRender": true,
+            
+            "columnDefs": [
+                { 
+                    "targets": 8, // Actions column
+                    "orderable": false,
+                    "searchable": false
+                }
+            ],
+            
+            "language": {
+                "emptyTable": "<div class='text-center py-4'><i class='fas fa-users fa-2x mb-2'></i><br>No staff members found. Click \"Add Staff\" to create one.</div>",
+                "search": "_INPUT_",
+                "searchPlaceholder": "Search staff...",
+                "lengthMenu": "_MENU_ staff per page",
+                "info": "Showing _START_ to _END_ of _TOTAL_ staff",
+                "infoEmpty": "Showing 0 to 0 of 0 staff",
+                "infoFiltered": "(filtered from _MAX_ total staff)",
+                "paginate": {
+                    "first": "First",
+                    "last": "Last",
+                    "next": "Next",
+                    "previous": "Previous"
+                }
+            },
+            "drawCallback": function(settings) {
+                var api = this.api();
+                var total = api.rows().count();
+                $('#total-count').text(total);
+                
+                // Count active staff
+                var activeCount = 0;
+                api.rows().every(function() {
+                    var data = this.data();
+                    var statusText = $(data[7]).text().toLowerCase();
+                    if (statusText.includes('active')) {
+                        activeCount++;
+                    }
+                });
+                $('#active-count').text(activeCount);
+            }
+        });
+
+        // CSRF token for AJAX requests
+        function getCSRFToken() {
+            return $('input[name="csrfmiddlewaretoken"]').val();
+        }
+
+        // Show toast message
+        function showToast(message, type = 'success') {
+            const toastId = type === 'success' ? '#success-toast' : '#error-toast';
+            const messageId = type === 'success' ? '#success-message' : '#error-message';
+            
+            $(messageId).text(message);
+            $(toastId).fadeIn().addClass('show');
+            
+            setTimeout(function() {
+                $(toastId).fadeOut(function() {
+                    $(this).removeClass('show');
+                });
+            }, type === 'success' ? 3000 : 5000);
+        }
+
+        // Function to reload page after delay
+        function reloadPageAfterDelay(message, type = 'success') {
+            showToast(message, type);
+            var delay = type === 'success' ? 2000 : 3000;
+            setTimeout(function() {
+                location.reload();
+            }, delay);
+        }
+
+        // Function to update UI without reload
+        function updateStaffUI(staffId, data) {
+            const statusBadge = $('#status-badge-' + staffId);
+            const statusBtn = $('.toggle-status-btn[data-id="' + staffId + '"]');
+            
+            if (data.hasOwnProperty('is_active')) {
+                if (data.is_active) {
+                    statusBadge.removeClass('badge-secondary').addClass('badge-success')
+                        .html('<i class="fas fa-check-circle"></i> Active');
+                    statusBtn.removeClass('btn-success').addClass('btn-warning')
+                        .attr('title', 'Deactivate Staff')
+                        .html('<i class="fas fa-toggle-off"></i>')
+                        .attr('data-current-status', 'active');
+                } else {
+                    statusBadge.removeClass('badge-success').addClass('badge-secondary')
+                        .html('<i class="fas fa-times-circle"></i> Inactive');
+                    statusBtn.removeClass('btn-warning').addClass('btn-success')
+                        .attr('title', 'Activate Staff')
+                        .html('<i class="fas fa-toggle-on"></i>')
+                        .attr('data-current-status', 'inactive');
+                }
+                
+                // Update active count
+                var currentActive = parseInt($('#active-count').text());
+                if (data.is_active) {
+                    $('#active-count').text(currentActive + 1);
+                } else {
+                    $('#active-count').text(currentActive - 1);
+                }
+            }
+        }
+
+        // Handle modal close/cancel buttons
+        $(document).on('click', '[data-dismiss="modal"]', function(e) {
+            e.preventDefault();
+            $(this).closest('.modal').modal('hide');
+        });
+
+        // Helper function to handle button loading state
+        function setButtonLoading(btn, isLoading) {
+            const spinner = btn.find('.spinner-border');
+            if (isLoading) {
+                btn.data('original-text', btn.html());
+                btn.prop('disabled', true);
+                spinner.show();
+                btn.html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>');
+            } else {
+                btn.prop('disabled', false);
+                spinner.hide();
+                if (btn.data('original-text')) {
+                    btn.html(btn.data('original-text'));
+                }
+            }
+        }
+        
+        // Password validation
+        function validatePassword(password, confirmPassword) {
+            if (password !== confirmPassword) {
+                return "Passwords do not match.";
+            }
+            if (password.length < 8) {
+                return "Password must be at least 8 characters long.";
+            }
+            return null;
+        }
+
+        // Form validation
+        function validateStaffForm(formId, isEdit = false) {
+            const form = $('#' + formId);
+            let isValid = true;
+            
+            // Clear previous validation
+            form.find('.is-invalid').removeClass('is-invalid');
+            form.find('.invalid-feedback').hide();
+            
+            // Required fields
+            const requiredFields = [
+                'first_name', 'last_name', 'username', 'email', 'user_type'
+            ];
+            
+            if (!isEdit) {
+                requiredFields.push('password', 'confirm_password');
+            }
+            
+            requiredFields.forEach(field => {
+                const input = form.find('[name="' + field + '"]');
+                if (input.length && (!input.val() || input.val().trim() === '')) {
+                    input.addClass('is-invalid');
+                    input.next('.invalid-feedback').show().text('This field is required.');
+                    isValid = false;
+                }
+            });
+            
+            // Email validation
+            const emailInput = form.find('[name="email"]');
+            if (emailInput.val() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailInput.val())) {
+                emailInput.addClass('is-invalid');
+                emailInput.next('.invalid-feedback').show().text('Please enter a valid email address.');
+                isValid = false;
+            }
+            
+            // Password validation
+            if (!isEdit || (isEdit && form.find('[name="password"]').val())) {
+                const password = form.find('[name="password"]').val();
+                const confirmPassword = form.find('[name="confirm_password"]').val();
+                
+                if (password || confirmPassword) {
+                    const passwordError = validatePassword(password, confirmPassword);
+                    if (passwordError) {
+                        form.find('[name="password"]').addClass('is-invalid');
+                        form.find('[name="confirm_password"]').addClass('is-invalid');
+                        form.find('[name="confirm_password"]').next('.invalid-feedback').show().text(passwordError);
+                        isValid = false;
+                    }
+                }
+            }
+            
+            // Name length validation
+            const firstName = form.find('[name="first_name"]').val();
+            const lastName = form.find('[name="last_name"]').val();
+            
+            if (firstName && firstName.length < 2) {
+                form.find('[name="first_name"]').addClass('is-invalid');
+                form.find('[name="first_name"]').next('.invalid-feedback').show().text('First name must be at least 2 characters long.');
+                isValid = false;
+            }
+            
+            if (lastName && lastName.length < 2) {
+                form.find('[name="last_name"]').addClass('is-invalid');
+                form.find('[name="last_name"]').next('.invalid-feedback').show().text('Last name must be at least 2 characters long.');
+                isValid = false;
+            }
+            
+            return isValid;
+        }
+
+        // Add Staff
+        $('#add-form').on('submit', function(e) {
+            e.preventDefault();
+            
+            if (!validateStaffForm('add-form')) {
+                return;
+            }
+            
+            const saveBtn = $('#save-btn');
+            setButtonLoading(saveBtn, true);
+            
+            const formData = new FormData(this);
+            formData.append('action', 'create');
+            
+            $.ajax({
+                url: '{% url "admin_staffs_crud" %}',
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCSRFToken(),
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function(data) {
+                    if (data.success) {
+                        $('#addStaffModal').modal('hide');
+                        reloadPageAfterDelay(data.message, 'success');
+                    } else {
+                        showToast(data.message, 'danger');
+                        setButtonLoading(saveBtn, false);
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error:', error);
+                    showToast('An error occurred while saving. Please try again.', 'danger');
+                    setButtonLoading(saveBtn, false);
+                }
+            });
+        });
+
+        // Edit Staff - Setup modal
+        $(document).on('click', '.edit-btn', function() {
+            const btn = $(this);
+            
+            $('#edit-id').val(btn.data('id'));
+            
+            // Store values
+            const firstName = btn.data('first-name');
+            const middleName = btn.data('middle-name');
+            const lastName = btn.data('last-name');
+            const username = btn.data('username');
+            const email = btn.data('email');
+            const gender = btn.data('gender');
+            const dateOfBirth = btn.data('date-of-birth');
+            const phoneNumber = btn.data('phone-number');
+            const maritalStatus = btn.data('marital-status');
+            const role = btn.data('role');
+            const workPlace = btn.data('work-place');
+            const joiningDate = btn.data('joining-date');
+            const userType = btn.data('user-type');
+            const isActive = btn.data('is-active') === 'true';
+            
+            // Show modal first
+            $('#editStaffModal').modal('show');
+            
+            // Set values after a short delay to ensure modal is fully shown
+            setTimeout(function() {
+                $('#edit-first_name').val(firstName);
+                $('#edit-middle_name').val(middleName);
+                $('#edit-last_name').val(lastName);
+                $('#edit-username').val(username);
+                $('#edit-email').val(email);
+                
+                // Set select values with proper triggering
+                $('#edit-gender').val(gender).trigger('change.select2');
+                $('#edit-marital_status').val(maritalStatus).trigger('change.select2');
+                $('#edit-role').val(role).trigger('change.select2');
+                $('#edit-work_place').val(workPlace).trigger('change.select2');
+                $('#edit-user_type').val(userType).trigger('change.select2');
+                
+                $('#edit-date_of_birth').val(dateOfBirth);
+                $('#edit-phone_number').val(phoneNumber);
+                $('#edit-joining_date').val(joiningDate);
+                
+                // Set checkbox state
+                $('#edit-is_active').prop('checked', isActive);
+                
+                // Update label
+                $('#edit-active-label').text(isActive ? 'Active' : 'Inactive');
+                
+                // Clear password fields
+                $('#edit-password').val('');
+                $('#edit-confirm_password').val('');
+                
+            }, 300); // Reduced delay for better performance
+        });
+
+        // Edit Staff - Submit form
+        $('#edit-form').on('submit', function(e) {
+            e.preventDefault();
+            
+            if (!validateStaffForm('edit-form', true)) {
+                return;
+            }
+            
+            const updateBtn = $('#update-btn');
+            setButtonLoading(updateBtn, true);
+            
+            const formData = new FormData(this);
+            formData.append('action', 'update');
+            
+            $.ajax({
+                url: '{% url "admin_staffs_crud" %}',
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCSRFToken(),
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function(data) {
+                    if (data.success) {
+                        $('#editStaffModal').modal('hide');
+                        reloadPageAfterDelay(data.message, 'success');
+                    } else {
+                        showToast(data.message, 'danger');
+                        setButtonLoading(updateBtn, false);
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error:', error);
+                    showToast('An error occurred while updating. Please try again.', 'danger');
+                    setButtonLoading(updateBtn, false);
+                }
+            });
+        });
+
+        // Toggle Staff Status
+        $(document).on('click', '.toggle-status-btn', function() {
+            const btn = $(this);
+            const staffId = btn.data('id');
+            const staffName = btn.data('name');
+            const currentStatus = btn.data('current-status');
+            const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
+            const actionText = currentStatus === 'active' ? 'deactivate' : 'activate';
+            
+            if (confirm(`Are you sure you want to ${actionText} "${staffName}"?`)) {
+                setButtonLoading(btn, true);
+                
+                $.ajax({
+                    url: '{% url "admin_staffs_crud" %}',
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': getCSRFToken(),
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    data: {
+                        'action': 'toggle_status',
+                        'id': staffId,
+                        'csrfmiddlewaretoken': getCSRFToken()
+                    },
+                    success: function(data) {
+                        if (data.success) {
+                            updateStaffUI(staffId, { is_active: data.is_active });
+                            showToast(data.message, 'success');
+                        } else {
+                            showToast(data.message, 'danger');
+                        }
+                        setButtonLoading(btn, false);
+                    },
+                    error: function(xhr, status, error) {
+                        console.error('Error:', error);
+                        showToast('An error occurred while updating status. Please try again.', 'danger');
+                        setButtonLoading(btn, false);
+                    }
+                });
+            }
+        });
+
+        // Delete Staff - Setup modal
+        let staffToDelete = null;
+        
+        $(document).on('click', '.delete-btn', function() {
+            const btn = $(this);
+            
+            staffToDelete = {
+                id: btn.data('id'),
+                name: btn.data('name')
+            };
+            
+            $('#delete-staff-name').text(btn.data('name'));
+            $('#deleteStaffModal').modal('show');
+        });
+
+        // Delete Staff - Confirm
+        $('#confirm-delete-btn').on('click', function() {
+            if (!staffToDelete) return;
+            
+            const deleteBtn = $(this);
+            setButtonLoading(deleteBtn, true);
+            
+            $.ajax({
+                url: '{% url "admin_staffs_crud" %}',
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCSRFToken(),
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                data: {
+                    'action': 'delete',
+                    'id': staffToDelete.id,
+                    'csrfmiddlewaretoken': getCSRFToken()
+                },
+                success: function(data) {
+                    if (data.success) {
+                        $('#deleteStaffModal').modal('hide');
+                        reloadPageAfterDelay(data.message, 'success');
+                    } else {
+                        showToast(data.message, 'danger');
+                        setButtonLoading(deleteBtn, false);
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error:', error);
+                    showToast('An error occurred while deleting. Please try again.', 'danger');
+                    setButtonLoading(deleteBtn, false);
+                }
+            });
+        });
+
+        // Clear form and reset button state on modal close
+        $('#addStaffModal').on('hidden.bs.modal', function() {
+            $('#add-form')[0].reset();
+            $('#add-form').find('.is-invalid').removeClass('is-invalid');
+            $('#add-form').find('.invalid-feedback').hide();
+            setButtonLoading($('#save-btn'), false);
+            $('.custom-file-label').html('Choose file');
+        });
+        
+        $('#deleteStaffModal').on('hidden.bs.modal', function() {
+            staffToDelete = null;
+            setButtonLoading($('#confirm-delete-btn'), false);
+        });
+
+        // Real-time validation
+        $('input, select').on('blur', function() {
+            if ($(this).hasClass('is-invalid')) {
+                $(this).removeClass('is-invalid');
+                $(this).next('.invalid-feedback').hide();
+            }
+        });
+
+        // Password match validation
+        $('#confirm_password, #edit-confirm_password').on('keyup', function() {
+            const form = $(this).closest('form');
+            const password = form.find('[name="password"]').val();
+            const confirmPassword = $(this).val();
+            
+            if (password && confirmPassword) {
+                if (password !== confirmPassword) {
+                    $(this).addClass('is-invalid');
+                    $(this).next('.invalid-feedback').show().text('Passwords do not match.');
+                } else {
+                    $(this).removeClass('is-invalid');
+                    $(this).next('.invalid-feedback').hide();
+                }
+            }
+        });
+    });
+</script>
+{% endblock extra_js %}

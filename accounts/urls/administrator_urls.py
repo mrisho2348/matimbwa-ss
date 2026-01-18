@@ -17,11 +17,14 @@ urlpatterns = [
     path('academic/years/', academic_years_list, name='admin_academic_years_list'),
     path('academic/years/crud/', academic_years_crud, name='admin_academic_years_crud'),
     path('academic/years/legacy/', academic_years, name='admin_academic_years'),  # Legacy redirect
-    
+        path('api/class-levels/', get_class_levels, name='get_class_levels'),
     path('academic/terms/', terms_list, name='admin_terms_list'),
     path('academic/terms/crud/', terms_crud, name='admin_terms_crud'),
     path('academic/terms/legacy/', terms, name='admin_terms'),  # Legacy redirect
-    
+     path('export/', get_students_export, name='students_export'),
+    path('class-statistics/', get_class_statistics, name='class_statistics'),
+    path('bulk-update-status/', bulk_update_student_status, name='students_bulk_update_status'),
+    path('bulk-move/', bulk_move_students, name='bulk_move_students'),
     path('academic/subjects/', subjects_list, name='admin_subjects_list'),
     path('academic/subjects/crud/', subjects_crud, name='admin_subjects_crud'),
     path('academic/subjects/legacy/', subjects, name='admin_subjects'),  # Legacy redirect
@@ -50,30 +53,32 @@ urlpatterns = [
     # Parent URLs
     path('parents/', parents_list, name='admin_parents_list'),
     path('parents/add/', add_parent, name='admin_parents_add'),
-    path('parents/<int:id>/edit/', parent_edit, name='admin_parent_edit'),
-    path('parents/<int:id>/delete/', parent_delete, name='admin_parent_delete'),
-    path('parents/ajax/', parents_ajax, name='parents_ajax'),
+    path('parents/<int:parent_id>/edit/', parent_edit, name='admin_parent_edit'),
+    path('parents/delete/', parent_delete, name='admin_parent_delete'),
+    path('parents/<int:parent_id>/view/', parent_detail, name='admin_view_parent'),
+    path('parents/<int:parent_id>/remove-student/<int:student_id>/',remove_student_from_parent, name='admin_remove_student_from_parent'),
+    path('parents/<int:parent_id>/add-student/', add_student_to_parent,  name='admin_add_student_to_parent'),
     
      # Parent management URLs
     path('students/<int:student_id>/parents/add/', add_parent_to_student,  name='admin_add_parent_to_student'),    
-    path('<int:student_id>/parent/<int:parent_id>/update-fee-responsibility/', update_parent_fee_responsibility,  name='update_parent_fee_responsibility'),
+    path('<int:student_id>/parent/<int:parent_id>/update-fee-responsibility/', update_parent_fee_responsibility,  name='admin_update_parent_fee_responsibility'),
     path('<int:student_id>/parent/<int:parent_id>/edit/', edit_parent, name='admin_edit_parent'),
     path('<int:student_id>/parent/<int:parent_id>/delete/', delete_parent, name='admin_delete_parent'),
-    
+    path('student/<int:student_id>/remove-subject/', remove_student_subject, name='admin_remove_student_subject'),
+    path('student/<int:student_id>/remove-parent/', remove_parent_from_student, name='admin_remove_parent_from_student'), 
+    path('student/<int:student_id>/add-subjects/', add_optional_subjects, name='admin_add_optional_subjects'),
     # AJAX endpoints for parent operations
     path('<int:student_id>/parent/save/', save_parent, name='admin_save_parent'),
     path('<int:student_id>/parent/<int:parent_id>/update/', update_parent, name='admin_update_parent'),
     
     # Previous Schools URLs
-    path('previous-schools/', previous_schools, name='admin_previous_schools'),
-    path('previous-schools/add/', previous_school_add, name='admin_previous_school_add'),
-    path('previous-schools/<int:id>/edit/', previous_school_edit, name='admin_previous_school_edit'),
-    path('previous-schools/<int:id>/delete/', previous_school_delete, name='admin_previous_school_delete'),
-    path('previous-schools/ajax/', previous_schools_ajax, name='previous_schools_ajax'),
+    path('previous-schools/', previous_schools_list, name='admin_previous_schools_list'),
+    path('previous-schools/crud/', previous_schools_crud, name='admin_previous_schools_crud'),
     
     # Staff Management URLs
-    path('staff/', staff_list, name='admin_staff_list'),
-    path('staff/add/', staff_add, name='admin_staff_add'),
+    path('staffs/', staffs_list, name='admin_staffs_list'),
+    path('staffs/crud/', staffs_crud, name='admin_staffs_crud'),
+    path('staffs/<int:staff_id>/view/', view_staff, name='admin_view_staff'),
     path('staff/roles/', staff_roles, name='admin_staff_roles'),
     path('staff/assignments/', staff_assignments, name='admin_staff_assignments'),
     

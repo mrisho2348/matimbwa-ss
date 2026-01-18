@@ -588,23 +588,7 @@
 {% endblock extra_css %}
 
 {% block content %}
-<!-- In student_detail.html or add_parent.html -->
-<div class="row" id="parentsContainer">
-    {% for parent in student.parents.all %}
-        {% include 'admin/students/parent_card.html' with parent=parent %}
-    {% empty %}
-        <div class="col-12">
-            <div class="empty-state">
-                <i class="fas fa-user-friends fa-3x text-muted mb-3"></i>
-                <h5>No Parents Added Yet</h5>
-                <p class="text-muted">This student doesn't have any parents or guardians registered.</p>
-                <a href="{% url 'add_parent_to_student' student.id %}" class="btn btn-primary">
-                    <i class="fas fa-user-plus me-2"></i>Add First Parent
-                </a>
-            </div>
-        </div>
-    {% endfor %}
-</div>
+
 <section class="content">
     <div class="container-fluid">
         <!-- Loading Overlay -->
@@ -677,51 +661,23 @@
 
         <!-- Existing Parents (if any) -->
         {% if student.parents.all and not parent %}
-        <div class="existing-parents-panel">
-            <h4 class="mb-4">
-                <i class="fas fa-users me-2"></i>
-                Existing Parents/Guardians ({{ student.parents.count }})
-            </h4>
-            <div class="row">
-                {% for existing_parent in student.parents.all %}
-                <div class="col-md-6 col-lg-4 mb-3">
-                    <div class="parent-card {% if existing_parent.is_fee_responsible %}fee-responsible{% endif %}">
-                        {% if existing_parent.is_fee_responsible %}
-                        <span class="fee-responsible-badge">
-                            <i class="fas fa-money-check-alt me-1"></i>Fee Responsible
-                        </span>
-                        {% endif %}
-                        
-                        <h6 class="mb-2">{{ existing_parent.full_name }}</h6>
-                        <p class="text-muted mb-2">
-                            <i class="fas fa-user-tag me-2"></i>{{ existing_parent.relationship }}
-                        </p>
-                        <p class="mb-2">
-                            <i class="fas fa-phone me-2"></i>{{ existing_parent.first_phone_number }}
-                        </p>
-                        {% if existing_parent.email %}
-                        <p class="mb-3">
-                            <i class="fas fa-envelope me-2"></i>{{ existing_parent.email }}
-                        </p>
-                        {% endif %}
-                        
-                        <div class="parent-actions">
-                            <button type="button" class="parent-action-btn" 
-                                    style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);"
-                                    onclick="editParent({{ existing_parent.id }})">
-                                <i class="fas fa-edit"></i>
-                            </button>
-                            <button type="button" class="parent-action-btn"
-                                    style="background: linear-gradient(135deg, #f56565 0%, #e53e3e 100%);"
-                                    onclick="deleteParent({{ existing_parent.id }}, '{{ existing_parent.full_name }}')">
-                                <i class="fas fa-trash"></i>
-                            </button>
+        <!-- In student_detail.html or add_parent.html -->
+            <div class="row" id="parentsContainer">
+                {% for parent in student.parents.all %}
+                    {% include 'admin/students/parent_card.html' with parent=parent %}
+                {% empty %}
+                    <div class="col-12">
+                        <div class="empty-state">
+                            <i class="fas fa-user-friends fa-3x text-muted mb-3"></i>
+                            <h5>No Parents Added Yet</h5>
+                            <p class="text-muted">This student doesn't have any parents or guardians registered.</p>
+                            <a href="{% url 'admin_add_parent_to_student' student.id %}" class="btn btn-primary">
+                                <i class="fas fa-user-plus me-2"></i>Add First Parent
+                            </a>
                         </div>
                     </div>
-                </div>
                 {% endfor %}
             </div>
-        </div>
         {% endif %}
 
         <!-- Main Form -->
@@ -847,8 +803,8 @@
                                            id="id_first_phone_number" name="first_phone_number" 
                                            value="{% if form.first_phone_number.value %}{{ form.first_phone_number.value }}{% elif parent %}{{ parent.first_phone_number }}{% endif %}"
                                            placeholder="e.g., 712 345 678"
-                                           pattern="[0-9]{9}"
-                                           maxlength="9"
+                                           pattern="[0-9]{11}"
+                                           maxlength="11"
                                            required>
                                 </div>
                                 {% if form.first_phone_number.errors %}
@@ -872,8 +828,8 @@
                                            id="id_second_phone_number" name="second_phone_number" 
                                            value="{% if form.second_phone_number.value %}{{ form.second_phone_number.value }}{% elif parent %}{{ parent.second_phone_number }}{% endif %}"
                                            placeholder="e.g., 712 345 678"
-                                           pattern="[0-9]{9}"
-                                           maxlength="9">
+                                           pattern="[0-9]{11}"
+                                           maxlength="11">
                                 </div>
                                 {% if form.second_phone_number.errors %}
                                 <div class="invalid-feedback">

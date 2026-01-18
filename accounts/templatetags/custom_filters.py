@@ -28,7 +28,86 @@ def contains_id(value, item_id):
         return any(str(item_id) == str(x) for x in value)
     return False
 
+@register.filter(name='highlight')
+def highlight(text, search_term):
+    """
+    Highlight search terms in text
+    """
+    if not search_term or not text:
+        return text
+    
+    # Convert to string if needed
+    text = str(text)
+    search_term = str(search_term)
+    
+    # Escape HTML in text
+    text = escape(text)
+    
+    # Create regex pattern for case-insensitive search
+    pattern = re.compile(re.escape(search_term), re.IGNORECASE)
+    
+    # Replace matches with highlighted span
+    highlighted = pattern.sub(
+        lambda match: f'<span class="highlight">{match.group()}</span>',
+        text
+    )
+    
+    return mark_safe(highlighted)
 
+
+@register.filter(name='query_transform')
+def query_transform(request, **kwargs):
+    """
+    Add or replace parameters in query string
+    """
+    updated = request.GET.copy()
+    for key, value in kwargs.items():
+        if value:
+            updated[key] = value
+        else:
+            updated.pop(key, None)
+    
+    return updated.urlencode()
+
+
+@register.filter(name='get_item')
+def get_item(dictionary, key):
+    """
+    Get item from dictionary
+    """
+    return dictionary.get(key)
+
+
+@register.filter(name='format_phone')
+def format_phone(phone):
+    """
+    Format phone number for display
+    """
+    if not phone:
+        return ''
+    
+    phone = str(phone).replace(' ', '')
+    if len(phone) == 9:
+        return f'{phone[:3]} {phone[3:6]} {phone[6:]}'
+    return phone
+
+
+@register.filter(name='truncate_chars')
+def truncate_chars(value, max_length):
+    """
+    Truncate text to specified length
+    """
+    if len(value) <= max_length:
+        return value
+    return f"{value[:max_length]}..."
+
+
+@register.filter(name='add_class')
+def add_class(field, css_class):
+    """
+    Add CSS class to form field
+    """
+    return field.as_widget(attrs={"class": css_class})
 @register.filter(name='json_serialize')
 def json_serialize(value):
     """Serialize Django objects to JSON"""

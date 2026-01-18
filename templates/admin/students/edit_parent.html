@@ -1,7 +1,7 @@
 {% extends 'admin/base.html' %}
 {% load static %}
 
-{% block title %}Add New Parent/Guardian{% endblock title %}
+{% block title %}Edit Parent/Guardian{% endblock title %}
 
 {% block breadcrumb %}
     <nav aria-label="breadcrumb" class="mb-4">
@@ -12,8 +12,11 @@
             <li class="breadcrumb-item"><a href="{% url 'admin_parents_list' %}" class="text-decoration-none">
                 <i class="fas fa-user-friends me-1"></i> Parents
             </a></li>
+            <li class="breadcrumb-item"><a href="{% url 'admin_view_parent' parent_id=parent.id %}" class="text-decoration-none">
+                <i class="fas fa-user me-1"></i> {{ parent.full_name|truncatechars:20 }}
+            </a></li>
             <li class="breadcrumb-item active text-primary fw-semibold" aria-current="page">
-                <i class="fas fa-user-plus me-1"></i> Add New Parent/Guardian
+                <i class="fas fa-edit me-1"></i> Edit Parent/Guardian
             </li>
         </ol>
     </nav>
@@ -65,6 +68,38 @@
         padding: 20px;
         border: 1px solid rgba(255, 255, 255, 0.2);
         margin-top: 15px;
+    }
+    
+    .parent-info-card {
+        background: white;
+        border-radius: 15px;
+        padding: 20px;
+        margin-bottom: 30px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+        border: 1px solid #e8eaf6;
+    }
+    
+    .parent-avatar {
+        width: 80px;
+        height: 80px;
+        border-radius: 50%;
+        object-fit: cover;
+        border: 3px solid white;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+    }
+    
+    .parent-avatar-placeholder {
+        width: 80px;
+        height: 80px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 2rem;
+        border: 3px solid white;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.1);
     }
     
     .form-container {
@@ -257,6 +292,16 @@
         font-size: 0.8rem;
         background: #fed7d7;
         color: #c53030;
+        padding: 2px 8px;
+        border-radius: 10px;
+        font-weight: 600;
+    }
+    
+    .student-already-assigned {
+        margin-left: 10px;
+        font-size: 0.8rem;
+        background: #c6f6d5;
+        color: #276749;
         padding: 2px 8px;
         border-radius: 10px;
         font-weight: 600;
@@ -555,6 +600,15 @@
     .form-section {
         animation: slideIn 0.5s ease-out;
     }
+    
+    /* Danger zone */
+    .danger-zone {
+        background: linear-gradient(135deg, #fff5f5 0%, #fff8f8 100%);
+        border: 2px solid #fed7d7;
+        border-radius: 12px;
+        padding: 25px;
+        margin-top: 40px;
+    }
 </style>
 {% endblock extra_css %}
 
@@ -596,12 +650,12 @@
                 <div class="row align-items-center">
                     <div class="col-lg-8">
                         <h1 class="display-6 fw-bold mb-3">
-                            <i class="fas fa-user-plus me-3"></i>
-                            Add New Parent/Guardian
+                            <i class="fas fa-edit me-3"></i>
+                            Edit Parent/Guardian
                         </h1>
                         <p class="mb-0 opacity-90">
                             <i class="fas fa-info-circle me-2"></i>
-                            Create a new parent record and assign multiple students
+                            Update parent information and student assignments
                         </p>
                     </div>
                     <div class="col-lg-4 text-lg-end">
@@ -609,15 +663,49 @@
                             <div class="d-flex align-items-center">
                                 <i class="fas fa-lightbulb me-3" style="font-size: 1.5rem;"></i>
                                 <div>
-                                    <h6 class="mb-1">Quick Tip</h6>
+                                    <h6 class="mb-1">Editing {{ parent.full_name }}</h6>
                                     <p class="mb-0 opacity-90" style="font-size: 0.9rem;">
-                                        Use the student selector to assign multiple students. 
-                                        Students already assigned to other parents will be highlighted.
+                                        Parent ID: <strong>#{{ parent.id }}</strong>
+                                        <br>Assigned to: <strong>{{ current_students.count }}</strong> student(s)
                                     </p>
                                 </div>
                             </div>
                         </div>
                     </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Parent Information Card -->
+        <div class="parent-info-card">
+            <div class="row align-items-center">
+                <div class="col-md-2 text-center mb-3 mb-md-0">
+                    <div class="parent-avatar-placeholder">
+                        {{ parent.full_name|first|upper }}
+                    </div>
+                </div>
+                <div class="col-md-8">
+                    <h4 class="mb-2">{{ parent.full_name }}</h4>
+                    <p class="mb-1">
+                        <i class="fas fa-user-tag me-2 text-primary"></i>
+                        <strong>Relationship:</strong> {{ parent.relationship }}
+                    </p>
+                    <p class="mb-1">
+                        <i class="fas fa-phone me-2 text-primary"></i>
+                        <strong>Primary Phone:</strong> {{ parent.first_phone_number }}
+                    </p>
+                    {% if parent.email %}
+                    <p class="mb-0">
+                        <i class="fas fa-envelope me-2 text-primary"></i>
+                        <strong>Email:</strong> {{ parent.email }}
+                    </p>
+                    {% endif %}
+                </div>
+                <div class="col-md-2 text-md-end">
+                    <span class="badge {% if parent.is_fee_responsible %}bg-success{% else %}bg-secondary{% endif %} p-2 fs-6">
+                        <i class="fas {% if parent.is_fee_responsible %}fa-check-circle{% else %}fa-times-circle{% endif %} me-1"></i>
+                        {% if parent.is_fee_responsible %}Fee Responsible{% else %}Not Fee Responsible{% endif %}
+                    </span>
                 </div>
             </div>
         </div>
@@ -855,14 +943,16 @@
                                         data-placeholder="Select students to assign to this parent...">
                                     {% for student in available_students %}
                                     <option value="{{ student.id }}" 
-                                            data-has-parent="{% if student.parents.exists %}true{% else %}false{% endif %}"
+                                            data-has-parent="{% if student.parents.exists and student not in current_students %}true{% else %}false{% endif %}"
+                                            data-is-current="{% if student in current_students %}true{% else %}false{% endif %}"
                                             data-full-name="{{ student.full_name }}"
                                             data-registration="{{ student.registration_number }}"
                                             data-class="{% if student.class_level %}{{ student.class_level.name }}{% endif %}"
-                                            data-avatar="{% if student.profile_pic %}{{ student.profile_pic.url }}{% endif %}">
+                                            data-avatar="{% if student.profile_pic %}{{ student.profile_pic.url }}{% endif %}"
+                                            {% if student in current_students %}selected{% endif %}>
                                         {{ student.full_name }} 
                                         ({{ student.registration_number }}{% if student.class_level %} - {{ student.class_level.name }}{% endif %})
-                                        {% if student.parents.exists %} ⚠ Already assigned{% endif %}
+                                        {% if student in current_students %} ✓ Already assigned{% elif student.parents.exists %} ⚠ Has other parent{% endif %}
                                     </option>
                                     {% endfor %}
                                 </select>
@@ -890,6 +980,19 @@
                     </div>
                 </div>
                 
+                <!-- Danger Zone -->
+                <div class="danger-zone">
+                    <h5 class="text-danger mb-3">
+                        <i class="fas fa-exclamation-triangle me-2"></i> Danger Zone
+                    </h5>
+                    <p class="text-muted mb-3">
+                        Once you delete a parent, there is no going back. Please be certain.
+                    </p>
+                    <button type="button" class="btn btn-danger" data-toggle="modal" data-target="#deleteParentModal">
+                        <i class="fas fa-trash me-2"></i> Delete This Parent
+                    </button>
+                </div>
+                
                 <!-- Action Buttons -->
                 <div class="action-buttons">
                     <div class="row">
@@ -901,24 +1004,25 @@
                                 
                                 <div class="btn-group" role="group">
                                     <button type="button" class="btn btn-primary dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                                        <i class="fas fa-save"></i> Save Parent
+                                        <i class="fas fa-save"></i> Update Parent
                                     </button>
                                     <div class="dropdown-menu" aria-labelledby="saveDropdown">
                                         <button class="dropdown-item" type="button" id="saveOnlyBtn">
-                                            <i class="fas fa-save text-primary me-2"></i> Save Only
+                                            <i class="fas fa-save text-primary me-2"></i> Update Only
                                         </button>
                                         <div class="dropdown-divider"></div>
                                         <button class="dropdown-item" type="button" id="saveAndViewBtn">
-                                            <i class="fas fa-eye text-info me-2"></i> Save and View Parent
-                                        </button>
-                                        <button class="dropdown-item" type="button" id="saveAndAddAnotherBtn">
-                                            <i class="fas fa-user-plus text-success me-2"></i> Save and Add Another
+                                            <i class="fas fa-eye text-info me-2"></i> Update and View Parent
                                         </button>
                                     </div>
                                 </div>
                                 
-                                <a href="{% url 'admin_parents_list' %}" class="btn btn-info">
-                                    <i class="fas fa-list"></i> View All Parents
+                                <a href="{% url 'admin_view_parent' parent_id=parent.id %}" class="btn btn-info">
+                                    <i class="fas fa-eye"></i> View Parent Details
+                                </a>
+                                
+                                <a href="{% url 'admin_parents_list' %}" class="btn btn-outline-primary">
+                                    <i class="fas fa-list"></i> All Parents
                                 </a>
                             </div>
                         </div>
@@ -928,6 +1032,62 @@
         </div>
     </div>
 </section>
+
+<!-- Delete Parent Modal -->
+<div class="modal fade" id="deleteParentModal" tabindex="-1" aria-labelledby="deleteParentModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="deleteParentModalLabel">
+                    <i class="fas fa-exclamation-triangle me-2"></i> Delete Parent
+                </h5>
+                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="text-center mb-4">
+                    <i class="fas fa-exclamation-circle fa-3x text-danger mb-3"></i>
+                    <h5 class="text-danger">Are you absolutely sure?</h5>
+                    <p class="text-muted">
+                        This action cannot be undone. This will permanently delete the parent 
+                        <strong>{{ parent.full_name }}</strong> and remove all associations with students.
+                    </p>
+                    
+                    {% if current_students.count > 0 %}
+                    <div class="alert alert-warning mt-3">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        <strong>Warning:</strong> This parent is currently assigned to 
+                        <strong>{{ current_students.count }}</strong> student(s). 
+                        These students will lose this parent association.
+                    </div>
+                    {% endif %}
+                    
+                    <p class="text-muted mt-3">
+                        Please type <strong>DELETE</strong> to confirm:
+                    </p>
+                    
+                    <input type="text" class="form-control text-center" id="deleteConfirmation" 
+                           placeholder="Type DELETE here" style="max-width: 200px; margin: 0 auto;">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">
+                    <i class="fas fa-times me-2"></i> Cancel
+                </button>
+                <button type="button" class="btn btn-danger" id="confirmDeleteBtn" disabled>
+                    <i class="fas fa-trash me-2"></i> Delete Parent
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Confirmation Form -->
+<form method="post" action="#" id="deleteForm" style="display: none;">
+    {% csrf_token %}
+</form>
+
 {% endblock content %}
 
 {% block extra_js %}
@@ -1001,6 +1161,7 @@ $(document).ready(function() {
         
         const $student = $(student.element);
         const hasParent = $student.data('has-parent') === 'true';
+        const isCurrent = $student.data('is-current') === 'true';
         const fullName = $student.data('full-name') || '';
         const registration = $student.data('registration') || '';
         const className = $student.data('class') || '';
@@ -1014,16 +1175,18 @@ $(document).ready(function() {
             avatarHtml = `<div class="student-avatar-placeholder-sm">${firstLetter}</div>`;
         }
         
-        let warningBadge = '';
-        if (hasParent) {
-            warningBadge = '<span class="student-has-parent">⚠ Has Parent</span>';
+        let badgeHtml = '';
+        if (isCurrent) {
+            badgeHtml = '<span class="student-already-assigned">✓ Current</span>';
+        } else if (hasParent) {
+            badgeHtml = '<span class="student-has-parent">⚠ Has Parent</span>';
         }
         
         return $(`
             <div class="student-select-option">
                 ${avatarHtml}
                 <div class="student-info">
-                    <div class="student-name">${fullName} ${warningBadge}</div>
+                    <div class="student-name">${fullName} ${badgeHtml}</div>
                     <div class="student-details">
                         ${registration} ${className ? '• ' + className : ''}
                     </div>
@@ -1070,6 +1233,7 @@ $(document).ready(function() {
             const registration = $option.data('registration') || '';
             const className = $option.data('class') || '';
             const hasParent = $option.data('has-parent') === 'true';
+            const isCurrent = $option.data('is-current') === 'true';
             
             const avatarUrl = $option.data('avatar') || '';
             const firstLetter = fullName ? fullName.charAt(0).toUpperCase() : 'S';
@@ -1081,9 +1245,11 @@ $(document).ready(function() {
                 avatarHtml = `<div class="student-avatar-placeholder-sm">${firstLetter}</div>`;
             }
             
-            let warningBadge = '';
-            if (hasParent) {
-                warningBadge = '<span class="badge bg-warning text-dark ms-2">Has Parent</span>';
+            let statusBadge = '';
+            if (isCurrent) {
+                statusBadge = '<span class="badge bg-success ms-2">Current</span>';
+            } else if (hasParent) {
+                statusBadge = '<span class="badge bg-warning text-dark ms-2">Has Parent</span>';
             }
             
             $list.append(`
@@ -1092,7 +1258,7 @@ $(document).ready(function() {
                     <div class="ms-3 flex-grow-1">
                         <div class="d-flex align-items-center">
                             <strong class="me-2">${fullName}</strong>
-                            ${warningBadge}
+                            ${statusBadge}
                         </div>
                         <small class="text-muted">${registration} ${className ? '• ' + className : ''}</small>
                     </div>
@@ -1103,7 +1269,7 @@ $(document).ready(function() {
             `);
         });
         
-        // Check for duplicates
+        // Check for duplicates (excluding current assignments)
         checkForDuplicates(selectedStudents);
     }
     
@@ -1119,7 +1285,8 @@ $(document).ready(function() {
         
         selectedStudents.forEach(studentId => {
             const $option = $(`#id_students option[value="${studentId}"]`);
-            if ($option.data('has-parent') === 'true') {
+            // Only show warning for students that have parents but aren't currently assigned to this parent
+            if ($option.data('has-parent') === 'true' && $option.data('is-current') === 'false') {
                 duplicateStudents.push({
                     id: studentId,
                     name: $option.data('full-name') || $option.text().split(' (')[0],
@@ -1186,15 +1353,11 @@ $(document).ready(function() {
         submitForm('save_and_view');
     });
     
-    $('#saveAndAddAnotherBtn').on('click', function() {
-        submitForm('save_and_add_another');
-    });
-    
     // Form submission function
     function submitForm(action) {
         // Show loading overlay
         $('#loadingOverlay').show();
-        $('#loadingText').text('Saving parent information...');
+        $('#loadingText').text('Updating parent information...');
         
         // Add action parameter
         $('<input>').attr({
@@ -1209,6 +1372,18 @@ $(document).ready(function() {
     
     // Initialize selected students preview on page load
     updateSelectedStudentsPreview();
+    
+    // Delete parent functionality
+    $('#deleteConfirmation').on('input', function() {
+        const input = $(this).val().toUpperCase();
+        $('#confirmDeleteBtn').prop('disabled', input !== 'DELETE');
+    });
+    
+    $('#confirmDeleteBtn').on('click', function() {
+        if ($('#deleteConfirmation').val().toUpperCase() === 'DELETE') {
+            $('#deleteForm').submit();
+        }
+    });
     
     // Show error messages
     {% if form.errors %}

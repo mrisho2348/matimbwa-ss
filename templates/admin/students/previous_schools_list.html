@@ -1,0 +1,773 @@
+{% extends 'admin/base.html' %}
+{% load static %}
+{% block title %} Previous Schools Management {% endblock title %}
+
+{% block breadcrumb %}
+    <button type="button" class="btn btn-primary" data-toggle="modal" data-target="#addSchoolModal">
+        <i class="fas fa-plus"></i> Add Previous School
+    </button>
+{% endblock breadcrumb %}
+
+{% block extra_css %}
+<!-- Select2 CSS -->
+<link rel="stylesheet" href="{% static 'admin/plugins/select2/css/select2.min.css' %}">
+<link rel="stylesheet" href="{% static 'admin/plugins/select2-bootstrap4-theme/select2-bootstrap4.min.css' %}">
+<style>
+    .table th {
+        font-weight: 600;
+        border-bottom-width: 2px;
+    }
+    .table td {
+        vertical-align: middle;
+    }
+    .badge {
+        font-size: 0.85em;
+        padding: 0.4em 0.8em;
+    }
+    .modal-header {
+        border-radius: 0;
+    }
+    
+    /* DataTable Styles */
+    .dataTables_wrapper .dataTables_filter {
+        float: right;
+        text-align: right;
+    }
+    .dataTables_wrapper .dataTables_length {
+        float: left;
+    }
+    .dataTables_wrapper .dataTables_paginate {
+        float: right;
+        margin-top: 10px;
+    }
+    .success-toast, .error-toast {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 1056;
+        min-width: 300px;
+    }
+    
+    /* School Level Badges */
+    .school-level-badge {
+        font-size: 0.8em;
+        padding: 4px 10px;
+        border-radius: 15px;
+        font-weight: 600;
+    }
+    
+    .level-nursery {
+        background-color: #e3f2fd;
+        color: #1565c0;
+    }
+    
+    .level-primary {
+        background-color: #e8f5e9;
+        color: #2e7d32;
+    }
+    
+    .level-o-level {
+        background-color: #fff3e0;
+        color: #ef6c00;
+    }
+    
+    .level-a-level {
+        background-color: #fce4ec;
+        color: #c2185b;
+    }
+    
+    /* Select2 in modal fix */
+    .select2-container {
+        z-index: 1056 !important;
+    }
+    .select2-dropdown {
+        z-index: 1057 !important;
+    }
+    
+    /* Action buttons */
+    .action-btn-sm {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.75rem;
+        border-radius: 0.2rem;
+    }
+    
+    /* Container: Reduce gap to pull buttons closer together */
+    .quick-actions {
+        display: flex;
+        gap: 4px;
+        justify-content: center;
+        align-items: center;
+    }
+
+    /* Base button styling: Circular & Professional */
+    .quick-action-btn {
+        width: 28px;
+        height: 28px;
+        padding: 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        border: none;
+        transition: all 0.2s ease;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+    }
+
+    /* Standard icon color fix */
+    .quick-action-btn i {
+        font-size: 0.75rem;
+        color: #ffffff !important;
+    }
+
+    /* Hover effects */
+    .quick-action-btn:hover {
+        transform: scale(1.1);
+        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        filter: brightness(1.05);
+    }
+
+    /* Button Colors */
+    .btn-primary.quick-action-btn { background-color: #007bff; }
+    .btn-warning.quick-action-btn { 
+        background-color: #ffc107;
+    }
+    .btn-danger.quick-action-btn  { background-color: #dc3545; }
+    .btn-info.quick-action-btn    { background-color: #17a2b8; }
+    
+    /* Adjust warning button icon for contrast */
+    .btn-warning.quick-action-btn i {
+        color: #212529 !important;
+    }
+    
+    /* School location styling */
+    .school-location {
+        font-size: 0.85em;
+        color: #6c757d;
+    }
+    
+    /* Empty state styling */
+    .empty-state {
+        padding: 40px 20px;
+        text-align: center;
+        color: #6c757d;
+    }
+    
+    /* Card header styling */
+    .card-header {
+        border-bottom: 1px solid rgba(0,0,0,.125);
+    }
+</style>
+{% endblock extra_css %}
+
+{% block content %}
+<section class="content">
+    <div class="container-fluid"> 
+        <div id="success-toast" class="alert alert-success alert-dismissible fade success-toast" style="display: none;" role="alert">
+            <strong><i class="fas fa-check-circle"></i> Success!</strong> 
+            <span id="success-message"></span>
+            <button type="button" class="close" onclick="$('#success-toast').fadeOut()" data-dismiss="alert" aria-label="Close">
+                <span aria-hidden="true">&times;</span>
+            </button>
+        </div>
+
+        <div id="error-toast" class="alert alert-danger alert-dismissible fade error-toast" style="display: none;" role="alert">
+            <strong><i class="fas fa-exclamation-circle"></i> Error!</strong> 
+            <span id="error-message"></span>
+            <button type="button" class="close" onclick="$('#error-toast').fadeOut()" data-dismiss="alert" aria-label="Close">
+                <span aria-hidden="true">&times;</span>
+            </button>
+        </div>
+
+        <div class="row">
+            <div class="col-lg-12">
+                <div class="card shadow-lg">
+                    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                        <h6 class="header-title mb-0 text-uppercase">
+                            <i class="fas fa-school"></i> Previous Schools Management
+                        </h6>
+                        <div class="d-flex align-items-center">
+                            <span class="badge badge-light">
+                                Total: <span id="total-count">{{ schools|length }}</span>
+                            </span>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover text-nowrap table-responsive-sm table-bordered table-striped table-sm display" id="schools-table">
+                                <thead class="bg-light">
+                                    <tr>
+                                        <th>School Name</th>
+                                        <th>School Level</th>
+                                        <th>Location</th>
+                                        <th>Created Date</th>
+                                        <th class="text-center">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for school in schools %}
+                                    <tr id="row-{{ school.id }}">
+                                        <td>
+                                            <strong>{{ school.name }}</strong>
+                                            {% if school.location %}
+                                            <br>
+                                            <small class="school-location">
+                                                <i class="fas fa-map-marker-alt"></i> {{ school.location }}
+                                            </small>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% with level_class="level-"|add:school.school_level|slugify %}
+                                            <span class="school-level-badge {{ level_class }}">
+                                                <i class="fas fa-graduation-cap"></i> 
+                                                {{ school.get_school_level_display }}
+                                            </span>
+                                            {% endwith %}
+                                        </td>
+                                        <td>
+                                            {% if school.location %}
+                                                {{ school.location|truncatechars:30 }}
+                                            {% else %}
+                                                <span class="text-muted">Not specified</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <small class="text-muted">
+                                                {{ school.created_at|date:"M d, Y" }}
+                                            </small>
+                                        </td>
+                                        <td class="text-center">
+                                            <div class="quick-actions">
+                                                <!-- Edit Button -->
+                                                <button class="btn btn-sm btn-primary quick-action-btn edit-btn" 
+                                                        data-id="{{ school.id }}"
+                                                        data-name="{{ school.name }}"
+                                                        data-school-level="{{ school.school_level }}"
+                                                        data-location="{{ school.location|default:'' }}"
+                                                        title="Edit School">
+                                                    <i class="fas fa-edit"></i>
+                                                </button>
+                                                
+                                                <!-- Delete Button -->
+                                                <button class="btn btn-sm btn-danger quick-action-btn delete-btn" 
+                                                        data-id="{{ school.id }}"
+                                                        data-name="{{ school.name }}"
+                                                        title="Delete School">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>                                    
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Add School Modal -->
+<div class="modal fade" id="addSchoolModal" tabindex="-1" role="dialog" aria-labelledby="addModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="addModalLabel">
+                    <i class="fas fa-plus-circle"></i> Add Previous School
+                </h5>
+                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <form id="add-form">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-12">
+                            <div class="form-group">
+                                <label for="name">School Name <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="name" name="name" required 
+                                       placeholder="e.g., Mlimani Primary School, Kiota Secondary School" maxlength="200">
+                                <small class="form-text text-muted">Full name of the previous school</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="school_level">School Level <span class="text-danger">*</span></label>
+                                <select class="form-control select2bs4" id="school_level" name="school_level" required style="width: 100%;">
+                                    <option value="">Select School Level</option>
+                                    {% for value, label in school_level_choices %}
+                                        <option value="{{ value }}">{{ label }}</option>
+                                    {% endfor %}
+                                </select>
+                                <small class="form-text text-muted">Select the educational level of the school</small>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="location">Location</label>
+                                <input type="text" class="form-control" id="location" name="location" 
+                                       placeholder="e.g., Dar es Salaam, Arusha City" maxlength="200">
+                                <small class="form-text text-muted">City, town or region where the school is located</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal" id="cancel-add-btn">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="save-btn">
+                        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="display: none;"></span>
+                        Save School
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Edit School Modal -->
+<div class="modal fade" id="editSchoolModal" tabindex="-1" role="dialog" aria-labelledby="editModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-warning text-dark">
+                <h5 class="modal-title" id="editModalLabel">
+                    <i class="fas fa-edit"></i> Edit Previous School
+                </h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <form id="edit-form">
+                {% csrf_token %}
+                <input type="hidden" id="edit-id" name="id">
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-12">
+                            <div class="form-group">
+                                <label for="edit-name">School Name <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="edit-name" name="name" required 
+                                       placeholder="e.g., Mlimani Primary School, Kiota Secondary School" maxlength="200">
+                                <small class="form-text text-muted">Full name of the previous school</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="edit-school_level">School Level <span class="text-danger">*</span></label>
+                                <select class="form-control select2bs4" id="edit-school_level" name="school_level" required style="width: 100%;">
+                                    <option value="">Select School Level</option>
+                                    {% for value, label in school_level_choices %}
+                                        <option value="{{ value }}">{{ label }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="edit-location">Location</label>
+                                <input type="text" class="form-control" id="edit-location" name="location" 
+                                       placeholder="e.g., Dar es Salaam, Arusha City" maxlength="200">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal" id="cancel-edit-btn">Cancel</button>
+                    <button type="submit" class="btn btn-warning" id="update-btn">
+                        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="display: none;"></span>
+                        Update School
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Delete School Modal -->
+<div class="modal fade" id="deleteSchoolModal" tabindex="-1" role="dialog" aria-labelledby="deleteModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="deleteModalLabel">
+                    <i class="fas fa-exclamation-triangle"></i> Confirm Deletion
+                </h5>
+                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete the school <strong id="delete-school-name"></strong>?</p>
+                <p class="text-danger"><small>This action cannot be undone. All associated student records might be affected.</small></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal" id="cancel-delete-btn">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirm-delete-btn">
+                    <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="display: none;"></span>
+                    Delete
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+
+<script>
+    $(document).ready(function() {
+        // Initialize Select2
+        function initializeSelect2() {
+            $('.select2bs4').select2({
+                theme: 'bootstrap4',
+                dropdownParent: $('.modal:visible'),
+                width: '100%',
+                placeholder: 'Select an option',
+                allowClear: false
+            });
+        }
+        
+        // Initialize on page load
+        initializeSelect2();
+
+        // Reinitialize when modals are shown
+        $('#addSchoolModal').on('shown.bs.modal', function() {
+            $('#school_level').select2({
+                theme: 'bootstrap4',
+                dropdownParent: $('#addSchoolModal'),
+                width: '100%',
+                placeholder: 'Select School Level',
+                allowClear: false
+            });
+        });
+
+        $('#editSchoolModal').on('shown.bs.modal', function() {
+            $('#edit-school_level').select2({
+                theme: 'bootstrap4',
+                dropdownParent: $('#editSchoolModal'),
+                width: '100%',
+                placeholder: 'Select School Level',
+                allowClear: false
+            });
+        });
+
+        // Destroy Select2 when modals are hidden
+        $('#addSchoolModal').on('hidden.bs.modal', function() {
+            $('#school_level').select2('destroy');
+            $('#add-form')[0].reset();
+        });
+
+        $('#editSchoolModal').on('hidden.bs.modal', function() {
+            $('#edit-school_level').select2('destroy');
+        });
+
+        // Initialize DataTable
+        var table = $('#schools-table').DataTable({
+            "dom": "<'row'<'col-sm-12 col-md-6'l><'col-sm-12 col-md-6'f>>" +
+                   "<'row'<'col-sm-12'tr>>" +
+                   "<'row'<'col-sm-12 col-md-5'i><'col-sm-12 col-md-7'p>>",
+            "lengthMenu": [[10, 25, 50, -1], [10, 25, 50, "All"]],
+            "pageLength": 10,
+            "responsive": true,
+            "autoWidth": false,
+            "ordering": true,
+            "order": [[0, 'asc']], // Sort by school name
+            
+            "destroy": true,
+            "retrieve": true,
+            "deferRender": true,
+            
+            "columnDefs": [
+                { 
+                    "targets": 4, // Actions column
+                    "orderable": false,
+                    "searchable": false
+                }
+            ],
+            
+            "language": {
+                "emptyTable": "<div class='text-center py-4'><i class='fas fa-school fa-2x mb-2'></i><br>No previous schools found. Click \"Add Previous School\" to create one.</div>",
+                "search": "_INPUT_",
+                "searchPlaceholder": "Search schools...",
+                "lengthMenu": "_MENU_ schools per page",
+                "info": "Showing _START_ to _END_ of _TOTAL_ schools",
+                "infoEmpty": "Showing 0 to 0 of 0 schools",
+                "infoFiltered": "(filtered from _MAX_ total schools)",
+                "paginate": {
+                    "first": "First",
+                    "last": "Last",
+                    "next": "Next",
+                    "previous": "Previous"
+                }
+            },
+            "drawCallback": function(settings) {
+                var api = this.api();
+                var total = api.rows().count();
+                $('#total-count').text(total);
+            }
+        });
+
+        // CSRF token for AJAX requests
+        function getCSRFToken() {
+            return $('input[name="csrfmiddlewaretoken"]').val();
+        }
+
+        // Show toast message
+        function showToast(message, type = 'success') {
+            const toastId = type === 'success' ? '#success-toast' : '#error-toast';
+            const messageId = type === 'success' ? '#success-message' : '#error-message';
+            
+            $(messageId).text(message);
+            $(toastId).addClass('show').fadeIn();
+            
+            setTimeout(function() {
+                $(toastId).fadeOut(function() {
+                    $(this).removeClass('show');
+                });
+            }, type === 'success' ? 3000 : 5000);
+        }
+
+        // Function to reload page after delay
+        function reloadPageAfterDelay(message, type = 'success') {
+            showToast(message, type);
+            var delay = type === 'success' ? 2000 : 3000;
+            setTimeout(function() {
+                location.reload();
+            }, delay);
+        }
+
+        // Handle modal close/cancel buttons
+        $(document).on('click', '[data-dismiss="modal"]', function(e) {
+            e.preventDefault();
+            $(this).closest('.modal').modal('hide');
+        });
+
+        // Handle cancel buttons
+        $('#cancel-add-btn, #cancel-edit-btn, #cancel-delete-btn').on('click', function(e) {
+            e.preventDefault();
+            $(this).closest('.modal').modal('hide');
+        });
+
+        // Helper function to handle button loading state
+        function setButtonLoading(btn, isLoading) {
+            const spinner = btn.find('.spinner-border');
+            if (isLoading) {
+                btn.data('original-text', btn.html());
+                btn.prop('disabled', true);
+                spinner.show();
+                btn.html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>');
+            } else {
+                btn.prop('disabled', false);
+                spinner.hide();
+                btn.html(btn.data('original-text'));
+            }
+        }
+        
+        // Add School
+        $('#add-form').on('submit', function(e) {
+            e.preventDefault();
+            
+            const saveBtn = $('#save-btn');
+            setButtonLoading(saveBtn, true);
+            
+            const formData = new FormData(this);
+            formData.append('action', 'create');
+            
+            $.ajax({
+                url: '{% url "admin_previous_schools_crud" %}',
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCSRFToken(),
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function(data) {
+                    if (data.success) {
+                        $('#addSchoolModal').modal('hide');
+                        reloadPageAfterDelay(data.message, 'success');
+                    } else {
+                        showToast(data.message, 'danger');
+                        setButtonLoading(saveBtn, false);
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error:', error);
+                    showToast('An error occurred while saving. Please try again.', 'danger');
+                    setButtonLoading(saveBtn, false);
+                }
+            });
+        });
+
+        // Edit School - Setup modal
+        $(document).on('click', '.edit-btn', function() {
+            const btn = $(this);
+            
+            $('#edit-id').val(btn.data('id'));
+            
+            // Store values
+            const name = btn.data('name');
+            const schoolLevel = btn.data('school-level');
+            const location = btn.data('location');
+            
+            // Show modal first
+            $('#editSchoolModal').modal('show');
+            
+            // Set values after modal is shown
+            setTimeout(function() {
+                $('#edit-name').val(name);
+                $('#edit-school_level').val(schoolLevel).trigger('change');
+                $('#edit-location').val(location);
+            }, 500);
+        });
+
+        // Edit School - Submit form
+        $('#edit-form').on('submit', function(e) {
+            e.preventDefault();
+            
+            const updateBtn = $('#update-btn');
+            setButtonLoading(updateBtn, true);
+            
+            const formData = new FormData(this);
+            formData.append('action', 'update');
+            
+            $.ajax({
+                url: '{% url "admin_previous_schools_crud" %}',
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCSRFToken(),
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function(data) {
+                    if (data.success) {
+                        $('#editSchoolModal').modal('hide');
+                        reloadPageAfterDelay(data.message, 'success');
+                    } else {
+                        showToast(data.message, 'danger');
+                        setButtonLoading(updateBtn, false);
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error:', error);
+                    showToast('An error occurred while updating. Please try again.', 'danger');
+                    setButtonLoading(updateBtn, false);
+                }
+            });
+        });
+
+        // Delete School - Setup modal
+        let schoolToDelete = null;
+        
+        $(document).on('click', '.delete-btn', function() {
+            const btn = $(this);
+            
+            schoolToDelete = {
+                id: btn.data('id'),
+                name: btn.data('name')
+            };
+            
+            $('#delete-school-name').text(btn.data('name'));
+            $('#deleteSchoolModal').modal('show');
+        });
+
+        // Delete School - Confirm
+        $('#confirm-delete-btn').on('click', function() {
+            if (!schoolToDelete) return;
+            
+            const deleteBtn = $(this);
+            setButtonLoading(deleteBtn, true);
+            
+            $.ajax({
+                url: '{% url "admin_previous_schools_crud" %}',
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCSRFToken(),
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                data: {
+                    'action': 'delete',
+                    'id': schoolToDelete.id,
+                    'csrfmiddlewaretoken': getCSRFToken()
+                },
+                success: function(data) {
+                    if (data.success) {
+                        $('#deleteSchoolModal').modal('hide');
+                        reloadPageAfterDelay(data.message, 'success');
+                    } else {
+                        showToast(data.message, 'danger');
+                        setButtonLoading(deleteBtn, false);
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error:', error);
+                    showToast('An error occurred while deleting. Please try again.', 'danger');
+                    setButtonLoading(deleteBtn, false);
+                }
+            });
+        });
+
+        // Clear form and reset button state on modal close
+        $('#addSchoolModal').on('hidden.bs.modal', function() {
+            $('#add-form')[0].reset();
+            setButtonLoading($('#save-btn'), false);
+        });
+        
+        $('#editSchoolModal').on('hidden.bs.modal', function() {
+            setButtonLoading($('#update-btn'), false);
+        });
+        
+        $('#deleteSchoolModal').on('hidden.bs.modal', function() {
+            schoolToDelete = null;
+            setButtonLoading($('#confirm-delete-btn'), false);
+        });
+
+        // Form validation
+        $('#add-form, #edit-form').on('submit', function(e) {
+            const isAddForm = $(this).attr('id') === 'add-form';
+            const nameInput = isAddForm ? '#name' : '#edit-name';
+            const levelSelect = isAddForm ? '#school_level' : '#edit-school_level';
+            
+            const name = $(nameInput).val().trim();
+            const schoolLevel = $(levelSelect).val();
+            
+            // Validate name
+            if (!name) {
+                e.preventDefault();
+                showToast('School name is required.', 'danger');
+                $(nameInput).addClass('is-invalid');
+                return false;
+            }
+            
+            // Validate school level
+            if (!schoolLevel) {
+                e.preventDefault();
+                showToast('School level is required.', 'danger');
+                $(levelSelect).addClass('is-invalid');
+                return false;
+            }
+            
+            // Validate name length
+            if (name.length < 2) {
+                e.preventDefault();
+                showToast('School name must be at least 2 characters long.', 'danger');
+                $(nameInput).addClass('is-invalid');
+                return false;
+            }
+            
+            return true;
+        });
+
+        // Remove validation classes on input
+        $('#name, #edit-name, #school_level, #edit-school_level').on('input change', function() {
+            $(this).removeClass('is-invalid');
+        });
+    });
+</script>
+{% endblock extra_js %}

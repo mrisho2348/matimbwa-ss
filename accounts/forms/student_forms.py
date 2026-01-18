@@ -1,12 +1,152 @@
 # accounts/forms/student_forms.py
 from datetime import datetime, date
+import re
 from django import forms
 from accounts.models import GENDER_CHOICES
 from students.models import RELATIONSHIP_CHOICES, STATUS_CHOICES, Student, Parent, PreviousSchool
 from core.models import ClassLevel, StreamClass, Subject
 from django.core.exceptions import ValidationError
 from django.utils import timezone
+from django.db.models import Q
+from django.utils.translation import gettext_lazy as _
 
+class ParentStudentForm(forms.ModelForm):
+    full_name = forms.CharField(
+        max_length=200,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Enter full name'
+        })
+    )
+    
+    relationship = forms.ChoiceField(
+        choices=RELATIONSHIP_CHOICES,
+        widget=forms.Select(attrs={
+            'class': 'form-control select2'
+        })
+    )
+    
+    first_phone_number = forms.CharField(
+        max_length=20,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'e.g., 712345678'
+        })
+    )
+    
+    second_phone_number = forms.CharField(
+        max_length=20,
+        required=False,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'e.g., 712345678 (optional)'
+        })
+    )
+    
+    email = forms.EmailField(
+        required=False,
+        widget=forms.EmailInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Enter email address (optional)'
+        })
+    )
+    
+    address = forms.CharField(
+        widget=forms.Textarea(attrs={
+            'class': 'form-control',
+            'rows': 4,
+            'placeholder': 'Enter complete address'
+        })
+    )
+    
+    is_fee_responsible = forms.BooleanField(
+        required=False,
+        widget=forms.CheckboxInput(attrs={
+            'class': 'custom-control-input'
+        })
+    )
+    
+    class Meta:
+        model = Parent
+        fields = [
+            'full_name', 'relationship', 'first_phone_number', 
+            'second_phone_number', 'email', 'address', 'is_fee_responsible'
+        ]
+    
+    def clean_first_phone_number(self):
+        phone = self.cleaned_data.get('first_phone_number', '').strip()
+        
+        # Remove any non-digit characters
+        phone = re.sub(r'\D', '', phone)
+        
+        # Tanzanian phone number validation (starting with 0 or 255)
+        if phone.startswith('0'):
+            phone = '255' + phone[1:]
+        elif phone.startswith('255'):
+            pass
+        else:
+            phone = '255' + phone
+        
+        # Check if it's a valid Tanzanian mobile number
+        if not re.match(r'^255(6|7|8|9)\d{8}$', phone):
+            raise ValidationError(_('Please enter a valid Tanzanian phone number.'))
+        
+        return phone
+    
+    def clean_second_phone_number(self):
+        phone = self.cleaned_data.get('second_phone_number', '').strip()
+        
+        if phone:
+            # Remove any non-digit characters
+            phone = re.sub(r'\D', '', phone)
+            
+            # Tanzanian phone number validation
+            if phone.startswith('0'):
+                phone = '255' + phone[1:]
+            elif phone.startswith('255'):
+                pass
+            else:
+                phone = '255' + phone
+            
+            # Check if it's a valid Tanzanian mobile number
+            if not re.match(r'^255(6|7|8|9)\d{8}$', phone):
+                raise ValidationError(_('Please enter a valid Tanzanian phone number.'))
+            
+            # Check if second phone is same as first
+            first_phone = self.cleaned_data.get('first_phone_number', '')
+            if phone == first_phone:
+                raise ValidationError(_('Second phone number cannot be the same as first phone number.'))
+        
+        return phone
+    
+    def clean_email(self):
+        email = self.cleaned_data.get('email', '').strip()
+        
+        if email:
+            # Check if email already exists for another parent
+            existing_parent = Parent.objects.filter(email=email)
+            if self.instance and self.instance.pk:
+                existing_parent = existing_parent.exclude(pk=self.instance.pk)
+            
+            if existing_parent.exists():
+                raise ValidationError(_('This email is already associated with another parent.'))
+        
+        return email
+    
+    def clean(self):
+        cleaned_data = super().clean()
+        
+        # Check for duplicate phone numbers
+        first_phone = cleaned_data.get('first_phone_number')
+        second_phone = cleaned_data.get('second_phone_number')
+        
+        if first_phone and second_phone and first_phone == second_phone:
+            self.add_error('second_phone_number', 
+                _('Second phone number cannot be the same as first phone number.')
+            )
+        
+        return cleaned_data
+    
 class StudentForm(forms.ModelForm):
     date_of_birth = forms.DateField(
         widget=forms.DateInput(attrs={
@@ -324,6 +464,8 @@ class StudentEditForm(forms.ModelForm):
     
     
 class ParentForm(forms.ModelForm):
+    student_id = forms.IntegerField(widget=forms.HiddenInput(), required=False)
+    
     class Meta:
         model = Parent
         fields = ['full_name', 'relationship', 'address', 'email', 
@@ -353,18 +495,25 @@ class ParentForm(forms.ModelForm):
         }
     
     def __init__(self, *args, **kwargs):
+        self.student = kwargs.pop('student', None)
         super().__init__(*args, **kwargs)
+        
+        if self.student:
+            self.fields['student_id'].initial = self.student.id
         
         # Add form-control class to all fields
         for field_name, field in self.fields.items():
-            if field_name != 'is_fee_responsible':  # Don't add to checkbox
+            if field_name not in ['is_fee_responsible', 'student_id']:  # Don't add to checkbox/hidden
                 field.widget.attrs['class'] = field.widget.attrs.get('class', '') + ' form-control'
+        
+        # Make relationship field required
+        self.fields['relationship'].required = True
     
     def clean_first_phone_number(self):
         phone = self.cleaned_data.get('first_phone_number')
         if phone:
-            # Remove any spaces
-            phone = phone.replace(' ', '')
+            # Remove any spaces and clean
+            phone = self._clean_phone_number(phone)
             
             # Validate it's 9 digits
             if not phone.isdigit() or len(phone) != 9:
@@ -379,7 +528,7 @@ class ParentForm(forms.ModelForm):
         phone = self.cleaned_data.get('second_phone_number')
         if phone:
             # Remove any spaces
-            phone = phone.replace(' ', '')
+            phone = self._clean_phone_number(phone)
             
             # Validate it's 9 digits
             if not phone.isdigit() or len(phone) != 9:
@@ -390,11 +539,38 @@ class ParentForm(forms.ModelForm):
         
         return phone
     
+    def _clean_phone_number(self, phone):
+        """Helper method to clean phone numbers"""
+        # Remove all non-digits
+        phone = ''.join(filter(str.isdigit, phone))
+        
+        # Remove country code if present (255)
+        if phone.startswith('255'):
+            phone = phone[3:]
+        
+        return phone
+    
     def clean_email(self):
         email = self.cleaned_data.get('email')
         if email:
             email = email.lower().strip()
         return email
+    
+    def clean_full_name(self):
+        """Clean and format full name"""
+        full_name = self.cleaned_data.get('full_name')
+        if full_name:
+            # Title case the name
+            full_name = full_name.strip()
+            full_name = ' '.join(word.capitalize() for word in full_name.split())
+        return full_name
+    
+    def clean_relationship(self):
+        """Validate relationship field"""
+        relationship = self.cleaned_data.get('relationship')
+        if not relationship:
+            raise ValidationError('Relationship is required')
+        return relationship
     
     def clean(self):
         cleaned_data = super().clean()
@@ -405,7 +581,138 @@ class ParentForm(forms.ModelForm):
                 'first_phone_number': 'At least one phone number is required.'
             })
         
+        # Prevent duplicate phone numbers
+        first_phone = cleaned_data.get('first_phone_number')
+        second_phone = cleaned_data.get('second_phone_number')
+        
+        if first_phone and second_phone and first_phone == second_phone:
+            raise ValidationError({
+                'second_phone_number': 'Second phone number cannot be the same as first phone number.'
+            })
+        
+        # Check for duplicate parent-student relationship
+        self._validate_unique_parent_student(cleaned_data)
+        
+        # Check for duplicate phone numbers across different parents
+        self._validate_unique_phone_numbers(cleaned_data)
+        
         return cleaned_data
+    
+    def _validate_unique_parent_student(self, cleaned_data):
+        """
+        Validate that this parent-student combination is unique.
+        Prevent adding the same parent (by name + phone) to the same student multiple times.
+        """
+        if not self.student:
+            return
+        
+        full_name = cleaned_data.get('full_name')
+        first_phone = cleaned_data.get('first_phone_number')
+        relationship = cleaned_data.get('relationship')
+        
+        if not full_name or not relationship:
+            return
+        
+        # Normalize phone for comparison
+        first_phone_clean = self._clean_phone_number(first_phone) if first_phone else None
+        
+        # Check for existing parent with same name and phone for this student
+        existing_parents = Parent.objects.filter(
+            students=self.student,
+            full_name__iexact=full_name,
+            relationship=relationship
+        )
+        
+        # Exclude current instance if editing
+        if self.instance and self.instance.pk:
+            existing_parents = existing_parents.exclude(pk=self.instance.pk)
+        
+        # If we have phone number, also check by phone
+        if first_phone_clean:
+            existing_by_phone = Parent.objects.filter(
+                students=self.student,
+                first_phone_number__icontains=first_phone_clean.replace(' ', '')
+            )
+            if self.instance and self.instance.pk:
+                existing_by_phone = existing_by_phone.exclude(pk=self.instance.pk)
+            
+            if existing_by_phone.exists():
+                raise ValidationError(
+                    f"A parent with phone number {first_phone} is already registered for this student."
+                )
+        
+        if existing_parents.exists():
+            raise ValidationError(
+                f"A parent named {full_name} with relationship '{relationship}' is already registered for this student."
+            )
+    
+    def _validate_unique_phone_numbers(self, cleaned_data):
+        """
+        Validate that phone numbers are not shared across different parents for the same student.
+        Also check if phone numbers are already associated with other students.
+        """
+        if not self.student:
+            return
+        
+        first_phone = cleaned_data.get('first_phone_number')
+        second_phone = cleaned_data.get('second_phone_number')
+        
+        # Clean phone numbers for comparison
+        first_phone_clean = self._clean_phone_number(first_phone) if first_phone else None
+        second_phone_clean = self._clean_phone_number(second_phone) if second_phone else None
+        
+        phone_numbers_to_check = []
+        if first_phone_clean:
+            phone_numbers_to_check.append(('first_phone_number', first_phone_clean))
+        if second_phone_clean:
+            phone_numbers_to_check.append(('second_phone_number', second_phone_clean))
+        
+        for field_name, phone_clean in phone_numbers_to_check:
+            # Find parents with this phone number (excluding current instance if editing)
+            parents_with_same_phone = Parent.objects.filter(
+                Q(first_phone_number__icontains=phone_clean) |
+                Q(second_phone_number__icontains=phone_clean)
+            )
+            
+            if self.instance and self.instance.pk:
+                parents_with_same_phone = parents_with_same_phone.exclude(pk=self.instance.pk)
+            
+            for parent in parents_with_same_phone:
+                # Check if this parent is already associated with our student
+                if parent.students.filter(id=self.student.id).exists():
+                    raise ValidationError({
+                        field_name: f'Phone number {phone_clean} is already registered for this student under {parent.full_name}.'
+                    })
+                
+                # Check if phone belongs to a parent of a different student
+                other_students = parent.students.exclude(id=self.student.id)
+                if other_students.exists():
+                    student_names = ', '.join([s.full_name for s in other_students[:3]])
+                    if other_students.count() > 3:
+                        student_names += f' and {other_students.count() - 3} more'
+                    
+                    raise ValidationError({
+                        field_name: f'Phone number {phone_clean} is already registered for other student(s): {student_names}.'
+                    })
+    
+    def save(self, commit=True):
+        """Save the parent and associate with student"""
+        parent = super().save(commit=False)
+        
+        if commit:
+            parent.save()
+            
+            # Associate with student if provided
+            if self.student:
+                parent.students.add(self.student)
+                parent.save()
+                
+                # If this parent is fee responsible, ensure no other parent is
+                if parent.is_fee_responsible:
+                    # Remove fee responsibility from other parents of this student
+                    self.student.parents.filter(is_fee_responsible=True).exclude(id=parent.id).update(is_fee_responsible=False)
+        
+        return parent
     
     
 class PreviousSchoolForm(forms.ModelForm):
@@ -441,3 +748,76 @@ class PreviousSchoolForm(forms.ModelForm):
             raise forms.ValidationError('School level is required.')
         
         return cleaned_data
+class StudentFilterForm(forms.Form):
+    class_level = forms.ModelChoiceField(
+        queryset=ClassLevel.objects.filter(is_active=True),
+        required=False,
+        label="Class Level",
+        widget=forms.Select(attrs={'class': 'form-control select2'})
+    )
+    
+    stream = forms.ModelChoiceField(
+        queryset=StreamClass.objects.none(),
+        required=False,
+        label="Stream",
+        widget=forms.Select(attrs={'class': 'form-control select2'})
+    )
+    
+    status = forms.ChoiceField(
+        choices=[('', 'All Status')] + list(STATUS_CHOICES),
+        required=False,
+        label="Status",
+        widget=forms.Select(attrs={'class': 'form-control'})
+    )
+    
+    gender = forms.ChoiceField(
+        choices=[('', 'All Gender')] + list(GENDER_CHOICES),
+        required=False,
+        label="Gender",
+        widget=forms.Select(attrs={'class': 'form-control'})
+    )
+    
+    search = forms.CharField(
+        required=False,
+        label="Search",
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Search by name, registration number...'
+        })
+    )
+    
+    date_from = forms.DateField(
+        required=False,
+        label="From Date",
+        widget=forms.DateInput(attrs={
+            'type': 'date',
+            'class': 'form-control',
+            'max': timezone.now().date().isoformat()
+        })
+    )
+    
+    date_to = forms.DateField(
+        required=False,
+        label="To Date",
+        widget=forms.DateInput(attrs={
+            'type': 'date',
+            'class': 'form-control',
+            'max': timezone.now().date().isoformat()
+        })
+    )
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        
+        # Update stream queryset based on selected class
+        if 'class_level' in self.data:
+            try:
+                class_level_id = int(self.data.get('class_level'))
+                self.fields['stream'].queryset = StreamClass.objects.filter(
+                    class_level_id=class_level_id,
+                    is_active=True
+                ).order_by('stream_letter')
+            except (ValueError, TypeError):
+                self.fields['stream'].queryset = StreamClass.objects.none()
+        else:
+            self.fields['stream'].queryset = StreamClass.objects.none()
