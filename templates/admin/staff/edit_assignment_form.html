@@ -1,0 +1,170 @@
+<!-- admin/staff/edit_assignment_form.html -->
+<div class="row">
+    <div class="col-md-6">
+        <div class="form-group">
+            <label for="edit_staff">Teacher *</label>
+            <select class="form-control select2bs4 select2-edit" id="edit_staff" name="staff" required>
+                <option value="">Select Teacher</option>
+                {% for staff in all_staff %}
+                <option value="{{ staff.id }}" {% if assignment.staff.id == staff.id %}selected{% endif %}>
+                    {{ staff.get_full_name }}
+                    {% if staff.department %}
+                    - {{ staff.department.name }}
+                    {% endif %}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="form-group">
+            <label for="edit_assignment_type">Assignment Type *</label>
+            <select class="form-control select2bs4 select2-edit" id="edit_assignment_type" name="assignment_type" required>
+                <option value="">Select Type</option>
+                <option value="class" {% if assignment.assignment_type == 'class' %}selected{% endif %}>Class Level (All Streams)</option>
+                <option value="stream" {% if assignment.assignment_type == 'stream' %}selected{% endif %}>Stream Specific</option>
+            </select>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-6">
+        <div class="form-group">
+            <label for="edit_class_level">Class Level *</label>
+            <select class="form-control select2bs4 select2-edit" id="edit_class_level" name="class_level" required>
+                <option value="">Select Class Level</option>
+                {% for class_level in class_levels %}
+                <option value="{{ class_level.id }}" {% if assignment.class_level.id == class_level.id %}selected{% endif %}>
+                    {{ class_level.name }} ({{ class_level.educational_level.name }})
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="form-group" id="edit_stream_group" style="{% if assignment.assignment_type == 'stream' %}display: block;{% else %}display: none;{% endif %}">
+            <label for="edit_stream_class">Stream (Optional for Stream Type)</label>
+            <select class="form-control select2bs4 select2-edit" id="edit_stream_class" name="stream_class">
+                <option value="">Select Stream</option>
+                {% for stream in streams %}
+                <option value="{{ stream.id }}" {% if assignment.stream_class and assignment.stream_class.id == stream.id %}selected{% endif %}>
+                    {{ stream }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-6">
+        <div class="form-group">
+            <div class="form-check">
+                <input type="checkbox" class="form-check-input" id="edit_is_class_teacher" name="is_class_teacher" 
+                       {% if assignment.is_class_teacher %}checked{% endif %}>
+                <label class="form-check-label" for="edit_is_class_teacher">
+                    This is a Class Teacher Assignment
+                </label>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="form-group" id="edit_subject_group" style="{% if assignment.is_class_teacher %}display: none;{% else %}display: block;{% endif %}">
+            <label for="edit_subject">Subject {% if not assignment.is_class_teacher %}*{% endif %}</label>
+            <select class="form-control select2bs4 select2-edit" id="edit_subject" name="subject" 
+                    {% if not assignment.is_class_teacher %}required{% endif %}>
+                <option value="">Select Subject</option>
+                {% for subject in subjects %}
+                <option value="{{ subject.id }}" 
+                        {% if assignment.subject and assignment.subject.id == subject.id %}selected{% endif %}
+                        {% if assignment.subject and assignment.subject.id != subject.id %}disabled{% endif %}>
+                    {{ subject.name }} ({{ subject.code }})
+                    {% if assignment.subject and assignment.subject.id == subject.id %}(Current){% endif %}
+                </option>
+                {% endfor %}
+            </select>
+            <small class="form-text text-muted">
+                Changing class level will update available subjects based on educational level
+            </small>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-4">
+        <div class="form-group">
+            <label for="edit_period_count">Periods per Week</label>
+            <input type="number" class="form-control" id="edit_period_count" name="period_count" 
+                   min="0" max="40" value="{{ assignment.period_count }}" 
+                   {% if assignment.is_class_teacher %}disabled{% endif %}>
+            <small class="form-text text-muted">
+                {% if assignment.is_class_teacher %}
+                Period count not applicable for class teacher
+                {% else %}
+                Number of teaching periods per week
+                {% endif %}
+            </small>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="form-group">
+            <label for="edit_start_date">Start Date (Optional)</label>
+            <input type="date" class="form-control" id="edit_start_date" name="start_date" 
+                   value="{{ assignment.start_date|date:'Y-m-d' }}">
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="form-group">
+            <label for="edit_end_date">End Date (Optional)</label>
+            <input type="date" class="form-control" id="edit_end_date" name="end_date" 
+                   value="{{ assignment.end_date|date:'Y-m-d' }}">
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-12">
+        <div class="form-group">
+            <label for="edit_is_active">Status</label>
+            <div class="custom-control custom-switch">
+                <input type="checkbox" class="custom-control-input" id="edit_is_active" name="is_active" 
+                       {% if assignment.is_active %}checked{% endif %}>
+                <label class="custom-control-label" for="edit_is_active">
+                    {% if assignment.is_active %}Active{% else %}Inactive{% endif %}
+                </label>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Hidden fields for assignment details -->
+<input type="hidden" name="academic_year" value="{{ assignment.academic_year.id }}">
+<input type="hidden" name="current_subject_id" id="current_subject_id" value="{% if assignment.subject %}{{ assignment.subject.id }}{% endif %}">
+<input type="hidden" name="current_stream_id" id="current_stream_id" value="{% if assignment.stream_class %}{{ assignment.stream_class.id }}{% endif %}">
+
+<style>
+    /* Custom styling for edit form */
+    .select2-edit + .select2-container {
+        width: 100% !important;
+    }
+    
+    .form-check-input:checked ~ .form-check-label {
+        font-weight: 600;
+    }
+    
+    .custom-switch .custom-control-label::before {
+        left: -2.25rem;
+        width: 2.75rem;
+    }
+    
+    .custom-switch .custom-control-label::after {
+        left: calc(-2.25rem + 2px);
+        background-color: #adb5bd;
+    }
+    
+    .custom-switch .custom-control-input:checked ~ .custom-control-label::after {
+        background-color: #fff;
+        transform: translateX(1.5rem);
+    }
+</style>

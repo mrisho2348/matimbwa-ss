@@ -79,8 +79,12 @@ urlpatterns = [
     path('staffs/', staffs_list, name='admin_staffs_list'),
     path('staffs/crud/', staffs_crud, name='admin_staffs_crud'),
     path('staffs/<int:staff_id>/view/', view_staff, name='admin_view_staff'),
-    path('staff/roles/', staff_roles, name='admin_staff_roles'),
-    path('staff/assignments/', staff_assignments, name='admin_staff_assignments'),
+    path('staff-roles/', staff_roles_list, name='admin_staff_roles'),
+    path('staff-roles/crud/', staff_roles_crud, name='admin_staff_roles_crud'),
+    path('teaching-assignments/', teaching_assignments_list, name='admin_teaching_assignments_list'),
+    path('teaching-assignments/crud/', teaching_assignments_crud, name='admin_teaching_assignments_crud'),
+    path('teaching-assignments/details/', get_assignment_details, name='admin_get_assignment_details'),
+    path('teaching-assignments/streams/', get_streams_for_class, name='admin_get_streams_for_class'),
     
     # User Management URLs
     path('users/', users_list, name='admin_users_list'),

@@ -1,0 +1,1307 @@
+{% extends 'admin/base.html' %}
+{% load static %}
+
+{% block title %}Staff Roles Management{% endblock %}
+
+{% block breadcrumb %}
+    <button type="button" class="btn btn-primary" data-toggle="modal" data-target="#assignRoleModal">
+        <i class="fas fa-user-plus"></i> Assign Role
+    </button>
+    <button type="button" class="btn btn-outline-primary" data-toggle="modal" data-target="#bulkAssignModal">
+        <i class="fas fa-users"></i> Bulk Assign
+    </button>
+{% endblock breadcrumb %}
+
+{% block extra_css %}
+<style>
+    /* Custom Styles */
+    .role-card {
+        border: none;
+        border-radius: 10px;
+        transition: all 0.3s ease;
+        height: 100%;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    }
+    .role-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 5px 20px rgba(0, 0, 0, 0.15);
+    }
+    
+    .role-icon {
+        width: 50px;
+        height: 50px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 15px;
+        font-size: 20px;
+    }
+    
+    .role-teacher {
+        background-color: rgba(23, 162, 184, 0.1);
+        color: #17a2b8;
+    }
+    .role-admin {
+        background-color: rgba(220, 53, 69, 0.1);
+        color: #dc3545;
+    }
+    .role-support {
+        background-color: rgba(40, 167, 69, 0.1);
+        color: #28a745;
+    }
+    .role-hod {
+        background-color: rgba(111, 66, 193, 0.1);
+        color: #6f42c1;
+    }
+    .role-other {
+        background-color: rgba(108, 117, 125, 0.1);
+        color: #6c757d;
+    }
+    
+    .role-count {
+        font-size: 2.5rem;
+        font-weight: 700;
+        margin: 10px 0;
+    }
+    
+    .status-badge {
+        padding: 5px 10px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: 600;
+    }
+    
+    .active-status {
+        background-color: #d4edda;
+        color: #155724;
+    }
+    
+    .inactive-status {
+        background-color: #f8d7da;
+        color: #721c24;
+    }
+    
+    .role-badge {
+        padding: 4px 8px;
+        border-radius: 12px;
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+    
+    .badge-teacher { background-color: #17a2b8; color: white; }
+    .badge-admin { background-color: #dc3545; color: white; }
+    .badge-support { background-color: #28a745; color: white; }
+    .badge-hod { background-color: #6f42c1; color: white; }
+    .badge-other { background-color: #6c757d; color: white; }
+    
+    .stats-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 10px;
+        padding: 20px;
+        margin-bottom: 20px;
+    }
+    
+    .stats-icon {
+        font-size: 40px;
+        opacity: 0.8;
+    }
+    
+    .stats-value {
+        font-size: 32px;
+        font-weight: 700;
+        margin: 10px 0;
+    }
+    
+    .stats-label {
+        font-size: 14px;
+        opacity: 0.9;
+    }
+    
+    .avatar {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        object-fit: cover;
+        border: 2px solid #dee2e6;
+    }
+    
+    .avatar-placeholder {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 14px;
+        font-weight: 600;
+    }
+    
+    .search-box {
+        position: relative;
+    }
+    
+    .search-box .search-icon {
+        position: absolute;
+        left: 15px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #6c757d;
+    }
+    
+    .search-box input {
+        padding-left: 45px;
+        border-radius: 25px;
+        border: 1px solid #dee2e6;
+        height: 45px;
+    }
+    
+    .action-dropdown .btn {
+        padding: 5px 10px;
+        font-size: 12px;
+    }
+    
+    .empty-state {
+        text-align: center;
+        padding: 50px 20px;
+        color: #6c757d;
+    }
+    
+    .empty-state i {
+        font-size: 60px;
+        margin-bottom: 20px;
+        opacity: 0.3;
+    }
+    
+    /* Container: Reduce gap to pull buttons closer together */
+    .quick-actions {
+        display: flex;
+        gap: 4px; /* Reduced from 6px/8px to 4px for a tighter group */
+        justify-content: center;
+        align-items: center;
+    }
+
+    /* Base button styling: Circular & Professional */
+    .quick-action-btn {
+        width: 28px;  /* Slightly smaller for better fit in tight rows */
+        height: 28px;
+        padding: 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%; /* Perfect circles */
+        border: none;
+        transition: all 0.2s ease;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+    }
+
+    /* Standard icon color fix */
+    .quick-action-btn i {
+        font-size: 0.75rem; /* Balanced size for 28px button */
+        color: #ffffff !important;
+    }
+
+    /* Hover effects */
+    .quick-action-btn:hover {
+        transform: scale(1.1); /* Slight grow on hover instead of lift */
+        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        filter: brightness(1.05);
+    }
+
+    /* Adjust warning button icon for contrast */
+    .btn-warning.quick-action-btn i {
+        color: #212529 !important;
+    }
+    .btn-success.quick-action-btn { background-color: #28a745; }
+    .btn-primary.quick-action-btn { background-color: #007bff; }
+    .btn-danger.quick-action-btn  { background-color: #dc3545; }
+    .btn-info.quick-action-btn    { background-color: #17a2b8; }
+    .btn-warning.quick-action-btn { background-color: #ffc107; }
+    
+    /* Toast notifications */
+    .success-toast, .error-toast {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 1056;
+        min-width: 300px;
+    }
+    
+    /* Modal Styles */
+    .modal-header.bg-warning {
+        background: linear-gradient(135deg, #f0ad4e 0%, #ec971f 100%) !important;
+    }
+    .modal-header.bg-danger {
+        background: linear-gradient(135deg, #d9534f 0%, #c9302c 100%) !important;
+        color: white;
+    }
+    
+    /* Select2 in modal fix */
+    .select2-container {
+        z-index: 1056 !important;
+    }
+    .select2-dropdown {
+        z-index: 1057 !important;
+    }
+    
+    /* DataTable custom styles */
+    .dataTables_wrapper .dataTables_filter {
+        float: right;
+        margin-bottom: 15px;
+    }
+    
+    .dataTables_wrapper .dataTables_length {
+        float: left;
+    }
+    
+    .dataTables_wrapper .dataTables_paginate {
+        margin-top: 15px;
+    }
+    
+    .dataTables_wrapper .dataTables_info {
+        padding-top: 15px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="content">
+    <div class="container-fluid"> 
+        <!-- Toast Notifications -->
+        <div id="success-toast" class="alert alert-success alert-dismissible fade success-toast" style="display: none;" role="alert">
+            <strong><i class="fas fa-check-circle"></i> Success!</strong> 
+            <span id="success-message"></span>
+            <button type="button" class="close" onclick="$('#success-toast').fadeOut()" data-dismiss="alert" aria-label="Close">
+                <span aria-hidden="true">&times;</span>
+            </button>
+        </div>
+
+        <div id="error-toast" class="alert alert-danger alert-dismissible fade error-toast" style="display: none;" role="alert">
+            <strong><i class="fas fa-exclamation-circle"></i> Error!</strong> 
+            <span id="error-message"></span>
+            <button type="button" class="close" onclick="$('#error-toast').fadeOut()" data-dismiss="alert" aria-label="Close">
+                <span aria-hidden="true">&times;</span>
+            </button>
+        </div>
+
+        <!-- Main Staff Table Card -->
+        <div class="card shadow-lg">
+            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                <h6 class="header-title mb-0 text-uppercase">
+                    <i class="fas fa-list"></i> Staff Roles Management
+                </h6>
+                <div class="d-flex gap-2">
+                    <!-- Role Filter Dropdown -->
+                    <div class="dropdown">
+                        <button class="btn btn-outline-light dropdown-toggle" type="button" 
+                                id="roleFilterDropdown" data-toggle="dropdown" aria-expanded="false">
+                            <i class="fas fa-filter me-2"></i>
+                            Filter by Role
+                        </button>
+                        <div class="dropdown-menu" aria-labelledby="roleFilterDropdown">
+                            <a class="dropdown-item filter-role" data-role="all" href="#">
+                                <i class="fas fa-layer-group me-2"></i>All Roles
+                            </a>
+                            {% for value, label in role_choices %}
+                            <a class="dropdown-item filter-role" data-role="{{ value }}" href="#">
+                                <i class="fas fa-tag me-2"></i>{{ label }}
+                            </a>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover text-nowrap table-responsive-sm table-bordered table-striped table-sm display" id="staff-table">
+                        <thead class="bg-light">
+                            <tr>
+                                <th>#</th>
+                                <th>Staff Member</th>
+                                <th>Current Role</th>
+                                <th>Department</th>
+                                <th>Contact</th>
+                                <th>Status</th>
+                                <th class="text-center">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for staff in staff_members %}
+                            <tr id="row-{{ staff.id }}" >
+                                <td>{{ forloop.counter }}</td>
+                                <td>
+                                    <div class="d-flex align-items-center">
+                                        {% if staff.profile_picture %}
+                                        <img src="{{ staff.profile_picture.url }}" 
+                                             alt="{{ staff.get_full_name }}" 
+                                             class="avatar me-3">
+                                        {% else %}
+                                        <div class="avatar-placeholder me-3">
+                                            {{ staff.get_full_name|slice:":1" }}
+                                        </div>
+                                        {% endif %}
+                                        <div>
+                                            <h6 class="mb-0">{{ staff.get_full_name }}</h6>
+                                            <small class="text-muted">@{{ staff.admin.username }}</small>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    <span class="role-badge 
+                                        {% if staff.position_title == 'teacher' %}badge-teacher
+                                        {% elif staff.position_title == 'admin' %}badge-admin
+                                        {% elif staff.position_title == 'support' %}badge-support
+                                        {% elif staff.position_title == 'hod' %}badge-hod
+                                        {% else %}badge-other{% endif %}">
+                                        {% for value, label in role_choices %}
+                                            {% if value == staff.position_title %}{{ label }}{% endif %}
+                                        {% empty %}
+                                            {{ staff.position_title|default:"Not Assigned"|title }}
+                                        {% endfor %}
+                                    </span>
+                                </td>
+                                <td>
+                                    {% if staff.work_place %}
+                                    <span class="badge badge-light text-dark">
+                                        <i class="fas fa-building me-1"></i>
+                                        {{ staff.work_place|title }}
+                                    </span>
+                                    {% else %}
+                                    <span class="text-muted">Not assigned</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div>
+                                        <div class="small">
+                                            <i class="fas fa-envelope me-1"></i>
+                                            <a href="mailto:{{ staff.admin.email }}" class="text-decoration-none">
+                                                {{ staff.admin.email|truncatechars:20 }}
+                                            </a>
+                                        </div>
+                                        {% if staff.phone_number %}
+                                        <div class="small">
+                                            <i class="fas fa-phone me-1"></i>
+                                            {{ staff.phone_number }}
+                                        </div>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                                <td>
+                                    {% if staff.admin.is_active %}
+                                    <span class="status-badge active-status">
+                                        <i class="fas fa-check-circle me-1"></i>Active
+                                    </span>
+                                    {% else %}
+                                    <span class="status-badge inactive-status">
+                                        <i class="fas fa-times-circle me-1"></i>Inactive
+                                    </span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-center">
+                                    <div class="quick-actions">
+                                        <!-- Edit Role Button -->
+                                        <button class="btn btn-sm btn-primary quick-action-btn edit-role-btn" 
+                                                data-id="{{ staff.id }}"
+                                                data-name="{{ staff.get_full_name }}"
+                                                data-current-role="{{ staff.position_title }}"
+                                                title="Edit Role">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                        
+                                        <!-- Remove Role Button -->
+                                        <button class="btn btn-sm btn-danger quick-action-btn remove-role-btn" 
+                                                data-id="{{ staff.id }}"
+                                                data-name="{{ staff.get_full_name }}"
+                                                data-current-role="{{ staff.position_title }}"
+                                                title="Remove Role">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                        
+                                        <!-- View Profile Button -->
+                                        <a href="{% url 'admin_view_staff' staff.id %}" 
+                                           class="btn btn-sm btn-info quick-action-btn" 
+                                           title="View Profile">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="7" class="text-center py-4">
+                                    <i class="fas fa-users fa-2x mb-3 text-muted"></i>
+                                    <h5>No Staff Members Found</h5>
+                                    <p class="text-muted">No staff members have been added yet.</p>
+                                    <button type="button" class="btn btn-primary" data-toggle="modal" data-target="#assignRoleModal">
+                                        <i class="fas fa-plus me-2"></i>Assign Roles
+                                    </button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Assign Role Modal -->
+<div class="modal fade" id="assignRoleModal" tabindex="-1" role="dialog" aria-labelledby="assignRoleModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="assignRoleModalLabel">
+                    <i class="fas fa-user-plus"></i> Assign Role to Staff
+                </h5>
+                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <form id="assign-role-form">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="assign_role">
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="staff">Select Staff <span class="text-danger">*</span></label>
+                                <select class="form-control select2bs4" id="staff" name="staff" required style="width: 100%;">
+                                    <option value="">Select Staff Member</option>
+                                    {% for staff in all_staff %}
+                                    <option value="{{ staff.id }}">
+                                        {{ staff.get_full_name }} 
+                                        {% if staff.position_title %}
+                                        (Current: {{ staff.position_title|title }})
+                                        {% else %}
+                                        (No Role Assigned)
+                                        {% endif %}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                                <small class="form-text text-muted">Select a staff member to assign a role</small>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="role">Select Role <span class="text-danger">*</span></label>
+                                <select class="form-control select2bs4" id="role" name="position_title" required style="width: 100%;">
+                                    <option value="">Select Role</option>
+                                    {% for value, label in role_choices %}
+                                    <option value="{{ value }}">{{ label }}</option>
+                                    {% endfor %}
+                                </select>
+                                <small class="form-text text-muted">Choose the role to assign</small>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row mt-3">
+                        <div class="col-md-12">
+                            <div class="form-group">
+                                <label for="work_place">Work Place/Department (Optional)</label>
+                                <input type="text" class="form-control" id="work_place" name="work_place" 
+                                       placeholder="e.g., Main Campus, IT Department, Remote">
+                                <small class="form-text text-muted">Assign a specific work place or department</small>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row mt-3">
+                        <div class="col-md-12">
+                            <div class="alert alert-info">
+                                <i class="fas fa-info-circle"></i>
+                                <strong>Note:</strong> Assigning a role will update the staff member's current role.
+                                If you want to assign multiple roles, use the bulk assign feature.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal" id="cancel-assign-btn">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="assign-btn">
+                        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="display: none;"></span>
+                        Assign Role
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Bulk Assign Modal -->
+<div class="modal fade" id="bulkAssignModal" tabindex="-1" role="dialog" aria-labelledby="bulkAssignModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-info text-white">
+                <h5 class="modal-title" id="bulkAssignModalLabel">
+                    <i class="fas fa-users"></i> Bulk Assign Roles
+                </h5>
+                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <form id="bulk-assign-form">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="bulk_assign">
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-12">
+                            <div class="form-group">
+                                <label for="staff_list">Select Multiple Staff <span class="text-danger">*</span></label>
+                                <select class="form-control select2bs4" id="staff_list" name="staff_list[]" multiple required style="width: 100%;">
+                                    {% for staff in all_staff %}
+                                    <option value="{{ staff.id }}">
+                                        {{ staff.get_full_name }} 
+                                        {% if staff.position_title %}
+                                        (Current: {{ staff.position_title|title }})
+                                        {% else %}
+                                        (No Role Assigned)
+                                        {% endif %}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                                <small class="form-text text-muted">Select multiple staff members to assign the same role</small>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-12">
+                            <div class="form-group">
+                                <label for="bulk_role">Select Role <span class="text-danger">*</span></label>
+                                <select class="form-control select2bs4" id="bulk_role" name="position_title" required style="width: 100%;">
+                                    <option value="">Select Role</option>
+                                    {% for value, label in role_choices %}
+                                    <option value="{{ value }}">{{ label }}</option>
+                                    {% endfor %}
+                                </select>
+                                <small class="form-text text-muted">All selected staff will be assigned this role</small>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row mt-3">
+                        <div class="col-md-12">
+                            <div class="alert alert-warning">
+                                <i class="fas fa-exclamation-triangle"></i>
+                                <strong>Warning:</strong> This will overwrite the current role for all selected staff members.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal" id="cancel-bulk-btn">Cancel</button>
+                    <button type="submit" class="btn btn-info" id="bulk-assign-btn">
+                        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="display: none;"></span>
+                        Assign to Selected
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Role Modal -->
+<div class="modal fade" id="editRoleModal" tabindex="-1" role="dialog" aria-labelledby="editRoleModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-warning text-dark">
+                <h5 class="modal-title" id="editRoleModalLabel">
+                    <i class="fas fa-edit"></i> Edit Staff Role
+                </h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <form id="edit-role-form">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="edit_role">
+                <input type="hidden" id="edit-staff-id" name="staff_id">
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="staff-name">Staff Name</label>
+                        <input type="text" class="form-control" id="staff-name" readonly>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="current-role">Current Role</label>
+                        <input type="text" class="form-control" id="current-role" readonly>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="new-role">New Role <span class="text-danger">*</span></label>
+                        <select class="form-control select2bs4" id="new-role" name="position_title" required style="width: 100%;">
+                            <option value="">Select New Role</option>
+                            {% for value, label in role_choices %}
+                            <option value="{{ value }}">{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="new-work_place">Work Place/Department (Optional)</label>
+                        <input type="text" class="form-control" id="new-work_place" name="work_place" 
+                               placeholder="e.g., Main Campus, IT Department, Remote">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal" id="cancel-edit-role-btn">Cancel</button>
+                    <button type="submit" class="btn btn-warning" id="update-role-btn">
+                        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="display: none;"></span>
+                        Update Role
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Remove Role Modal -->
+<div class="modal fade" id="removeRoleModal" tabindex="-1" role="dialog" aria-labelledby="removeRoleModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="removeRoleModalLabel">
+                    <i class="fas fa-trash"></i> Remove Staff Role
+                </h5>
+                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to remove the role from <strong id="remove-staff-name"></strong>?</p>
+                <p class="text-muted">Current Role: <span id="remove-current-role"></span></p>
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <strong>Note:</strong> This will only remove the role assignment. The staff account will remain active.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal" id="cancel-remove-btn">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirm-remove-btn">
+                    <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="display: none;"></span>
+                    Remove Role
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+<!-- Select2 JS -->
+<script src="{% static 'admin/plugins/select2/js/select2.full.min.js' %}"></script>
+
+<script>
+$(document).ready(function() {
+    // Initialize DataTable
+    var table = $('#staff-table').DataTable({
+        "dom": "<'row'<'col-sm-12 col-md-6'l><'col-sm-12 col-md-6'f>>" +
+               "<'row'<'col-sm-12'tr>>" +
+               "<'row'<'col-sm-12 col-md-5'i><'col-sm-12 col-md-7'p>>",
+        "lengthMenu": [[10, 25, 50, -1], [10, 25, 50, "All"]],
+        "pageLength": 10,
+        "responsive": true,
+        "autoWidth": false,
+        "ordering": true,
+        "order": [[1, 'asc']],
+        "columnDefs": [
+            { 
+                "targets": 2, // Role column - make searchable
+                "orderable": true,
+                "searchable": true,
+                "type": "string"
+            },
+            { 
+                "targets": 6, // Actions column
+                "orderable": false,
+                "searchable": false
+            }
+        ],
+        "language": {
+            "emptyTable": "<div class='text-center py-4'><i class='fas fa-users fa-2x mb-2'></i><br>No staff members found.</div>",
+            "search": "_INPUT_",
+            "searchPlaceholder": "Search staff...",
+            "lengthMenu": "_MENU_ records per page",
+            "info": "Showing _START_ to _END_ of _TOTAL_ staff",
+            "infoEmpty": "Showing 0 to 0 of 0 staff",
+            "infoFiltered": "(filtered from _MAX_ total staff)",
+            "paginate": {
+                "first": "First",
+                "last": "Last",
+                "next": "Next",
+                "previous": "Previous"
+            }
+        }
+    });
+
+    // Store role mapping for filtering
+    const roleMapping = {};
+    {% for value, label in role_choices %}
+        roleMapping['{{ value }}'] = '{{ label }}';
+        roleMapping['{{ label }}'] = '{{ value }}';
+    {% endfor %}
+
+    // Role filter functionality
+    let currentRoleFilter = 'all';
+    
+    $(document).on('click', '.filter-role', function(e) {
+        e.preventDefault();
+        const roleValue = $(this).data('role');
+        currentRoleFilter = roleValue;
+        
+        // Update dropdown button text
+        if (roleValue === 'all') {
+            $('#roleFilterDropdown').html('<i class="fas fa-filter me-2"></i>Filter by Role');
+        } else {
+            const roleText = $(this).find('i').next().text().trim();
+            $('#roleFilterDropdown').html('<i class="fas fa-filter me-2"></i>' + roleText);
+        }
+        
+        // Clear all filters first
+        table.search('').columns().search('').draw();
+        
+        // Apply filter to DataTable
+        if (roleValue !== 'all') {
+            // Get the display label for the role value
+            const roleLabel = roleMapping[roleValue];
+            
+            if (roleLabel) {
+                // Create a custom search function that searches both the role value and label
+                $.fn.dataTable.ext.search.push(function(settings, data, dataIndex) {
+                    const roleCell = data[2]; // Role column is index 2
+                    
+                    // Check if the role cell contains the role label
+                    if (roleLabel && roleCell.includes(roleLabel)) {
+                        return true;
+                    }
+                    
+                    // Also check for the role value in the badge class
+                    const row = table.row(dataIndex).node();
+                    if (row) {
+                        const roleBadge = $(row).find('.role-badge');
+                        const badgeClass = roleBadge.attr('class');
+                        if (badgeClass && badgeClass.includes('badge-' + roleValue)) {
+                            return true;
+                        }
+                    }
+                    
+                    return false;
+                });
+            }
+        }
+        
+        // Redraw the table
+        table.draw();
+        
+        // Remove the custom filter function for future draws
+        $.fn.dataTable.ext.search.pop();
+        
+        // Update dropdown items active state
+        $('.filter-role').removeClass('active');
+        $(this).addClass('active');
+    });
+
+    // Alternative approach using DataTable's built-in filtering with custom data attribute
+    // Add data attributes to table rows for filtering
+    $('#staff-table tbody tr').each(function() {
+        const roleBadge = $(this).find('.role-badge');
+        const roleValue = roleBadge.data('role-value') || '';
+        if (!roleValue) {
+            // Extract role value from badge class
+            const badgeClass = roleBadge.attr('class');
+            if (badgeClass.includes('badge-teacher')) {
+                $(this).attr('data-role', 'teacher');
+            } else if (badgeClass.includes('badge-admin')) {
+                $(this).attr('data-role', 'admin');
+            } else if (badgeClass.includes('badge-support')) {
+                $(this).attr('data-role', 'support');
+            } else if (badgeClass.includes('badge-hod')) {
+                $(this).attr('data-role', 'hod');
+            } else {
+                $(this).attr('data-role', 'other');
+            }
+        }
+    });
+
+    // Enhanced filter function using jQuery
+    function filterByRole(roleValue) {
+        if (roleValue === 'all') {
+            $('#staff-table tbody tr').show();
+        } else {
+            $('#staff-table tbody tr').each(function() {
+                const rowRole = $(this).attr('data-role') || '';
+                const roleText = $(this).find('.role-badge').text().trim().toLowerCase();
+                const roleLabel = roleMapping[roleValue] || '';
+                
+                if (rowRole === roleValue || 
+                    roleText === roleLabel.toLowerCase() ||
+                    (roleLabel && roleText.includes(roleLabel.toLowerCase()))) {
+                    $(this).show();
+                } else {
+                    $(this).hide();
+                }
+            });
+        }
+        
+        // Update DataTable info
+        updateTableInfo();
+    }
+
+    // Function to update table info display
+    function updateTableInfo() {
+        const visibleRows = $('#staff-table tbody tr:visible').length;
+        const totalRows = $('#staff-table tbody tr').length;
+        const pageInfo = table.page.info();
+        
+        // Update the DataTable info display
+        const infoElement = $('.dataTables_info');
+        if (infoElement.length) {
+            const start = pageInfo.start + 1;
+            const end = Math.min(pageInfo.start + pageInfo.length, visibleRows);
+            infoElement.text(`Showing ${start} to ${end} of ${visibleRows} entries`);
+        }
+    }
+
+    // Simple and reliable filter implementation
+    $(document).on('click', '.filter-role', function(e) {
+        e.preventDefault();
+        const roleValue = $(this).data('role');
+        currentRoleFilter = roleValue;
+        
+        // Update dropdown button text
+        if (roleValue === 'all') {
+            $('#roleFilterDropdown').html('<i class="fas fa-filter me-2"></i>Filter by Role');
+        } else {
+            const roleText = $(this).find('i').next().text().trim();
+            $('#roleFilterDropdown').html('<i class="fas fa-filter me-2"></i>' + roleText);
+        }
+        
+        // Apply filter
+        if (roleValue === 'all') {
+            // Show all rows
+            $('#staff-table tbody tr').show();
+            // Clear DataTable search
+            table.search('').draw();
+        } else {
+            // Get role label for this value
+            const roleLabel = roleMapping[roleValue];
+            
+            // Hide all rows first
+            $('#staff-table tbody tr').hide();
+            
+            // Show only rows with matching role
+            $('#staff-table tbody tr').each(function() {
+                const row = $(this);
+                const roleBadge = row.find('.role-badge');
+                const badgeClass = roleBadge.attr('class') || '';
+                const badgeText = roleBadge.text().trim();
+                
+                // Check if this row matches the selected role
+                const matchesRole = 
+                    badgeClass.includes('badge-' + roleValue) || 
+                    badgeText === roleLabel ||
+                    (roleLabel && badgeText.includes(roleLabel));
+                
+                if (matchesRole) {
+                    row.show();
+                }
+            });
+            
+            // Also filter in DataTable for consistency
+            if (roleLabel) {
+                table.search(roleLabel).draw();
+            }
+        }
+        
+        // Update dropdown items active state
+        $('.filter-role').removeClass('active');
+        $(this).addClass('active');
+        
+        // Update pagination display
+        updateTableInfo();
+    });
+
+    // Initialize Select2
+    function initializeSelect2() {
+        $('.select2bs4').select2({
+            theme: 'bootstrap4',
+            dropdownParent: $('.modal:visible'),
+            width: '100%',
+            placeholder: 'Select an option',
+            allowClear: false
+        });
+    }
+    
+    // Initialize on page load
+    initializeSelect2();
+
+    // Reinitialize when modals are shown
+    $('#assignRoleModal').on('shown.bs.modal', function() {
+        $('#staff, #role').select2({
+            theme: 'bootstrap4',
+            dropdownParent: $('#assignRoleModal'),
+            width: '100%'
+        });
+    });
+
+    $('#bulkAssignModal').on('shown.bs.modal', function() {
+        $('#staff_list, #bulk_role').select2({
+            theme: 'bootstrap4',
+            dropdownParent: $('#bulkAssignModal'),
+            width: '100%'
+        });
+    });
+
+    $('#editRoleModal').on('shown.bs.modal', function() {
+        $('#new-role').select2({
+            theme: 'bootstrap4',
+            dropdownParent: $('#editRoleModal'),
+            width: '100%'
+        });
+    });
+
+    // Destroy Select2 when modals are hidden
+    $('#assignRoleModal').on('hidden.bs.modal', function() {
+        $('#staff, #role').select2('destroy');
+        $('#assign-role-form')[0].reset();
+    });
+
+    $('#bulkAssignModal').on('hidden.bs.modal', function() {
+        $('#staff_list, #bulk_role').select2('destroy');
+        $('#bulk-assign-form')[0].reset();
+    });
+
+    $('#editRoleModal').on('hidden.bs.modal', function() {
+        $('#new-role').select2('destroy');
+    });
+
+    // CSRF token for AJAX requests
+    function getCSRFToken() {
+        return $('input[name="csrfmiddlewaretoken"]').val();
+    }
+
+    // Show toast message
+    function showToast(message, type = 'success') {
+        const toastId = type === 'success' ? '#success-toast' : '#error-toast';
+        const messageId = type === 'success' ? '#success-message' : '#error-message';
+        
+        $(messageId).text(message);
+        $(toastId).addClass('show').fadeIn();
+        
+        setTimeout(function() {
+            $(toastId).fadeOut(function() {
+                $(this).removeClass('show');
+            });
+        }, type === 'success' ? 3000 : 5000);
+    }
+
+    // Function to update UI without reload
+    function updateStaffRoleUI(staffId, data) {
+        const row = $('#row-' + staffId);
+        const roleBadge = row.find('.role-badge');
+        const currentRole = data.position_title || '';
+        
+        // Update role badge
+        if (currentRole) {
+            let badgeClass = 'badge-other';
+            let roleText = currentRole.charAt(0).toUpperCase() + currentRole.slice(1);
+            
+            if (currentRole === 'teacher') badgeClass = 'badge-teacher';
+            else if (currentRole === 'admin') badgeClass = 'badge-admin';
+            else if (currentRole === 'support') badgeClass = 'badge-support';
+            else if (currentRole === 'hod') badgeClass = 'badge-hod';
+            
+            // Get role label from choices
+            {% for value, label in role_choices %}
+                if (currentRole === '{{ value }}') {
+                    roleText = '{{ label }}';
+                }
+            {% endfor %}
+            
+            roleBadge.removeClass().addClass('role-badge ' + badgeClass).text(roleText);
+            
+            // Update edit button data
+            row.find('.edit-role-btn').attr('data-current-role', currentRole);
+            row.find('.remove-role-btn').attr('data-current-role', currentRole);
+            
+            // Update data-role attribute for filtering
+            row.attr('data-role', currentRole);
+        } else {
+            roleBadge.removeClass().addClass('role-badge badge-secondary').text('No Role');
+            row.find('.edit-role-btn').attr('data-current-role', '');
+            row.find('.remove-role-btn').attr('data-current-role', '');
+            row.attr('data-role', '');
+        }
+        
+        // Update work place if provided
+        if (data.work_place !== undefined) {
+            const workPlaceCell = row.find('td').eq(3);
+            if (data.work_place) {
+                workPlaceCell.html('<span class="badge badge-light text-dark"><i class="fas fa-building me-1"></i>' + data.work_place + '</span>');
+            } else {
+                workPlaceCell.html('<span class="text-muted">Not assigned</span>');
+            }
+        }
+        
+        // If we have a role filter active, reapply it to show/hide the row
+        if (currentRoleFilter !== 'all') {
+            const roleLabel = roleMapping[currentRoleFilter];
+            const badgeClass = roleBadge.attr('class') || '';
+            const badgeText = roleBadge.text().trim();
+            
+            const matchesRole = 
+                badgeClass.includes('badge-' + currentRoleFilter) || 
+                badgeText === roleLabel ||
+                (roleLabel && badgeText.includes(roleLabel));
+            
+            if (matchesRole) {
+                row.show();
+            } else {
+                row.hide();
+            }
+            
+            updateTableInfo();
+        }
+    }
+
+    // Handle modal close/cancel buttons
+    $(document).on('click', '[data-dismiss="modal"]', function(e) {
+        e.preventDefault();
+        $(this).closest('.modal').modal('hide');
+    });
+
+    // Helper function to handle button loading state
+    function setButtonLoading(btn, isLoading) {
+        const spinner = btn.find('.spinner-border');
+        if (isLoading) {
+            btn.data('original-text', btn.html());
+            btn.prop('disabled', true);
+            spinner.show();
+            btn.html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>');
+        } else {
+            btn.prop('disabled', false);
+            spinner.hide();
+            btn.html(btn.data('original-text'));
+        }
+    }
+
+    // Assign Role Form Submission
+    $('#assign-role-form').on('submit', function(e) {
+        e.preventDefault();
+        
+        const assignBtn = $('#assign-btn');
+        setButtonLoading(assignBtn, true);
+        
+        const formData = new FormData(this);
+        
+        $.ajax({
+            url: '{% url "admin_staff_roles_crud" %}',
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': getCSRFToken(),
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            data: formData,
+            processData: false,
+            contentType: false,
+            success: function(data) {
+                if (data.success) {
+                    $('#assignRoleModal').modal('hide');
+                    showToast(data.message, 'success');
+                    
+                    // Reload the page to get updated data
+                    setTimeout(function() {
+                        location.reload();
+                    }, 1500);
+                } else {
+                    showToast(data.message, 'danger');
+                }
+                setButtonLoading(assignBtn, false);
+            },
+            error: function(xhr, status, error) {
+                console.error('Error:', error);
+                showToast('An error occurred while assigning role. Please try again.', 'danger');
+                setButtonLoading(assignBtn, false);
+            }
+        });
+    });
+
+    // Bulk Assign Form Submission
+    $('#bulk-assign-form').on('submit', function(e) {
+        e.preventDefault();
+        
+        const bulkBtn = $('#bulk-assign-btn');
+        setButtonLoading(bulkBtn, true);
+        
+        const formData = new FormData(this);
+        
+        $.ajax({
+            url: '{% url "admin_staff_roles_crud" %}',
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': getCSRFToken(),
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            data: formData,
+            processData: false,
+            contentType: false,
+            success: function(data) {
+                if (data.success) {
+                    $('#bulkAssignModal').modal('hide');
+                    showToast(data.message, 'success');
+                    
+                    // Reload the page to get updated data
+                    setTimeout(function() {
+                        location.reload();
+                    }, 1500);
+                } else {
+                    showToast(data.message, 'danger');
+                }
+                setButtonLoading(bulkBtn, false);
+            },
+            error: function(xhr, status, error) {
+                console.error('Error:', error);
+                showToast('An error occurred while bulk assigning roles. Please try again.', 'danger');
+                setButtonLoading(bulkBtn, false);
+            }
+        });
+    });
+
+    // Edit Role Button Click
+    $(document).on('click', '.edit-role-btn', function() {
+        const btn = $(this);
+        const staffId = btn.data('id');
+        const staffName = btn.data('name');
+        const currentRole = btn.data('current-role');
+        
+        $('#edit-staff-id').val(staffId);
+        $('#staff-name').val(staffName);
+        $('#current-role').val(currentRole || 'No Role Assigned');
+        
+        // Show modal first
+        $('#editRoleModal').modal('show');
+        
+        // Set current role as selected
+        setTimeout(function() {
+            $('#new-role').val(currentRole).trigger('change');
+        }, 500);
+    });
+
+    // Edit Role Form Submission
+    $('#edit-role-form').on('submit', function(e) {
+        e.preventDefault();
+        
+        const updateBtn = $('#update-role-btn');
+        setButtonLoading(updateBtn, true);
+        
+        const formData = new FormData(this);
+        
+        $.ajax({
+            url: '{% url "admin_staff_roles_crud" %}',
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': getCSRFToken(),
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            data: formData,
+            processData: false,
+            contentType: false,
+            success: function(data) {
+                if (data.success) {
+                    $('#editRoleModal').modal('hide');
+                    updateStaffRoleUI(data.staff_id, data);
+                    showToast(data.message, 'success');
+                } else {
+                    showToast(data.message, 'danger');
+                }
+                setButtonLoading(updateBtn, false);
+            },
+            error: function(xhr, status, error) {
+                console.error('Error:', error);
+                showToast('An error occurred while updating role. Please try again.', 'danger');
+                setButtonLoading(updateBtn, false);
+            }
+        });
+    });
+
+    // Remove Role Button Click
+    let staffToRemoveRole = null;
+    
+    $(document).on('click', '.remove-role-btn', function() {
+        const btn = $(this);
+        
+        staffToRemoveRole = {
+            id: btn.data('id'),
+            name: btn.data('name'),
+            currentRole: btn.data('current-role')
+        };
+        
+        $('#remove-staff-name').text(btn.data('name'));
+        $('#remove-current-role').text(btn.data('current-role') || 'No Role Assigned');
+        $('#removeRoleModal').modal('show');
+    });
+
+    // Confirm Remove Role
+    $('#confirm-remove-btn').on('click', function() {
+        if (!staffToRemoveRole) return;
+        
+        const removeBtn = $(this);
+        setButtonLoading(removeBtn, true);
+        
+        $.ajax({
+            url: '{% url "admin_staff_roles_crud" %}',
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': getCSRFToken(),
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            data: {
+                'action': 'remove_role',
+                'staff_id': staffToRemoveRole.id,
+                'csrfmiddlewaretoken': getCSRFToken()
+            },
+            success: function(data) {
+                if (data.success) {
+                    $('#removeRoleModal').modal('hide');
+                    updateStaffRoleUI(staffToRemoveRole.id, data);
+                    showToast(data.message, 'success');
+                } else {
+                    showToast(data.message, 'danger');
+                }
+                setButtonLoading(removeBtn, false);
+                staffToRemoveRole = null;
+            },
+            error: function(xhr, status, error) {
+                console.error('Error:', error);
+                showToast('An error occurred while removing role. Please try again.', 'danger');
+                setButtonLoading(removeBtn, false);
+                staffToRemoveRole = null;
+            }
+        });
+    });
+
+    // Clear button states on modal close
+    $('#assignRoleModal, #bulkAssignModal, #editRoleModal, #removeRoleModal').on('hidden.bs.modal', function() {
+        const modalId = $(this).attr('id');
+        
+        if (modalId === 'assignRoleModal') {
+            setButtonLoading($('#assign-btn'), false);
+        } else if (modalId === 'bulkAssignModal') {
+            setButtonLoading($('#bulk-assign-btn'), false);
+        } else if (modalId === 'editRoleModal') {
+            setButtonLoading($('#update-role-btn'), false);
+        } else if (modalId === 'removeRoleModal') {
+            setButtonLoading($('#confirm-remove-btn'), false);
+            staffToRemoveRole = null;
+        }
+    });
+});
+</script>
+{% endblock extra_js %}
