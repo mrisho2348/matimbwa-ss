@@ -46,6 +46,7 @@ INSTALLED_APPS = [
     'students.apps.StudentsConfig',
     'results.apps.ResultsConfig',
     'public.apps.PublicConfig',
+    'library.apps.LibraryConfig',
 ]
 
 MIDDLEWARE = [

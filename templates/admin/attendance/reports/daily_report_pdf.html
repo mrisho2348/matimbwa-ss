@@ -1,0 +1,882 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Daily Attendance Report - {{ formatted_date }}</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 1.5cm;
+            @top-center {
+                content: "{{ school_name }}";
+                font-size: 12px;
+                font-weight: bold;
+            }
+            @bottom-center {
+                content: "Page " counter(page) " of " counter(pages);
+                font-size: 10px;
+                color: #666;
+            }
+        }
+        
+        body {
+            font-family: 'Helvetica', 'Arial', sans-serif;
+            font-size: 11px;
+            line-height: 1.4;
+            color: #333;
+            margin: 0;
+            padding: 0;
+        }
+        
+        /* Header Section */
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #2c3e50;
+        }
+        
+        .header h1 {
+            font-size: 22px;
+            color: #2c3e50;
+            margin: 5px 0;
+            font-weight: bold;
+        }
+        
+        .header .subtitle {
+            font-size: 13px;
+            color: #666;
+            margin: 3px 0;
+        }
+        
+        .header .date {
+            font-size: 11px;
+            color: #888;
+        }
+        
+        /* Report Information Card */
+        .report-info {
+            background: #f8f9fa;
+            border-radius: 5px;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-left: 4px solid #007bff;
+        }
+        
+        .report-info h3 {
+            font-size: 15px;
+            color: #2c3e50;
+            margin: 0 0 10px 0;
+            font-weight: bold;
+        }
+        
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 8px;
+            font-size: 10px;
+        }
+        
+        .info-item {
+            display: flex;
+        }
+        
+        .info-label {
+            font-weight: bold;
+            min-width: 120px;
+            color: #555;
+        }
+        
+        .info-value {
+            color: #333;
+            font-weight: 500;
+        }
+        
+        .section {
+            margin-bottom: 25px;
+            page-break-inside: avoid;
+        }
+        
+        .section-title {
+            font-size: 15px;
+            font-weight: bold;
+            color: #2c3e50;
+            margin: 0 0 12px 0;
+            padding-bottom: 5px;
+            border-bottom: 1px solid #dee2e6;
+        }
+        
+        /* Statistics Cards */
+        .stats-container {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px;
+            margin-bottom: 15px;
+        }
+        
+        .stat-card {
+            background: white;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 10px;
+            text-align: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        
+        .stat-number {
+            font-size: 22px;
+            font-weight: bold;
+            display: block;
+            line-height: 1;
+        }
+        
+        .stat-present .stat-number { color: #28a745; }
+        .stat-absent .stat-number { color: #dc3545; }
+        .stat-late .stat-number { color: #ffc107; }
+        .stat-excused .stat-number { color: #17a2b8; }
+        
+        .stat-label {
+            font-size: 10px;
+            color: #6c757d;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-top: 4px;
+        }
+        
+        .overall-stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            margin-top: 15px;
+        }
+        
+        .overall-stat {
+            text-align: center;
+            padding: 8px;
+            background: #f8f9fa;
+            border-radius: 5px;
+            border: 1px solid #dee2e6;
+        }
+        
+        .overall-stat-number {
+            font-size: 18px;
+            font-weight: bold;
+            color: #007bff;
+            display: block;
+        }
+        
+        .overall-stat-label {
+            font-size: 10px;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        /* Tables */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 12px 0;
+            font-size: 9px;
+        }
+        
+        th {
+            background-color: #2c3e50;
+            color: white;
+            font-weight: bold;
+            text-align: left;
+            padding: 6px 5px;
+            border: 1px solid #dee2e6;
+            font-size: 9px;
+        }
+        
+        td {
+            padding: 5px;
+            border: 1px solid #dee2e6;
+            vertical-align: top;
+        }
+        
+        tr:nth-child(even) {
+            background-color: #f8f9fa;
+        }
+        
+        /* Attendance Badges */
+        .attendance-badge {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 10px;
+            font-size: 8px;
+            font-weight: 600;
+            text-align: center;
+            min-width: 45px;
+        }
+        
+        .badge-present {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .badge-absent {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .badge-late {
+            background: #fff3cd;
+            color: #856404;
+        }
+        
+        .badge-excused {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+        
+        /* Student Summary Cards */
+        .student-card {
+            background: white;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 10px;
+            margin-bottom: 10px;
+            page-break-inside: avoid;
+        }
+        
+        .student-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 5px;
+        }
+        
+        .student-name {
+            font-weight: bold;
+            color: #2c3e50;
+            font-size: 11px;
+        }
+        
+        .student-admission {
+            font-size: 9px;
+            color: #666;
+        }
+        
+        .student-attendance-rate {
+            font-size: 10px;
+            font-weight: bold;
+            padding: 2px 8px;
+            border-radius: 10px;
+        }
+        
+        /* Class Cards */
+        .class-card {
+            background: white;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 12px;
+            margin-bottom: 15px;
+            page-break-inside: avoid;
+        }
+        
+        .class-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+            padding-bottom: 6px;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .class-name {
+            font-weight: bold;
+            color: #2c3e50;
+            font-size: 13px;
+        }
+        
+        .class-stream {
+            font-size: 11px;
+            color: #666;
+        }
+        
+        .class-rate {
+            font-size: 11px;
+            font-weight: bold;
+            padding: 3px 10px;
+            border-radius: 12px;
+        }
+        
+        .rate-high { background: #d4edda; color: #155724; }
+        .rate-medium { background: #fff3cd; color: #856404; }
+        .rate-low { background: #f8d7da; color: #721c24; }
+        
+        /* Progress Bar */
+        .progress-bar {
+            height: 5px;
+            background: #e9ecef;
+            border-radius: 3px;
+            margin: 5px 0;
+            overflow: hidden;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: #28a745;
+        }
+        
+        /* Page Breaks */
+        .page-break {
+            page-break-before: always;
+        }
+        
+        /* View Type Indicators */
+        .view-indicator {
+            display: inline-block;
+            padding: 2px 8px;
+            background: #6c757d;
+            color: white;
+            border-radius: 10px;
+            font-size: 8px;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+        
+        .view-summary { background: #17a2b8; }
+        .view-detailed { background: #28a745; }
+        .view-both { background: #007bff; }
+        
+        /* Footer */
+        .footer-note {
+            font-size: 8px;
+            color: #888;
+            text-align: center;
+            margin-top: 20px;
+            padding-top: 10px;
+            border-top: 1px solid #dee2e6;
+        }
+        
+        /* Utility Classes */
+        .text-center { text-align: center; }
+        .text-right { text-align: right; }
+        .text-left { text-align: left; }
+        .mb-10 { margin-bottom: 10px; }
+        .mb-15 { margin-bottom: 15px; }
+        .mt-10 { margin-top: 10px; }
+        .mt-15 { margin-top: 15px; }
+        .mb-20 { margin-bottom: 20px; }
+        
+        /* Compact Layout for Detailed View */
+        .compact-table {
+            font-size: 8px;
+        }
+        
+        .compact-table th,
+        .compact-table td {
+            padding: 4px 3px;
+        }
+        
+        /* Stream Group */
+        .stream-group {
+            margin-bottom: 20px;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 10px;
+            background: #fafafa;
+        }
+        
+        .stream-header {
+            font-weight: bold;
+            color: #2c3e50;
+            font-size: 12px;
+            margin-bottom: 10px;
+            padding-bottom: 5px;
+            border-bottom: 1px solid #eee;
+        }
+        
+        /* Filter Summary */
+        .filter-summary {
+            background: #e8f4fd;
+            border-radius: 5px;
+            padding: 10px;
+            margin-bottom: 15px;
+            font-size: 10px;
+        }
+        
+        .filter-item {
+            display: inline-block;
+            margin-right: 15px;
+            font-weight: 500;
+        }
+        
+        .filter-label {
+            color: #666;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <!-- Header Section -->
+    <div class="header">
+        <h1>DAILY ATTENDANCE REPORT
+            <span class="view-indicator 
+                {% if filter_view == 'summary' %}view-summary
+                {% elif filter_view == 'detailed' %}view-detailed
+                {% else %}view-both{% endif %}">
+                {% if filter_view == 'summary' %}SUMMARY VIEW
+                {% elif filter_view == 'detailed' %}DETAILED VIEW
+                {% else %}SUMMARY & DETAILED{% endif %}
+            </span>
+        </h1>
+        <div class="subtitle">{{ school_name }}</div>
+        <div class="date">Report Date: {{ formatted_date }} ({{ day_name }}) | Generated: {{ generation_date }}</div>
+    </div>
+    
+    <!-- Filter Summary -->
+    {% if filter_class_name or filter_stream_name or filter_type_name %}
+    <div class="filter-summary mb-15">
+        <div class="filter-item">
+            <span class="filter-label">Filters Applied:</span>
+            {% if filter_class_name %}
+            <span>Class: {{ filter_class_name }}</span>
+            {% endif %}
+            {% if filter_stream_name %}
+            <span> | Stream: {{ filter_stream_name }}</span>
+            {% endif %}
+            {% if filter_type_name and filter_type_name != 'All Types' %}
+            <span> | Type: {{ filter_type_name }}</span>
+            {% endif %}
+        </div>
+        <div class="filter-item">
+            <span class="filter-label">Report Scope:</span>
+            <span>{{ total_classes }} Classes, {{ total_stats.sessions|default:0 }} Sessions</span>
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- Report Information -->
+    <div class="report-info">
+        <h3>Report Summary</h3>
+        <div class="info-grid">
+            <div class="info-item">
+                <span class="info-label">Report Date:</span>
+                <span class="info-value">{{ formatted_date }} ({{ day_name }})</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Generated By:</span>
+                <span class="info-value">{{ generated_by }}</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">View Mode:</span>
+                <span class="info-value">
+                    {% if filter_view == 'summary' %}Summary Only
+                    {% elif filter_view == 'detailed' %}Detailed Only
+                    {% else %}Summary & Detailed{% endif %}
+                </span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Classes Covered:</span>
+                <span class="info-value">
+                    {% if total_classes == 1 %}
+                        {{ class_levels_data.0.class_level.name }}
+                        {% if class_levels_data.0.stream %}
+                            - Stream {{ class_levels_data.0.stream.stream_letter }}
+                        {% else %}
+                            (All Streams)
+                        {% endif %}
+                    {% else %}
+                        {{ total_classes }} Classes
+                    {% endif %}
+                </span>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Overall Statistics -->
+    <div class="section">
+        <h3 class="section-title">Overall Attendance Statistics</h3>
+        
+        <div class="stats-container">
+            <div class="stat-card stat-present">
+                <span class="stat-number">{{ total_stats.present|default:0 }}</span>
+                <span class="stat-label">Present</span>
+            </div>
+            <div class="stat-card stat-absent">
+                <span class="stat-number">{{ total_stats.absent|default:0 }}</span>
+                <span class="stat-label">Absent</span>
+            </div>
+            <div class="stat-card stat-late">
+                <span class="stat-number">{{ total_stats.late|default:0 }}</span>
+                <span class="stat-label">Late</span>
+            </div>
+            <div class="stat-card stat-excused">
+                <span class="stat-number">{{ total_stats.excused|default:0 }}</span>
+                <span class="stat-label">Excused</span>
+            </div>
+        </div>
+        
+        <div class="overall-stats">
+            <div class="overall-stat">
+                <span class="overall-stat-number">{{ total_stats.attendance_rate|default:0 }}%</span>
+                <span class="overall-stat-label">Attendance Rate</span>
+            </div>
+            <div class="overall-stat">
+                <span class="overall-stat-number">{{ total_stats.sessions|default:0 }}</span>
+                <span class="overall-stat-label">Total Sessions</span>
+            </div>
+            <div class="overall-stat">
+                <span class="overall-stat-number">{{ total_stats.students|default:0 }}</span>
+                <span class="overall-stat-label">Total Students</span>
+            </div>
+        </div>
+    </div>
+    
+    <!-- ============================================= -->
+    <!-- CLASS SUMMARY SECTION (Always shown) -->
+    <!-- ============================================= -->
+    <div class="section {% if filter_view != 'detailed' %}page-break{% endif %}">
+        <h3 class="section-title">Class Summary</h3>
+        
+        <table>
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Class</th>
+                    <th>Stream</th>
+                    <th class="text-center">Sessions</th>
+                    <th class="text-center">Students</th>
+                    <th class="text-center">Present</th>
+                    <th class="text-center">Absent</th>
+                    <th class="text-center">Late</th>
+                    <th class="text-center">Excused</th>
+                    <th class="text-center">Attendance Rate</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for class_data in class_levels_data %}
+                <tr>
+                    <td>{{ forloop.counter }}</td>
+                    <td>{{ class_data.class_level.name }}</td>
+                    <td class="text-center">
+                        {% if class_data.stream %}
+                            {{ class_data.stream.stream_letter }}
+                        {% else %}
+                            All
+                        {% endif %}
+                    </td>
+                    <td class="text-center">{{ class_data.stats.total_sessions|default:0 }}</td>
+                    <td class="text-center">{{ class_data.stats.total_students|default:0 }}</td>
+                    <td class="text-center">
+                        <span class="attendance-badge badge-present">{{ class_data.stats.present|default:0 }}</span>
+                    </td>
+                    <td class="text-center">
+                        <span class="attendance-badge badge-absent">{{ class_data.stats.absent|default:0 }}</span>
+                    </td>
+                    <td class="text-center">
+                        <span class="attendance-badge badge-late">{{ class_data.stats.late|default:0 }}</span>
+                    </td>
+                    <td class="text-center">
+                        <span class="attendance-badge badge-excused">{{ class_data.stats.excused|default:0 }}</span>
+                    </td>
+                    <td class="text-center">
+                        <span class="class-rate 
+                            {% if class_data.stats.attendance_rate >= 80 %}rate-high
+                            {% elif class_data.stats.attendance_rate >= 60 %}rate-medium
+                            {% else %}rate-low{% endif %}">
+                            {{ class_data.stats.attendance_rate|default:"0" }}%
+                        </span>
+                    </td>
+                </tr>
+                {% endfor %}
+                <!-- Total Row -->
+                <tr style="background-color: #e9ecef; font-weight: bold;">
+                    <td colspan="3" class="text-right">TOTAL</td>
+                    <td class="text-center">{{ total_stats.sessions|default:0 }}</td>
+                    <td class="text-center">{{ total_stats.students|default:0 }}</td>
+                    <td class="text-center">{{ total_stats.present|default:0 }}</td>
+                    <td class="text-center">{{ total_stats.absent|default:0 }}</td>
+                    <td class="text-center">{{ total_stats.late|default:0 }}</td>
+                    <td class="text-center">{{ total_stats.excused|default:0 }}</td>
+                    <td class="text-center">{{ total_stats.attendance_rate|default:"0" }}%</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+    
+    <!-- ============================================= -->
+    <!-- STUDENT ATTENDANCE SUMMARY SECTION -->
+    <!-- ============================================= -->
+    {% if filter_view == 'summary' or filter_view == 'both' %}
+    <div class="section page-break">
+        <h3 class="section-title">Student Attendance Summary</h3>
+        
+        <!-- Group by Class/Stream -->
+        {% regroup student_summary|dictsort:"student.class_level.name"|dictsort:"student.stream_class.stream_letter" by student.class_level.name as class_groups %}
+        
+        {% for class_group in class_groups %}
+        <div class="stream-group mb-20">
+            <div class="stream-header">Class: {{ class_group.grouper }}</div>
+            
+            <!-- Group by Stream within this class -->
+            {% regroup class_group.list by student.stream_class.stream_letter as stream_groups %}
+            
+            {% for stream_group in stream_groups %}
+            {% if stream_group.grouper %}
+            <div class="mb-15">
+                <div style="font-size: 11px; font-weight: bold; color: #495057; margin-bottom: 8px;">
+                    Stream: {{ stream_group.grouper }}
+                </div>
+            {% endif %}
+            
+            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 10px;">
+                {% for student_data in stream_group.list %}
+                <div class="student-card">
+                    <div class="student-header">
+                        <div>
+                            <div class="student-name">{{ student_data.student.full_name }}</div>
+                            <div class="student-admission">{{ student_data.student.registration_number|default:"No Reg Number" }}</div>
+                        </div>
+                        <div class="student-attendance-rate 
+                            {% if student_data.attendance_rate >= 80 %}rate-high
+                            {% elif student_data.attendance_rate >= 60 %}rate-medium
+                            {% else %}rate-low{% endif %}">
+                            {{ student_data.attendance_rate }}%
+                        </div>
+                    </div>
+                    
+                    <div class="progress-bar mb-10">
+                        <div class="progress-fill" style="width: {{ student_data.attendance_rate }}%"></div>
+                    </div>
+                    
+                    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; font-size: 9px;">
+                        <div class="text-center">
+                            <span style="color: #28a745; font-weight: bold;">{{ student_data.present }}</span><br>
+                            <span style="color: #666; font-size: 8px;">Present</span>
+                        </div>
+                        <div class="text-center">
+                            <span style="color: #dc3545; font-weight: bold;">{{ student_data.absent }}</span><br>
+                            <span style="color: #666; font-size: 8px;">Absent</span>
+                        </div>
+                        <div class="text-center">
+                            <span style="color: #ffc107; font-weight: bold;">{{ student_data.late }}</span><br>
+                            <span style="color: #666; font-size: 8px;">Late</span>
+                        </div>
+                        <div class="text-center">
+                            <span style="color: #17a2b8; font-weight: bold;">{{ student_data.excused }}</span><br>
+                            <span style="color: #666; font-size: 8px;">Excused</span>
+                        </div>
+                    </div>
+                    
+                    <div style="font-size: 8px; color: #666; margin-top: 5px;">
+                        {{ student_data.sessions }} sessions in {{ student_data.classes_list|length }} classes
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            
+            {% if stream_group.grouper %}
+            </div>
+            {% endif %}
+            {% endfor %}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+    
+    <!-- ============================================= -->
+    <!-- DETAILED VIEW SECTION -->
+    <!-- ============================================= -->
+    {% if filter_view == 'detailed' or filter_view == 'both' %}
+    <div class="section page-break">
+        <h3 class="section-title">Detailed Session Breakdown</h3>
+        
+        {% for class_data in class_levels_data %}
+        <div class="class-card mb-20">
+            <div class="class-header">
+                <div>
+                    <div class="class-name">{{ class_data.class_level.name }}</div>
+                    <div class="class-stream">
+                        Stream: {{ class_data.stream.stream_letter|default:"All Streams" }}
+                        | Sessions: {{ class_data.stats.total_sessions|default:0 }}
+                        | Students: {{ class_data.stats.total_students|default:0 }}
+                    </div>
+                </div>
+                <div class="class-rate 
+                    {% if class_data.stats.attendance_rate >= 80 %}rate-high
+                    {% elif class_data.stats.attendance_rate >= 60 %}rate-medium
+                    {% else %}rate-low{% endif %}">
+                    {{ class_data.stats.attendance_rate|default:"0" }}%
+                </div>
+            </div>
+            
+            <!-- Session Details Table -->
+            {% if class_data.sessions %}
+            <table class="compact-table">
+                <thead>
+                    <tr>
+                        <th>Time</th>
+                        <th>Type</th>
+                        <th>Subject</th>
+                        <th>Period</th>
+                        <th class="text-center">Present</th>
+                        <th class="text-center">Absent</th>
+                        <th class="text-center">Late</th>
+                        <th class="text-center">Excused</th>
+                        <th class="text-center">Total</th>
+                        <th class="text-center">Rate</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for session_data in class_data.sessions %}
+                    <tr>
+                        <td>{{ session_data.time }}</td>
+                        <td>
+                            {% if session_data.session.attendance_type == 'CLASS' %}
+                                <span style="color: #007bff;">Class</span>
+                            {% else %}
+                                <span style="color: #28a745;">Subject</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if session_data.session.subject %}
+                                {{ session_data.session.subject.name|truncatechars:20 }}
+                            {% else %}
+                                <span style="color: #666;">Class</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-center">{{ session_data.session.period|default:"-" }}</td>
+                        <td class="text-center">
+                            <span class="attendance-badge badge-present">{{ session_data.stats.present|default:"0" }}</span>
+                        </td>
+                        <td class="text-center">
+                            <span class="attendance-badge badge-absent">{{ session_data.stats.absent|default:"0" }}</span>
+                        </td>
+                        <td class="text-center">
+                            <span class="attendance-badge badge-late">{{ session_data.stats.late|default:"0" }}</span>
+                        </td>
+                        <td class="text-center">
+                            <span class="attendance-badge badge-excused">{{ session_data.stats.excused|default:"0" }}</span>
+                        </td>
+                        <td class="text-center">{{ session_data.stats.total|default:"0" }}</td>
+                        <td class="text-center">
+                            {% if session_data.stats.total > 0 %}
+                                {% widthratio session_data.stats.present session_data.stats.total 100 %}%
+                            {% else %}
+                                0%
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                    <!-- Session Total Row -->
+                    <tr style="background-color: #f8f9fa; font-weight: bold;">
+                        <td colspan="4" class="text-right">Total for {{ class_data.class_level.name }} {{ class_data.stream.stream_letter|default:"" }}</td>
+                        <td class="text-center">{{ class_data.stats.present|default:0 }}</td>
+                        <td class="text-center">{{ class_data.stats.absent|default:0 }}</td>
+                        <td class="text-center">{{ class_data.stats.late|default:0 }}</td>
+                        <td class="text-center">{{ class_data.stats.excused|default:0 }}</td>
+                        <td class="text-center">{{ class_data.stats.total_students|default:0 }}</td>
+                        <td class="text-center">{{ class_data.stats.attendance_rate|default:"0" }}%</td>
+                    </tr>
+                </tbody>
+            </table>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+    
+    <!-- ============================================= -->
+    <!-- INDIVIDUAL STUDENT DETAILS (Detailed View) -->
+    <!-- ============================================= -->
+    {% if filter_view == 'detailed' and student_summary %}
+    <div class="section page-break">
+        <h3 class="section-title">Individual Student Details</h3>
+        
+        {% regroup student_summary|dictsort:"student.class_level.name"|dictsort:"student.stream_class.stream_letter" by student.class_level.name as class_groups %}
+        
+        {% for class_group in class_groups %}
+        <div class="stream-group mb-20">
+            <div class="stream-header">Class: {{ class_group.grouper }}</div>
+            
+            <!-- Group by Stream within this class -->
+            {% regroup class_group.list by student.stream_class.stream_letter as stream_groups %}
+            
+            {% for stream_group in stream_groups %}
+            {% if stream_group.grouper %}
+            <div class="mb-15">
+                <div style="font-size: 12px; font-weight: bold; color: #495057; margin-bottom: 10px; padding-bottom: 5px; border-bottom: 1px solid #dee2e6;">
+                    Stream: {{ stream_group.grouper }}
+                </div>
+            {% endif %}
+            
+            <table>
+                <thead>
+                    <tr>
+                        <th>Student</th>
+                        <th>Admission No.</th>
+                        <th class="text-center">Sessions</th>
+                        <th class="text-center">Present</th>
+                        <th class="text-center">Absent</th>
+                        <th class="text-center">Late</th>
+                        <th class="text-center">Excused</th>
+                        <th class="text-center">Rate</th>
+                        <th>Classes Attended</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for student_data in stream_group.list %}
+                    <tr>
+                        <td>{{ student_data.student.full_name }}</td>
+                        <td>{{ student_data.student.registration_number|default:"-" }}</td>
+                        <td class="text-center">{{ student_data.sessions }}</td>
+                        <td class="text-center">
+                            <span class="attendance-badge badge-present">{{ student_data.present }}</span>
+                        </td>
+                        <td class="text-center">
+                            <span class="attendance-badge badge-absent">{{ student_data.absent }}</span>
+                        </td>
+                        <td class="text-center">
+                            <span class="attendance-badge badge-late">{{ student_data.late }}</span>
+                        </td>
+                        <td class="text-center">
+                            <span class="attendance-badge badge-excused">{{ student_data.excused }}</span>
+                        </td>
+                        <td class="text-center">
+                            <span class="class-rate 
+                                {% if student_data.attendance_rate >= 80 %}rate-high
+                                {% elif student_data.attendance_rate >= 60 %}rate-medium
+                                {% else %}rate-low{% endif %}">
+                                {{ student_data.attendance_rate }}%
+                            </span>
+                        </td>
+                        <td style="font-size: 8px;">
+                            {% if student_data.classes_list %}
+                                {{ student_data.classes_list|join:", " }}
+                            {% else %}
+                                No classes
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            
+            {% if stream_group.grouper %}
+            </div>
+            {% endif %}
+            {% endfor %}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+    
+    <!-- Footer -->
+    <div class="footer-note">
+        <strong>DAILY ATTENDANCE REPORT</strong><br>
+        Date: {{ formatted_date }} | Generated: {{ generation_date }}<br>
+        Report ID: DAR-{{ date_obj|date:"Ymd" }}-{{ total_stats.sessions|default:"0" }}-{{ total_classes|default:"0" }}-{{ filter_view|slice:"0:1"|upper }}<br>
+        Filters: 
+        {% if filter_class_name %}Class: {{ filter_class_name }}{% endif %}
+        {% if filter_stream_name %} | Stream: {{ filter_stream_name }}{% endif %}
+        {% if filter_type_name and filter_type_name != 'All Types' %} | Type: {{ filter_type_name }}{% endif %}
+        | View: {{ filter_view|title }}
+    </div>
+</body>
+</html>

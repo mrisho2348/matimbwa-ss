@@ -1,0 +1,1013 @@
+{% extends 'admin/base.html' %}
+{% load static %}
+
+{% block title %}Student Attendance Management{% endblock %}
+
+{% block breadcrumb %}
+<button type="button" class="btn btn-primary" onclick="window.location.href='{% url 'attendance_create' %}'">
+    <i class="fas fa-plus-circle"></i> Create Attendance Session
+</button>
+{% endblock breadcrumb %}
+
+{% block extra_css %}
+
+
+<style>
+    /* DataTable Custom Styling */
+    .dataTables_wrapper {
+        margin-top: 20px;
+    }
+    
+    .dataTables_filter input {
+        border: 1px solid #ced4da;
+        border-radius: 4px;
+        padding: 5px 10px;
+    }
+    
+    .dataTables_length select {
+        border: 1px solid #ced4da;
+        border-radius: 4px;
+        padding: 5px;
+    }
+    
+    .table-hover tbody tr:hover {
+        background-color: #f8f9fa;
+        cursor: pointer;
+    }
+    
+    /* Status Badges */
+    .status-badge {
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 12px;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+    
+    .status-present { background-color: #d4edda; color: #155724; }
+    .status-absent { background-color: #f8d7da; color: #721c24; }
+    .status-late { background-color: #fff3cd; color: #856404; }
+    .status-excused { background-color: #d1ecf1; color: #0c5460; }
+    
+    .badge-class { background-color: #17a2b8; }
+    .badge-subject { background-color: #28a745; }
+    
+    /* Action Buttons */
+    .action-buttons {
+        display: flex;
+        gap: 5px;
+        justify-content: center;
+    }
+    
+    .btn-action {
+        width: 32px;
+        height: 32px;
+        padding: 0;
+        border-radius: 4px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    .btn-action i {
+        font-size: 0.8rem;
+    }
+    
+    /* Modal Custom Styles */
+    .modal-lg-custom {
+        max-width: 1200px;
+    }
+    
+    /* Filter Controls */
+    .filter-controls {
+        background-color: #f8f9fa;
+        padding: 15px;
+        border-radius: 10px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+    }
+    
+    /* Progress Bars in Table */
+    .attendance-progress {
+        height: 8px;
+        margin-bottom: 5px;
+        border-radius: 4px;
+        overflow: hidden;
+    }
+    
+    .progress-bar {
+        border-radius: 4px;
+    }
+    
+    /* Toast Notifications */
+    .custom-toast {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 1060;
+        min-width: 300px;
+        animation: slideInRight 0.3s ease-out;
+    }
+    
+    @keyframes slideInRight {
+        from {
+            transform: translateX(100%);
+            opacity: 0;
+        }
+        to {
+            transform: translateX(0);
+            opacity: 1;
+        }
+    }
+    
+    /* Table Header */
+    .card-header {
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        background: linear-gradient(135deg, #007bff 0%, #0056b3 100%) !important;
+    }
+    
+    /* Empty State */
+    .empty-state {
+        text-align: center;
+        padding: 40px 20px;
+        color: #6c757d;
+    }
+    
+    .empty-state i {
+        font-size: 3rem;
+        margin-bottom: 15px;
+        opacity: 0.5;
+    }
+    
+    /* Period Badge */
+    .period-badge {
+        background-color: #6c757d;
+        color: white;
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-size: 11px;
+        font-weight: 600;
+        min-width: 30px;
+        display: inline-block;
+        text-align: center;
+    }
+    
+    /* Responsive Table */
+    @media (max-width: 768px) {
+        .dataTables_wrapper .dataTables_length,
+        .dataTables_wrapper .dataTables_filter {
+            float: none;
+            text-align: center;
+            margin-bottom: 10px;
+        }
+    }
+    
+    /* Select2 Custom Styling */
+    .select2-container--bootstrap4 .select2-selection {
+        border: 1px solid #ced4da;
+        border-radius: 0.25rem;
+        height: calc(2.25rem + 2px);
+        padding: 0.375rem 0.75rem;
+    }
+    
+    .select2-container--bootstrap4 .select2-selection--single .select2-selection__rendered {
+        line-height: 1.5;
+        padding-left: 0;
+    }
+    
+    .select2-container--bootstrap4 .select2-selection__arrow {
+        height: calc(2.25rem + 2px);
+    }
+    
+    /* Statistics Cards for Modal */
+    .stat-card {
+        border-radius: 5px;
+        padding: 10px;
+        color: white;
+        text-align: center;
+        margin-bottom: 10px;
+    }
+    
+    .stat-present { background-color: #28a745; }
+    .stat-absent { background-color: #dc3545; }
+    .stat-late { background-color: #ffc107; color: #212529; }
+    .stat-excused { background-color: #17a2b8; }
+    
+    .stat-number {
+        font-size: 1.5rem;
+        font-weight: 700;
+        line-height: 1;
+        margin-bottom: 3px;
+    }
+    
+    .stat-label {
+        font-size: 0.8rem;
+        opacity: 0.9;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="content">
+    <div class="container-fluid">
+        <!-- Toast Notifications -->
+        <div class="custom-toast alert alert-success alert-dismissible fade" id="success-toast" style="display: none;">
+            <button type="button" class="close" onclick="$('#success-toast').fadeOut()">
+                <span aria-hidden="true">&times;</span>
+            </button>
+            <strong><i class="fas fa-check-circle"></i> Success!</strong> 
+            <span id="success-message"></span>
+        </div>
+
+        <div class="custom-toast alert alert-danger alert-dismissible fade" id="error-toast" style="display: none;">
+            <button type="button" class="close" onclick="$('#error-toast').fadeOut()">
+                <span aria-hidden="true">&times;</span>
+            </button>
+            <strong><i class="fas fa-exclamation-circle"></i> Error!</strong> 
+            <span id="error-message"></span>
+        </div>
+
+        <!-- Filter Controls with Select2 -->
+        <div class="filter-controls">
+            <div class="row">
+                <div class="col-md-3">
+                    <div class="form-group">
+                        <label for="filterDate">Date</label>
+                        <input type="date" class="form-control" id="filterDate" value="{% now 'Y-m-d' %}">
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="form-group">
+                        <label for="filterClass">Class Level</label>
+                        <select class="form-control select2-basic" id="filterClass">
+                            <option value="">All Classes</option>
+                            {% for class_level in class_levels %}
+                            <option value="{{ class_level.id }}">{{ class_level.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="form-group">
+                        <label for="filterStream">Stream</label>
+                        <select class="form-control select2-basic" id="filterStream">
+                            <option value="">All Streams</option>
+                            <!-- Streams will be populated based on class selection -->
+                        </select>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="form-group">
+                        <label for="filterType">Attendance Type</label>
+                        <select class="form-control select2-basic" id="filterType">
+                            <option value="">All Types</option>
+                            <option value="CLASS">Class Wise</option>
+                            <option value="SUBJECT">Subject Wise</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="row mt-2">
+                <div class="col-md-12 text-right">
+                    <button class="btn btn-primary" id="applyFilters">
+                        <i class="fas fa-filter"></i> Apply Filters
+                    </button>
+                    <button class="btn btn-outline-secondary" id="resetFilters">
+                        <i class="fas fa-redo"></i> Reset
+                    </button>
+                    <button class="btn btn-info" id="refreshSessions">
+                        <i class="fas fa-sync-alt"></i> Refresh
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Attendance Sessions Table -->
+        <div class="row">
+            <div class="col-md-12">
+                <div class="card shadow">
+                    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                        <h6 class="header-title mb-0">
+                            <i class="fas fa-calendar-check"></i> Attendance Sessions
+                        </h6>
+                        <span class="badge badge-light" id="session-count">0 sessions</span>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table id="attendance-sessions-table" class="table table-hover table-striped" style="width:100%">
+                                <thead>
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>Type</th>
+                                        <th>Class & Stream</th>
+                                        <th>Subject</th>
+                                        <th>Period</th>
+                                        <th>Attendance</th>
+                                        <th>Statistics</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <!-- Data will be loaded via DataTable -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- View Attendance Modal with DataTable -->
+<div class="modal fade" id="viewAttendanceModal" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-lg-custom" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-info text-white">
+                <h5 class="modal-title">
+                    <i class="fas fa-eye"></i> Attendance Session Details
+                </h5>
+                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body" id="attendance-details-content">
+                <!-- The entire HTML from the API will be loaded here -->
+                <div class="text-center py-5">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="sr-only">Loading...</span>
+                    </div>
+                    <p class="mt-2">Loading session details...</p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" id="edit-attendance-btn" data-session-id="">
+                    <i class="fas fa-edit"></i> Edit Attendance
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="deleteAttendanceModal" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title">
+                    <i class="fas fa-trash"></i> Delete Attendance Session
+                </h5>
+                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete this attendance session?</p>
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    This action will permanently delete all student attendance records for this session.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirm-delete-btn">
+                    <span class="spinner-border spinner-border-sm" role="status" style="display: none;"></span>
+                    Delete Session
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+<script>
+// Global CSRF token for AJAX requests
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+const csrftoken = getCookie('csrftoken');
+
+$(document).ready(function() {
+    // Global variables
+    let currentSessionId = null;
+    let sessionsDataTable = null;
+    let studentAttendanceDataTable = null;
+
+    // Initialize Select2 for filter dropdowns
+    function initializeSelect2() {
+        $('.select2-basic').select2({
+            theme: 'bootstrap4',
+            width: '100%',
+            placeholder: function() {
+                return $(this).data('placeholder') || 'Select an option';
+            },
+            allowClear: true
+        });
+    }
+
+    // Initialize DataTable for attendance sessions
+    function initializeSessionsDataTable() {
+        sessionsDataTable = $('#attendance-sessions-table').DataTable({
+            processing: true,
+            serverSide: false,
+            searching: true,
+            ordering: true,
+            pageLength: 10,
+            lengthMenu: [[10, 25, 50, 100], [10, 25, 50, 100]],
+            language: {
+                search: "",
+                searchPlaceholder: "Search sessions...",
+                lengthMenu: "Show _MENU_ entries",
+                info: "Showing _START_ to _END_ of _TOTAL_ sessions",
+                infoEmpty: "No sessions available",
+                zeroRecords: "No matching sessions found"
+            },
+            columns: [
+                { data: 'date', width: '10%' },
+                { data: 'type', width: '10%' },
+                { data: 'class_stream', width: '20%' },
+                { data: 'subject', width: '20%' },
+                { data: 'period', width: '8%' },
+                { data: 'attendance', width: '15%' },
+                { data: 'stats', width: '12%' },
+                { data: 'actions', width: '15%', orderable: false }
+            ],
+            createdRow: function(row, data, dataIndex) {
+                $(row).attr('data-session-id', data.id);
+            }
+        });
+    }
+
+    // Set up event listeners
+    function setupEventListeners() {
+        // Apply filters
+        $('#applyFilters').click(function(e) {
+            e.preventDefault();
+            loadAttendanceSessions();
+        });
+
+        // Reset filters
+        $('#resetFilters').click(function(e) {
+            e.preventDefault();
+            $('#filterDate').val('');
+            $('#filterClass').val('').trigger('change');
+            $('#filterStream').val('').trigger('change');
+            $('#filterType').val('').trigger('change');
+            loadAttendanceSessions();
+        });
+
+        // Refresh sessions
+        $('#refreshSessions').click(function(e) {
+            e.preventDefault();
+            loadAttendanceSessions();
+        });
+
+        // Class selection change (for filters)
+        $('#filterClass').change(function() {
+            const classId = $(this).val();
+            const $streamSelect = $('#filterStream');
+            
+            // Reset stream dropdown
+            $streamSelect.empty();
+            $streamSelect.append('<option value="">All Streams</option>');
+            
+            if (classId) {
+                // Show loading in stream dropdown
+                $streamSelect.prop('disabled', true);
+                
+                $.ajax({
+                    url: `{% url 'admin_get_streams_for_class' 0 %}`.replace('/0/', `/${classId}/`),
+                    method: 'GET',
+                    success: function(data) {
+                        if (data.success && data.streams.length > 0) {
+                            $.each(data.streams, function(index, stream) {
+                                $streamSelect.append(new Option(stream.name, stream.id));
+                            });
+                        }
+                        $streamSelect.prop('disabled', false);
+                        $streamSelect.trigger('change');
+                    },
+                    error: function() {
+                        $streamSelect.prop('disabled', false);
+                        showToast('Error loading streams', 'danger');
+                    }
+                });
+            } else {
+                $streamSelect.trigger('change');
+            }
+        });
+
+        // Delete attendance session - FIXED with proper event handling
+        $(document).on('click', '.delete-session-btn', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            e.stopImmediatePropagation();
+            
+            currentSessionId = $(this).data('id');
+            console.log('Opening delete modal for session:', currentSessionId);
+            $('#deleteAttendanceModal').modal('show');
+            
+            // Return false to prevent any other handlers
+            return false;
+        });
+
+        // View button (for explicit click) - FIXED with proper event handling
+        $(document).on('click', '.view-session-btn', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            e.stopImmediatePropagation();
+            
+            const sessionId = $(this).data('id');
+            console.log('Opening view modal for session:', sessionId);
+            viewAttendanceDetails(sessionId);
+            
+            return false;
+        });
+
+        $('#viewAttendanceModal').on('shown.bs.modal', function () {
+    if (studentAttendanceDataTable) {
+        studentAttendanceDataTable.columns.adjust().draw();
+    }
+});
+
+        // Edit button - FIXED with proper event handling
+        $(document).on('click', '.edit-session-btn', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            e.stopImmediatePropagation();
+            
+            const sessionId = $(this).data('id');
+            console.log('Redirecting to edit session:', sessionId);
+            window.location.href = `{% url 'edit_attendance_session' 0 %}`.replace('0', sessionId);
+            
+            return false;
+        });
+
+        // View attendance details on row click - FIXED to ignore clicks on action buttons
+        $('#attendance-sessions-table tbody').on('click', 'tr', function(e) {
+            // Check if the click was on an action button
+            if ($(e.target).closest('.action-buttons').length > 0 ||
+                $(e.target).closest('.btn-action').length > 0 ||
+                $(e.target).closest('.view-session-btn').length > 0 ||
+                $(e.target).closest('.edit-session-btn').length > 0 ||
+                $(e.target).closest('.delete-session-btn').length > 0) {
+                return; // Don't open view modal if clicking on action buttons
+            }
+            
+            const sessionId = $(this).data('session-id');
+            if (sessionId) {
+                console.log('Opening view modal from row click for session:', sessionId);
+                viewAttendanceDetails(sessionId);
+            }
+        });
+
+        // Confirm delete
+        $('#confirm-delete-btn').click(function(e) {
+            e.preventDefault();
+            
+            if (!currentSessionId) {
+                showToast('No session selected for deletion', 'danger');
+                return;
+            }
+            
+            const btn = $(this);
+            setButtonLoading(btn, true);
+            
+            $.ajax({
+                url: `{% url 'admin_delete_attendance_session' 0 %}`.replace('/0/', `/${currentSessionId}/`),
+                method: 'POST',
+                headers: { 
+                    'X-CSRFToken': csrftoken,
+                    'Content-Type': 'application/json'
+                },
+                success: function(data) {
+                    if (data.success) {
+                        $('#deleteAttendanceModal').modal('hide');
+                        showToast(data.message, 'success');
+                        loadAttendanceSessions();
+                    } else {
+                        showToast(data.message, 'danger');
+                    }
+                    setButtonLoading(btn, false);
+                },
+                error: function(xhr) {
+                    showToast('An error occurred during deletion', 'danger');
+                    setButtonLoading(btn, false);
+                }
+            });
+        });
+
+        // Cancel delete modal button
+        $('#deleteAttendanceModal .btn-secondary').click(function(e) {
+            e.preventDefault();
+            $('#deleteAttendanceModal').modal('hide');
+        });
+
+        // Edit button in modal
+        $('#edit-attendance-btn').click(function(e) {
+            e.preventDefault();
+            const sessionId = $(this).data('session-id');
+            if (sessionId) {
+                $('#viewAttendanceModal').modal('hide');
+                setTimeout(() => {
+                    window.location.href = `{% url 'edit_attendance_session' 0 %}`.replace('0', sessionId);
+                }, 300);
+            }
+        });
+
+        // Close view modal button
+        $('#viewAttendanceModal .btn-secondary').click(function(e) {
+            e.preventDefault();
+            $('#viewAttendanceModal').modal('hide');
+        });
+
+        // Handle modal dismiss via close button
+        $(document).on('click', '.close', function(e) {
+            e.preventDefault();
+            $(this).closest('.modal').modal('hide');
+        });
+
+        // Handle ESC key to close modals
+        $(document).on('keydown', function(e) {
+            if (e.key === 'Escape') {
+                $('.modal.show').modal('hide');
+            }
+        });
+
+        // Prevent multiple modals from opening at once
+        $(document).on('show.bs.modal', '.modal', function() {
+            // Close any other open modals
+            $('.modal.show').not(this).each(function() {
+                $(this).modal('hide');
+            });
+        });
+
+        // Reset state when delete modal is closed
+        $('#deleteAttendanceModal').on('hidden.bs.modal', function() {
+            currentSessionId = null;
+            const btn = $('#confirm-delete-btn');
+            setButtonLoading(btn, false);
+        });
+
+        // Reset state when view modal is closed
+        $('#viewAttendanceModal').on('hidden.bs.modal', function() {
+            // Destroy the student attendance DataTable if it exists
+            if (studentAttendanceDataTable) {
+                try {
+                    studentAttendanceDataTable.destroy();
+                } catch(e) {
+                    console.log('Error destroying DataTable:', e);
+                }
+                studentAttendanceDataTable = null;
+            }
+            $('#attendance-details-content').html(`
+                <div class="text-center py-5">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="sr-only">Loading...</span>
+                    </div>
+                    <p class="mt-2">Loading session details...</p>
+                </div>
+            `);
+        });
+    }
+
+    // Get current filters
+    function getFilters() {
+        return {
+            date: $('#filterDate').val(),
+            class_level: $('#filterClass').val(),
+            stream: $('#filterStream').val(),
+            attendance_type: $('#filterType').val()
+        };
+    }
+
+    // Load attendance sessions
+    function loadAttendanceSessions() {
+        const filters = getFilters();
+        
+        $.ajax({
+            url: '{% url "admin_get_attendance_sessions" %}',
+            method: 'GET',
+            data: filters,
+            success: function(data) {
+                if (data.success && data.sessions && data.sessions.length > 0) {
+                    // Update session count
+                    $('#session-count').text(`${data.count || data.sessions.length} sessions`);
+                    
+                    // Prepare data for DataTable
+                    const tableData = data.sessions.map(function(session) {
+                        // Calculate attendance rate
+                        const total = session.stats.total || 1;
+                        const present = session.stats.present || 0;
+                        const attendanceRate = Math.round((present / total) * 100);
+                        
+                        // Determine progress bar color
+                        let progressClass = '';
+                        if (attendanceRate >= 80) progressClass = 'bg-success';
+                        else if (attendanceRate >= 60) progressClass = 'bg-warning';
+                        else progressClass = 'bg-danger';
+                        
+                        // Status badge for attendance type
+                        const typeBadge = session.attendance_type === 'CLASS' ? 
+                            '<span class="badge badge-class">Class</span>' : 
+                            '<span class="badge badge-subject">Subject</span>';
+                        
+                        // Period display
+                        const periodDisplay = session.period ? 
+                            `<span class="period-badge">${session.period}</span>` : 
+                            '-';
+                        
+                        // Attendance progress bar
+                        const attendanceProgress = `
+                            <div class="attendance-progress">
+                                <div class="progress-bar ${progressClass}" style="width: ${attendanceRate}%"></div>
+                            </div>
+                            <small class="text-muted">${attendanceRate}% attendance</small>
+                        `;
+                        
+                        // Statistics badges
+                        const statsDisplay = `
+                            <div class="d-flex flex-wrap gap-1">
+                                <span class="badge badge-success" title="Present">${session.stats.present || 0}P</span>
+                                <span class="badge badge-danger" title="Absent">${session.stats.absent || 0}A</span>
+                                <span class="badge badge-warning" title="Late">${session.stats.late || 0}L</span>
+                                <span class="badge badge-info" title="Excused">${session.stats.excused || 0}E</span>
+                            </div>
+                        `;
+                        
+                        // Action buttons
+                        const actions = `
+                            <div class="action-buttons">
+                                <button class="btn btn-action btn-info view-session-btn" 
+                                        data-id="${session.id}" title="View Details">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                                <button class="btn btn-action btn-warning edit-session-btn" 
+                                        data-id="${session.id}" title="Edit Session">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="btn btn-action btn-danger delete-session-btn" 
+                                        data-id="${session.id}" title="Delete Session">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        `;
+                        
+                        return {
+                            id: session.id,
+                            date: session.date,
+                            type: typeBadge,
+                            class_stream: `${session.class_level_name} ${session.stream_name ? '- ' + session.stream_name : ''}`,
+                            subject: session.subject_name || '-',
+                            period: periodDisplay,
+                            attendance: attendanceProgress,
+                            stats: statsDisplay,
+                            actions: actions
+                        };
+                    });
+                    
+                    // Clear and repopulate DataTable
+                    if (sessionsDataTable) {
+                        sessionsDataTable.clear().rows.add(tableData).draw();
+                    }
+                } else {
+                    // Show empty state
+                    if (sessionsDataTable) {
+                        sessionsDataTable.clear().draw();
+                    }
+                    $('#session-count').text('0 sessions');
+                }
+            },
+            error: function(xhr) {
+                showToast('Error loading attendance sessions', 'danger');
+                if (sessionsDataTable) {
+                    sessionsDataTable.clear().draw();
+                }
+                $('#session-count').text('0 sessions');
+            }
+        });
+    }
+
+    // View attendance details
+    function viewAttendanceDetails(sessionId) {
+        // Close delete modal if it's open
+        if ($('#deleteAttendanceModal').hasClass('show')) {
+            $('#deleteAttendanceModal').modal('hide');
+        }
+        
+        $('#viewAttendanceModal').modal('show');
+        
+        // Show loading state
+        $('#attendance-details-content').html(`
+            <div class="text-center py-5">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="sr-only">Loading...</span>
+                </div>
+                <p class="mt-2">Loading session details...</p>
+            </div>
+        `);
+        
+        $.ajax({
+            url: `{% url 'admin_get_attendance_details' 0 %}`.replace('/0/', `/${sessionId}/`),
+            method: 'GET',
+            success: function(data) {
+                if (data.success) {
+                    // Parse the HTML to create a DataTable
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(data.html, 'text/html');
+                    
+                    // Extract session information
+                    const sessionInfoHTML = doc.querySelector('.row.mb-4')?.outerHTML || '';
+                    
+                    // Extract student table data
+                    const studentTable = doc.querySelector('.table-responsive table');
+                    if (studentTable) {
+                        // Create new structure with DataTable
+                        const modalContent = `
+                            <div class="attendance-details">
+                                <!-- Session Info -->
+                                ${sessionInfoHTML}
+                                
+                                <!-- Student Attendance DataTable -->
+                                <div class="mt-4">
+                                    <h5>Student Attendance</h5>
+                                    <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                                        <table id="modal-student-table" class="table table-hover text-nowrap table-bordered table-striped display" style="width:100%">
+                                            <thead>
+                                                <tr>
+                                                    <th>#</th>
+                                                    <th>Student</th>
+                                                    <th>Admission No.</th>
+                                                    <th>Status</th>
+                                                    <th>Remark</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                ${extractStudentTableData(doc)}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                        
+                        $('#attendance-details-content').html(modalContent);
+                        
+                        // Initialize DataTable for student attendance
+                        initializeStudentAttendanceDataTable();
+                        
+                    } else {
+                        // Fallback to original HTML if table not found
+                        $('#attendance-details-content').html(data.html);
+                    }
+                    
+                    // Set the edit button session ID
+                    $('#edit-attendance-btn').data('session-id', sessionId);
+                    
+                } else {
+                    $('#attendance-details-content').html(`
+                        <div class="alert alert-danger">
+                            <i class="fas fa-exclamation-triangle"></i>
+                            ${data.message || 'Error loading attendance details'}
+                        </div>
+                    `);
+                }
+            },
+            error: function(xhr) {
+                $('#attendance-details-content').html(`
+                    <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        Error loading attendance details. Please try again.
+                    </div>
+                `);
+            }
+        });
+    }
+        
+    // Extract student table data from HTML
+    function extractStudentTableData(doc) {
+        const rows = doc.querySelectorAll('.table-responsive tbody tr');
+        let tableRowsHTML = '';
+        
+        rows.forEach((row, index) => {
+            const cells = row.querySelectorAll('td');
+            if (cells.length >= 5) {
+                const studentName = cells[1]?.textContent?.trim() || '';
+                const admissionNo = cells[2]?.textContent?.trim() || '';
+                const statusHTML = cells[3]?.innerHTML || '';
+                const remark = cells[4]?.textContent?.trim() || '-';
+                
+                tableRowsHTML += `
+                    <tr>
+                        <td>${index + 1}</td>
+                        <td>${studentName}</td>
+                        <td>${admissionNo}</td>
+                        <td>${statusHTML}</td>
+                        <td>${remark}</td>
+                    </tr>
+                `;
+            }
+        });
+        
+        return tableRowsHTML;
+    }
+
+    // Initialize DataTable for student attendance in modal
+    function initializeStudentAttendanceDataTable() {
+        if (studentAttendanceDataTable) {
+            try {
+                studentAttendanceDataTable.destroy();
+            } catch(e) {
+                console.log('Error destroying existing DataTable:', e);
+            }
+        }
+        
+        studentAttendanceDataTable = $('#modal-student-table').DataTable({
+            processing: true,
+            serverSide: false,
+            searching: true,
+            ordering: true,
+            pageLength: 10,
+            lengthMenu: [[10, 25, 50], [10, 25, 50]],
+            language: {
+                search: "",
+                searchPlaceholder: "Search students...",
+                lengthMenu: "Show _MENU_ entries",
+                info: "Showing _START_ to _END_ of _TOTAL_ students",
+                infoEmpty: "No students in this session",
+                zeroRecords: "No matching students found"
+            },
+            scrollY: '300px',
+            scrollCollapse: true,
+            paging: true,
+            responsive: true,
+            columnDefs: [
+                { width: '5%', targets: 0 },
+                { width: '30%', targets: 1 },
+                { width: '20%', targets: 2 },
+                { width: '15%', targets: 3 },
+                { width: '30%', targets: 4 }
+            ],
+            createdRow: function(row, data, dataIndex) {
+                $(row).hover(
+                    function() {
+                        $(this).addClass('table-active');
+                    },
+                    function() {
+                        $(this).removeClass('table-active');
+                    }
+                );
+            }
+        });
+    }
+
+    // Show toast notification
+    function showToast(message, type = 'success') {
+        const toastId = type === 'success' ? '#success-toast' : '#error-toast';
+        const messageId = type === 'success' ? '#success-message' : '#error-message';
+        
+        $(messageId).text(message);
+        $(toastId).fadeIn();
+        
+        setTimeout(function() {
+            $(toastId).fadeOut();
+        }, type === 'success' ? 3000 : 5000);
+    }
+
+    // Set button loading state
+    function setButtonLoading(btn, isLoading) {
+        const spinner = btn.find('.spinner-border');
+        if (isLoading) {
+            btn.data('original-text', btn.html());
+            btn.prop('disabled', true);
+            spinner.show();
+        } else {
+            btn.prop('disabled', false);
+            spinner.hide();
+            btn.html(btn.data('original-text'));
+        }
+    }
+
+    // Initialize everything
+    initializeSelect2();
+    initializeSessionsDataTable();
+    setupEventListeners();
+    loadAttendanceSessions();
+});
+</script>
+{% endblock extra_js %}

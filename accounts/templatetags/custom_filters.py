@@ -1,8 +1,11 @@
 # templatetags/custom_filters.py
 import json
+import re
 from django import template
 from django.core.serializers import serialize
 from django.db.models.query import QuerySet
+from django.utils.safestring import mark_safe
+from django.utils.html import escape
 
 register = template.Library()
 
@@ -53,6 +56,20 @@ def highlight(text, search_term):
     )
     
     return mark_safe(highlighted)
+
+@register.filter
+def month_name(value):
+    """Convert month number to month name"""
+    import calendar
+    try:
+        return calendar.month_name[int(value)]
+    except (ValueError, TypeError, IndexError):
+        return value
+
+@register.filter
+def split(value, delimiter=' '):
+    """Split a string by delimiter"""
+    return value.split(delimiter)
 
 
 @register.filter(name='query_transform')

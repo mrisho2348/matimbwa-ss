@@ -1,0 +1,992 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Weekly Attendance Report - {{ start_date }} to {{ end_date }}</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 1.5cm;
+            @top-center {
+                content: "{{ school_name }}";
+                font-size: 12px;
+                font-weight: bold;
+            }
+            @bottom-center {
+                content: "Page " counter(page) " of " counter(pages);
+                font-size: 10px;
+                color: #666;
+            }
+        }
+        
+        body {
+            font-family: 'Helvetica', 'Arial', sans-serif;
+            font-size: 10px;
+            line-height: 1.4;
+            color: #333;
+            margin: 0;
+            padding: 0;
+        }
+        
+        /* Header Section */
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #2c3e50;
+        }
+        
+        .header h1 {
+            font-size: 20px;
+            color: #2c3e50;
+            margin: 5px 0;
+            font-weight: bold;
+        }
+        
+        .header .subtitle {
+            font-size: 12px;
+            color: #666;
+            margin: 3px 0;
+        }
+        
+        .header .date {
+            font-size: 10px;
+            color: #888;
+        }
+        
+        /* Report Information Card */
+        .report-info {
+            background: #f8f9fa;
+            border-radius: 5px;
+            padding: 12px;
+            margin-bottom: 15px;
+            border-left: 4px solid #007bff;
+        }
+        
+        .report-info h3 {
+            font-size: 14px;
+            color: #2c3e50;
+            margin: 0 0 8px 0;
+            font-weight: bold;
+        }
+        
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 6px;
+            font-size: 9px;
+        }
+        
+        .info-item {
+            display: flex;
+        }
+        
+        .info-label {
+            font-weight: bold;
+            min-width: 100px;
+            color: #555;
+        }
+        
+        .info-value {
+            color: #333;
+            font-weight: 500;
+        }
+        
+        .section {
+            margin-bottom: 20px;
+            page-break-inside: avoid;
+        }
+        
+        .section-title {
+            font-size: 14px;
+            font-weight: bold;
+            color: #2c3e50;
+            margin: 0 0 10px 0;
+            padding-bottom: 5px;
+            border-bottom: 1px solid #dee2e6;
+        }
+        
+        /* Statistics Cards */
+        .stats-container {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 6px;
+            margin-bottom: 12px;
+        }
+        
+        .stat-card {
+            background: white;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 8px;
+            text-align: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        
+        .stat-number {
+            font-size: 18px;
+            font-weight: bold;
+            display: block;
+            line-height: 1;
+        }
+        
+        .stat-overall .stat-number { color: #007bff; }
+        .stat-present .stat-number { color: #28a745; }
+        .stat-absent .stat-number { color: #dc3545; }
+        .stat-late .stat-number { color: #ffc107; }
+        .stat-excused .stat-number { color: #17a2b8; }
+        .stat-days .stat-number { color: #6f42c1; }
+        
+        .stat-label {
+            font-size: 8px;
+            color: #6c757d;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-top: 4px;
+        }
+        
+        /* Tables */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 10px 0;
+            font-size: 8px;
+        }
+        
+        th {
+            background-color: #2c3e50;
+            color: white;
+            font-weight: bold;
+            text-align: left;
+            padding: 5px 4px;
+            border: 1px solid #dee2e6;
+            font-size: 8px;
+        }
+        
+        td {
+            padding: 4px;
+            border: 1px solid #dee2e6;
+            vertical-align: middle;
+        }
+        
+        tr:nth-child(even) {
+            background-color: #f8f9fa;
+        }
+        
+        /* Attendance Badges */
+        .attendance-badge {
+            display: inline-block;
+            padding: 1px 4px;
+            border-radius: 8px;
+            font-size: 7px;
+            font-weight: 600;
+            text-align: center;
+            min-width: 35px;
+        }
+        
+        .badge-present {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .badge-absent {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .badge-late {
+            background: #fff3cd;
+            color: #856404;
+        }
+        
+        .badge-excused {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+        
+        /* Rate Badges */
+        .rate-badge {
+            display: inline-block;
+            padding: 1px 6px;
+            border-radius: 10px;
+            font-size: 8px;
+            font-weight: 600;
+            text-align: center;
+            min-width: 40px;
+        }
+        
+        .rate-high {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .rate-medium {
+            background: #fff3cd;
+            color: #856404;
+        }
+        
+        .rate-low {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        /* Page Breaks */
+        .page-break {
+            page-break-before: always;
+        }
+        
+        /* View Type Indicators */
+        .view-indicator {
+            display: inline-block;
+            padding: 1px 6px;
+            background: #6c757d;
+            color: white;
+            border-radius: 8px;
+            font-size: 7px;
+            font-weight: bold;
+            margin-left: 8px;
+        }
+        
+        .view-summary { background: #17a2b8; }
+        
+        /* Footer */
+        .footer-note {
+            font-size: 7px;
+            color: #888;
+            text-align: center;
+            margin-top: 15px;
+            padding-top: 8px;
+            border-top: 1px solid #dee2e6;
+        }
+        
+        /* Utility Classes */
+        .text-center { text-align: center; }
+        .text-right { text-align: right; }
+        .text-left { text-align: left; }
+        .mb-5 { margin-bottom: 5px; }
+        .mb-10 { margin-bottom: 10px; }
+        .mb-15 { margin-bottom: 15px; }
+        .mt-5 { margin-top: 5px; }
+        .mt-10 { margin-top: 10px; }
+        .mt-15 { margin-top: 15px; }
+        
+        /* Compact Layout */
+        .compact-table {
+            font-size: 7px;
+        }
+        
+        .compact-table th,
+        .compact-table td {
+            padding: 3px 2px;
+        }
+        
+        /* Summary Cards */
+        .summary-card {
+            background: white;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 8px;
+            margin-bottom: 10px;
+            page-break-inside: avoid;
+        }
+        
+        .summary-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 6px;
+            padding-bottom: 4px;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .summary-title {
+            font-weight: bold;
+            color: #2c3e50;
+            font-size: 11px;
+        }
+        
+        .summary-date {
+            font-size: 9px;
+            color: #666;
+        }
+        
+        .summary-rate {
+            font-size: 10px;
+            font-weight: bold;
+            padding: 2px 6px;
+            border-radius: 10px;
+        }
+        
+        /* Filter Summary */
+        .filter-summary {
+            background: #e8f4fd;
+            border-radius: 5px;
+            padding: 8px;
+            margin-bottom: 12px;
+            font-size: 9px;
+        }
+        
+        .filter-item {
+            display: inline-block;
+            margin-right: 10px;
+            font-weight: 500;
+        }
+        
+        .filter-label {
+            color: #666;
+            font-weight: bold;
+        }
+        
+        /* Student Summary */
+        .student-row {
+            font-size: 8px;
+        }
+        
+        /* Daily Summary */
+        .daily-card {
+            background: white;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 8px;
+            margin-bottom: 8px;
+            page-break-inside: avoid;
+        }
+        
+        .daily-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 5px;
+        }
+        
+        .daily-title {
+            font-weight: bold;
+            color: #2c3e50;
+            font-size: 10px;
+        }
+        
+        .daily-date {
+            font-size: 8px;
+            color: #666;
+        }
+        
+        .daily-stats {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 5px;
+            font-size: 8px;
+        }
+        
+        .daily-stat-item {
+            text-align: center;
+        }
+        
+        .daily-stat-value {
+            font-weight: bold;
+            color: #2c3e50;
+            display: block;
+        }
+        
+        .daily-stat-label {
+            color: #6c757d;
+            font-size: 7px;
+            margin-top: 2px;
+        }
+        
+        /* Grid Layouts */
+        .grid-2 {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+        }
+        
+        .grid-3 {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+        }
+        
+        .grid-4 {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px;
+        }
+        
+        /* No Data State */
+        .no-data {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+            font-style: italic;
+        }
+        
+        /* Print Optimizations */
+        @media print {
+            .no-print {
+                display: none !important;
+            }
+            
+            body {
+                font-size: 9px;
+            }
+            
+            table {
+                font-size: 7px;
+            }
+            
+            .stat-card {
+                box-shadow: none;
+            }
+        }
+        
+        /* Weekly Specific Styles */
+        .week-header {
+            background: #f8f9fa;
+            border-radius: 5px;
+            padding: 10px;
+            margin-bottom: 15px;
+            border-left: 4px solid #007bff;
+        }
+        
+        .week-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        
+        .week-range {
+            font-size: 11px;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        
+        .week-duration {
+            font-size: 9px;
+            color: #666;
+            background: #e9ecef;
+            padding: 2px 8px;
+            border-radius: 10px;
+        }
+        
+        /* Calendar Grid for Weekly View */
+        .week-calendar {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 2px;
+            margin-bottom: 15px;
+        }
+        
+        .week-day {
+            background: white;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 5px;
+            text-align: center;
+            min-height: 60px;
+        }
+        
+        .week-day.has-data {
+            background: #f0f9ff;
+            border-color: #007bff;
+        }
+        
+        .week-day-header {
+            font-weight: bold;
+            color: #2c3e50;
+            font-size: 9px;
+            margin-bottom: 3px;
+        }
+        
+        .week-day-date {
+            font-size: 10px;
+            font-weight: bold;
+            margin-bottom: 3px;
+        }
+        
+        .week-day-stats {
+            font-size: 7px;
+            color: #666;
+            line-height: 1.2;
+        }
+    </style>
+</head>
+<body>
+    <!-- Header Section -->
+    <div class="header">
+        <h1>WEEKLY ATTENDANCE REPORT</h1>
+        <div class="subtitle">{{ school_name }}</div>
+        <div class="date">Report Period: {{ start_date_obj|date:"F j, Y" }} to {{ end_date_obj|date:"F j, Y" }} | Generated: {{ generation_date }}</div>
+    </div>
+    
+    <!-- Filter Summary -->
+    {% if filter_class_name or filter_stream_name or filter_type_name %}
+    <div class="filter-summary mb-15">
+        <div class="filter-item">
+            <span class="filter-label">Filters Applied:</span>
+            {% if filter_class_name %}
+            <span>Class: {{ filter_class_name }}</span>
+            {% endif %}
+            {% if filter_stream_name %}
+            <span> | Stream: {{ filter_stream_name }}</span>
+            {% endif %}
+            {% if filter_type_name %}
+            <span> | Type: {{ filter_type_name }}</span>
+            {% endif %}
+        </div>
+        <div class="filter-item">
+            <span class="filter-label">Report Scope:</span>
+            <span>{{ week_duration }} Days, {{ total_stats.days }} Days with Data</span>
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- Week Information -->
+    <div class="week-header">
+        <div class="week-info">
+            <div>
+                <div class="week-range">{{ start_date_obj|date:"F j, Y" }} - {{ end_date_obj|date:"j, Y" }}</div>
+                <div class="week-duration">{{ week_duration }} day week</div>
+            </div>
+            <div class="text-right">
+                <div style="font-size: 24px; font-weight: bold; color: #007bff;">{{ total_stats.attendance_rate|default:"0" }}%</div>
+                <div style="font-size: 9px; color: #666;">Overall Attendance Rate</div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Report Information -->
+    <div class="report-info">
+        <h3>Report Summary</h3>
+        <div class="info-grid">
+            <div class="info-item">
+                <span class="info-label">Report Period:</span>
+                <span class="info-value">{{ start_date_obj|date:"F j, Y" }} to {{ end_date_obj|date:"j, Y" }}</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Generated By:</span>
+                <span class="info-value">{{ generated_by }}</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Data Coverage:</span>
+                <span class="info-value">{{ total_stats.days }}/{{ week_duration }} days ({% widthratio total_stats.days week_duration 100 %}%)</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Total Classes:</span>
+                <span class="info-value">{{ total_classes }}</span>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Overall Statistics -->
+    <div class="section">
+        <h3 class="section-title">Weekly Statistics Overview</h3>
+        
+        <div class="stats-container">
+            <div class="stat-card stat-overall">
+                <span class="stat-number">{{ total_stats.attendance_rate|default:"0" }}%</span>
+                <span class="stat-label">Overall Rate</span>
+            </div>
+            <div class="stat-card stat-present">
+                <span class="stat-number">{{ total_stats.present|default:"0" }}</span>
+                <span class="stat-label">Present</span>
+            </div>
+            <div class="stat-card stat-absent">
+                <span class="stat-number">{{ total_stats.absent|default:"0" }}</span>
+                <span class="stat-label">Absent</span>
+            </div>
+            <div class="stat-card stat-late">
+                <span class="stat-number">{{ total_stats.late|default:"0" }}</span>
+                <span class="stat-label">Late</span>
+            </div>
+            <div class="stat-card stat-excused">
+                <span class="stat-number">{{ total_stats.excused|default:"0" }}</span>
+                <span class="stat-label">Excused</span>
+            </div>
+            <div class="stat-card stat-days">
+                <span class="stat-number">{{ total_stats.days }}/{{ week_duration }}</span>
+                <span class="stat-label">Days</span>
+            </div>
+        </div>
+        
+        <div class="grid-3 mb-10">
+            <div class="text-center">
+                <div style="font-size: 12px; font-weight: bold; color: #007bff;">{{ total_stats.sessions|default:"0" }}</div>
+                <div style="font-size: 8px; color: #666;">Total Sessions</div>
+            </div>
+            <div class="text-center">
+                <div style="font-size: 12px; font-weight: bold; color: #007bff;">{{ total_stats.students|default:"0" }}</div>
+                <div style="font-size: 8px; color: #666;">Student Records</div>
+            </div>
+            <div class="text-center">
+                <div style="font-size: 12px; font-weight: bold; color: #007bff;">{{ total_classes }}</div>
+                <div style="font-size: 8px; color: #666;">Classes</div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Weekly Calendar Overview -->
+    {% if daily_data %}
+    <div class="section">
+        <h3 class="section-title">Daily Breakdown</h3>
+        
+        <div class="week-calendar">
+            {% for day in daily_data %}
+            <div class="week-day {% if day.sessions > 0 %}has-data{% endif %}">
+                <div class="week-day-header">{{ day.day_name|slice:":3" }}</div>
+                <div class="week-day-date">{{ day.date|date:"j" }}</div>
+                <div class="week-day-stats">
+                    {% if day.sessions > 0 %}
+                    {{ day.sessions }}s<br>
+                    {{ day.attendance_rate }}%<br>
+                    {{ day.present }}P
+                    {% else %}
+                    No Data
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        
+        <div class="grid-4 mt-10">
+            <div class="text-center">
+                <div style="width: 10px; height: 10px; background: #f0f9ff; border: 1px solid #007bff; display: inline-block; margin-right: 5px;"></div>
+                <span style="font-size: 7px;">Days with data</span>
+            </div>
+            <div class="text-center">
+                <div style="font-size: 7px;">s = Sessions</div>
+            </div>
+            <div class="text-center">
+                <div style="font-size: 7px;">% = Attendance rate</div>
+            </div>
+            <div class="text-center">
+                <div style="font-size: 7px;">P = Present students</div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- Daily Attendance Details -->
+    {% if daily_data %}
+    <div class="section page-break">
+        <h3 class="section-title">Daily Attendance Details</h3>
+        
+        {% for day in daily_data %}
+        <div class="daily-card">
+            <div class="daily-header">
+                <div>
+                    <div class="daily-title">{{ day.date|date:"F j, Y" }}</div>
+                    <div class="daily-date">{{ day.day_name }}</div>
+                </div>
+                <div class="summary-rate 
+                    {% if day.attendance_rate >= 80 %}rate-high
+                    {% elif day.attendance_rate >= 60 %}rate-medium
+                    {% else %}rate-low{% endif %}">
+                    {{ day.attendance_rate }}%
+                </div>
+            </div>
+            
+            <div class="daily-stats">
+                <div class="daily-stat-item">
+                    <span class="daily-stat-value">{{ day.sessions }}</span>
+                    <span class="daily-stat-label">Sessions</span>
+                </div>
+                <div class="daily-stat-item">
+                    <span class="daily-stat-value">{{ day.students }}</span>
+                    <span class="daily-stat-label">Students</span>
+                </div>
+                <div class="daily-stat-item">
+                    <span class="daily-stat-value">{{ day.present }}/{{ day.students }}</span>
+                    <span class="daily-stat-label">Present</span>
+                </div>
+                <div class="daily-stat-item">
+                    <span class="daily-stat-value">{{ day.attendance_rate }}%</span>
+                    <span class="daily-stat-label">Rate</span>
+                </div>
+            </div>
+            
+            {% if day.absent > 0 or day.late > 0 or day.excused > 0 %}
+            <div class="text-center mt-5">
+                {% if day.absent > 0 %}
+                <span class="attendance-badge badge-absent">{{ day.absent }} Absent</span>
+                {% endif %}
+                {% if day.late > 0 %}
+                <span class="attendance-badge badge-late">{{ day.late }} Late</span>
+                {% endif %}
+                {% if day.excused > 0 %}
+                <span class="attendance-badge badge-excused">{{ day.excused }} Excused</span>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+    
+    <!-- Class Summary -->
+    {% if class_data %}
+    <div class="section page-break">
+        <h3 class="section-title">Class Performance Summary</h3>
+        
+        <table class="compact-table">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Class</th>
+                    <th>Stream</th>
+                    <th class="text-center">Days</th>
+                    <th class="text-center">Sessions</th>
+                    <th class="text-center">Students</th>
+                    <th class="text-center">Present</th>
+                    <th class="text-center">Absent</th>
+                    <th class="text-center">Late</th>
+                    <th class="text-center">Excused</th>
+                    <th class="text-center">Rate</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for class in class_data %}
+                <tr>
+                    <td>{{ forloop.counter }}</td>
+                    <td>{{ class.class_level.name }}</td>
+                    <td class="text-center">
+                        {% if class.stream %}
+                            {{ class.stream.stream_letter }}
+                        {% else %}
+                            All
+                        {% endif %}
+                    </td>
+                    <td class="text-center">{{ class.days|default:"0" }}</td>
+                    <td class="text-center">{{ class.sessions|default:"0" }}</td>
+                    <td class="text-center">{{ class.students|default:"0" }}</td>
+                    <td class="text-center">
+                        <span class="attendance-badge badge-present">{{ class.present|default:"0" }}</span>
+                    </td>
+                    <td class="text-center">
+                        <span class="attendance-badge badge-absent">{{ class.absent|default:"0" }}</span>
+                    </td>
+                    <td class="text-center">
+                        <span class="attendance-badge badge-late">{{ class.late|default:"0" }}</span>
+                    </td>
+                    <td class="text-center">
+                        <span class="attendance-badge badge-excused">{{ class.excused|default:"0" }}</span>
+                    </td>
+                    <td class="text-center">
+                        <span class="rate-badge 
+                            {% if class.attendance_rate >= 80 %}rate-high
+                            {% elif class.attendance_rate >= 60 %}rate-medium
+                            {% else %}rate-low{% endif %}">
+                            {{ class.attendance_rate|default:"0" }}%
+                        </span>
+                    </td>
+                </tr>
+                {% endfor %}
+                <!-- Total Row -->
+                <tr style="background-color: #e9ecef; font-weight: bold;">
+                    <td colspan="3" class="text-right">TOTAL</td>
+                    <td class="text-center">{{ total_stats.days|default:"0" }}</td>
+                    <td class="text-center">{{ total_stats.sessions|default:"0" }}</td>
+                    <td class="text-center">{{ total_stats.students|default:"0" }}</td>
+                    <td class="text-center">{{ total_stats.present|default:"0" }}</td>
+                    <td class="text-center">{{ total_stats.absent|default:"0" }}</td>
+                    <td class="text-center">{{ total_stats.late|default:"0" }}</td>
+                    <td class="text-center">{{ total_stats.excused|default:"0" }}</td>
+                    <td class="text-center">{{ total_stats.attendance_rate|default:"0" }}%</td>
+                </tr>
+            </tbody>
+        </table>
+        
+        <div class="text-center mt-10">
+            <div style="font-size: 8px; color: #666;">
+                Showing {{ class_data|length }} classes with attendance data
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- Top Students Performance -->
+    {% if student_data %}
+    <div class="section page-break">
+        <h3 class="section-title">Top Students Performance</h3>
+        
+        <table class="compact-table">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Student Name</th>
+                    <th>Admission No.</th>
+                    <th>Class</th>
+                    <th class="text-center">Days</th>
+                    <th class="text-center">Sessions</th>
+                    <th class="text-center">Present</th>
+                    <th class="text-center">Absent</th>
+                    <th class="text-center">Late</th>
+                    <th class="text-center">Excused</th>
+                    <th class="text-center">Rate</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for student in student_data %}
+                <tr class="student-row">
+                    <td>{{ forloop.counter }}</td>
+                    <td>{{ student.student.full_name }}</td>
+                    <td>{{ student.student.registration_number|default:"N/A" }}</td>
+                    <td>
+                        {% if student.student.class_level %}
+                            {{ student.student.class_level.name }}
+                            {% if student.student.stream_class %}
+                                - {{ student.student.stream_class.stream_letter }}
+                            {% endif %}
+                        {% else %}
+                            N/A
+                        {% endif %}
+                    </td>
+                    <td class="text-center">{{ student.days|default:"0" }}</td>
+                    <td class="text-center">{{ student.sessions|default:"0" }}</td>
+                    <td class="text-center">{{ student.present|default:"0" }}</td>
+                    <td class="text-center">{{ student.absent|default:"0" }}</td>
+                    <td class="text-center">{{ student.late|default:"0" }}</td>
+                    <td class="text-center">{{ student.excused|default:"0" }}</td>
+                    <td class="text-center">
+                        <span class="rate-badge 
+                            {% if student.attendance_rate >= 80 %}rate-high
+                            {% elif student.attendance_rate >= 60 %}rate-medium
+                            {% else %}rate-low{% endif %}">
+                            {{ student.attendance_rate|default:"0" }}%
+                        </span>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        
+        <div class="text-center mt-10">
+            <div style="font-size: 8px; color: #666;">
+                Showing top {{ student_data|length }} students by attendance rate
+                {% if total_students > student_data|length %}
+                (of {{ total_students }} total students)
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- Attendance Trends -->
+    {% if daily_data|length > 1 %}
+    <div class="section">
+        <h3 class="section-title">Daily Attendance Trends</h3>
+        
+        <table class="compact-table">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Day</th>
+                    <th class="text-center">Sessions</th>
+                    <th class="text-center">Students</th>
+                    <th class="text-center">Attendance Rate</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for day in daily_data %}
+                <tr>
+                    <td>{{ day.date|date:"M d" }}</td>
+                    <td>{{ day.day_name|slice:":3" }}</td>
+                    <td class="text-center">{{ day.sessions }}</td>
+                    <td class="text-center">{{ day.students }}</td>
+                    <td class="text-center">{{ day.attendance_rate }}%</td>
+                    <td>
+                        {% if day.attendance_rate >= 80 %}
+                            <span style="color: #28a745; font-weight: bold;">Excellent</span>
+                        {% elif day.attendance_rate >= 60 %}
+                            <span style="color: #ffc107; font-weight: bold;">Good</span>
+                        {% else %}
+                            <span style="color: #dc3545; font-weight: bold;">Needs Attention</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        
+        <div class="grid-3 mt-10">
+            <div class="text-center">
+                <div style="font-size: 10px; font-weight: bold; color: #28a745;">≥80%</div>
+                <div style="font-size: 7px; color: #666;">Excellent</div>
+            </div>
+            <div class="text-center">
+                <div style="font-size: 10px; font-weight: bold; color: #ffc107;">60-79%</div>
+                <div style="font-size: 7px; color: #666;">Good</div>
+            </div>
+            <div class="text-center">
+                <div style="font-size: 10px; font-weight: bold; color: #dc3545;">&lt;60%</div>
+                <div style="font-size: 7px; color: #666;">Needs Attention</div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- Summary & Recommendations -->
+    <div class="section">
+        <h3 class="section-title">Summary & Recommendations</h3>
+        
+        <div class="grid-2">
+            <div class="summary-card">
+                <div class="summary-card-header">
+                    <div class="summary-title">Weekly Performance</div>
+                </div>
+                <div style="font-size: 9px; line-height: 1.4;">
+                    <p><strong>Overall Attendance Rate:</strong> {{ total_stats.attendance_rate }}%</p>
+                    <p><strong>Days with Data:</strong> {{ total_stats.days }} out of {{ week_duration }} days</p>
+                    <p><strong>Total Sessions:</strong> {{ total_stats.sessions }}</p>
+                    <p><strong>Student Attendance Records:</strong> {{ total_stats.students }}</p>
+                </div>
+            </div>
+            
+            <div class="summary-card">
+                <div class="summary-card-header">
+                    <div class="summary-title">Attendance Status</div>
+                </div>
+                <div style="font-size: 9px; line-height: 1.4;">
+                    <p><strong>Present:</strong> {{ total_stats.present }} ({% widthratio total_stats.present total_stats.students 100 %}%)</p>
+                    <p><strong>Absent:</strong> {{ total_stats.absent }} ({% widthratio total_stats.absent total_stats.students 100 %}%)</p>
+                    <p><strong>Late:</strong> {{ total_stats.late }} ({% widthratio total_stats.late total_stats.students 100 %}%)</p>
+                    <p><strong>Excused:</strong> {{ total_stats.excused }} ({% widthratio total_stats.excused total_stats.students 100 %}%)</p>
+                </div>
+            </div>
+        </div>
+        
+        {% if total_stats.attendance_rate < 80 %}
+        <div class="summary-card" style="background: #fff3cd; border-color: #ffc107;">
+            <div class="summary-card-header">
+                <div class="summary-title" style="color: #856404;">Recommendations</div>
+            </div>
+            <div style="font-size: 9px; line-height: 1.4; color: #856404;">
+                <p><strong>Attention Required:</strong> Overall attendance rate is below 80% target.</p>
+                <p><strong>Action Items:</strong></p>
+                <ul style="margin: 5px 0; padding-left: 15px;">
+                    <li>Review classes with low attendance rates</li>
+                    <li>Identify students with frequent absences</li>
+                    <li>Consider implementing attendance improvement programs</li>
+                    <li>Communicate with parents about attendance expectations</li>
+                </ul>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    
+    <!-- Footer -->
+    <div class="footer-note">
+        <strong>WEEKLY ATTENDANCE REPORT</strong><br>
+        Period: {{ start_date_obj|date:"F j, Y" }} to {{ end_date_obj|date:"j, Y" }} | Generated: {{ generation_date }}<br>
+        Report ID: WAR-{{ start_date|slice:"2:4" }}{{ start_date|slice:"5:7" }}{{ start_date|slice:"8:10" }}-{{ end_date|slice:"8:10" }}-{{ total_stats.sessions|default:"0" }}-{{ class_data|length }}<br>
+        Filters: 
+        {% if filter_class_name %}Class: {{ filter_class_name }}{% endif %}
+        {% if filter_stream_name %} | Stream: {{ filter_stream_name }}{% endif %}
+        {% if filter_type_name %} | Type: {{ filter_type_name }}{% endif %}
+        | Data Coverage: {{ total_stats.days }}/{{ week_duration }} days
+        | Overall Rate: {{ total_stats.attendance_rate }}%
+    </div>
+</body>
+</html>

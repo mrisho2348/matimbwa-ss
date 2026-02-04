@@ -20,6 +20,8 @@ urlpatterns = [
     path('staff/', include('accounts.urls.staff_urls')),
     path('student/', include('accounts.urls.student_urls')),
     path('administrator/', include('accounts.urls.administrator_urls')),
+    path('attendance/', include('accounts.urls.attendance_admin_urls')),
+    path('library/', include('accounts.urls.library_admin_urls')),
 ]
 
 __all__ = [

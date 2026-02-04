@@ -1,0 +1,1112 @@
+{% extends 'admin/base.html' %}
+{% load static %}
+
+{% block title %}Daily Attendance Report - {{ formatted_date }}{% endblock %}
+
+{% block breadcrumb %}
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'admin_dashboard' %}">Dashboard</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'attendance_report_daily' %}">Daily Reports</a></li>
+        <li class="breadcrumb-item active" aria-current="page">{{ formatted_date }}</li>
+    </ol>
+</nav>
+{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.1/font/bootstrap-icons.css">
+<style>
+    /* ===== ROOT VARIABLES ===== */
+    :root {
+        --primary-color: #2c3e50;
+        --secondary-color: #3498db;
+        --success-color: #27ae60;
+        --danger-color: #e74c3c;
+        --warning-color: #f39c12;
+        --info-color: #17a2b8;
+        --light-color: #f8f9fa;
+        --dark-color: #343a40;
+        --border-radius: 10px;
+        --box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        --transition: all 0.3s ease;
+    }
+
+    /* ===== PAGE HEADER ===== */
+    .report-header {
+        background: linear-gradient(135deg, var(--primary-color) 0%, #34495e 100%);
+        color: white;
+        border-radius: var(--border-radius);
+        padding: 1.5rem;
+        margin-bottom: 2rem;
+        box-shadow: var(--box-shadow);
+        position: relative;
+        overflow: hidden;
+    }
+
+    .report-header::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        right: 0;
+        width: 150px;
+        height: 150px;
+        background: rgba(255,255,255,0.1);
+        border-radius: 50%;
+        transform: translate(30%, -30%);
+    }
+
+    .report-title {
+        font-size: 1.8rem;
+        font-weight: 700;
+        margin-bottom: 0.5rem;
+        position: relative;
+        z-index: 1;
+    }
+
+    .report-subtitle {
+        font-size: 1rem;
+        opacity: 0.9;
+        margin-bottom: 0;
+        position: relative;
+        z-index: 1;
+    }
+
+    .date-display {
+        background: rgba(255,255,255,0.15);
+        backdrop-filter: blur(10px);
+        border-radius: 8px;
+        padding: 0.75rem 1.25rem;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-weight: 500;
+        position: relative;
+        z-index: 1;
+        border: 1px solid rgba(255,255,255,0.2);
+    }
+
+    /* ===== FILTER SECTION ===== */
+    .filter-section {
+        background: white;
+        border-radius: var(--border-radius);
+        padding: 1.5rem;
+        margin-bottom: 2rem;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        border: 1px solid #e9ecef;
+    }
+
+    .filter-section .form-label {
+        font-weight: 600;
+        color: var(--primary-color);
+        margin-bottom: 0.5rem;
+    }
+
+    .form-control, .form-select {
+        border: 1px solid #dee2e6;
+        border-radius: 6px;
+        padding: 0.5rem 0.75rem;
+        transition: var(--transition);
+    }
+
+    .form-control:focus, .form-select:focus {
+        border-color: var(--secondary-color);
+        box-shadow: 0 0 0 0.2rem rgba(52, 152, 219, 0.25);
+        outline: none;
+    }
+
+    /* ===== STATISTICS CARDS ===== */
+    .stats-container {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1.25rem;
+        margin-bottom: 2rem;
+    }
+
+    .stat-card {
+        background: white;
+        border-radius: var(--border-radius);
+        padding: 1.25rem;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+        border: 1px solid #e9ecef;
+        transition: var(--transition);
+        position: relative;
+        overflow: hidden;
+    }
+
+    .stat-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+    }
+
+    .stat-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 4px;
+    }
+
+    .stat-card.overall::before { background: var(--secondary-color); }
+    .stat-card.present::before { background: var(--success-color); }
+    .stat-card.absent::before { background: var(--danger-color); }
+    .stat-card.late::before { background: var(--warning-color); }
+    .stat-card.excused::before { background: var(--info-color); }
+
+    .stat-card-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 0.75rem;
+    }
+
+    .stat-card-icon {
+        width: 40px;
+        height: 40px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.25rem;
+    }
+
+    .stat-card.overall .stat-card-icon { background: rgba(52, 152, 219, 0.15); color: var(--secondary-color); }
+    .stat-card.present .stat-card-icon { background: rgba(39, 174, 96, 0.15); color: var(--success-color); }
+    .stat-card.absent .stat-card-icon { background: rgba(231, 76, 60, 0.15); color: var(--danger-color); }
+    .stat-card.late .stat-card-icon { background: rgba(243, 156, 18, 0.15); color: var(--warning-color); }
+    .stat-card.excused .stat-card-icon { background: rgba(23, 162, 184, 0.15); color: var(--info-color); }
+
+    .stat-value {
+        font-size: 2rem;
+        font-weight: 800;
+        line-height: 1;
+        margin-bottom: 0.25rem;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+
+    .stat-card.overall .stat-value { color: var(--secondary-color); }
+    .stat-card.present .stat-value { color: var(--success-color); }
+    .stat-card.absent .stat-value { color: var(--danger-color); }
+    .stat-card.late .stat-value { color: var(--warning-color); }
+    .stat-card.excused .stat-value { color: var(--info-color); }
+
+    .stat-label {
+        font-size: 0.85rem;
+        color: #6c757d;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        font-weight: 600;
+        margin-bottom: 0.5rem;
+    }
+
+    .progress {
+        height: 6px;
+        border-radius: 3px;
+        background: #e9ecef;
+        overflow: hidden;
+    }
+
+    .progress-bar {
+        border-radius: 3px;
+        transition: width 1s ease-in-out;
+    }
+
+    /* ===== SUMMARY CARDS ===== */
+    .summary-card {
+        background: white;
+        border-radius: var(--border-radius);
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        border: 1px solid #e9ecef;
+    }
+
+    .summary-card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1rem;
+        padding-bottom: 0.75rem;
+        border-bottom: 2px solid #f1f3f4;
+    }
+
+    .summary-card-title {
+        font-size: 1.25rem;
+        font-weight: 600;
+        color: var(--primary-color);
+        margin: 0;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .summary-card-badge {
+        font-size: 0.9rem;
+        font-weight: 600;
+        padding: 0.25rem 0.75rem;
+        border-radius: 20px;
+    }
+
+    .badge-high { background: #d4edda; color: #155724; }
+    .badge-medium { background: #fff3cd; color: #856404; }
+    .badge-low { background: #f8d7da; color: #721c24; }
+
+    /* ===== CLASS CARDS ===== */
+    .class-card {
+        background: white;
+        border-radius: var(--border-radius);
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        border: 1px solid #e9ecef;
+        transition: var(--transition);
+    }
+
+    .class-card:hover {
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }
+
+    .class-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1rem;
+        padding-bottom: 0.75rem;
+        border-bottom: 2px solid #f1f3f4;
+    }
+
+    .class-info h5 {
+        font-size: 1.25rem;
+        font-weight: 600;
+        color: var(--primary-color);
+        margin: 0;
+    }
+
+    .class-info small {
+        color: #6c757d;
+        font-size: 0.85rem;
+    }
+
+    .attendance-rate {
+        font-size: 1rem;
+        font-weight: 600;
+        padding: 0.5rem 1rem;
+        border-radius: 20px;
+        background: #e8f5e9;
+        color: var(--success-color);
+    }
+
+    .attendance-rate.low {
+        background: #f8d7da;
+        color: var(--danger-color);
+    }
+
+    .attendance-rate.medium {
+        background: #fff3cd;
+        color: var(--warning-color);
+    }
+
+    /* ===== SESSION CARDS ===== */
+    .session-card {
+        background: #f8f9fa;
+        border-radius: 8px;
+        padding: 1rem;
+        margin-bottom: 1rem;
+        border-left: 4px solid var(--secondary-color);
+        transition: var(--transition);
+    }
+
+    .session-card:hover {
+        background: #f1f3f4;
+    }
+
+    .session-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 0.75rem;
+    }
+
+    .session-title {
+        font-weight: 600;
+        color: var(--primary-color);
+        margin: 0;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .session-meta {
+        font-size: 0.85rem;
+        color: #6c757d;
+    }
+
+    .session-stats {
+        display: flex;
+        gap: 0.5rem;
+        align-items: center;
+    }
+
+    .stat-badge {
+        padding: 0.25rem 0.5rem;
+        border-radius: 12px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+    }
+
+    .stat-badge.present { background: rgba(39, 174, 96, 0.15); color: #27ae60; }
+    .stat-badge.absent { background: rgba(231, 76, 60, 0.15); color: #e74c3c; }
+    .stat-badge.late { background: rgba(243, 156, 18, 0.15); color: #f39c12; }
+    .stat-badge.excused { background: rgba(52, 152, 219, 0.15); color: #3498db; }
+
+    /* ===== TABLES ===== */
+    .data-table {
+        width: 100%;
+        font-size: 0.875rem;
+    }
+
+    .data-table thead {
+        background: #f8f9fa;
+    }
+
+    .data-table th {
+        font-weight: 600;
+        color: var(--primary-color);
+        padding: 0.75rem;
+        border-bottom: 2px solid #dee2e6;
+    }
+
+    .data-table td {
+        padding: 0.75rem;
+        border-bottom: 1px solid #e9ecef;
+        vertical-align: middle;
+    }
+
+    .data-table tbody tr:hover {
+        background-color: #f8f9fa;
+    }
+
+    .status-indicator {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-weight: 500;
+    }
+
+    .status-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+    }
+
+    .status-present .status-dot { background: var(--success-color); }
+    .status-absent .status-dot { background: var(--danger-color); }
+    .status-late .status-dot { background: var(--warning-color); }
+    .status-excused .status-dot { background: var(--info-color); }
+
+    /* ===== EMPTY STATE ===== */
+    .empty-state {
+        text-align: center;
+        padding: 3rem;
+        color: #6c757d;
+    }
+
+    .empty-state-icon {
+        font-size: 3rem;
+        color: #dee2e6;
+        margin-bottom: 1rem;
+        opacity: 0.5;
+    }
+
+    .empty-state-title {
+        font-size: 1.25rem;
+        margin-bottom: 0.5rem;
+        color: #495057;
+    }
+
+    .empty-state-text {
+        margin-bottom: 1.5rem;
+        max-width: 500px;
+        margin-left: auto;
+        margin-right: auto;
+    }
+
+    /* ===== ACTION BUTTONS ===== */
+    .action-buttons {
+        display: flex;
+        gap: 0.5rem;
+        align-items: center;
+    }
+
+    .btn-custom {
+        padding: 0.5rem 1.25rem;
+        border-radius: 6px;
+        font-weight: 500;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        transition: var(--transition);
+        border: none;
+        cursor: pointer;
+    }
+
+    .btn-custom:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+
+    .btn-primary {
+        background: var(--secondary-color);
+        color: white;
+    }
+
+    .btn-primary:hover {
+        background: #2980b9;
+    }
+
+    .btn-success {
+        background: var(--success-color);
+        color: white;
+    }
+
+    .btn-success:hover {
+        background: #219653;
+    }
+
+    .btn-outline-secondary {
+        background: transparent;
+        color: #6c757d;
+        border: 1px solid #dee2e6;
+    }
+
+    .btn-outline-secondary:hover {
+        background: #f8f9fa;
+        color: var(--primary-color);
+    }
+
+    /* ===== TABS ===== */
+    .nav-tabs {
+        border-bottom: 2px solid #e9ecef;
+        margin-bottom: 1.5rem;
+    }
+
+    .nav-tabs .nav-link {
+        color: #6c757d;
+        font-weight: 500;
+        border: none;
+        padding: 0.75rem 1.5rem;
+        margin-right: 0.5rem;
+        border-radius: 6px 6px 0 0;
+        transition: var(--transition);
+    }
+
+    .nav-tabs .nav-link:hover {
+        color: var(--secondary-color);
+        background: #f8f9fa;
+    }
+
+    .nav-tabs .nav-link.active {
+        color: var(--secondary-color);
+        background: transparent;
+        border-bottom: 3px solid var(--secondary-color);
+    }
+
+    /* ===== UTILITY CLASSES ===== */
+    .mb-4 { margin-bottom: 1.5rem; }
+    .mt-4 { margin-top: 1.5rem; }
+    .text-center { text-align: center; }
+    .text-muted { color: #6c757d; }
+    .text-success { color: var(--success-color); }
+    .text-danger { color: var(--danger-color); }
+    .text-warning { color: var(--warning-color); }
+    .text-info { color: var(--info-color); }
+
+    /* ===== PRINT STYLES ===== */
+    @media print {
+        .no-print {
+            display: none !important;
+        }
+        
+        .report-header {
+            background: white !important;
+            color: black !important;
+            box-shadow: none;
+            border: 2px solid #000;
+        }
+        
+        .filter-section {
+            display: none;
+        }
+        
+        .stat-card, .class-card {
+            box-shadow: none;
+            border: 1px solid #dee2e6;
+            page-break-inside: avoid;
+        }
+        
+        .action-buttons {
+            display: none;
+        }
+        
+        body {
+            font-size: 12px;
+        }
+    }
+
+    /* ===== PDF DOWNLOAD BUTTON ===== */
+    .btn-pdf {
+        background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+        color: white;
+        border: none;
+        padding: 0.5rem 1.5rem;
+        border-radius: 6px;
+        font-weight: 500;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        transition: var(--transition);
+        text-decoration: none;
+    }
+
+    .btn-pdf:hover {
+        background: linear-gradient(135deg, #c82333 0%, #bd2130 100%);
+        color: white;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(220, 53, 69, 0.3);
+    }
+
+    .btn-pdf:active {
+        transform: translateY(0);
+    }
+
+    .pdf-loading {
+        display: none;
+        align-items: center;
+        gap: 0.5rem;
+        color: var(--secondary-color);
+        font-weight: 500;
+    }
+
+    .spinner-border {
+        width: 1rem;
+        height: 1rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Page Header -->
+    <div class="report-header">
+        <div class="d-flex justify-content-between align-items-start">
+            <div>
+                <h1 class="report-title">Daily Attendance Report</h1>
+                <div class="report-subtitle">
+                    Comprehensive overview of student attendance for the selected date
+                </div>
+            </div>
+            <div class="date-display">
+                <i class="bi bi-calendar-check"></i>
+                <span>{{ formatted_date }} ({{ day_name }})</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filter Section -->
+    <div class="filter-section no-print">
+        <form method="GET" id="reportFilters">
+            <div class="row g-3">
+                <div class="col-md-3">
+                    <label for="date" class="form-label">Date</label>
+                    <input type="date" class="form-control" id="date" name="date" 
+                           value="{{ report_date }}" onchange="this.form.submit()">
+                </div>
+                
+                <div class="col-md-3">
+                    <label for="class_level" class="form-label">Class</label>
+                    <select class="form-select" id="class_level" name="class_level" 
+                            onchange="this.form.submit()">
+                        <option value="">All Classes</option>
+                        {% for class in class_levels %}
+                        <option value="{{ class.id }}" 
+                                {% if class.id|stringformat:"s" == filter_class %}selected{% endif %}>
+                            {{ class.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div class="col-md-2">
+                    <label for="stream" class="form-label">Stream</label>
+                    <select class="form-select" id="stream" name="stream" 
+                            onchange="this.form.submit()" 
+                            {% if not filter_class %}disabled{% endif %}>
+                        <option value="">All Streams</option>
+                        {% for stream in streams %}
+                        <option value="{{ stream.id }}" 
+                                {% if stream.id|stringformat:"s" == filter_stream %}selected{% endif %}>
+                            {{ stream.stream_letter }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div class="col-md-2">
+                    <label for="attendance_type" class="form-label">Type</label>
+                    <select class="form-select" id="attendance_type" name="attendance_type" 
+                            onchange="this.form.submit()">
+                        {% for type_id, type_name in attendance_types %}
+                        <option value="{{ type_id }}" 
+                                {% if type_id == filter_type %}selected{% endif %}>
+                            {{ type_name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div class="col-md-2">
+                    <label for="view" class="form-label">View</label>
+                    <select class="form-select" id="view" name="view" onchange="this.form.submit()">
+                        {% for view_id, view_name in view_modes %}
+                        <option value="{{ view_id }}" 
+                                {% if view_id == filter_view %}selected{% endif %}>
+                            {{ view_name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            
+            <div class="row mt-3">
+                <div class="col-12">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div class="action-buttons">
+                            <button type="submit" class="btn-custom btn-primary">
+                                <i class="bi bi-filter"></i> Apply Filters
+                            </button>
+                            <a href="?" class="btn-custom btn-outline-secondary">
+                                <i class="bi bi-x-circle"></i> Clear Filters
+                            </a>
+                        </div>
+                        
+                        <div class="action-buttons">
+                            {% if has_data %}
+                            <a href="{% url 'export_daily_attendance_pdf' %}?date={{ report_date }}&class_level={{ filter_class }}&stream={{ filter_stream }}&attendance_type={{ filter_type }}&view={{ filter_view }}"
+                               class="btn-pdf" id="pdfDownloadBtn" onclick="showPDFLoading()">
+                                <i class="bi bi-file-pdf"></i> Download PDF Report
+                            </a>
+                            <div class="pdf-loading" id="pdfLoading">
+                                <div class="spinner-border spinner-border-sm" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                                Generating PDF...
+                            </div>
+                            {% endif %}
+                            <button class="btn-custom btn-outline-secondary" onclick="window.print()">
+                                <i class="bi bi-printer"></i> Print
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    {% if not has_data %}
+    <!-- Empty State -->
+    <div class="empty-state">
+        <div class="empty-state-icon">
+            <i class="bi bi-calendar-x"></i>
+        </div>
+        <h3 class="empty-state-title">No Attendance Data Found</h3>
+        <p class="empty-state-text">
+            No attendance records available for <strong>{{ formatted_date }}</strong> 
+            with the selected filters. Please try a different date or adjust your filters.
+        </p>
+        <a href="?date={% now 'Y-m-d' %}" class="btn-custom btn-primary">
+            <i class="bi bi-calendar-plus me-2"></i> View Today's Attendance
+        </a>
+    </div>
+    {% else %}
+    <!-- Statistics Overview -->
+    <div class="stats-container mb-4">
+        <div class="stat-card overall">
+            <div class="stat-card-header">
+                <div class="stat-card-icon">
+                    <i class="bi bi-graph-up"></i>
+                </div>
+            </div>
+            <div class="stat-value">{{ total_stats.attendance_rate|default:"0" }}%</div>
+            <div class="stat-label">Overall Attendance Rate</div>
+            <div class="progress">
+                <div class="progress-bar bg-success" role="progressbar" 
+                     style="width: {{ total_stats.attendance_rate|default:'0' }}%">
+                </div>
+            </div>
+        </div>
+        
+        <div class="stat-card present">
+            <div class="stat-card-header">
+                <div class="stat-card-icon">
+                    <i class="bi bi-check-circle"></i>
+                </div>
+            </div>
+            <div class="stat-value">{{ total_stats.present|default:"0" }}</div>
+            <div class="stat-label">Present Students</div>
+        </div>
+        
+        <div class="stat-card absent">
+            <div class="stat-card-header">
+                <div class="stat-card-icon">
+                    <i class="bi bi-x-circle"></i>
+                </div>
+            </div>
+            <div class="stat-value">{{ total_stats.absent|default:"0" }}</div>
+            <div class="stat-label">Absent Students</div>
+        </div>
+        
+        <div class="stat-card late">
+            <div class="stat-card-header">
+                <div class="stat-card-icon">
+                    <i class="bi bi-clock"></i>
+                </div>
+            </div>
+            <div class="stat-value">{{ total_stats.late|default:"0" }}</div>
+            <div class="stat-label">Late Arrivals</div>
+        </div>
+        
+        <div class="stat-card excused">
+            <div class="stat-card-header">
+                <div class="stat-card-icon">
+                    <i class="bi bi-envelope-paper"></i>
+                </div>
+            </div>
+            <div class="stat-value">{{ total_stats.excused|default:"0" }}</div>
+            <div class="stat-label">Excused Absences</div>
+        </div>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="summary-card">
+                <div class="summary-card-header">
+                    <h5 class="summary-card-title">
+                        <i class="bi bi-calendar-event"></i> Sessions
+                    </h5>
+                </div>
+                <div class="stat-value text-primary">{{ total_stats.sessions|default:"0" }}</div>
+                <p class="text-muted mb-0">Total attendance sessions conducted</p>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <div class="summary-card">
+                <div class="summary-card-header">
+                    <h5 class="summary-card-title">
+                        <i class="bi bi-people"></i> Students
+                    </h5>
+                </div>
+                <div class="stat-value text-primary">{{ total_stats.students|default:"0" }}</div>
+                <p class="text-muted mb-0">Total student attendance records</p>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <div class="summary-card">
+                <div class="summary-card-header">
+                    <h5 class="summary-card-title">
+                        <i class="bi bi-building"></i> Classes
+                    </h5>
+                </div>
+                <div class="stat-value text-primary">{{ total_classes|default:"0" }}</div>
+                <p class="text-muted mb-0">Classes with attendance records</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <ul class="nav nav-tabs mb-4" id="reportTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="summary-tab" data-bs-toggle="tab" 
+                    data-bs-target="#summary" type="button" role="tab">
+                <i class="bi bi-grid-3x3-gap me-2"></i> Summary View
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="detailed-tab" data-bs-toggle="tab" 
+                    data-bs-target="#detailed" type="button" role="tab">
+                <i class="bi bi-list-task me-2"></i> Detailed View
+            </button>
+        </li>
+    </ul>
+
+    <!-- Tab Content -->
+    <div class="tab-content" id="reportTabsContent">
+        <!-- Summary Tab -->
+        <div class="tab-pane fade show active" id="summary" role="tabpanel">
+            {% for class_data in class_levels_data %}
+            <div class="class-card">
+                <div class="class-header">
+                    <div class="class-info">
+                        <h5>{{ class_data.class_level.name }} {{ class_data.stream.stream_letter }}</h5>
+                        <small>
+                            {{ class_data.stats.total_sessions }} sessions • 
+                            {{ class_data.stats.total_students }} attendance records
+                        </small>
+                    </div>
+                    <div class="attendance-rate 
+                        {% if class_data.stats.attendance_rate >= 80 %}high
+                        {% elif class_data.stats.attendance_rate >= 60 %}medium
+                        {% else %}low{% endif %}">
+                        {{ class_data.stats.attendance_rate|default:"0" }}%
+                    </div>
+                </div>
+                
+                <!-- Session Statistics -->
+                <div class="row mb-3">
+                    <div class="col-md-8">
+                        <div class="d-flex flex-wrap gap-2">
+                            <span class="stat-badge present">
+                                <i class="bi bi-check-circle"></i> {{ class_data.stats.present|default:"0" }} Present
+                            </span>
+                            <span class="stat-badge absent">
+                                <i class="bi bi-x-circle"></i> {{ class_data.stats.absent|default:"0" }} Absent
+                            </span>
+                            <span class="stat-badge late">
+                                <i class="bi bi-clock"></i> {{ class_data.stats.late|default:"0" }} Late
+                            </span>
+                            <span class="stat-badge excused">
+                                <i class="bi bi-envelope-paper"></i> {{ class_data.stats.excused|default:"0" }} Excused
+                            </span>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="progress">
+                            <div class="progress-bar bg-success" role="progressbar" 
+                                 style="width: {{ class_data.stats.attendance_rate|default:'0' }}%">
+                            </div>
+                        </div>
+                        <small class="text-muted text-center d-block mt-1">
+                            Attendance Rate: {{ class_data.stats.attendance_rate|default:"0" }}%
+                        </small>
+                    </div>
+                </div>
+                
+                <!-- Sessions List -->
+                <div class="sessions-list">
+                    {% for session_data in class_data.sessions %}
+                    <div class="session-card">
+                        <div class="session-header">
+                            <div>
+                                <h6 class="session-title">
+                                    {% if session_data.session.attendance_type == 'CLASS' %}
+                                    <i class="bi bi-people"></i> Class Attendance
+                                    {% else %}
+                                    <i class="bi bi-book"></i> {{ session_data.session.subject.name|default:"Subject" }}
+                                    {% endif %}
+                                </h6>
+                                <div class="session-meta">
+                                    <i class="bi bi-clock"></i> {{ session_data.time }}
+                                    {% if session_data.session.period %}
+                                    • Period {{ session_data.session.period }}
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="session-stats">
+                                <span class="stat-badge present">{{ session_data.stats.present|default:"0" }}P</span>
+                                <span class="stat-badge absent">{{ session_data.stats.absent|default:"0" }}A</span>
+                                <span class="text-muted">{{ session_data.attendance_rate|default:"0" }}%</span>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        
+        <!-- Detailed Tab -->
+        <div class="tab-pane fade" id="detailed" role="tabpanel">
+            {% if student_summary %}
+            <div class="class-card">
+                <div class="class-header">
+                    <h5 class="summary-card-title">
+                        <i class="bi bi-people"></i> Student Attendance Summary
+                    </h5>
+                    <div class="summary-card-badge badge-high">
+                        {{ student_summary|length }} Students
+                    </div>
+                </div>
+                
+                <div class="table-responsive">
+                    <table class="table data-table">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Student</th>
+                                <th>Class</th>
+                                <th>Sessions</th>
+                                <th>Present</th>
+                                <th>Absent</th>
+                                <th>Late</th>
+                                <th>Excused</th>
+                                <th>Rate</th>
+                                <th>Classes</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for student in student_summary %}
+                            <tr>
+                                <td>{{ forloop.counter }}</td>
+                                <td>
+                                    <strong>{{ student.student.full_name }}</strong>
+                                    <br>
+                                    <small class="text-muted">
+                                        {{ student.student.registration_number|default:"N/A" }}
+                                    </small>
+                                </td>
+                                <td>
+                                    {% if student.student.class_level %}
+                                        {{ student.student.class_level.name }}
+                                        {% if student.student.stream_class %}
+                                            {{ student.student.stream_class.stream_letter }}
+                                        {% endif %}
+                                    {% else %}
+                                        <span class="text-muted">Not assigned</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ student.sessions|default:"0" }}</td>
+                                <td class="text-success">{{ student.present|default:"0" }}</td>
+                                <td class="text-danger">{{ student.absent|default:"0" }}</td>
+                                <td class="text-warning">{{ student.late|default:"0" }}</td>
+                                <td class="text-info">{{ student.excused|default:"0" }}</td>
+                                <td>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <strong>{{ student.attendance_rate|default:"0" }}%</strong>
+                                        <div class="progress" style="width: 100px; height: 5px;">
+                                            <div class="progress-bar bg-success" role="progressbar" 
+                                                 style="width: {{ student.attendance_rate|default:'0' }}%">
+                                            </div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="d-flex flex-wrap gap-1">
+                                        {% for class_name in student.classes_list %}
+                                        <span class="badge bg-light text-dark">{{ class_name }}</span>
+                                        {% endfor %}
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            {% else %}
+            <div class="empty-state">
+                <div class="empty-state-icon">
+                    <i class="bi bi-people"></i>
+                </div>
+                <h3 class="empty-state-title">No Student Summary Available</h3>
+                <p class="empty-state-text">
+                    Switch to "Detailed View" to see student-by-student breakdown. 
+                    This view requires student attendance data for the selected filters.
+                </p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    
+    <!-- Report Footer -->
+    <div class="mt-4 text-center text-muted">
+        <p>
+            Report generated on {% now "F j, Y" %} at {% now "g:i A" %} | 
+            Showing {{ total_stats.sessions|default:"0" }} sessions across {{ total_classes|default:"0" }} classes
+        </p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Enable stream dropdown when class is selected
+        const classSelect = document.getElementById('class_level');
+        const streamSelect = document.getElementById('stream');
+        
+        if (classSelect) {
+            classSelect.addEventListener('change', function() {
+                streamSelect.disabled = !this.value;
+                if (!this.value) {
+                    streamSelect.value = '';
+                }
+            });
+        }
+        
+        // Initialize tab based on current view
+        const currentView = '{{ filter_view }}';
+        if (currentView === 'detailed') {
+            const detailedTab = new bootstrap.Tab(document.getElementById('detailed-tab'));
+            detailedTab.show();
+        }
+        
+        // Auto-submit form on filter changes
+        const filterElements = document.querySelectorAll('#reportFilters select, #reportFilters input');
+        filterElements.forEach(element => {
+            element.addEventListener('change', function() {
+                if (this.id !== 'view') {
+                    this.form.submit();
+                }
+            });
+        });
+        
+        // Print functionality
+        window.printReport = function() {
+            window.print();
+        };
+        
+        // Show PDF loading indicator
+        window.showPDFLoading = function() {
+            const pdfBtn = document.getElementById('pdfDownloadBtn');
+            const pdfLoading = document.getElementById('pdfLoading');
+            
+            if (pdfBtn && pdfLoading) {
+                pdfBtn.style.display = 'none';
+                pdfLoading.style.display = 'flex';
+                
+                // Re-enable the button after 10 seconds in case of error
+                setTimeout(() => {
+                    pdfBtn.style.display = 'flex';
+                    pdfLoading.style.display = 'none';
+                }, 10000);
+            }
+        };
+        
+        // Check if PDF generation failed and restore button
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.has('pdf_error')) {
+            const pdfBtn = document.getElementById('pdfDownloadBtn');
+            const pdfLoading = document.getElementById('pdfLoading');
+            
+            if (pdfBtn && pdfLoading) {
+                pdfBtn.style.display = 'flex';
+                pdfLoading.style.display = 'none';
+                
+                // Show error message if PDF generation failed
+                const errorMsg = urlParams.get('pdf_error');
+                if (errorMsg) {
+                    alert('PDF generation failed: ' + decodeURIComponent(errorMsg));
+                }
+            }
+        }
+    });
+</script>
+{% endblock %}

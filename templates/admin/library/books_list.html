@@ -1,0 +1,1547 @@
+{% extends 'admin/base.html' %}
+{% load static %}
+{% block title %} Books Management {% endblock title %}
+
+{% block breadcrumb %}
+    <button type="button" class="btn btn-primary" data-toggle="modal" data-target="#addBookModal">
+        <i class="fas fa-plus"></i> Add Book
+    </button>    
+    <button class="btn btn-outline-secondary ml-2" onclick="location.reload()">
+        <i class="fas fa-sync-alt"></i> Refresh
+    </button>
+{% endblock breadcrumb %}
+
+{% block extra_css %}
+<style>
+    .table th {
+        font-weight: 600;
+        border-bottom-width: 2px;
+    }
+    .table td {
+        vertical-align: middle;
+    }
+    .badge {
+        font-size: 0.85em;
+        padding: 0.4em 0.8em;
+    }
+    .modal-header {
+        border-radius: 0;
+    }
+    
+    /* DataTable Styles */
+    .dataTables_wrapper .dataTables_filter {
+        float: right;
+        text-align: right;
+    }
+    .dataTables_wrapper .dataTables_length {
+        float: left;
+    }
+    .dataTables_wrapper .dataTables_paginate {
+        float: right;
+        margin-top: 10px;
+    }
+    .success-toast, .error-toast {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 1056;
+        min-width: 300px;
+    }
+    
+    /* Status badges */
+    .status-available { background-color: #28a745; color: white; }
+    .status-borrowed { background-color: #007bff; color: white; }
+    .status-reserved { background-color: #ffc107; color: #212529; }
+    .status-damaged { background-color: #dc3545; color: white; }
+    .status-lost { background-color: #6c757d; color: white; }
+    .status-under_maintenance { background-color: #17a2b8; color: white; }
+    
+    /* Condition badges */
+    .condition-excellent { background-color: #28a745; color: white; }
+    .condition-good { background-color: #20c997; color: white; }
+    .condition-fair { background-color: #ffc107; color: #212529; }
+    .condition-poor { background-color: #fd7e14; color: white; }
+    .condition-damaged { background-color: #dc3545; color: white; }
+    
+    /* Type badges */
+    .type-textbook { background-color: #6610f2; color: white; }
+    .type-reference { background-color: #e83e8c; color: white; }
+    .type-fiction { background-color: #17a2b8; color: white; }
+    .type-non_fiction { background-color: #20c997; color: white; }
+    .type-academic { background-color: #6f42c1; color: white; }
+    .type-general { background-color: #6c757d; color: white; }
+    
+    /* Select2 in modal fix */
+    .select2-container {
+        z-index: 1056 !important;
+    }
+    .select2-dropdown {
+        z-index: 1057 !important;
+    }
+    
+    /* Quick action buttons */
+    .quick-actions {
+        display: flex;
+        gap: 4px;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .quick-action-btn {
+        width: 28px;
+        height: 28px;
+        padding: 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        border: none;
+        transition: all 0.2s ease;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+    }
+
+    .quick-action-btn i {
+        font-size: 0.75rem;
+        color: #ffffff !important;
+    }
+
+    .btn-warning.quick-action-btn i {
+        color: #212529 !important;
+    }
+
+    .quick-action-btn:hover {
+        transform: scale(1.1);
+        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        filter: brightness(1.05);
+    }
+
+    .btn-success.quick-action-btn { background-color: #28a745; }
+    .btn-primary.quick-action-btn { background-color: #007bff; }
+    .btn-danger.quick-action-btn  { background-color: #dc3545; }
+    .btn-secondary.quick-action-btn { background-color: #6c757d; }
+    .btn-warning.quick-action-btn { background-color: #ffc107; }
+    .btn-info.quick-action-btn { background-color: #17a2b8; }
+    
+    /* Book details */
+    .book-title {
+        font-weight: 600;
+        font-size: 0.95rem;
+        margin-bottom: 2px;
+    }
+    .book-author {
+        font-size: 0.85rem;
+        color: #6c757d;
+    }
+    .book-code {
+        background-color: #e9ecef;
+        color: #495057;
+        padding: 2px 6px;
+        border-radius: 3px;
+        font-family: 'Courier New', monospace;
+        font-size: 0.85em;
+    }
+    
+    /* Copy indicators */
+    .copy-indicator {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+    }
+    .copy-badge {
+        font-size: 0.75rem;
+        padding: 2px 6px;
+        border-radius: 10px;
+    }
+    
+    /* Modal sizes */
+    .modal-xl {
+        max-width: 1200px;
+    }
+    
+    /* Required field indicator */
+    .required-field::after {
+        content: " *";
+        color: #dc3545;
+    }
+</style>
+{% endblock extra_css %}
+
+{% block content %}
+<section class="content">
+    <div class="container-fluid"> 
+        <div id="success-toast" class="alert alert-success alert-dismissible fade success-toast" style="display: none;" role="alert">
+            <strong><i class="fas fa-check-circle"></i> Success!</strong> 
+            <span id="success-message"></span>
+            <button type="button" class="close" onclick="$('#success-toast').fadeOut()" data-dismiss="alert" aria-label="Close">
+                <span aria-hidden="true">&times;</span>
+            </button>
+        </div>
+
+        <div id="error-toast" class="alert alert-danger alert-dismissible fade error-toast" style="display: none;" role="alert">
+            <strong><i class="fas fa-exclamation-circle"></i> Error!</strong> 
+            <span id="error-message"></span>
+            <button type="button" class="close" onclick="$('#error-toast').fadeOut()" data-dismiss="alert" aria-label="Close">
+                <span aria-hidden="true">&times;</span>
+            </button>
+        </div>
+
+        <div class="row">
+            <div class="col-lg-12">
+                <div class="card shadow-lg">
+                    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                        <h6 class="header-title mb-0 text-uppercase">
+                            <i class="fas fa-book"></i> Books Management
+                        </h6>
+                        <div class="d-flex align-items-center">
+                            <span class="badge badge-success mr-2">
+                                <i class="fas fa-check-circle"></i> Available: <span id="available-count">{{ available_books_count }}</span>
+                            </span>
+                            <span class="badge badge-info mr-2">
+                                <i class="fas fa-book-reader"></i> Borrowed: <span id="borrowed-count">{{ borrowed_books_count }}</span>
+                            </span>
+                            <span class="badge badge-light">
+                                Total: <span id="total-count">{{ books|length }}</span>
+                            </span>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover text-nowrap table-responsive-sm table-bordered table-striped table-sm display" id="books-table">
+                                <thead class="bg-light">
+                                    <tr>
+                                        <th>Book Details</th>
+                                        <th>Category</th>
+                                        <th>Identification</th>
+                                        <th>Status & Type</th>
+                                        <th>Copies</th>
+                                        <th>Condition</th>
+                                        <th class="text-center">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for book in books %}
+                                    <tr id="row-{{ book.id }}">
+                                        <td>
+                                            <div class="book-title">{{ book.title|truncatechars:60 }}</div>
+                                            <div class="book-author">by {{ book.author|truncatechars:40 }}</div>
+                                            {% if book.isbn %}
+                                            <small class="text-muted">ISBN: {{ book.isbn }}</small>
+                                            {% endif %}
+                                            {% if book.publisher %}
+                                            <small class="text-muted d-block">Publisher: {{ book.publisher }}</small>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if book.category %}
+                                                <span class="badge badge-info">{{ book.category.name }}</span>
+                                            {% else %}
+                                                <span class="text-muted">-</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <div class="book-code mb-1">{{ book.accession_number }}</div>
+                                            {% if book.barcode %}
+                                            <small class="text-muted">Barcode: {{ book.barcode }}</small>
+                                            {% endif %}
+                                            {% if book.location_code %}
+                                            <small class="text-muted d-block">Location: {{ book.location_code }}</small>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <div class="mb-1">
+                                                <span class="badge status-{{ book.status }}" id="status-badge-{{ book.id }}">
+                                                    {{ book.get_status_display }}
+                                                </span>
+                                            </div>
+                                            <div>
+                                                <span class="badge type-{{ book.book_type }}">
+                                                    {{ book.get_book_type_display }}
+                                                </span>
+                                                {% if book.is_reference %}
+                                                <span class="badge badge-warning">Reference</span>
+                                                {% endif %}
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <div class="copy-indicator">
+                                                <span class="copy-badge badge-success" title="Available">
+                                                    <i class="fas fa-check"></i> {{ book.available_copies }}
+                                                </span>
+                                                <span class="copy-badge badge-info" title="Borrowed">
+                                                    <i class="fas fa-book-reader"></i> {{ book.borrowed_copies }}
+                                                </span>
+                                                <span class="copy-badge badge-secondary" title="Total">
+                                                    <i class="fas fa-copy"></i> {{ book.total_copies }}
+                                                </span>
+                                            </div>
+                                            <small class="text-muted">Fine: TZS {{ book.fine_amount|floatformat:0 }}/day</small>
+                                        </td>
+                                        <td>
+                                            <span class="badge condition-{{ book.condition }}" id="condition-badge-{{ book.id }}">
+                                                {{ book.get_condition_display }}
+                                            </span>
+                                        </td>
+                                        <td class="text-center">
+                                            <div class="quick-actions">
+                                                <!-- Quick Status Toggle -->
+                                                {% if book.status == 'available' %}
+                                                <button class="btn btn-sm btn-warning quick-action-btn toggle-status-btn" 
+                                                        data-id="{{ book.id }}"
+                                                        data-title="{{ book.title }}"
+                                                        data-current-status="available"
+                                                        title="Mark as Unavailable">
+                                                    <i class="fas fa-toggle-off"></i>
+                                                </button>
+                                                {% else %}
+                                                <button class="btn btn-sm btn-success quick-action-btn toggle-status-btn" 
+                                                        data-id="{{ book.id }}"
+                                                        data-title="{{ book.title }}"
+                                                        data-current-status="unavailable"
+                                                        title="Mark as Available">
+                                                    <i class="fas fa-toggle-on"></i>
+                                                </button>
+                                                {% endif %}
+                                                
+                                                <!-- Reference Toggle -->
+                                                {% if book.is_reference %}
+                                                <button class="btn btn-sm btn-info quick-action-btn toggle-reference-btn" 
+                                                        data-id="{{ book.id }}"
+                                                        data-title="{{ book.title }}"
+                                                        data-current-reference="true"
+                                                        title="Mark as Non-Reference">
+                                                    <i class="fas fa-bookmark"></i>
+                                                </button>
+                                                {% else %}
+                                                <button class="btn btn-sm btn-secondary quick-action-btn toggle-reference-btn" 
+                                                        data-id="{{ book.id }}"
+                                                        data-title="{{ book.title }}"
+                                                        data-current-reference="false"
+                                                        title="Mark as Reference">
+                                                    <i class="far fa-bookmark"></i>
+                                                </button>
+                                                {% endif %}
+                                                
+                                                <!-- Edit Button -->
+                                                <button class="btn btn-sm btn-primary quick-action-btn edit-btn" 
+                                                        data-id="{{ book.id }}"
+                                                        data-title="{{ book.title }}"
+                                                        data-author="{{ book.author }}"
+                                                        data-isbn="{{ book.isbn }}"
+                                                        data-publisher="{{ book.publisher }}"
+                                                        data-publication_year="{{ book.publication_year }}"
+                                                        data-edition="{{ book.edition }}"
+                                                        data-category="{{ book.category.id|default:'' }}"
+                                                        data-book_type="{{ book.book_type }}"
+                                                        data-accession_number="{{ book.accession_number }}"
+                                                        data-barcode="{{ book.barcode }}"
+                                                        data-location_code="{{ book.location_code }}"
+                                                        data-pages="{{ book.pages }}"
+                                                        data-language="{{ book.language }}"
+                                                        data-description="{{ book.description }}"
+                                                        data-keywords="{{ book.keywords }}"
+                                                        data-condition="{{ book.condition }}"
+                                                        data-status="{{ book.status }}"
+                                                        data-is_reference="{{ book.is_reference|yesno:'true,false' }}"
+                                                        data-fine_amount="{{ book.fine_amount }}"
+                                                        data-total_copies="{{ book.total_copies }}"
+                                                        data-borrowed_copies="{{ book.borrowed_copies }}"
+                                                        title="Edit Book">
+                                                    <i class="fas fa-edit"></i>
+                                                </button>
+                                                
+                                                <!-- Delete Button -->
+                                                <button class="btn btn-sm btn-danger quick-action-btn delete-btn" 
+                                                        data-id="{{ book.id }}"
+                                                        data-title="{{ book.title }}"
+                                                        title="Delete Book">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Add Book Modal -->
+<div class="modal fade" id="addBookModal" tabindex="-1" role="dialog" aria-labelledby="addModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="addModalLabel">
+                    <i class="fas fa-plus-circle"></i> Add New Book
+                </h5>
+                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <form id="add-form">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-8">
+                            <h6 class="border-bottom pb-2 mb-3"><i class="fas fa-info-circle"></i> Basic Information</h6>
+                            <div class="row">
+                                <div class="col-md-12">
+                                    <div class="form-group">
+                                        <label for="title" class="required-field">Book Title</label>
+                                        <input type="text" class="form-control" id="title" name="title" required 
+                                               placeholder="e.g., Introduction to Computer Science" maxlength="200">
+                                        <small class="form-text text-muted">Full title of the book (max 200 characters)</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label for="author" class="required-field">Author</label>
+                                        <input type="text" class="form-control" id="author" name="author" required 
+                                               placeholder="e.g., John Doe" maxlength="200">
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label for="isbn">ISBN</label>
+                                        <input type="text" class="form-control" id="isbn" name="isbn" 
+                                               placeholder="e.g., 978-0-123456-78-9" maxlength="20">
+                                        <small class="form-text text-muted">International Standard Book Number (13 or 10 digits)</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label for="publisher">Publisher</label>
+                                        <input type="text" class="form-control" id="publisher" name="publisher" 
+                                               placeholder="e.g., Oxford University Press" maxlength="100">
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="form-group">
+                                        <label for="publication_year">Publication Year</label>
+                                        <input type="number" class="form-control" id="publication_year" name="publication_year" 
+                                               placeholder="e.g., 2023" min="1900" max="{% now 'Y' %}">
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="form-group">
+                                        <label for="edition">Edition</label>
+                                        <input type="text" class="form-control" id="edition" name="edition" 
+                                               placeholder="e.g., 3rd" maxlength="50">
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <h6 class="border-bottom pb-2 mb-3 mt-4"><i class="fas fa-tags"></i> Classification</h6>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label for="category" class="required-field">Category</label>
+                                        <select class="form-control select2bs4" id="category" name="category" required style="width: 100%;">
+                                            <option value="">Select Category</option>
+                                            {% for category in categories %}
+                                                <option value="{{ category.id }}">{{ category.name }} ({{ category.code }})</option>
+                                            {% endfor %}
+                                        </select>
+                                        <small class="form-text text-muted">Book category for classification</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label for="book_type" class="required-field">Book Type</label>
+                                        <select class="form-control select2bs4" id="book_type" name="book_type" required style="width: 100%;">
+                                            <option value="">Select Book Type</option>
+                                            {% for type_code, type_name in book_type_choices %}
+                                                <option value="{{ type_code }}" {% if type_code == 'textbook' %}selected{% endif %}>{{ type_name }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <h6 class="border-bottom pb-2 mb-3 mt-4"><i class="fas fa-fingerprint"></i> Identification</h6>
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <div class="form-group">
+                                        <label for="accession_number">Accession Number</label>
+                                        <input type="text" class="form-control" id="accession_number" name="accession_number" 
+                                               placeholder="Will be auto-generated" maxlength="50" readonly>
+                                        <small class="form-text text-muted">Unique library identification number (auto-generated)</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="form-group">
+                                        <label for="barcode">Barcode</label>
+                                        <input type="text" class="form-control" id="barcode" name="barcode" 
+                                               placeholder="Will be auto-generated" maxlength="50" readonly>
+                                        <small class="form-text text-muted">Barcode for quick scanning (auto-generated)</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="form-group">
+                                        <label for="location_code">Location Code</label>
+                                        <input type="text" class="form-control" id="location_code" name="location_code" 
+                                               placeholder="e.g., A-12-3" maxlength="20">
+                                        <small class="form-text text-muted">Shelf location (Section-Row-Shelf)</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-4">
+                            <h6 class="border-bottom pb-2 mb-3"><i class="fas fa-book-open"></i> Book Details</h6>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label for="pages">Pages</label>
+                                        <input type="number" class="form-control" id="pages" name="pages" 
+                                               placeholder="e.g., 350" min="1">
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label for="language" class="required-field">Language</label>
+                                        <input type="text" class="form-control" id="language" name="language" 
+                                               placeholder="e.g., English" maxlength="50" value="English" required>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label for="keywords">Keywords</label>
+                                <input type="text" class="form-control" id="keywords" name="keywords" 
+                                       placeholder="e.g., computer, programming, algorithms" maxlength="200">
+                                <small class="form-text text-muted">Comma-separated keywords for search</small>
+                            </div>
+                            <div class="form-group">
+                                <label for="description">Description</label>
+                                <textarea class="form-control" id="description" name="description" rows="4" 
+                                          placeholder="Brief description of the book"></textarea>
+                            </div>
+                            
+                            <h6 class="border-bottom pb-2 mb-3 mt-4"><i class="fas fa-heartbeat"></i> Physical Condition</h6>
+                            <div class="form-group">
+                                <label for="condition" class="required-field">Condition</label>
+                                <select class="form-control select2bs4" id="condition" name="condition" required style="width: 100%;">
+                                    <option value="">Select Condition</option>
+                                    {% for condition_code, condition_name in condition_choices %}
+                                        <option value="{{ condition_code }}" {% if condition_code == 'good' %}selected{% endif %}>{{ condition_name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            
+                            <h6 class="border-bottom pb-2 mb-3 mt-4"><i class="fas fa-cogs"></i> Status & Settings</h6>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label for="status" class="required-field">Status</label>
+                                        <select class="form-control select2bs4" id="status" name="status" required style="width: 100%;">
+                                            <option value="">Select Status</option>
+                                            {% for status_code, status_name in status_choices %}
+                                                <option value="{{ status_code }}" {% if status_code == 'available' %}selected{% endif %}>{{ status_name }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label for="fine_amount" class="required-field">Fine Amount (TZS)</label>
+                                        <input type="number" class="form-control" id="fine_amount" name="fine_amount" 
+                                               value="500" min="0" step="100" required>
+                                        <small class="form-text text-muted">Per day for overdue</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="custom-control custom-switch mt-2">
+                                <input type="checkbox" class="custom-control-input" id="is_reference" name="is_reference">
+                                <label class="custom-control-label" for="is_reference">Reference Book (Cannot be borrowed)</label>
+                            </div>
+                            
+                            <h6 class="border-bottom pb-2 mb-3 mt-4"><i class="fas fa-copy"></i> Copies</h6>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label for="total_copies" class="required-field">Total Copies</label>
+                                        <input type="number" class="form-control" id="total_copies" name="total_copies" 
+                                               value="1" min="1" required>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label for="borrowed_copies">Borrowed Copies</label>
+                                        <input type="number" class="form-control" id="borrowed_copies" name="borrowed_copies" 
+                                               value="0" min="0">
+                                        <small class="form-text text-muted">Currently borrowed</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="alert alert-info mt-3">
+                                <small>
+                                    <i class="fas fa-info-circle"></i> 
+                                    <strong>Note:</strong> Available copies will be calculated automatically: Available = Total - Borrowed
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal" id="cancel-add-btn">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="save-btn">
+                        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="display: none;"></span>
+                        Save Book
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Book Modal -->
+<div class="modal fade" id="editBookModal" tabindex="-1" role="dialog" aria-labelledby="editModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-warning text-dark">
+                <h5 class="modal-title" id="editModalLabel">
+                    <i class="fas fa-edit"></i> Edit Book
+                </h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <form id="edit-form">
+                {% csrf_token %}
+                <input type="hidden" id="edit-id" name="id">
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-8">
+                            <h6 class="border-bottom pb-2 mb-3"><i class="fas fa-info-circle"></i> Basic Information</h6>
+                            <div class="row">
+                                <div class="col-md-12">
+                                    <div class="form-group">
+                                        <label for="edit-title" class="required-field">Book Title</label>
+                                        <input type="text" class="form-control" id="edit-title" name="title" required 
+                                               placeholder="e.g., Introduction to Computer Science" maxlength="200">
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label for="edit-author" class="required-field">Author</label>
+                                        <input type="text" class="form-control" id="edit-author" name="author" required 
+                                               placeholder="e.g., John Doe" maxlength="200">
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label for="edit-isbn">ISBN</label>
+                                        <input type="text" class="form-control" id="edit-isbn" name="isbn" 
+                                               placeholder="e.g., 978-0-123456-78-9" maxlength="20">
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label for="edit-publisher">Publisher</label>
+                                        <input type="text" class="form-control" id="edit-publisher" name="publisher" 
+                                               placeholder="e.g., Oxford University Press" maxlength="100">
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="form-group">
+                                        <label for="edit-publication_year">Publication Year</label>
+                                        <input type="number" class="form-control" id="edit-publication_year" name="publication_year" 
+                                               placeholder="e.g., 2023" min="1900" max="{% now 'Y' %}">
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="form-group">
+                                        <label for="edit-edition">Edition</label>
+                                        <input type="text" class="form-control" id="edit-edition" name="edition" 
+                                               placeholder="e.g., 3rd" maxlength="50">
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <h6 class="border-bottom pb-2 mb-3 mt-4"><i class="fas fa-tags"></i> Classification</h6>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label for="edit-category" class="required-field">Category</label>
+                                        <select class="form-control select2bs4" id="edit-category" name="category" required style="width: 100%;">
+                                            <option value="">Select Category</option>
+                                            {% for category in categories %}
+                                                <option value="{{ category.id }}">{{ category.name }} ({{ category.code }})</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label for="edit-book_type" class="required-field">Book Type</label>
+                                        <select class="form-control select2bs4" id="edit-book_type" name="book_type" required style="width: 100%;">
+                                            <option value="">Select Book Type</option>
+                                            {% for type_code, type_name in book_type_choices %}
+                                                <option value="{{ type_code }}">{{ type_name }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <h6 class="border-bottom pb-2 mb-3 mt-4"><i class="fas fa-fingerprint"></i> Identification</h6>
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <div class="form-group">
+                                        <label for="edit-accession_number">Accession Number</label>
+                                        <input type="text" class="form-control" id="edit-accession_number" name="accession_number" 
+                                               placeholder="Auto-generated" maxlength="50" readonly>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="form-group">
+                                        <label for="edit-barcode">Barcode</label>
+                                        <input type="text" class="form-control" id="edit-barcode" name="barcode" 
+                                               placeholder="Auto-generated" maxlength="50" readonly>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="form-group">
+                                        <label for="edit-location_code">Location Code</label>
+                                        <input type="text" class="form-control" id="edit-location_code" name="location_code" 
+                                               placeholder="e.g., A-12-3" maxlength="20">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-4">
+                            <h6 class="border-bottom pb-2 mb-3"><i class="fas fa-book-open"></i> Book Details</h6>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label for="edit-pages">Pages</label>
+                                        <input type="number" class="form-control" id="edit-pages" name="pages" 
+                                               placeholder="e.g., 350" min="1">
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label for="edit-language" class="required-field">Language</label>
+                                        <input type="text" class="form-control" id="edit-language" name="language" 
+                                               placeholder="e.g., English" maxlength="50" required>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label for="edit-keywords">Keywords</label>
+                                <input type="text" class="form-control" id="edit-keywords" name="keywords" 
+                                       placeholder="e.g., computer, programming, algorithms" maxlength="200">
+                            </div>
+                            <div class="form-group">
+                                <label for="edit-description">Description</label>
+                                <textarea class="form-control" id="edit-description" name="description" rows="4" 
+                                          placeholder="Brief description of the book"></textarea>
+                            </div>
+                            
+                            <h6 class="border-bottom pb-2 mb-3 mt-4"><i class="fas fa-heartbeat"></i> Physical Condition</h6>
+                            <div class="form-group">
+                                <label for="edit-condition" class="required-field">Condition</label>
+                                <select class="form-control select2bs4" id="edit-condition" name="condition" required style="width: 100%;">
+                                    <option value="">Select Condition</option>
+                                    {% for condition_code, condition_name in condition_choices %}
+                                        <option value="{{ condition_code }}">{{ condition_name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            
+                            <h6 class="border-bottom pb-2 mb-3 mt-4"><i class="fas fa-cogs"></i> Status & Settings</h6>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label for="edit-status" class="required-field">Status</label>
+                                        <select class="form-control select2bs4" id="edit-status" name="status" required style="width: 100%;">
+                                            <option value="">Select Status</option>
+                                            {% for status_code, status_name in status_choices %}
+                                                <option value="{{ status_code }}">{{ status_name }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label for="edit-fine_amount" class="required-field">Fine Amount (TZS)</label>
+                                        <input type="number" class="form-control" id="edit-fine_amount" name="fine_amount" 
+                                               min="0" step="100" required>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="custom-control custom-switch mt-2">
+                                <input type="checkbox" class="custom-control-input" id="edit-is_reference" name="is_reference">
+                                <label class="custom-control-label" for="edit-is_reference">Reference Book (Cannot be borrowed)</label>
+                            </div>
+                            
+                            <h6 class="border-bottom pb-2 mb-3 mt-4"><i class="fas fa-copy"></i> Copies</h6>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label for="edit-total_copies" class="required-field">Total Copies</label>
+                                        <input type="number" class="form-control" id="edit-total_copies" name="total_copies" 
+                                               min="1" required>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label for="edit-borrowed_copies">Borrowed Copies</label>
+                                        <input type="number" class="form-control" id="edit-borrowed_copies" name="borrowed_copies" 
+                                               min="0">
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="alert alert-info mt-3">
+                                <small>
+                                    <i class="fas fa-info-circle"></i> 
+                                    <strong>Note:</strong> Available copies: <span id="edit-available-calculated">0</span> (Total - Borrowed)
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal" id="cancel-edit-btn">Cancel</button>
+                    <button type="submit" class="btn btn-warning" id="update-btn">
+                        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="display: none;"></span>
+                        Update Book
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Book Modal -->
+<div class="modal fade" id="deleteBookModal" tabindex="-1" role="dialog" aria-labelledby="deleteModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="deleteModalLabel">
+                    <i class="fas fa-exclamation-triangle"></i> Confirm Deletion
+                </h5>
+                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete the book <strong id="delete-book-title"></strong>?</p>
+                <p class="text-danger"><small>This action cannot be undone. All associated data (borrows, fines, etc.) will be affected.</small></p>
+                <div class="alert alert-warning mt-3">
+                    <small>
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <strong>Warning:</strong> If this book has active borrows or fines, deletion may cause data inconsistency.
+                    </small>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal" id="cancel-delete-btn">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirm-delete-btn">
+                    <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="display: none;"></span>
+                    Delete
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+
+<script>
+    $(document).ready(function() {
+        // Initialize Select2 for all select fields
+        function initializeSelect2() {
+            $('.select2bs4').select2({
+                theme: 'bootstrap4',
+                dropdownParent: $('.modal:visible'),
+                width: '100%',
+                placeholder: 'Select an option',
+                allowClear: false,
+                minimumResultsForSearch: 10
+            });
+        }
+        
+        // Initialize on page load
+        initializeSelect2();
+
+        // Reinitialize when modals are shown
+        $('#addBookModal').on('shown.bs.modal', function() {
+            $('#category, #book_type, #condition, #status').select2({
+                theme: 'bootstrap4',
+                dropdownParent: $('#addBookModal'),
+                width: '100%',
+                placeholder: 'Select an option',
+                allowClear: false
+            });
+        });
+
+        $('#editBookModal').on('shown.bs.modal', function() {
+            $('#edit-category, #edit-book_type, #edit-condition, #edit-status').select2({
+                theme: 'bootstrap4',
+                dropdownParent: $('#editBookModal'),
+                width: '100%',
+                placeholder: 'Select an option',
+                allowClear: false
+            });
+        });
+
+        // Destroy Select2 when modals are hidden
+        $('#addBookModal').on('hidden.bs.modal', function() {
+            $('#category, #book_type, #condition, #status').select2('destroy');
+            $('#add-form')[0].reset();
+        });
+
+        $('#editBookModal').on('hidden.bs.modal', function() {
+            $('#edit-category, #edit-book_type, #edit-condition, #edit-status').select2('destroy');
+        });
+
+        // Initialize DataTable
+        var table = $('#books-table').DataTable({
+            "dom": "<'row'<'col-sm-12 col-md-6'l><'col-sm-12 col-md-6'f>>" +
+                   "<'row'<'col-sm-12'tr>>" +
+                   "<'row'<'col-sm-12 col-md-5'i><'col-sm-12 col-md-7'p>>",
+            "lengthMenu": [[10, 25, 50, -1], [10, 25, 50, "All"]],
+            "pageLength": 10,
+            "responsive": true,
+            "autoWidth": false,
+            "ordering": true,
+            "order": [[0, 'asc']], // Sort by book title
+            
+            "destroy": true,
+            "retrieve": true,
+            "deferRender": true,
+            
+            "columnDefs": [
+                { 
+                    "targets": 6, // Actions column
+                    "orderable": false,
+                    "searchable": false
+                }
+            ],
+            
+            "language": {
+                "emptyTable": "<div class='text-center py-4'><i class='fas fa-book fa-2x mb-2'></i><br>No books found. Click \"Add Book\" to create one.</div>",
+                "search": "_INPUT_",
+                "searchPlaceholder": "Search books...",
+                "lengthMenu": "_MENU_ books per page",
+                "info": "Showing _START_ to _END_ of _TOTAL_ books",
+                "infoEmpty": "Showing 0 to 0 of 0 books",
+                "infoFiltered": "(filtered from _MAX_ total books)",
+                "paginate": {
+                    "first": "First",
+                    "last": "Last",
+                    "next": "Next",
+                    "previous": "Previous"
+                }
+            },
+            "drawCallback": function(settings) {
+                var api = this.api();
+                var total = api.rows().count();
+                $('#total-count').text(total);
+                
+                // Count available and borrowed books
+                var availableCount = 0;
+                var borrowedCount = 0;
+                
+                api.rows().every(function() {
+                    var data = this.data();
+                    var statusText = $(data[3]).find('.badge').first().text().toLowerCase();
+                    if (statusText.includes('available')) {
+                        availableCount++;
+                    }
+                    if (statusText.includes('borrowed')) {
+                        borrowedCount++;
+                    }
+                });
+                
+                $('#available-count').text(availableCount);
+                $('#borrowed-count').text(borrowedCount);
+            }
+        });
+
+        // CSRF token for AJAX requests
+        function getCSRFToken() {
+            return $('input[name="csrfmiddlewaretoken"]').val();
+        }
+
+        // Show toast message
+        function showToast(message, type = 'success') {
+            const toastId = type === 'success' ? '#success-toast' : '#error-toast';
+            const messageId = type === 'success' ? '#success-message' : '#error-message';
+            
+            $(messageId).text(message);
+            $(toastId).addClass('show').fadeIn();
+            
+            setTimeout(function() {
+                $(toastId).fadeOut(function() {
+                    $(this).removeClass('show');
+                });
+            }, type === 'success' ? 3000 : 5000);
+        }
+
+        // Function to reload page after delay
+        function reloadPageAfterDelay(message, type = 'success') {
+            showToast(message, type);
+            var delay = type === 'success' ? 2000 : 3000;
+            setTimeout(function() {
+                location.reload();
+            }, delay);
+        }
+
+        // Function to update UI without reload
+        function updateBookUI(bookId, data) {
+            // Update status badge
+            const statusBadge = $('#status-badge-' + bookId);
+            const conditionBadge = $('#condition-badge-' + bookId);
+            const statusBtn = $('.toggle-status-btn[data-id="' + bookId + '"]');
+            
+            if (data.hasOwnProperty('status')) {
+                const statusClass = 'status-' + data.status;
+                statusBadge.removeClass().addClass('badge ' + statusClass).text(data.status_display);
+                
+                if (data.status === 'available') {
+                    statusBtn.removeClass('btn-success').addClass('btn-warning')
+                        .attr('title', 'Mark as Unavailable')
+                        .html('<i class="fas fa-toggle-off"></i>')
+                        .attr('data-current-status', 'available');
+                } else {
+                    statusBtn.removeClass('btn-warning').addClass('btn-success')
+                        .attr('title', 'Mark as Available')
+                        .html('<i class="fas fa-toggle-on"></i>')
+                        .attr('data-current-status', 'unavailable');
+                }
+            }
+            
+            if (data.hasOwnProperty('condition')) {
+                const conditionClass = 'condition-' + data.condition;
+                conditionBadge.removeClass().addClass('badge ' + conditionClass).text(data.condition_display);
+            }
+            
+            // Update counts
+            if (data.hasOwnProperty('available_copies')) {
+                const row = $('#row-' + bookId);
+                const copyBadge = row.find('.copy-badge.badge-success');
+                copyBadge.html('<i class="fas fa-check"></i> ' + data.available_copies);
+            }
+            
+            if (data.hasOwnProperty('borrowed_copies')) {
+                const row = $('#row-' + bookId);
+                const copyBadge = row.find('.copy-badge.badge-info');
+                copyBadge.html('<i class="fas fa-book-reader"></i> ' + data.borrowed_copies);
+            }
+            
+            if (data.hasOwnProperty('total_copies')) {
+                const row = $('#row-' + bookId);
+                const copyBadge = row.find('.copy-badge.badge-secondary');
+                copyBadge.html('<i class="fas fa-copy"></i> ' + data.total_copies);
+            }
+        }
+
+        // Handle modal close/cancel buttons
+        $(document).on('click', '[data-dismiss="modal"]', function(e) {
+            e.preventDefault();
+            $(this).closest('.modal').modal('hide');
+        });
+
+        // Handle cancel buttons
+        $('#cancel-add-btn, #cancel-edit-btn, #cancel-delete-btn').on('click', function(e) {
+            e.preventDefault();
+            $(this).closest('.modal').modal('hide');
+        });
+
+        // Helper function to handle button loading state
+        function setButtonLoading(btn, isLoading) {
+            const spinner = btn.find('.spinner-border');
+            if (isLoading) {
+                btn.data('original-text', btn.html());
+                btn.prop('disabled', true);
+                spinner.show();
+                btn.html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>');
+            } else {
+                btn.prop('disabled', false);
+                spinner.hide();
+                btn.html(btn.data('original-text'));
+            }
+        }
+        
+        // Add Book
+        $('#add-form').on('submit', function(e) {
+            e.preventDefault();
+            
+            const saveBtn = $('#save-btn');
+            setButtonLoading(saveBtn, true);
+            
+            const formData = new FormData(this);
+            formData.append('action', 'create');
+            
+            $.ajax({
+                url: '{% url "admin_books_crud" %}',
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCSRFToken(),
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function(data) {
+                    if (data.success) {
+                        $('#addBookModal').modal('hide');
+                        reloadPageAfterDelay(data.message, 'success');
+                    } else {
+                        showToast(data.message, 'danger');
+                        setButtonLoading(saveBtn, false);
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error:', error);
+                    showToast('An error occurred while saving. Please try again.', 'danger');
+                    setButtonLoading(saveBtn, false);
+                }
+            });
+        });
+
+        // Edit Book - Setup modal
+        $(document).on('click', '.edit-btn', function() {
+            const btn = $(this);
+            
+            $('#edit-id').val(btn.data('id'));
+            
+            // Store values
+            const title = btn.data('title');
+            const author = btn.data('author');
+            const isbn = btn.data('isbn');
+            const publisher = btn.data('publisher');
+            const publicationYear = btn.data('publication_year');
+            const edition = btn.data('edition');
+            const categoryId = btn.data('category');
+            const bookType = btn.data('book_type');
+            const accessionNumber = btn.data('accession_number');
+            const barcode = btn.data('barcode');
+            const locationCode = btn.data('location_code');
+            const pages = btn.data('pages');
+            const language = btn.data('language');
+            const description = btn.data('description');
+            const keywords = btn.data('keywords');
+            const condition = btn.data('condition');
+            const status = btn.data('status');
+            const isReference = btn.data('is_reference') === 'true';
+            const fineAmount = btn.data('fine_amount');
+            const totalCopies = btn.data('total_copies');
+            const borrowedCopies = btn.data('borrowed_copies');
+            
+            // Calculate available copies
+            const availableCopies = totalCopies - borrowedCopies;
+            
+            // Show modal first
+            $('#editBookModal').modal('show');
+            
+            // Set values after modal is shown
+            setTimeout(function() {
+                $('#edit-title').val(title);
+                $('#edit-author').val(author);
+                $('#edit-isbn').val(isbn);
+                $('#edit-publisher').val(publisher);
+                $('#edit-publication_year').val(publicationYear);
+                $('#edit-edition').val(edition);
+                $('#edit-category').val(categoryId).trigger('change');
+                $('#edit-book_type').val(bookType).trigger('change');
+                $('#edit-accession_number').val(accessionNumber);
+                $('#edit-barcode').val(barcode);
+                $('#edit-location_code').val(locationCode);
+                $('#edit-pages').val(pages);
+                $('#edit-language').val(language);
+                $('#edit-description').val(description);
+                $('#edit-keywords').val(keywords);
+                $('#edit-condition').val(condition).trigger('change');
+                $('#edit-status').val(status).trigger('change');
+                $('#edit-is_reference').prop('checked', isReference);
+                $('#edit-fine_amount').val(fineAmount);
+                $('#edit-total_copies').val(totalCopies);
+                $('#edit-borrowed_copies').val(borrowedCopies);
+                $('#edit-available-calculated').text(availableCopies);
+            }, 500);
+        });
+
+        // Calculate available copies on input change
+        $('#edit-total_copies, #edit-borrowed_copies').on('input', function() {
+            const total = parseInt($('#edit-total_copies').val()) || 0;
+            const borrowed = parseInt($('#edit-borrowed_copies').val()) || 0;
+            const available = Math.max(0, total - borrowed);
+            $('#edit-available-calculated').text(available);
+        });
+
+        // Edit Book - Submit form
+        $('#edit-form').on('submit', function(e) {
+            e.preventDefault();
+            
+            const updateBtn = $('#update-btn');
+            setButtonLoading(updateBtn, true);
+            
+            const formData = new FormData(this);
+            formData.append('action', 'update');
+            
+            $.ajax({
+                url: '{% url "admin_books_crud" %}',
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCSRFToken(),
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function(data) {
+                    if (data.success) {
+                        $('#editBookModal').modal('hide');
+                        reloadPageAfterDelay(data.message, 'success');
+                    } else {
+                        showToast(data.message, 'danger');
+                        setButtonLoading(updateBtn, false);
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error:', error);
+                    showToast('An error occurred while updating. Please try again.', 'danger');
+                    setButtonLoading(updateBtn, false);
+                }
+            });
+        });
+
+        // Toggle Book Status (Available/Unavailable)
+        $(document).on('click', '.toggle-status-btn', function() {
+            const btn = $(this);
+            const bookId = btn.data('id');
+            const bookTitle = btn.data('title');
+            const currentStatus = btn.data('current-status');
+            const newStatus = currentStatus === 'available' ? 'unavailable' : 'available';
+            const actionText = currentStatus === 'available' ? 'mark as unavailable' : 'mark as available';
+            
+            if (confirm(`Are you sure you want to ${actionText} "${bookTitle}"?`)) {
+                setButtonLoading(btn, true);
+                
+                $.ajax({
+                    url: '{% url "admin_books_crud" %}',
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': getCSRFToken(),
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    data: {
+                        'action': 'toggle_status',
+                        'id': bookId,
+                        'csrfmiddlewaretoken': getCSRFToken()
+                    },
+                    success: function(data) {
+                        if (data.success) {
+                            updateBookUI(bookId, { 
+                                status: data.status,
+                                status_display: data.status_display
+                            });
+                            showToast(data.message, 'success');
+                        } else {
+                            showToast(data.message, 'danger');
+                        }
+                        setButtonLoading(btn, false);
+                    },
+                    error: function(xhr, status, error) {
+                        console.error('Error:', error);
+                        showToast('An error occurred while updating status. Please try again.', 'danger');
+                        setButtonLoading(btn, false);
+                    }
+                });
+            }
+        });
+
+        // Toggle Book Reference Status
+        $(document).on('click', '.toggle-reference-btn', function() {
+            const btn = $(this);
+            const bookId = btn.data('id');
+            const bookTitle = btn.data('title');
+            const currentReference = btn.data('current-reference');
+            const newReference = currentReference === 'true' ? false : true;
+            const actionText = currentReference === 'true' ? 'mark as non-reference' : 'mark as reference';
+            
+            if (confirm(`Are you sure you want to ${actionText} "${bookTitle}"?`)) {
+                setButtonLoading(btn, true);
+                
+                $.ajax({
+                    url: '{% url "admin_books_crud" %}',
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': getCSRFToken(),
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    data: {
+                        'action': 'toggle_reference',
+                        'id': bookId,
+                        'csrfmiddlewaretoken': getCSRFToken()
+                    },
+                    success: function(data) {
+                        if (data.success) {
+                            // Update button
+                            if (data.is_reference) {
+                                btn.removeClass('btn-secondary').addClass('btn-info')
+                                    .attr('title', 'Mark as Non-Reference')
+                                    .html('<i class="fas fa-bookmark"></i>')
+                                    .attr('data-current-reference', 'true');
+                            } else {
+                                btn.removeClass('btn-info').addClass('btn-secondary')
+                                    .attr('title', 'Mark as Reference')
+                                    .html('<i class="far fa-bookmark"></i>')
+                                    .attr('data-current-reference', 'false');
+                            }
+                            showToast(data.message, 'success');
+                        } else {
+                            showToast(data.message, 'danger');
+                        }
+                        setButtonLoading(btn, false);
+                    },
+                    error: function(xhr, status, error) {
+                        console.error('Error:', error);
+                        showToast('An error occurred while updating reference status. Please try again.', 'danger');
+                        setButtonLoading(btn, false);
+                    }
+                });
+            }
+        });
+
+        // Delete Book - Setup modal
+        let bookToDelete = null;
+        
+        $(document).on('click', '.delete-btn', function() {
+            const btn = $(this);
+            
+            bookToDelete = {
+                id: btn.data('id'),
+                title: btn.data('title')
+            };
+            
+            $('#delete-book-title').text(btn.data('title'));
+            $('#deleteBookModal').modal('show');
+        });
+
+        // Delete Book - Confirm
+        $('#confirm-delete-btn').on('click', function() {
+            if (!bookToDelete) return;
+            
+            const deleteBtn = $(this);
+            setButtonLoading(deleteBtn, true);
+            
+            $.ajax({
+                url: '{% url "admin_books_crud" %}',
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCSRFToken(),
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                data: {
+                    'action': 'delete',
+                    'id': bookToDelete.id,
+                    'csrfmiddlewaretoken': getCSRFToken()
+                },
+                success: function(data) {
+                    if (data.success) {
+                        $('#deleteBookModal').modal('hide');
+                        reloadPageAfterDelay(data.message, 'success');
+                    } else {
+                        showToast(data.message, 'danger');
+                        setButtonLoading(deleteBtn, false);
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error:', error);
+                    showToast('An error occurred while deleting. Please try again.', 'danger');
+                    setButtonLoading(deleteBtn, false);
+                }
+            });
+        });
+
+        // Clear form and reset button state on modal close
+        $('#addBookModal').on('hidden.bs.modal', function() {
+            $('#add-form')[0].reset();
+            setButtonLoading($('#save-btn'), false);
+        });
+        
+        $('#editBookModal').on('hidden.bs.modal', function() {
+            setButtonLoading($('#update-btn'), false);
+        });
+        
+        $('#deleteBookModal').on('hidden.bs.modal', function() {
+            bookToDelete = null;
+            setButtonLoading($('#confirm-delete-btn'), false);
+        });
+
+        // Form validation
+        $('#add-form, #edit-form').on('submit', function(e) {
+            const isAddForm = $(this).attr('id') === 'add-form';
+            const titleInput = isAddForm ? '#title' : '#edit-title';
+            const authorInput = isAddForm ? '#author' : '#edit-author';
+            const categoryInput = isAddForm ? '#category' : '#edit-category';
+            const bookTypeInput = isAddForm ? '#book_type' : '#edit-book_type';
+            const conditionInput = isAddForm ? '#condition' : '#edit-condition';
+            const statusInput = isAddForm ? '#status' : '#edit-status';
+            const fineAmountInput = isAddForm ? '#fine_amount' : '#edit-fine_amount';
+            const totalCopiesInput = isAddForm ? '#total_copies' : '#edit-total_copies';
+            const languageInput = isAddForm ? '#language' : '#edit-language';
+            
+            const title = $(titleInput).val().trim();
+            const author = $(authorInput).val().trim();
+            const category = $(categoryInput).val();
+            const bookType = $(bookTypeInput).val();
+            const condition = $(conditionInput).val();
+            const status = $(statusInput).val();
+            const fineAmount = $(fineAmountInput).val();
+            const totalCopies = $(totalCopiesInput).val();
+            const language = $(languageInput).val().trim();
+            const borrowedCopies = isAddForm ? $('#borrowed_copies').val() : $('#edit-borrowed_copies').val();
+            
+            // Validate required fields
+            if (!title) {
+                e.preventDefault();
+                showToast('Book title is required.', 'danger');
+                $(titleInput).addClass('is-invalid');
+                return false;
+            }
+            
+            if (!author) {
+                e.preventDefault();
+                showToast('Author is required.', 'danger');
+                $(authorInput).addClass('is-invalid');
+                return false;
+            }
+            
+            if (!category) {
+                e.preventDefault();
+                showToast('Category is required.', 'danger');
+                $(categoryInput).addClass('is-invalid');
+                return false;
+            }
+            
+            if (!bookType) {
+                e.preventDefault();
+                showToast('Book type is required.', 'danger');
+                $(bookTypeInput).addClass('is-invalid');
+                return false;
+            }
+            
+            if (!condition) {
+                e.preventDefault();
+                showToast('Condition is required.', 'danger');
+                $(conditionInput).addClass('is-invalid');
+                return false;
+            }
+            
+            if (!status) {
+                e.preventDefault();
+                showToast('Status is required.', 'danger');
+                $(statusInput).addClass('is-invalid');
+                return false;
+            }
+            
+            if (!language) {
+                e.preventDefault();
+                showToast('Language is required.', 'danger');
+                $(languageInput).addClass('is-invalid');
+                return false;
+            }
+            
+            // Validate title length
+            if (title.length < 2) {
+                e.preventDefault();
+                showToast('Book title must be at least 2 characters long.', 'danger');
+                $(titleInput).addClass('is-invalid');
+                return false;
+            }
+            
+            if (title.length > 200) {
+                e.preventDefault();
+                showToast('Book title cannot exceed 200 characters.', 'danger');
+                $(titleInput).addClass('is-invalid');
+                return false;
+            }
+            
+            // Validate author length
+            if (author.length < 2) {
+                e.preventDefault();
+                showToast('Author name must be at least 2 characters long.', 'danger');
+                $(authorInput).addClass('is-invalid');
+                return false;
+            }
+            
+            // Validate fine amount
+            if (parseFloat(fineAmount) < 0) {
+                e.preventDefault();
+                showToast('Fine amount cannot be negative.', 'danger');
+                $(fineAmountInput).addClass('is-invalid');
+                return false;
+            }
+            
+            // Validate copies
+            if (parseInt(totalCopies) < 1) {
+                e.preventDefault();
+                showToast('Total copies must be at least 1.', 'danger');
+                $(totalCopiesInput).addClass('is-invalid');
+                return false;
+            }
+            
+            if (parseInt(borrowedCopies) > parseInt(totalCopies)) {
+                e.preventDefault();
+                showToast('Borrowed copies cannot exceed total copies.', 'danger');
+                $(isAddForm ? '#borrowed_copies' : '#edit-borrowed_copies').addClass('is-invalid');
+                return false;
+            }
+            
+            // Validate publication year if provided
+            const publicationYearInput = isAddForm ? '#publication_year' : '#edit-publication_year';
+            const publicationYear = $(publicationYearInput).val();
+            if (publicationYear) {
+                const currentYear = new Date().getFullYear();
+                if (parseInt(publicationYear) > currentYear) {
+                    e.preventDefault();
+                    showToast('Publication year cannot be in the future.', 'danger');
+                    $(publicationYearInput).addClass('is-invalid');
+                    return false;
+                }
+            }
+            
+            return true;
+        });
+
+        // Remove validation classes on input
+        $('input, select, textarea').on('input change', function() {
+            $(this).removeClass('is-invalid');
+        });
+
+        // ISBN validation
+        $('#isbn, #edit-isbn').on('blur', function() {
+            const isbn = $(this).val().trim();
+            if (isbn) {
+                // Remove hyphens and spaces
+                const cleanIsbn = isbn.replace(/[-\s]/g, '');
+                
+                // Validate ISBN-10 or ISBN-13
+                if (!/^(97(8|9))?\d{9}(\d|X)$/.test(cleanIsbn)) {
+                    showToast('Invalid ISBN format. Please enter a valid ISBN-10 or ISBN-13.', 'danger');
+                    $(this).addClass('is-invalid');
+                }
+            }
+        });
+    });
+</script>
+{% endblock extra_js %}

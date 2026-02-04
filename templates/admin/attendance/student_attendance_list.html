@@ -1,0 +1,654 @@
+{% extends 'admin/base.html' %}
+{% load static %}
+
+{% block title %}Student Attendance Records{% endblock %}
+
+{% block breadcrumb %}
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'admin_dashboard' %}">Dashboard</a></li>
+        <li class="breadcrumb-item active" aria-current="page">Students</li>
+    </ol>
+</nav>
+{% endblock breadcrumb %}
+
+{% block extra_css %}
+<style>
+    /* Custom styles for the student table */
+    .student-table-wrapper {
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        padding: 20px;
+    }
+    
+    .student-avatar-sm {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 600;
+        font-size: 14px;
+    }
+    
+    .status-badge {
+        padding: 4px 10px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: 500;
+    }
+    
+    .status-active {
+        background: #d4edda;
+        color: #155724;
+    }
+    
+    .status-inactive {
+        background: #f8d7da;
+        color: #721c24;
+    }
+    
+    .action-buttons {
+        display: flex;
+        gap: 8px;
+    }
+    
+    .action-btn {
+        width: 36px;
+        height: 36px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 6px;
+        border: none;
+        transition: all 0.3s ease;
+    }
+    
+    .action-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    }
+    
+    .btn-view {
+        background: #28a745;
+        color: white;
+    }
+    
+    .btn-view:hover {
+        background: #218838;
+    }
+    
+    .btn-report {
+        background: #007bff;
+        color: white;
+    }
+    
+    .btn-report:hover {
+        background: #0056b3;
+    }
+    
+    .btn-edit {
+        background: #ffc107;
+        color: #212529;
+    }
+    
+    .btn-edit:hover {
+        background: #e0a800;
+    }
+    
+    /* Filter section styles */
+    .filter-card {
+        background: #f8f9fa;
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 20px;
+        border: 1px solid #dee2e6;
+    }
+    
+    /* Responsive adjustments */
+    @media (max-width: 768px) {
+        .student-table-wrapper {
+            padding: 10px;
+        }
+        
+        .action-buttons {
+            flex-wrap: wrap;
+        }
+    }
+    
+    /* Custom Select2 styles */
+    .select2-container--bootstrap-5 {
+        width: 100% !important;
+    }
+    
+    .select2-selection--single {
+        height: 38px !important;
+        border: 1px solid #ced4da !important;
+    }
+    
+    .select2-selection--single .select2-selection__rendered {
+        line-height: 36px !important;
+    }
+    
+    .select2-selection--single .select2-selection__arrow {
+        height: 36px !important;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="content">
+    <div class="container-fluid">
+        <!-- Page Header -->
+        <div class="row mb-4">
+            <div class="col-md-12">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h3><i class="fas fa-users me-2"></i>Student Management</h3>
+                        <p class="text-muted mb-0">View and manage all students in the system</p>
+                    </div>
+                    <div>
+                        <button type="button" class="btn btn-outline-secondary" onclick="window.history.back()">
+                            <i class="fas fa-arrow-left me-2"></i>Back
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Filter Section -->
+        <div class="filter-card">
+            <form method="GET" id="filterForm">
+                <div class="row">
+                    <div class="col-md-3">
+                        <div class="form-group mb-3">
+                            <label for="class_level" class="form-label">
+                                <i class="fas fa-graduation-cap me-2"></i>Class Level
+                            </label>
+                            <select name="class_level" id="class_level" class="form-select select2-class">
+                                <option value="">All Classes</option>
+                                {% for class in class_levels %}
+                                <option value="{{ class.id }}" {% if filter_class == class.id|stringformat:"i" %}selected{% endif %}>
+                                    {{ class.name }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="form-group mb-3">
+                            <label for="stream" class="form-label">
+                                <i class="fas fa-stream me-2"></i>Stream
+                            </label>
+                            <select name="stream" id="stream" class="form-select select2-stream" {% if not filter_class %}disabled{% endif %}>
+                                <option value="">All Streams</option>
+                                {% if filter_class %}
+                                    {% for stream in streams %}
+                                    <option value="{{ stream.id }}" {% if filter_stream == stream.id|stringformat:"i" %}selected{% endif %}>
+                                        {{ stream.stream_letter }}
+                                    </option>
+                                    {% endfor %}
+                                {% endif %}
+                            </select>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="form-group mb-3">
+                            <label for="status" class="form-label">
+                                <i class="fas fa-circle me-2"></i>Status
+                            </label>
+                            <select name="status" id="status" class="form-select select2-status">
+                                <option value="">All Status</option>
+                                <option value="active" {% if filter_status == 'active' %}selected{% endif %}>Active</option>
+                                <option value="inactive" {% if filter_status == 'inactive' %}selected{% endif %}>Inactive</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="form-group mb-3">
+                            <label for="search" class="form-label">
+                                <i class="fas fa-search me-2"></i>Search
+                            </label>
+                            <input type="text" name="search" id="search" class="form-control" 
+                                   placeholder="Name, Admission No, etc." value="{{ filter_search }}">
+                        </div>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-12">
+                        <div class="d-flex justify-content-end gap-2">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-filter me-2"></i>Apply Filters
+                            </button>
+                            <button type="button" onclick="resetFilters()" class="btn btn-outline-secondary">
+                                <i class="fas fa-redo me-2"></i>Reset
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <!-- Students Table -->
+        <div class="student-table-wrapper">
+            <table id="studentsTable" class="table table-striped table-hover" style="width:100%">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Student</th>
+                        <th>Admission No</th>
+                        <th>Class</th>
+                        <th>Stream</th>
+                        <th>Gender</th>
+                        <th>Status</th>
+                        <th>Attendance Records</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for student in students %}
+                    <tr data-class="{{ student.class_level.name|default:'' }}" 
+                        data-stream="{{ student.stream_class.stream_letter|default:'' }}"
+                        data-status="{{ student.is_active|yesno:'active,inactive' }}">
+                        <td>{{ forloop.counter }}</td>
+                        <td>
+                            <div class="d-flex align-items-center">
+                                <div class="student-avatar-sm me-3">
+                                    {{ student.first_name|first }}{{ student.last_name|first }}
+                                </div>
+                                <div>
+                                    <div class="fw-bold">{{ student.full_name }}</div>
+                                    <small class="text-muted">{{ student.email|default:"No email" }}</small>
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            <span class="badge bg-info text-dark">
+                                {{ student.registration_number|default:"N/A" }}
+                            </span>
+                        </td>
+                        <td>{{ student.class_level.name|default:"Not assigned" }}</td>
+                        <td>
+                            {% if student.stream_class %}
+                            <span class="badge bg-secondary">{{ student.stream_class.stream_letter }}</span>
+                            {% else %}
+                            <span class="text-muted">N/A</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if student.gender == 'male' %}
+                                <i class="fas fa-male text-primary"></i> Male
+                            {% elif student.gender == 'female' %}
+                                <i class="fas fa-female text-danger"></i> Female
+                            {% else %}
+                                <i class="fas fa-user text-secondary"></i> Other
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if student.is_active %}
+                                <span class="status-badge status-active">
+                                    <i class="fas fa-check-circle me-1"></i> Active
+                                </span>
+                            {% else %}
+                                <span class="status-badge status-inactive">
+                                    <i class="fas fa-times-circle me-1"></i> Inactive
+                                </span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if student.attendance_count > 0 %}
+                                <span class="badge bg-success">
+                                    <i class="fas fa-calendar-check me-1"></i> {{ student.attendance_count }}
+                                </span>
+                            {% else %}
+                                <span class="badge bg-warning text-dark">
+                                    <i class="fas fa-calendar-times me-1"></i> None
+                                </span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="action-buttons">
+                                <a href="{% url 'student_attendance_report' student.id %}" 
+                                   class="action-btn btn-report" title="View Attendance Report">
+                                    <i class="fas fa-chart-bar"></i>
+                                </a>
+                                <a href="{% url 'admin_student_detail' student.id %}" 
+                                   class="action-btn btn-view" title="View Student Details">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                                <a href="{% url 'admin_student_edit' student.id %}" 
+                                   class="action-btn btn-edit" title="Edit Student">
+                                    <i class="fas fa-edit"></i>
+                                </a>
+                            </div>
+                        </td>
+                    </tr>                   
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+
+
+<script>
+    $(document).ready(function() {
+        // Initialize Select2 for all select elements
+        $('.select2-class').select2({
+            theme: 'bootstrap-5',
+            placeholder: 'Select class level',
+            allowClear: true
+        });
+        
+        $('.select2-stream').select2({
+            theme: 'bootstrap-5',
+            placeholder: 'Select stream',
+            allowClear: true,
+            {% if not filter_class %}disabled: true{% endif %}
+        });
+        
+        $('.select2-status').select2({
+            theme: 'bootstrap-5',
+            placeholder: 'Select status',
+            allowClear: true
+        });
+        
+        // Initialize DataTable
+        var table = $('#studentsTable').DataTable({
+            responsive: true,
+            order: [[1, 'asc']],
+            pageLength: 25,
+            lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, "All"]],
+            dom: '<"row"<"col-md-6"l><"col-md-6"f>>rt<"row"<"col-md-6"i><"col-md-6"p>>',
+            language: {
+                search: "_INPUT_",
+                searchPlaceholder: "Search students...",
+                lengthMenu: "Show _MENU_ entries",
+                info: "Showing _START_ to _END_ of _TOTAL_ students",
+                infoEmpty: "No students found",
+                infoFiltered: "(filtered from _MAX_ total students)"
+            },
+            columnDefs: [
+                {
+                    targets: [0, 8],
+                    orderable: false,
+                    searchable: false
+                },
+                {
+                    targets: 8,
+                    className: 'text-center'
+                }
+            ],
+            // Custom filtering function
+            initComplete: function() {
+                // Apply initial filters from URL parameters
+                applyFiltersFromURL();
+            }
+        });
+        
+        // Custom filtering function
+        $.fn.dataTable.ext.search.push(
+            function(settings, data, dataIndex) {
+                var classFilter = $('#class_level option:selected').text().toLowerCase();
+                var streamFilter = $('#stream option:selected').text().toLowerCase();
+                var statusFilter = $('#status').val();
+                var searchFilter = $('#search').val().toLowerCase();
+                
+                // Get row data
+                var row = table.row(dataIndex).node();
+                var className = $(row).data('class') || '';
+                var streamName = $(row).data('stream') || '';
+                var statusValue = $(row).data('status') || '';
+                
+                // Search filter (applies to all text columns)
+                if (searchFilter) {
+                    var rowText = '';
+                    for (var i = 0; i < data.length; i++) {
+                        rowText += data[i] + ' ';
+                    }
+                    rowText = rowText.toLowerCase();
+                    
+                    if (rowText.indexOf(searchFilter) === -1) {
+                        return false;
+                    }
+                }
+                
+                // Class filter
+                if (classFilter && classFilter !== 'all classes' && classFilter !== '') {
+                    if (className.toLowerCase() !== classFilter) {
+                        return false;
+                    }
+                }
+                
+                // Stream filter
+                if (streamFilter && streamFilter !== 'all streams' && streamFilter !== '') {
+                    if (streamName.toLowerCase() !== streamFilter) {
+                        return false;
+                    }
+                }
+                
+                // Status filter
+                if (statusFilter && statusFilter !== '') {
+                    if (statusValue !== statusFilter) {
+                        return false;
+                    }
+                }
+                
+                return true;
+            }
+        );
+        
+        // Load streams based on selected class using Select2
+        $('#class_level').on('change', function() {
+            const classId = $(this).val();
+            const $streamSelect = $('#stream');
+            
+            if (classId) {
+                $streamSelect.prop('disabled', true);
+                $streamSelect.empty();
+                $streamSelect.append('<option value="">Loading streams...</option>');
+                $streamSelect.select2({
+                    theme: 'bootstrap-5',
+                    placeholder: 'Select stream',
+                    allowClear: true,
+                    disabled: true
+                });
+                
+                $.ajax({
+                    url: `/attendance/api/streams/class/${classId}/`,
+                    method: 'GET',
+                    success: function(data) {
+                        $streamSelect.empty();
+                        $streamSelect.append('<option value="">All Streams</option>');
+                        
+                        if (data.success && data.streams.length > 0) {
+                            $.each(data.streams, function(index, stream) {
+                                $streamSelect.append(new Option(stream.name, stream.id));
+                            });
+                        }
+                        
+                        $streamSelect.prop('disabled', false);
+                        $streamSelect.select2({
+                            theme: 'bootstrap-5',
+                            placeholder: 'Select stream',
+                            allowClear: true
+                        });
+                        
+                        // If there's a previously selected stream value, set it
+                        const streamVal = new URLSearchParams(window.location.search).get('stream');
+                        if (streamVal) {
+                            $streamSelect.val(streamVal).trigger('change');
+                        }
+                        
+                        // Apply filters after streams are loaded
+                        setTimeout(applyDataTableFilters, 100);
+                    },
+                    error: function() {
+                        $streamSelect.empty();
+                        $streamSelect.append('<option value="">Error loading streams</option>');
+                        $streamSelect.prop('disabled', true);
+                        showToast('Error loading streams', 'danger');
+                    }
+                });
+            } else {
+                $streamSelect.empty();
+                $streamSelect.append('<option value="">All Streams</option>');
+                $streamSelect.prop('disabled', true);
+                $streamSelect.select2({
+                    theme: 'bootstrap-5',
+                    placeholder: 'Select stream',
+                    allowClear: true,
+                    disabled: true
+                });
+                
+                // Apply filters when class is cleared
+                setTimeout(applyDataTableFilters, 100);
+            }
+            
+            // Apply filters immediately
+            setTimeout(applyDataTableFilters, 100);
+        });
+        
+        // Apply filters when stream changes
+        $('#stream').on('change', function() {
+            setTimeout(applyDataTableFilters, 100);
+        });
+        
+        // Apply filters when status changes
+        $('#status').on('change', function() {
+            setTimeout(applyDataTableFilters, 100);
+        });
+        
+        // Apply filters on search input (with debounce)
+        var searchTimeout;
+        $('#search').on('keyup', function() {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(function() {
+                applyDataTableFilters();
+            }, 500);
+        });
+        
+        // Function to apply DataTable filters
+        function applyDataTableFilters() {
+            table.draw();
+            
+            // Update URL with filter parameters (without page reload)
+            updateURLWithFilters();
+        }
+        
+        // Function to apply filters from URL on page load
+        function applyFiltersFromURL() {
+            const urlParams = new URLSearchParams(window.location.search);
+            
+            // Apply search filter
+            const searchParam = urlParams.get('search');
+            if (searchParam) {
+                $('#search').val(searchParam);
+            }
+            
+            // Apply status filter
+            const statusParam = urlParams.get('status');
+            if (statusParam) {
+                $('#status').val(statusParam).trigger('change');
+            }
+            
+            // Apply filters after a short delay
+            setTimeout(applyDataTableFilters, 500);
+        }
+        
+        // Function to update URL with current filters
+        function updateURLWithFilters() {
+            const url = new URL(window.location);
+            const params = new URLSearchParams();
+            
+            // Add all filter values to URL
+            const classVal = $('#class_level').val();
+            const streamVal = $('#stream').val();
+            const statusVal = $('#status').val();
+            const searchVal = $('#search').val();
+            
+            if (classVal) params.set('class_level', classVal);
+            if (streamVal) params.set('stream', streamVal);
+            if (statusVal) params.set('status', statusVal);
+            if (searchVal) params.set('search', searchVal);
+            
+            // Update URL without reloading page
+            const newUrl = `${url.pathname}${params.toString() ? '?' + params.toString() : ''}`;
+            window.history.replaceState({}, '', newUrl);
+        }
+        
+        // Reset filters
+        window.resetFilters = function() {
+            $('#class_level').val('').trigger('change');
+            $('#stream').val('').trigger('change');
+            $('#status').val('').trigger('change');
+            $('#search').val('');
+            
+            // Clear URL parameters
+            window.history.replaceState({}, '', window.location.pathname);
+            
+            // Apply filters
+            setTimeout(applyDataTableFilters, 100);
+        };
+        
+        // Apply filters on form submit
+        $('#filterForm').on('submit', function(e) {
+            e.preventDefault();
+            applyDataTableFilters();
+        });
+        
+        // Toast notification function
+        function showToast(message, type = 'info') {
+            // Create toast element
+            const toast = $(`
+                <div class="toast align-items-center text-white bg-${type} border-0" role="alert" aria-live="assertive" aria-atomic="true">
+                    <div class="d-flex">
+                        <div class="toast-body">
+                            ${message}
+                        </div>
+                        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+                    </div>
+                </div>
+            `);
+            
+            // Append to toast container
+            const container = $('#toastContainer');
+            if (container.length === 0) {
+                $('body').append('<div id="toastContainer" class="position-fixed top-0 end-0 p-3" style="z-index: 1056"></div>');
+            }
+            
+            $('#toastContainer').append(toast);
+            
+            // Initialize and show toast
+            const bsToast = new bootstrap.Toast(toast[0]);
+            bsToast.show();
+            
+            // Remove toast after hide
+            toast.on('hidden.bs.toast', function () {
+                $(this).remove();
+            });
+        }
+        
+        // Initialize tooltips
+        $('[title]').tooltip({
+            trigger: 'hover',
+            placement: 'top'
+        });
+        
+        // Trigger class change on page load if class is selected
+        if ($('#class_level').val()) {
+            $('#class_level').trigger('change');
+        } else {
+            // Apply filters on initial page load
+            setTimeout(applyDataTableFilters, 500);
+        }
+    });
+</script>
+{% endblock %}

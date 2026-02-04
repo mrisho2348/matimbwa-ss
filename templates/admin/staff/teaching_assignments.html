@@ -7,9 +7,6 @@
     <button type="button" class="btn btn-primary" data-toggle="modal" data-target="#createAssignmentModal">
         <i class="fas fa-plus-circle"></i> New Assignment
     </button>
-    <button type="button" class="btn btn-outline-primary" data-toggle="modal" data-target="#bulkAssignmentModal">
-        <i class="fas fa-copy"></i> Clone Assignments
-    </button>
 {% endblock breadcrumb %}
 
 {% block extra_css %}
@@ -70,14 +67,17 @@
         border-radius: 5px;
     }
     
+    /* Improved Action Buttons */
     .quick-actions {
         display: flex;
-        gap: 4px;
+        gap: 5px;
+        justify-content: center;
+        align-items: center;
     }
     
     .quick-action-btn {
-        width: 28px;
-        height: 28px;
+        width: 32px;
+        height: 32px;
         padding: 0;
         border-radius: 50%;
         border: none;
@@ -85,15 +85,30 @@
         align-items: center;
         justify-content: center;
         transition: all 0.2s ease;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .quick-action-btn.toggle-btn {
+        background: linear-gradient(135deg, #ffc107 0%, #e0a800 100%);
+    }
+    
+    .quick-action-btn.delete-btn {
+        background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
     }
     
     .quick-action-btn i {
-        font-size: 0.75rem;
+        font-size: 0.8rem;
         color: #ffffff !important;
     }
     
-    .btn-warning.quick-action-btn i {
+    .quick-action-btn.toggle-btn i {
         color: #212529 !important;
+        font-weight: 600;
+    }
+    
+    .quick-action-btn:hover {
+        transform: scale(1.1);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.2);
     }
     
     .modal-lg-custom {
@@ -128,11 +143,6 @@
         padding-top: 10px;
     }
     
-    .dt-buttons {
-        margin-bottom: 10px;
-    }
-    
-    /* Filter Dropdown */
     .filter-dropdown {
         margin-right: 10px;
     }
@@ -250,7 +260,7 @@
             </div>
             <div class="card-body">
                 <div class="table-responsive">
-                    <table class="table table-hover table-bordered table-striped" id="assignments-table">
+                    <table class="table table-hover text-nowrap table-bordered table-striped display" id="assignments-table">
                         <thead class="bg-light">
                             <tr>
                                 <th>#</th>
@@ -343,18 +353,13 @@
                                 </td>
                                 <td class="text-center">
                                     <div class="quick-actions">
-                                        <button class="btn btn-sm btn-primary quick-action-btn edit-assignment-btn"
-                                                data-id="{{ assignment.id }}"
-                                                title="Edit Assignment">
-                                            <i class="fas fa-edit"></i>
-                                        </button>
-                                        <button class="btn btn-sm btn-warning quick-action-btn toggle-assignment-btn"
+                                        <button class="quick-action-btn toggle-btn toggle-assignment-btn"
                                                 data-id="{{ assignment.id }}"
                                                 data-active="{{ assignment.is_active|yesno:'true,false' }}"
                                                 title="{% if assignment.is_active %}Deactivate{% else %}Activate{% endif %}">
                                             <i class="fas {% if assignment.is_active %}fa-toggle-on{% else %}fa-toggle-off{% endif %}"></i>
                                         </button>
-                                        <button class="btn btn-sm btn-danger quick-action-btn delete-assignment-btn"
+                                        <button class="quick-action-btn delete-btn delete-assignment-btn"
                                                 data-id="{{ assignment.id }}"
                                                 title="Delete Assignment">
                                             <i class="fas fa-trash"></i>
@@ -392,7 +397,7 @@
                         <div class="col-md-6">
                             <div class="form-group">
                                 <label for="staff">Teacher *</label>
-                                <select class="form-control select2bs4 select2-create" id="staff" name="staff" required>
+                                <select class="form-control select2bs4" id="staff" name="staff" required>
                                     <option value="">Select Teacher</option>
                                     {% for staff in all_staff %}
                                     <option value="{{ staff.id }}">
@@ -408,7 +413,7 @@
                         <div class="col-md-6">
                             <div class="form-group">
                                 <label for="assignment_type">Assignment Type *</label>
-                                <select class="form-control select2bs4 select2-create" id="assignment_type" name="assignment_type" required>
+                                <select class="form-control select2bs4" id="assignment_type" name="assignment_type" required>
                                     <option value="">Select Type</option>
                                     <option value="class">Class Level (All Streams)</option>
                                     <option value="stream">Stream Specific</option>
@@ -421,7 +426,7 @@
                         <div class="col-md-6">
                             <div class="form-group">
                                 <label for="class_level">Class Level *</label>
-                                <select class="form-control select2bs4 select2-create" id="class_level" name="class_level" required>
+                                <select class="form-control select2bs4" id="class_level" name="class_level" required>
                                     <option value="">Select Class Level</option>
                                     {% for class_level in class_levels %}
                                     <option value="{{ class_level.id }}">
@@ -434,10 +439,11 @@
                         <div class="col-md-6">
                             <div class="form-group" id="stream-group" style="display: none;">
                                 <label for="stream_class">Stream (Optional for Stream Type)</label>
-                                <select class="form-control select2bs4 select2-create" id="stream_class" name="stream_class">
+                                <select class="form-control select2bs4" id="stream_class" name="stream_class">
                                     <option value="">Select Stream</option>
                                     <!-- Streams will be populated based on class level -->
                                 </select>
+                                <small class="form-text text-muted">Leave empty to assign to all streams in the class</small>
                             </div>
                         </div>
                     </div>
@@ -445,9 +451,9 @@
                     <div class="row">
                         <div class="col-md-6">
                             <div class="form-group">
-                                <div class="form-check">
-                                    <input type="checkbox" class="form-check-input" id="is_class_teacher" name="is_class_teacher">
-                                    <label class="form-check-label" for="is_class_teacher">
+                                <div class="custom-control custom-switch">
+                                    <input type="checkbox" class="custom-control-input" id="is_class_teacher" name="is_class_teacher">
+                                    <label class="custom-control-label" for="is_class_teacher">
                                         This is a Class Teacher Assignment
                                     </label>
                                 </div>
@@ -456,7 +462,7 @@
                         <div class="col-md-6">
                             <div class="form-group" id="subject-group">
                                 <label for="subject">Subject *</label>
-                                <select class="form-control select2bs4 select2-create" id="subject" name="subject">
+                                <select class="form-control select2bs4" id="subject" name="subject" required>
                                     <option value="">Select Subject</option>
                                     <!-- Subjects will be populated based on class level's educational level -->
                                 </select>
@@ -469,7 +475,8 @@
                             <div class="form-group">
                                 <label for="period_count">Periods per Week</label>
                                 <input type="number" class="form-control" id="period_count" name="period_count" 
-                                       min="0" max="40" value="0" required>
+                                       min="0" max="40" value="0">
+                                <small class="form-text text-muted">For subject teaching assignments only</small>
                             </div>
                         </div>
                         <div class="col-md-6">
@@ -502,37 +509,6 @@
     </div>
 </div>
 
-<!-- Edit Assignment Modal -->
-<div class="modal fade" id="editAssignmentModal" tabindex="-1" role="dialog" aria-labelledby="editAssignmentModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg-custom" role="document">
-        <div class="modal-content">
-            <div class="modal-header bg-warning text-white">
-                <h5 class="modal-title" id="editAssignmentModalLabel">
-                    <i class="fas fa-edit"></i> Edit Teaching Assignment
-                </h5>
-                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
-                    <span aria-hidden="true">&times;</span>
-                </button>
-            </div>
-            <form id="edit-assignment-form">
-                {% csrf_token %}
-                <input type="hidden" name="action" value="edit_assignment">
-                <input type="hidden" id="edit-assignment-id" name="assignment_id">
-                <div class="modal-body">
-                    <!-- Content will be loaded via AJAX -->
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-warning" id="update-assignment-btn">
-                        <span class="spinner-border spinner-border-sm" role="status" style="display: none;"></span>
-                        Update Assignment
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
-
 <!-- Delete Confirmation Modal -->
 <div class="modal fade" id="deleteAssignmentModal" tabindex="-1" role="dialog" aria-labelledby="deleteAssignmentModalLabel" aria-hidden="true">
     <div class="modal-dialog" role="document">
@@ -554,75 +530,11 @@
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-danger" id="confirm-delete-btn">
+                    <button type="button" class="btn btn-danger" id="confirm-delete-btn">
                     <span class="spinner-border spinner-border-sm" role="status" style="display: none;"></span>
                     Delete Assignment
                 </button>
             </div>
-        </div>
-    </div>
-</div>
-
-<!-- Clone Assignments Modal -->
-<div class="modal fade" id="bulkAssignmentModal" tabindex="-1" role="dialog" aria-labelledby="bulkAssignmentModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg" role="document">
-        <div class="modal-content">
-            <div class="modal-header bg-info text-white">
-                <h5 class="modal-title" id="bulkAssignmentModalLabel">
-                    <i class="fas fa-copy"></i> Clone Assignments
-                </h5>
-                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
-                    <span aria-hidden="true">&times;</span>
-                </button>
-            </div>
-            <form id="clone-assignments-form">
-                {% csrf_token %}
-                <input type="hidden" name="action" value="clone_assignments">
-                <div class="modal-body">
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="form-group">
-                                <label for="source_academic_year">Source Academic Year *</label>
-                                <select class="form-control select2bs4 select2-bulk" id="source_academic_year" name="source_academic_year" required>
-                                    <option value="">Select Source Year</option>
-                                    {% for ay in academic_years %}
-                                    <option value="{{ ay.id }}" {% if ay.id == current_academic_year.id %}selected{% endif %}>
-                                        {{ ay.name }}
-                                    </option>
-                                    {% endfor %}
-                                </select>
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="form-group">
-                                <label for="target_academic_year">Target Academic Year *</label>
-                                <select class="form-control select2bs4 select2-bulk" id="target_academic_year" name="target_academic_year" required>
-                                    <option value="">Select Target Year</option>
-                                    {% for ay in academic_years %}
-                                    <option value="{{ ay.id }}">
-                                        {{ ay.name }}
-                                    </option>
-                                    {% endfor %}
-                                </select>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="alert alert-warning">
-                        <i class="fas fa-exclamation-triangle"></i>
-                        <strong>Warning:</strong> This will copy all active teaching assignments from the source 
-                        academic year to the target academic year. Any existing assignments in the target year 
-                        for the same teachers will be preserved (not overwritten).
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-info" id="clone-assignments-btn">
-                        <span class="spinner-border spinner-border-sm" role="status" style="display: none;"></span>
-                        Clone Assignments
-                    </button>
-                </div>
-            </form>
         </div>
     </div>
 </div>
@@ -674,7 +586,7 @@ $(document).ready(function() {
                     "targets": 8,
                     "orderable": false,
                     "searchable": false,
-                    "width": "100px"
+                    "width": "90px"
                 }
             ],
             "initComplete": function() {
@@ -734,15 +646,6 @@ $(document).ready(function() {
             } else {
                 dataTable.column(2).search('').draw();
             }
-        });
-    }
-
-    // Initialize Select2
-    function initializeSelect2(selector, modalSelector) {
-        $(selector).select2({
-            theme: 'bootstrap4',
-            dropdownParent: $(modalSelector),
-            width: '100%'
         });
     }
 
@@ -837,25 +740,21 @@ $(document).ready(function() {
         return $('input[name="csrfmiddlewaretoken"]').val();
     }
 
+    // Initialize Select2 for a specific modal
+    function initSelect2ForModal(modalSelector) {
+        $(modalSelector).find('.select2bs4').each(function() {
+            if (!$(this).hasClass('select2-hidden-accessible')) {
+                $(this).select2({
+                    theme: 'bootstrap4',
+                    dropdownParent: $(modalSelector),
+                    width: '100%'
+                });
+            }
+        });
+    }
+
     // ============ INITIALIZATION ============
     initializeDataTable();
-
-    // Initialize Select2 for modals when they open
-    $('#createAssignmentModal').on('shown.bs.modal', function() {
-        $(this).find('.select2bs4').each(function() {
-            if (!$(this).hasClass('select2-hidden-accessible')) {
-                initializeSelect2($(this), '#createAssignmentModal');
-            }
-        });
-    });
-
-    $('#bulkAssignmentModal').on('shown.bs.modal', function() {
-        $(this).find('.select2bs4').each(function() {
-            if (!$(this).hasClass('select2-hidden-accessible')) {
-                initializeSelect2($(this), '#bulkAssignmentModal');
-            }
-        });
-    });
 
     // ============ CREATE MODAL HANDLERS ============
     
@@ -866,43 +765,64 @@ $(document).ready(function() {
         window.location.href = `?academic_year=${yearId}`;
     });
 
-    // Assignment type change
-    $('#createAssignmentModal').on('change', '#assignment_type', function() {
+    // Initialize create modal when shown
+    $('#createAssignmentModal').on('shown.bs.modal', function() {
+        initSelect2ForModal(this);
+        $('#createAssignmentModal #stream-group').hide();
+        $('#createAssignmentModal #subject-group').show();
+        $('#createAssignmentModal #subject').prop('required', true);
+        $('#createAssignmentModal #is_class_teacher').prop('checked', false);
+    });
+
+    // Assignment type change handler for create modal
+    $(document).on('change', '#createAssignmentModal #assignment_type', function() {
         const type = $(this).val();
         const classLevelId = $('#createAssignmentModal #class_level').val();
         
-        if (type === 'stream' && classLevelId) {
-            $('#stream-group').show();
-            loadStreamsForClass(classLevelId, '#stream_class');
+        if (type === 'stream') {
+            $('#createAssignmentModal #stream-group').show();
+            if (classLevelId) {
+                loadStreamsForClass(classLevelId, '#createAssignmentModal #stream_class');
+            }
         } else {
-            $('#stream-group').hide();
-            $('#stream_class').val('').trigger('change');
+            $('#createAssignmentModal #stream-group').hide();
+            $('#createAssignmentModal #stream_class').val('').trigger('change');
         }
     });
 
-    // Class teacher checkbox
-    $('#createAssignmentModal').on('change', '#is_class_teacher', function() {
+    // Class teacher checkbox handler for create modal
+    $(document).on('change', '#createAssignmentModal #is_class_teacher', function() {
         if ($(this).is(':checked')) {
-            $('#subject-group').hide();
-            $('#subject').prop('required', false);
+            $('#createAssignmentModal #subject-group').hide();
+            $('#createAssignmentModal #subject').prop('required', false);
+            $('#createAssignmentModal #subject').val('').trigger('change');
+            $('#createAssignmentModal #period_count').val('0').prop('disabled', true);
         } else {
-            $('#subject-group').show();
-            $('#subject').prop('required', true);
+            $('#createAssignmentModal #subject-group').show();
+            $('#createAssignmentModal #subject').prop('required', true);
+            $('#createAssignmentModal #period_count').prop('disabled', false);
+            
+            const classLevelId = $('#createAssignmentModal #class_level').val();
+            if (classLevelId) {
+                loadSubjectsForClass(classLevelId, '#createAssignmentModal #subject');
+            }
         }
     });
 
-    // Class level change
-    $('#createAssignmentModal').on('change', '#class_level', function() {
+    // Class level change handler for create modal
+    $(document).on('change', '#createAssignmentModal #class_level', function() {
         const classLevelId = $(this).val();
-        const assignmentType = $('#assignment_type').val();
+        const assignmentType = $('#createAssignmentModal #assignment_type').val();
         
-        loadSubjectsForClass(classLevelId, '#subject');
+        // Load subjects
+        loadSubjectsForClass(classLevelId, '#createAssignmentModal #subject');
         
-        if (classLevelId && assignmentType === 'stream') {
-            loadStreamsForClass(classLevelId, '#stream_class');
-            $('#stream-group').show();
-        } else {
-            $('#stream-group').hide();
+        // Handle stream visibility
+        if (assignmentType === 'stream') {
+            $('#createAssignmentModal #stream-group').show();
+            if (classLevelId) {
+                loadStreamsForClass(classLevelId, '#createAssignmentModal #stream_class');
+            }
         }
     });
 
@@ -911,6 +831,16 @@ $(document).ready(function() {
         e.preventDefault();
         const btn = $('#create-assignment-btn');
         setButtonLoading(btn, true);
+        
+        // Validation
+        const isClassTeacher = $('#createAssignmentModal #is_class_teacher').is(':checked');
+        const subject = $('#createAssignmentModal #subject').val();
+        
+        if (!isClassTeacher && (!subject || subject === '')) {
+            showToast('Subject is required for subject teaching assignments', 'danger');
+            setButtonLoading(btn, false);
+            return;
+        }
         
         $.ajax({
             url: '{% url "admin_teaching_assignments_crud" %}',
@@ -936,140 +866,12 @@ $(document).ready(function() {
         });
     });
 
-    // ============ EDIT MODAL HANDLERS ============
-    
-    // Edit assignment button click
-    $(document).on('click', '.edit-assignment-btn', function() {
-        const assignmentId = $(this).data('id');
-        
-        $.ajax({
-            url: '{% url "admin_get_assignment_details" %}',
-            method: 'GET',
-            data: { assignment_id: assignmentId },
-            success: function(data) {
-                if (data.success) {
-                    $('#edit-assignment-form').find('.modal-body').html(data.html);
-                    $('#edit-assignment-id').val(assignmentId);
-                    $('#editAssignmentModal').modal('show');
-                    
-                    // Initialize Select2 for the edit modal
-                    setTimeout(() => {
-                        $('#editAssignmentModal').find('.select2bs4').each(function() {
-                            if (!$(this).hasClass('select2-hidden-accessible')) {
-                                initializeSelect2($(this), '#editAssignmentModal');
-                            }
-                        });
-                        
-                        // Load initial subjects if class level exists
-                        const initialClassId = $('#editAssignmentModal #class_level').val();
-                        if (initialClassId) {
-                            loadSubjectsForClass(
-                                initialClassId, 
-                                '#editAssignmentModal #subject',
-                                $('#editAssignmentModal #subject').val()
-                            );
-                        }
-                    }, 100);
-                } else {
-                    showToast(data.message, 'danger');
-                }
-            }
-        });
-    });
-
-    // Handle edit modal close/cancel buttons - FIXED
-    $(document).on('click', '#editAssignmentModal .close, #editAssignmentModal .btn-secondary', function(e) {
-        e.preventDefault();
-        e.stopPropagation();
-        $('#editAssignmentModal').modal('hide');
-    });
-
-    // Handle class level change in edit modal
-    $(document).on('change', '#editAssignmentModal #class_level', function() {
-        const classLevelId = $(this).val();
-        const assignmentType = $('#editAssignmentModal #assignment_type').val();
-        const currentSubjectId = $('#editAssignmentModal #subject').val();
-        
-        loadSubjectsForClass(classLevelId, '#editAssignmentModal #subject', currentSubjectId);
-        
-        if (classLevelId && assignmentType === 'stream') {
-            const currentStreamId = $('#editAssignmentModal #stream_class').val();
-            loadStreamsForClass(classLevelId, '#editAssignmentModal #stream_class', currentStreamId);
-            $('#editAssignmentModal #stream-group').show();
-        } else {
-            $('#editAssignmentModal #stream-group').hide();
-        }
-    });
-
-    // Handle assignment type change in edit modal
-    $(document).on('change', '#editAssignmentModal #assignment_type', function() {
-        const type = $(this).val();
-        const classLevelId = $('#editAssignmentModal #class_level').val();
-        
-        if (type === 'stream' && classLevelId) {
-            const currentStreamId = $('#editAssignmentModal #stream_class').val();
-            $('#editAssignmentModal #stream-group').show();
-            loadStreamsForClass(classLevelId, '#editAssignmentModal #stream_class', currentStreamId);
-        } else {
-            $('#editAssignmentModal #stream-group').hide();
-            $('#editAssignmentModal #stream_class').val('').trigger('change');
-        }
-    });
-
-    // Handle class teacher checkbox in edit modal
-    $(document).on('change', '#editAssignmentModal #is_class_teacher', function() {
-        if ($(this).is(':checked')) {
-            $('#editAssignmentModal #subject-group').hide();
-            $('#editAssignmentModal #subject').prop('required', false);
-        } else {
-            $('#editAssignmentModal #subject-group').show();
-            $('#editAssignmentModal #subject').prop('required', true);
-        }
-    });
-
-    // Edit form submission
-    $(document).on('submit', '#edit-assignment-form', function(e) {
-        e.preventDefault();
-        const btn = $('#update-assignment-btn');
-        setButtonLoading(btn, true);
-        
-        $.ajax({
-            url: '{% url "admin_teaching_assignments_crud" %}',
-            method: 'POST',
-            headers: { 'X-CSRFToken': getCSRFToken() },
-            data: new FormData(this),
-            processData: false,
-            contentType: false,
-            success: function(data) {
-                if (data.success) {
-                    $('#editAssignmentModal').modal('hide');
-                    showToast(data.message, 'success');
-                    setTimeout(() => location.reload(), 1500);
-                } else {
-                    showToast(data.message, 'danger');
-                }
-                setButtonLoading(btn, false);
-            },
-            error: function(xhr) {
-                showToast('An error occurred: ' + xhr.responseText, 'danger');
-                setButtonLoading(btn, false);
-            }
-        });
-    });
-
     // ============ DELETE MODAL HANDLERS ============
     
     // Delete assignment button click
     $(document).on('click', '.delete-assignment-btn', function() {
         assignmentToDelete = $(this).data('id');
         $('#deleteAssignmentModal').modal('show');
-    });
-
-    // Handle delete modal close/cancel buttons - FIXED
-    $(document).on('click', '#deleteAssignmentModal .close, #deleteAssignmentModal .btn-secondary', function(e) {
-        e.preventDefault();
-        e.stopPropagation();
-        $('#deleteAssignmentModal').modal('hide');
     });
 
     // Confirm delete assignment
@@ -1137,69 +939,28 @@ $(document).ready(function() {
         });
     });
 
-    // ============ CLONE ASSIGNMENTS HANDLERS ============
-    
-    // Clone assignments form submission
-    $('#clone-assignments-form').submit(function(e) {
-        e.preventDefault();
-        const btn = $('#clone-assignments-btn');
-        setButtonLoading(btn, true);
-        
-        $.ajax({
-            url: '{% url "admin_teaching_assignments_crud" %}',
-            method: 'POST',
-            headers: { 'X-CSRFToken': getCSRFToken() },
-            data: new FormData(this),
-            processData: false,
-            contentType: false,
-            success: function(data) {
-                if (data.success) {
-                    $('#bulkAssignmentModal').modal('hide');
-                    showToast(data.message, 'success');
-                    setTimeout(() => location.reload(), 1500);
-                } else {
-                    showToast(data.message, 'danger');
-                }
-                setButtonLoading(btn, false);
-            },
-            error: function(xhr) {
-                showToast('An error occurred: ' + xhr.responseText, 'danger');
-                setButtonLoading(btn, false);
-            }
-        });
-    });
-
     // ============ MODAL CLEANUP ============
     
     // Clean up create modal
     $('#createAssignmentModal').on('hidden.bs.modal', function() {
         $('#create-assignment-form')[0].reset();
-        $('#stream-group').hide();
-        $('#subject-group').show();
-        $('#subject').prop('required', true);
-        $('#is_class_teacher').prop('checked', false);
-        $(this).find('.select2bs4').select2('destroy');
-    });
-
-    // Clean up edit modal
-    $('#editAssignmentModal').on('hidden.bs.modal', function() {
-        $('#edit-assignment-form')[0].reset();
+        $('#createAssignmentModal #stream-group').hide();
+        $('#createAssignmentModal #subject-group').show();
+        $('#createAssignmentModal #subject').prop('required', true);
+        $('#createAssignmentModal #is_class_teacher').prop('checked', false);
         $(this).find('.select2bs4').select2('destroy');
     });
 
     // Clean up delete modal
     $('#deleteAssignmentModal').on('hidden.bs.modal', function() {
-        const deleteBtn = $('#confirm-delete-btn');
-        deleteBtn.prop('disabled', false);
-        deleteBtn.find('.spinner-border').hide();
-        deleteBtn.html('Delete Assignment');
         assignmentToDelete = null;
+        setButtonLoading($('#confirm-delete-btn'), false);
     });
 
-    // Clean up bulk modal
-    $('#bulkAssignmentModal').on('hidden.bs.modal', function() {
-        $('#clone-assignments-form')[0].reset();
-        $(this).find('.select2bs4').select2('destroy');
+    // Handle cancel/close buttons for delete modal
+    $(document).on('click', '#deleteAssignmentModal .close, #deleteAssignmentModal .btn-secondary[data-dismiss="modal"]', function(e) {
+        e.preventDefault();
+        $('#deleteAssignmentModal').modal('hide');
     });
 });
 </script>

@@ -205,6 +205,12 @@ class Staffs(models.Model):
             teaching_assignments__in=assignments
         ).distinct()
     
+    def get_role_display(self):
+        """
+        Return human-readable role/position title
+        """
+        return self.get_position_title_display() or "Not Assigned"
+    
     @property
     def is_class_teacher(self):
         """Check if staff is assigned as a class teacher for any class"""

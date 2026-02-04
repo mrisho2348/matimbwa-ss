@@ -203,6 +203,14 @@
         transform: none !important;
     }
     
+    /* Disabled field styling */
+    .form-control:disabled, .select2-container--bootstrap4 .select2-selection--single[aria-disabled="true"] {
+        background-color: #f7fafc !important;
+        cursor: not-allowed;
+        opacity: 0.7;
+        border-color: #e2e8f0 !important;
+    }
+    
     /* Error styling */
     .is-invalid {
         border-color: #e53e3e !important;
@@ -393,6 +401,31 @@
         margin-right: 8px;
     }
     
+    /* Year info styling */
+    .year-info {
+        display: inline-block;
+        margin-left: 8px;
+        color: #718096;
+        cursor: help;
+        position: relative;
+    }
+    
+    .year-info:hover::after {
+        content: 'Academic year cannot be changed after student is created';
+        position: absolute;
+        bottom: 100%;
+        left: 50%;
+        transform: translateX(-50%);
+        background: #2d3748;
+        color: white;
+        padding: 8px 12px;
+        border-radius: 6px;
+        font-size: 0.85rem;
+        width: 250px;
+        z-index: 1000;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+    
     /* Action buttons container */
     .quick-actions {
         margin-bottom: 20px;
@@ -537,6 +570,68 @@
                 </div>
             {% endif %}
             
+            <!-- Academic Year Section -->
+            <div class="form-section">
+                <div class="form-section-title">
+                    <i class="fas fa-calendar-alt"></i> Academic Year Information
+                </div>
+                
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="id_academic_year" class="form-label required-field">
+                                <i class="fas fa-calendar-check"></i> Academic Year
+                                <span class="year-info" title="Academic year cannot be changed after student is created">
+                                    <i class="fas fa-info-circle"></i>
+                                </span>
+                            </label>
+                            <select class="form-control select2 {% if form.academic_year.errors %}is-invalid{% endif %}" 
+                                    id="id_academic_year" name="academic_year" style="width: 100%;" required disabled>
+                                <option value="">Select Academic Year</option>
+                                {% for year in academic_years %}
+                                    <option value="{{ year.id }}" 
+                                        {% if form.academic_year.value|stringformat:"s" == year.id|stringformat:"s" or student.academic_year.id|stringformat:"s" == year.id|stringformat:"s" %}selected{% endif %}
+                                        {% if year.is_active %}data-active="true"{% endif %}>
+                                        {{ year.name }}
+                                        {% if year.is_active %}
+                                            <span class="badge badge-success ml-2">Active</span>
+                                        {% endif %}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                            {% if form.academic_year.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {{ form.academic_year.errors.0 }}
+                                </div>
+                            {% endif %}
+                            <small class="form-text text-muted">
+                                Academic year cannot be changed after student is created. 
+                                Current: <strong>{{ student.academic_year.name }}</strong> 
+                                (Admission Year: {{ student.admission_year }})
+                            </small>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="id_registration_number" class="form-label">
+                                <i class="fas fa-id-card"></i> Registration Number
+                            </label>
+                            <input type="text" class="form-control {% if form.registration_number.errors %}is-invalid{% endif %}" 
+                                   id="id_registration_number" name="registration_number" 
+                                   value="{{ form.registration_number.value|default:student.registration_number|default:'' }}"
+                                   placeholder="Registration Number" readonly>
+                            {% if form.registration_number.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {{ form.registration_number.errors.0 }}
+                                </div>
+                            {% endif %}
+                            <small class="form-text text-muted">Registration number cannot be changed</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
             <!-- Personal Information Section -->
             <div class="form-section">
                 <div class="form-section-title">
@@ -611,6 +706,11 @@
                                         </div>
                                     {% endif %}
                                     <small class="form-text text-muted">Format: YYYY-MM-DD</small>
+                                    {% if student.age %}
+                                    <div class="text-primary fw-semibold">
+                                        Age: {{ student.age }} years old
+                                    </div>
+                                    {% endif %}
                                 </div>
                             </div>
                             <div class="col-md-6">
@@ -645,9 +745,7 @@
                                     </label>
                                     <textarea class="form-control {% if form.address.errors %}is-invalid{% endif %}" 
                                               id="id_address" name="address" rows="3" 
-                                              placeholder="Enter full residential address">
-                                        {{ form.address.value|default:student.address|default:'' }}
-                                    </textarea>
+                                              placeholder="Enter full residential address">{{ form.address.value|default:student.address|default:'' }}</textarea>
                                     {% if form.address.errors %}
                                         <div class="invalid-feedback d-block">
                                             {{ form.address.errors.0 }}
@@ -763,7 +861,7 @@
                                 {% for stream in stream_classes %}
                                     <option value="{{ stream.id }}" 
                                         {% if form.stream_class.value|stringformat:"s" == stream.id|stringformat:"s" or student.stream_class.id|stringformat:"s" == stream.id|stringformat:"s" %}selected{% endif %}>
-                                        {{ stream.class_level.name }}{{ stream.stream_letter }}
+                                        {{ stream.class_level.name }} - {{ stream.stream_letter }}
                                     </option>
                                 {% endfor %}
                             </select>
@@ -777,23 +875,6 @@
                 </div>
                 
                 <div class="row">
-                    <div class="col-md-6">
-                        <div class="form-group">
-                            <label for="id_registration_number" class="form-label">
-                                <i class="fas fa-id-card"></i> Registration Number
-                            </label>
-                            <input type="text" class="form-control {% if form.registration_number.errors %}is-invalid{% endif %}" 
-                                   id="id_registration_number" name="registration_number" 
-                                   value="{{ form.registration_number.value|default:student.registration_number|default:'' }}"
-                                   placeholder="Registration Number" readonly>
-                            {% if form.registration_number.errors %}
-                                <div class="invalid-feedback d-block">
-                                    {{ form.registration_number.errors.0 }}
-                                </div>
-                            {% endif %}
-                            <small class="form-text text-muted">Registration number cannot be changed</small>
-                        </div>
-                    </div>
                     <div class="col-md-6">
                         <div class="form-group">
                             <label for="id_examination_number" class="form-label">
@@ -810,21 +891,34 @@
                             {% endif %}
                         </div>
                     </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="id_admission_year" class="form-label">
+                                <i class="fas fa-calendar"></i> Admission Year
+                            </label>
+                            <input type="text" class="form-control" 
+                                   id="id_admission_year" 
+                                   value="{{ student.admission_year }}" readonly>
+                            <small class="form-text text-muted">Automatically set from academic year</small>
+                        </div>
+                    </div>
                 </div>
                 
+               <!-- In the Academic Information Section, replace the optional_subjects field with subjects: -->
                 <div class="row">
                     <div class="col-12">
                         <div class="form-group">
                             <label for="id_subjects" class="form-label required-field">
                                 <i class="fas fa-book"></i> Subjects
                             </label>
-                            <select class="form-control select2" id="id_subjects" name="subjects" 
+                            <select class="form-control select2 {% if form.subjects.errors %}is-invalid{% endif %}" 
+                                    id="id_subjects" name="subjects" 
                                     multiple="multiple" style="width: 100%;" required>
                                 <option value="">Select Subjects</option>
                                 {% for subject in subjects %}
                                     <option value="{{ subject.id }}" 
-                                         {% if subject.id in student_subjects_ids or subject.id|stringformat:"s" in form.subjects.value|default:''|split_string:',' %}selected{% endif %}>
-                                         {{ subject.name }}
+                                        {% if subject.id in student_subjects_ids %}selected{% endif %}>
+                                        {{ subject.name }}
                                     </option>
                                 {% endfor %}
                             </select>
@@ -944,11 +1038,11 @@
                 <div class="row">
                     <div class="col-md-6">
                         <div class="form-group">
-                            <label for="id_status" class="form-label">
+                            <label for="id_status" class="form-label required-field">
                                 <i class="fas fa-tag"></i> Student Status
                             </label>
                             <select class="form-control select2 {% if form.status.errors %}is-invalid{% endif %}" 
-                                    id="id_status" name="status" style="width: 100%;">
+                                    id="id_status" name="status" style="width: 100%;" required>
                                 {% for status, label in status_choices %}
                                     <option value="{{ status }}" 
                                         {% if form.status.value == status or student.status == status %}selected{% endif %}>
@@ -1130,7 +1224,8 @@ $(document).ready(function() {
         Swal.fire({
             title: 'Delete Student?',
             html: `<p>Are you sure you want to delete <strong>${"{{ student.get_full_name }}"}</strong>?</p>
-                  <p class="text-danger"><i class="fas fa-exclamation-triangle me-2"></i>This action cannot be undone!</p>`,
+                  <p class="text-danger"><i class="fas fa-exclamation-triangle me-2"></i>This action cannot be undone!</p>
+                  <p><small>Student ID: {{ student.registration_number }}</small></p>`,
             icon: 'error',
             showCancelButton: true,
             confirmButtonColor: '#dc3545',
@@ -1282,11 +1377,12 @@ $(document).ready(function() {
         });
     }
 
-    // Enhanced form validation (including gender as required field)
+    // Enhanced form validation
     function validateForm() {
         let isValid = true;
         $('.is-invalid').removeClass('is-invalid');
         $('.invalid-feedback').remove();
+        $('.select2-container').removeClass('required');
         
         // Check required fields
         const requiredFields = [
@@ -1294,15 +1390,20 @@ $(document).ready(function() {
             { id: 'id_last_name', message: 'Last name is required' },
             { id: 'id_gender', message: 'Gender is required', type: 'select' },
             { id: 'id_class_level', message: 'Class level is required', type: 'select' },
-            { id: 'id_stream_class', message: 'Stream/Class is required', type: 'select' }
+            { id: 'id_stream_class', message: 'Stream/Class is required', type: 'select' },
+            { id: 'id_status', message: 'Student status is required', type: 'select' },
+            { id: 'id_subjects', message: 'At least one subject must be selected', type: 'select-multiple' }
         ];
         
         requiredFields.forEach(field => {
             let element;
-            if (field.type === 'select') {
+            let selectValue;
+            
+            if (field.type === 'select' || field.type === 'select-multiple') {
                 element = $(`.select2-selection[aria-labelledby="select2-${field.id}-container"]`).parent();
-                const selectValue = $(`#${field.id}`).val();
-                if (!selectValue) {
+                selectValue = $(`#${field.id}`).val();
+                
+                if (!selectValue || (Array.isArray(selectValue) && selectValue.length === 0)) {
                     element.addClass('is-invalid');
                     element.parent().find('.select2-container').addClass('required');
                     element.after(`<div class="invalid-feedback d-block">${field.message}</div>`);
@@ -1318,28 +1419,12 @@ $(document).ready(function() {
             }
             
             // Scroll to first error
-            if (!isValid) {
+            if (!isValid && $('.is-invalid').length === 1) {
                 $('html, body').animate({
                     scrollTop: element.offset().top - 100
                 }, 500);
             }
         });
-        
-        // Validate subjects (at least one required)
-        const selectedSubjects = $('#id_subjects').val();
-        if (!selectedSubjects || selectedSubjects.length === 0) {
-            const subjectsElement = $('.select2-selection[aria-labelledby="select2-id_subjects-container"]').parent();
-            subjectsElement.addClass('is-invalid');
-            subjectsElement.parent().find('.select2-container').addClass('required');
-            subjectsElement.after('<div class="invalid-feedback d-block">At least one subject must be selected</div>');
-            isValid = false;
-            
-            if (isValid) {
-                $('html, body').animate({
-                    scrollTop: subjectsElement.offset().top - 100
-                }, 500);
-            }
-        }
         
         // Validate date of birth
         const dob = $('#id_date_of_birth').val();
@@ -1379,7 +1464,12 @@ $(document).ready(function() {
                 $('#studentForm').prepend(errorHtml);
             } else {
                 // Display field-specific errors
-                const element = $(`#id_${field}`);
+                let element = $(`#id_${field}`);
+                if (!element.length) {
+                    // Try alternative selector for some fields
+                    element = $(`#${field}`);
+                }
+                
                 if (element.length) {
                     element.addClass('is-invalid');
                     
@@ -1388,13 +1478,10 @@ $(document).ready(function() {
                         element.parent().find('.select2-container').addClass('required');
                     }
                     
-                    element.after(`<div class="invalid-feedback d-block">${errors[field]}</div>`);
-                } else {
-                    // Try to find element without id_ prefix
-                    const element2 = $(`#${field}`);
-                    if (element2.length) {
-                        element2.addClass('is-invalid');
-                        element2.after(`<div class="invalid-feedback d-block">${errors[field]}</div>`);
+                    // Check if error message already exists
+                    if (element.next('.invalid-feedback').length === 0) {
+                        const errorMessages = Array.isArray(errors[field]) ? errors[field].join(' ') : errors[field];
+                        element.after(`<div class="invalid-feedback d-block">${errorMessages}</div>`);
                     }
                 }
             }
@@ -1503,10 +1590,119 @@ $(document).ready(function() {
         submitForm('save_only');
     });
 
+    // Load streams when class level changes
+    $('#id_class_level').on('change', function() {
+        const classId = $(this).val();
+        const streamSelect = $('#id_stream_class');
+        
+        if (classId) {
+            $.ajax({
+                url: "{% url 'admin_get_streams_by_class' %}",
+                type: 'GET',
+                dataType: 'json',
+                data: { class_id: classId },
+                success: function(response) {
+                    streamSelect.empty().append('<option value="">Select Stream</option>');
+                    
+                    if (response.success && Array.isArray(response.streams)) {
+                        response.streams.forEach(function(stream) {
+                            streamSelect.append(
+                                $('<option>', {
+                                    value: stream.id,
+                                    text: stream.text
+                                })
+                            );
+                        });
+                    }
+                    
+                    // Re-select current value if it exists in new options
+                    const currentValue = streamSelect.data('current-value') || '{{ student.stream_class.id|default:'' }}';
+                    if (currentValue) {
+                        streamSelect.val(currentValue).trigger('change');
+                    }
+                },
+                error: function() {
+                    streamSelect
+                        .empty()
+                        .append('<option value="">Error loading streams</option>');
+                    showError('Stream Error', 'Unable to load streams. Please refresh and try again.');
+                }
+            });
+        } else {
+            streamSelect.empty().append('<option value="">Select Class Level first</option>');
+            streamSelect.prop('disabled', true);
+        }
+    });
+
+    // Load subjects when class level changes
+    $('#id_class_level').on('change', function() {
+        const classId = $(this).val();
+        const subjectsSelect = $('#id_subjects');
+        
+        if (classId) {
+            // Store current selected values
+            const currentValues = subjectsSelect.val();
+            subjectsSelect.data('previous-values', currentValues);
+            
+            subjectsSelect.prop('disabled', true);
+            subjectsSelect.empty().append('<option value="">Loading subjects...</option>');
+            
+            // Load subjects by class
+            $.ajax({
+                url: "{% url 'admin_get_subjects_by_class' %}",
+                type: 'GET',
+                dataType: 'json',
+                data: { class_id: classId },
+                success: function(response) {
+                    subjectsSelect.empty().append('<option value="">Select Subjects</option>');
+                    
+                    if (response.success && Array.isArray(response.subjects) && response.subjects.length > 0) {
+                        subjectsSelect.prop('disabled', false);
+                        
+                        response.subjects.forEach(function(subject) {
+                            subjectsSelect.append(
+                                $('<option>', {
+                                    value: subject.id,
+                                    text: subject.name
+                                })
+                            );
+                        });
+                        
+                        // If there's a previously selected value, set it
+                        const previousValues = subjectsSelect.data('previous-values');
+                        if (previousValues && Array.isArray(previousValues)) {
+                            subjectsSelect.val(previousValues).trigger('change');
+                            subjectsSelect.removeData('previous-values');
+                        }
+                    } else {
+                        subjectsSelect.append('<option value="">No subjects available for this class</option>');
+                    }
+                    
+                    subjectsSelect.trigger('change');
+                },
+                error: function() {
+                    subjectsSelect
+                        .empty()
+                        .append('<option value="">Error loading subjects</option>');
+                    showError('Subject Error', 'Unable to load subjects. Please refresh and try again.');
+                }
+            });
+        } else {
+            subjectsSelect.empty().append('<option value="">Select Class Level first</option>');
+            subjectsSelect.prop('disabled', true);
+        }
+    });
+
     // Initialize form based on existing values
     function initializeForm() {
         // Make registration number readonly
         $('#id_registration_number').prop('readonly', true);
+        
+        // Make admission year field readonly (it's derived from academic year)
+        $('#id_admission_year').prop('readonly', true);
+        
+        // Disable academic year field (cannot be changed after creation)
+        $('#id_academic_year').prop('disabled', true);
         
         // Initialize any existing form errors
         if ($('.is-invalid').length > 0) {
@@ -1522,96 +1718,39 @@ $(document).ready(function() {
             previewImage(profilePicInput);
         }
         
-        // Load streams when class level changes
-        $('#id_class_level').on('change', function() {
-            const classId = $(this).val();
-            const streamSelect = $('#id_stream_class');
-            
-            if (classId) {
-                $.ajax({
-                    url: "{% url 'admin_get_streams_by_class' %}",
-                    type: 'GET',
-                    dataType: 'json',
-                    data: { class_id: classId },
-                    success: function(response) {
-                        streamSelect.empty().append('<option value="">Select Stream</option>');
-                        
-                        if (response.success && Array.isArray(response.streams)) {
-                            response.streams.forEach(function(stream) {
-                                streamSelect.append(
-                                    $('<option>', {
-                                        value: stream.id,
-                                        text: stream.text
-                                    })
-                                );
-                            });
-                        }
-                        
-                        // Re-select current value if it exists in new options
-                        const currentValue = streamSelect.data('current-value');
-                        if (currentValue) {
-                            streamSelect.val(currentValue).trigger('change');
-                        }
-                    }
-                });
-            }
-        });
+        // Store current stream ID for AJAX loading
+        const currentStreamId = '{{ student.stream_class.id|default:"" }}';
+        if (currentStreamId) {
+            $('#id_stream_class').data('current-value', currentStreamId);
+        }
         
-        // Load subjects when class level changes
-        $('#id_class_level').on('change', function() {
-            const classId = $(this).val();
-            const subjectsSelect = $('#id_subjects');
+        // Store current subjects for AJAX loading
+        const currentSubjectIds = [{% for subject_id in student_subjects_ids %}{{ subject_id }}{% if not forloop.last %}, {% endif %}{% endfor %}];
+        if (currentSubjectIds.length > 0) {
+            $('#id_subjects').data('previous-values', currentSubjectIds);
+        }
+        
+        // Trigger initial load of streams and subjects based on current class level
+        const currentClassLevelId = $('#id_class_level').val();
+        if (currentClassLevelId) {
+            // Trigger both AJAX calls
+            $('#id_class_level').trigger('change');
             
-            if (classId) {
-                // Store current selected values
-                const currentValues = subjectsSelect.val();
-                subjectsSelect.data('previous-values', currentValues);
-                
-                subjectsSelect.prop('disabled', true);
-                subjectsSelect.empty().append('<option value="">Loading subjects...</option>');
-                
-                // Load subjects by class
-                $.ajax({
-                    url: "{% url 'admin_get_subjects_by_class' %}",
-                    type: 'GET',
-                    dataType: 'json',
-                    data: { class_id: classId },
-                    success: function(response) {
-                        subjectsSelect.empty().append('<option value="">Select Subjects</option>');
-                        
-                        if (response.success && Array.isArray(response.subjects) && response.subjects.length > 0) {
-                            subjectsSelect.prop('disabled', false);
-                            
-                            response.subjects.forEach(function(subject) {
-                                subjectsSelect.append(
-                                    $('<option>', {
-                                        value: subject.id,
-                                        text: subject.name
-                                    })
-                                );
-                            });
-                            
-                            // If there's a previously selected value, set it
-                            const previousValues = subjectsSelect.data('previous-values');
-                            if (previousValues && Array.isArray(previousValues)) {
-                                subjectsSelect.val(previousValues).trigger('change');
-                                subjectsSelect.removeData('previous-values');
-                            }
-                        } else {
-                            subjectsSelect.append('<option value="">No subjects available for this class</option>');
-                        }
-                        
-                        subjectsSelect.trigger('change');
-                    },
-                    error: function() {
-                        subjectsSelect
-                            .empty()
-                            .append('<option value="">Error loading subjects</option>');
-                        showError('Subject Error', 'Unable to load subjects. Please refresh and try again.');
-                    }
-                });
+            // Also load subjects immediately if we already have them in the DOM
+            const subjectsSelect = $('#id_subjects');
+            if (subjectsSelect.find('option[value!=""]').length > 0 && currentSubjectIds.length > 0) {
+                subjectsSelect.val(currentSubjectIds).trigger('change');
             }
-        });
+        }
+        
+        // Ensure subjects field is properly initialized
+        const subjectsSelect = $('#id_subjects');
+        if (subjectsSelect.find('option[value!=""]').length === 0 && currentSubjectIds.length > 0) {
+            // If subjects haven't loaded yet, set the value anyway
+            setTimeout(function() {
+                subjectsSelect.val(currentSubjectIds).trigger('change');
+            }, 500);
+        }
     }
 
     // Call initialization

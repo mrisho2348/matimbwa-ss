@@ -1,0 +1,1889 @@
+<!-- attendance/edit_session.html -->
+{% extends 'admin/base.html' %}
+{% load static %}
+
+{% block title %}Edit Attendance Session{% endblock %}
+
+{% block breadcrumb %}
+<button type="button" class="btn btn-secondary" onclick="window.history.back()">
+    <i class="fas fa-arrow-left"></i> Back to Dashboard
+</button>
+{% endblock breadcrumb %}
+
+{% block extra_css %}
+<style>
+    .edit-session-container {
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        min-height: calc(100vh - 200px);
+        padding: 20px;
+        border-radius: 10px;
+    }
+    
+    .session-wrapper {
+        background: white;
+        border-radius: 10px;
+        padding: 30px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        max-width: 1200px;
+        margin: 0 auto;
+    }
+    
+    .session-header {
+        margin-bottom: 30px;
+        padding-bottom: 20px;
+        border-bottom: 2px solid #e9ecef;
+    }
+    
+    .session-title {
+        font-size: 1.8rem;
+        font-weight: 700;
+        color: #2c3e50;
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        margin-bottom: 20px;
+    }
+    
+    .session-meta {
+        background: #f8f9fa;
+        padding: 15px;
+        border-radius: 8px;
+        margin-top: 15px;
+        border: 1px solid #e9ecef;
+    }
+    
+    .meta-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 8px;
+    }
+    
+    .meta-label {
+        font-weight: 600;
+        color: #495057;
+        min-width: 100px;
+    }
+    
+    .meta-value {
+        color: #2c3e50;
+        font-weight: 500;
+    }
+    
+    .session-steps {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-top: 20px;
+    }
+    
+    .step-indicator {
+        width: 35px;
+        height: 35px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 600;
+        font-size: 0.9rem;
+        background: #e9ecef;
+        color: #6c757d;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+    
+    .step-indicator.active {
+        background: #007bff;
+        color: white;
+    }
+    
+    .step-indicator.completed {
+        background: #28a745;
+        color: white;
+    }
+    
+    .step-separator {
+        width: 30px;
+        height: 2px;
+        background: #e9ecef;
+    }
+    
+    .step-separator.active {
+        background: #007bff;
+    }
+    
+    .steps-container {
+        min-height: 400px;
+        position: relative;
+    }
+    
+    .step-content {
+        display: none;
+        animation: fadeIn 0.5s ease;
+    }
+    
+    .step-content.active {
+        display: block;
+    }
+    
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    
+    .session-details-container {
+        max-width: 800px;
+        margin: 0 auto;
+    }
+    
+    .detail-card {
+        background: #f8f9fa;
+        border-radius: 10px;
+        padding: 25px;
+        margin-bottom: 25px;
+        border: 1px solid #e9ecef;
+    }
+    
+    .detail-title {
+        font-weight: 600;
+        color: #495057;
+        margin-bottom: 20px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 1.1rem;
+    }
+    
+    .detail-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 20px;
+    }
+    
+    .detail-item {
+        margin-bottom: 15px;
+    }
+    
+    .detail-label {
+        font-weight: 600;
+        color: #495057;
+        margin-bottom: 5px;
+        font-size: 0.9rem;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    
+    .detail-value {
+        color: #2c3e50;
+        font-weight: 500;
+        font-size: 1.1rem;
+        padding: 8px 12px;
+        background: white;
+        border-radius: 6px;
+        border: 1px solid #e9ecef;
+        min-height: 42px;
+        display: flex;
+        align-items: center;
+    }
+    
+    .detail-badge {
+        padding: 4px 10px;
+        border-radius: 4px;
+        font-size: 0.85rem;
+        font-weight: 600;
+    }
+    
+    .badge-class {
+        background-color: #d4edda;
+        color: #155724;
+        border: 1px solid #c3e6cb;
+    }
+    
+    .badge-subject {
+        background-color: #d1ecf1;
+        color: #0c5460;
+        border: 1px solid #bee5eb;
+    }
+    
+    .badge-draft {
+        background-color: #fff3cd;
+        color: #856404;
+        border: 1px solid #ffeaa7;
+    }
+    
+    .badge-finalized {
+        background-color: #d4edda;
+        color: #155724;
+        border: 1px solid #c3e6cb;
+    }
+    
+    .students-selection {
+        max-width: 100%;
+    }
+    
+    .selection-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+        padding: 15px;
+        background: #f8f9fa;
+        border-radius: 8px;
+        border: 1px solid #e9ecef;
+    }
+    
+    .info-badge {
+        padding: 5px 12px;
+        border-radius: 20px;
+        font-weight: 500;
+        font-size: 0.9rem;
+    }
+    
+    .info-badge.total { background: #6c757d; color: white; }
+    .info-badge.selected { background: #007bff; color: white; }
+    
+    .students-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 15px;
+        margin-bottom: 30px;
+        max-height: 500px;
+        overflow-y: auto;
+        padding: 10px;
+    }
+    
+    .student-select-card {
+        background: white;
+        border: 2px solid #e9ecef;
+        border-radius: 8px;
+        padding: 15px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+    
+    .student-select-card:hover {
+        border-color: #007bff;
+        transform: translateY(-2px);
+        box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
+    }
+    
+    .student-select-card.selected {
+        border-color: #28a745;
+        background: #f8fff9;
+    }
+    
+    .student-header {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        margin-bottom: 10px;
+    }
+    
+    .student-avatar-sm {
+        width: 45px;
+        height: 45px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-weight: 600;
+        flex-shrink: 0;
+    }
+    
+    .student-name {
+        font-weight: 600;
+        color: #495057;
+        margin-bottom: 3px;
+    }
+    
+    .student-details {
+        font-size: 0.85rem;
+        color: #6c757d;
+    }
+    
+    .status-select {
+        width: 100%;
+        padding: 8px;
+        border: 1px solid #dee2e6;
+        border-radius: 5px;
+        font-size: 0.9rem;
+        background: white;
+        cursor: pointer;
+    }
+    
+    .status-select.present { background: #d4edda; color: #155724; }
+    .status-select.absent { background: #f8d7da; color: #721c24; }
+    .status-select.late { background: #fff3cd; color: #856404; }
+    .status-select.excused { background: #d1ecf1; color: #0c5460; }
+    
+    .remark-input {
+        width: 100%;
+        padding: 8px;
+        border: 1px solid #dee2e6;
+        border-radius: 5px;
+        font-size: 0.85rem;
+        margin-top: 8px;
+        display: none;
+    }
+    
+    .student-select-card.selected .remark-input {
+        display: block;
+    }
+    
+    .bulk-actions {
+        background: #f8f9fa;
+        border-radius: 8px;
+        padding: 15px;
+        margin-bottom: 20px;
+        border: 1px solid #e9ecef;
+    }
+    
+    .bulk-controls {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+    }
+    
+    .review-container {
+        max-width: 900px;
+        margin: 0 auto;
+    }
+    
+    .review-summary {
+        background: #f8f9fa;
+        border-radius: 10px;
+        padding: 25px;
+        margin-bottom: 30px;
+        border: 1px solid #e9ecef;
+    }
+    
+    .review-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 15px;
+        margin-bottom: 20px;
+    }
+    
+    .review-item {
+        padding: 15px;
+        background: white;
+        border-radius: 8px;
+        border: 1px solid #e9ecef;
+        text-align: center;
+    }
+    
+    .review-value {
+        font-size: 1.2rem;
+        font-weight: 700;
+        color: #495057;
+        margin-bottom: 5px;
+        min-height: 30px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    .review-label {
+        font-size: 0.85rem;
+        color: #6c757d;
+        font-weight: 500;
+    }
+    
+    .attendance-stats {
+        display: flex;
+        justify-content: space-around;
+        margin: 25px 0;
+        padding: 20px;
+        background: white;
+        border-radius: 10px;
+        border: 1px solid #e9ecef;
+    }
+    
+    .stat-item {
+        text-align: center;
+        padding: 0 15px;
+    }
+    
+    .stat-value {
+        font-size: 2rem;
+        font-weight: 700;
+        display: block;
+        margin-bottom: 5px;
+    }
+    
+    .stat-label {
+        font-size: 0.9rem;
+        color: #6c757d;
+        font-weight: 500;
+    }
+    
+    .stat-present { color: #28a745; }
+    .stat-absent { color: #dc3545; }
+    .stat-late { color: #ffc107; }
+    .stat-excused { color: #17a2b8; }
+    
+    .changes-summary {
+        margin-top: 25px;
+        padding: 20px;
+        background: #fff3cd;
+        border-radius: 8px;
+        border: 1px solid #ffeaa7;
+    }
+    
+    .changes-title {
+        font-weight: 600;
+        color: #856404;
+        margin-bottom: 10px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    
+    .step-navigation {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-top: 30px;
+        padding-top: 20px;
+        border-top: 1px solid #e9ecef;
+    }
+    
+    .nav-btn {
+        padding: 8px 20px;
+        border-radius: 5px;
+        font-weight: 500;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        transition: all 0.3s ease;
+    }
+    
+    .btn-prev {
+        background: #6c757d;
+        color: white;
+        border: none;
+    }
+    
+    .btn-prev:hover {
+        background: #5a6268;
+    }
+    
+    .btn-next {
+        background: #007bff;
+        color: white;
+        border: none;
+    }
+    
+    .btn-next:hover {
+        background: #0056b3;
+    }
+    
+    .btn-update {
+        background: #28a745;
+        color: white;
+        border: none;
+    }
+    
+    .btn-update:hover {
+        background: #218838;
+    }
+    
+    .loading-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(255, 255, 255, 0.9);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+        display: none;
+    }
+    
+    .loading-spinner {
+        width: 50px;
+        height: 50px;
+        border: 5px solid #f3f3f3;
+        border-top: 5px solid #007bff;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin-bottom: 20px;
+    }
+    
+    .original-status {
+        font-size: 0.8rem;
+        color: #6c757d;
+        margin-top: 5px;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+    }
+    
+    .original-status-badge {
+        padding: 2px 6px;
+        border-radius: 3px;
+        font-size: 0.75rem;
+    }
+    
+    .original-status-present { background: #d4edda; color: #155724; }
+    .original-status-absent { background: #f8d7da; color: #721c24; }
+    .original-status-late { background: #fff3cd; color: #856404; }
+    .original-status-excused { background: #d1ecf1; color: #0c5460; }
+    
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+    
+    @media (max-width: 768px) {
+        .session-wrapper {
+            padding: 20px;
+        }
+        
+        .detail-grid {
+            grid-template-columns: 1fr;
+        }
+        
+        .students-grid {
+            grid-template-columns: 1fr;
+        }
+        
+        .step-navigation {
+            flex-direction: column;
+            gap: 15px;
+        }
+        
+        .nav-btn {
+            width: 100%;
+            justify-content: center;
+        }
+        
+        .attendance-stats {
+            flex-wrap: wrap;
+        }
+        
+        .stat-item {
+            width: 50%;
+            margin-bottom: 15px;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="content">
+    <div class="container-fluid">
+        <div class="edit-session-container">
+            <div class="session-wrapper">
+                <!-- Session Header -->
+                <div class="session-header">
+                    <div class="session-title">
+                        <i class="fas fa-edit"></i>
+                        Edit Attendance Session
+                    </div>
+                    
+                    <!-- Step Indicators -->
+                    <div class="session-steps">
+                        <div class="step-indicator active" data-step="1">
+                            <i class="fas fa-info-circle"></i>
+                        </div>
+                        <div class="step-separator"></div>
+                        <div class="step-indicator" data-step="2">
+                            <i class="fas fa-users"></i>
+                        </div>
+                        <div class="step-separator"></div>
+                        <div class="step-indicator" data-step="3">
+                            <i class="fas fa-check-circle"></i>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Steps Container -->
+                <div class="steps-container">
+                    <!-- Step 1: Session Details (Display Only) -->
+                    <div class="step-content active" id="step1">
+                        <div class="session-details-container">
+                            <!-- Session Information Card -->
+                            <div class="detail-card">
+                                <h5 class="detail-title">
+                                    <i class="fas fa-calendar-alt"></i>
+                                    Session Information
+                                </h5>
+                                
+                                <div class="detail-grid">
+                                    <div class="detail-item">
+                                        <div class="detail-label">
+                                            <i class="fas fa-hashtag"></i>
+                                            Session ID
+                                        </div>
+                                        <div class="detail-value">
+                                            {{ session_id }}
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="detail-item">
+                                        <div class="detail-label">
+                                            <i class="fas fa-calendar-day"></i>
+                                            Date
+                                        </div>
+                                        <div class="detail-value" id="sessionDateDisplay">
+                                            {% if session_data.date %}
+                                                {{ session_data.date|date:"l, F d, Y" }}
+                                            {% else %}
+                                                Not specified
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="detail-item">
+                                        <div class="detail-label">
+                                            <i class="fas fa-clock"></i>
+                                            Period
+                                        </div>
+                                        <div class="detail-value" id="periodDisplay">
+                                            {% if session_data.period %}
+                                                Period {{ session_data.period }}
+                                            {% else %}
+                                                Not specified
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="detail-item">
+                                        <div class="detail-label">
+                                            <i class="fas fa-flag"></i>
+                                            Status
+                                        </div>
+                                        <div class="detail-value">
+                                            {% if session_data.is_draft %}
+                                                <span class="detail-badge badge-draft">Draft</span>
+                                            {% else %}
+                                                <span class="detail-badge badge-finalized">Finalized</span>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Class & Stream Information Card -->
+                            <div class="detail-card">
+                                <h5 class="detail-title">
+                                    <i class="fas fa-school"></i>
+                                    Class & Stream
+                                </h5>
+                                
+                                <div class="detail-grid">
+                                    <div class="detail-item">
+                                        <div class="detail-label">
+                                            <i class="fas fa-chalkboard-teacher"></i>
+                                            Class Level
+                                        </div>
+                                        <div class="detail-value" id="classLevelDisplay">
+                                            {% if session_data.class_name %}
+                                                {{ session_data.class_name }}
+                                            {% else %}
+                                                Not specified
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="detail-item">
+                                        <div class="detail-label">
+                                            <i class="fas fa-stream"></i>
+                                            Stream
+                                        </div>
+                                        <div class="detail-value" id="streamDisplay">
+                                            {% if session_data.stream_name %}
+                                                {{ session_data.stream_name }}
+                                            {% else %}
+                                                Not specified
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Session Type Card -->
+                            <div class="detail-card">
+                                <h5 class="detail-title">
+                                    <i class="fas fa-tasks"></i>
+                                    Session Type
+                                </h5>
+                                
+                                <div class="detail-grid">
+                                    <div class="detail-item">
+                                        <div class="detail-label">
+                                            <i class="fas fa-clipboard-check"></i>
+                                            Attendance Type
+                                        </div>
+                                        <div class="detail-value">
+                                            <span id="sessionTypeDisplay">
+                                                {% if session_data.attendance_type == 'SUBJECT' %}
+                                                    Subject Attendance
+                                                {% else %}
+                                                    Class Attendance
+                                                {% endif %}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="detail-item">
+                                        <div class="detail-label">
+                                            <i class="fas fa-user-check"></i>
+                                            Default Status
+                                        </div>
+                                        <div class="detail-value">
+                                            Present
+                                        </div>
+                                    </div>
+                                    
+                                    {% if session_data.attendance_type == 'SUBJECT' and session_data.subject_name %}
+                                    <div class="detail-item" id="subjectDisplayItem">
+                                        <div class="detail-label">
+                                            <i class="fas fa-book"></i>
+                                            Subject
+                                        </div>
+                                        <div class="detail-value" id="subjectDisplay">
+                                            {{ session_data.subject_name }}
+                                        </div>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            
+                            <!-- Session Stats Card -->
+                            <div class="detail-card">
+                                <h5 class="detail-title">
+                                    <i class="fas fa-chart-bar"></i>
+                                    Session Statistics
+                                </h5>
+                                
+                                <div class="detail-grid">
+                                    <div class="detail-item">
+                                        <div class="detail-label">
+                                            <i class="fas fa-users"></i>
+                                            Total Students
+                                        </div>
+                                        <div class="detail-value" id="totalStudentsDisplay">
+                                            Loading...
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="detail-item">
+                                        <div class="detail-label">
+                                            <i class="fas fa-calendar-plus"></i>
+                                            Created At
+                                        </div>
+                                        <div class="detail-value" id="createdAtDisplay">
+                                            {% if session_data.created_at %}
+                                                {{ session_data.created_at|date:"M d, Y H:i" }}
+                                            {% else %}
+                                                N/A
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="detail-item">
+                                        <div class="detail-label">
+                                            <i class="fas fa-history"></i>
+                                            Last Updated
+                                        </div>
+                                        <div class="detail-value" id="updatedAtDisplay">
+                                            {% if session_data.updated_at %}
+                                                {{ session_data.updated_at|date:"M d, Y H:i" }}
+                                            {% else %}
+                                                N/A
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Step 2: Edit Students (Active for editing) -->
+                    <div class="step-content" id="step2">
+                        <div class="students-selection">
+                            <!-- Selection Header -->
+                            <div class="selection-header">
+                                <div class="selection-info">
+                                    <span class="info-badge total">
+                                        <i class="fas fa-users"></i>
+                                        <span id="totalStudentsCount">0</span> Students
+                                    </span>
+                                    <span class="info-badge selected">
+                                        <i class="fas fa-check-circle"></i>
+                                        <span id="selectedStudentsCount">0</span> Selected
+                                    </span>
+                                </div>
+                                <div class="selection-actions">
+                                    <button type="button" class="btn btn-outline-primary btn-sm" id="selectAllBtn">
+                                        <i class="fas fa-check-double"></i> Select All
+                                    </button>
+                                    <button type="button" class="btn btn-outline-secondary btn-sm" id="deselectAllBtn">
+                                        <i class="fas fa-times"></i> Deselect All
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <!-- Student Search -->
+                            <div class="student-search mb-3">
+                                <div class="input-group">
+                                    <div class="input-group-prepend">
+                                        <span class="input-group-text">
+                                            <i class="fas fa-search"></i>
+                                        </span>
+                                    </div>
+                                    <input type="text" 
+                                           class="form-control" 
+                                           id="studentSearch" 
+                                           placeholder="Search students by name or admission number...">
+                                </div>
+                            </div>
+                            
+                            <!-- Bulk Actions -->
+                            <div class="bulk-actions mb-3">
+                                <div class="bulk-controls">
+                                    <select class="form-control form-control-sm" id="bulkStatus" style="max-width: 120px;">
+                                        <option value="P">Present</option>
+                                        <option value="A">Absent</option>
+                                        <option value="L">Late</option>
+                                        <option value="E">Excused</option>
+                                    </select>
+                                    <button type="button" class="btn btn-primary btn-sm" id="applyBulkStatus">
+                                        <i class="fas fa-check"></i> Apply to Selected
+                                    </button>
+                                    <button type="button" class="btn btn-outline-info btn-sm" id="addRemarkToAll">
+                                        <i class="fas fa-comment"></i> Add Remark
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <!-- Students Grid -->
+                            <div class="students-grid" id="studentsGrid">
+                                <div class="text-center py-5" id="loadingStudents">
+                                    <div class="spinner-border text-primary" role="status">
+                                        <span class="sr-only">Loading students...</span>
+                                    </div>
+                                    <p class="text-muted mt-3">Loading attendance data...</p>
+                                </div>
+                            </div>
+                            
+                            <!-- No Students Message -->
+                            <div class="text-center py-5" id="noStudentsMessage" style="display: none;">
+                                <i class="fas fa-users-slash fa-3x text-muted mb-3"></i>
+                                <h5 class="text-muted">No Students Found</h5>
+                                <p class="text-muted">No students are registered in the selected class and stream.</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Step 3: Review & Update -->
+                    <div class="step-content" id="step3">
+                        <div class="review-container">
+                            <div class="review-summary">
+                                <h5 class="detail-title mb-4">
+                                    <i class="fas fa-clipboard-check"></i>
+                                    Review & Update Session
+                                </h5>
+                                
+                                <!-- Session Details Review -->
+                                <div class="review-grid">
+                                    <div class="review-item">
+                                        <div class="review-value" id="reviewDate">
+                                            {% if session_data.date %}
+                                                {{ session_data.date|date:"M d, Y" }}
+                                            {% else %}
+                                                -
+                                            {% endif %}
+                                        </div>
+                                        <div class="review-label">Session Date</div>
+                                    </div>
+                                    <div class="review-item">
+                                        <div class="review-value" id="reviewClass">
+                                            {% if session_data.class_name %}
+                                                {{ session_data.class_name }}{% if session_data.stream_name %} - {{ session_data.stream_name }}{% endif %}
+                                            {% else %}
+                                                -
+                                            {% endif %}
+                                        </div>
+                                        <div class="review-label">Class</div>
+                                    </div>
+                                    <div class="review-item">
+                                        <div class="review-value" id="reviewType">
+                                            {% if session_data.attendance_type == 'SUBJECT' %}
+                                                Subject
+                                            {% else %}
+                                                Class
+                                            {% endif %}
+                                        </div>
+                                        <div class="review-label">Type</div>
+                                    </div>
+                                    <div class="review-item">
+                                        <div class="review-value" id="reviewPeriod">
+                                            {% if session_data.period %}
+                                                Period {{ session_data.period }}
+                                            {% else %}
+                                                N/A
+                                            {% endif %}
+                                        </div>
+                                        <div class="review-label">Period</div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Attendance Statistics -->
+                                <div class="attendance-stats">
+                                    <div class="stat-item">
+                                        <span class="stat-value stat-present" id="reviewPresent">0</span>
+                                        <span class="stat-label">Present</span>
+                                    </div>
+                                    <div class="stat-item">
+                                        <span class="stat-value stat-absent" id="reviewAbsent">0</span>
+                                        <span class="stat-label">Absent</span>
+                                    </div>
+                                    <div class="stat-item">
+                                        <span class="stat-value stat-late" id="reviewLate">0</span>
+                                        <span class="stat-label">Late</span>
+                                    </div>
+                                    <div class="stat-item">
+                                        <span class="stat-value stat-excused" id="reviewExcused">0</span>
+                                        <span class="stat-label">Excused</span>
+                                    </div>
+                                    <div class="stat-item">
+                                        <span class="stat-value" id="reviewTotal">0</span>
+                                        <span class="stat-label">Total</span>
+                                    </div>
+                                </div>
+                                
+                                <!-- Changes Summary -->
+                                <div class="changes-summary" id="changesSummary" style="display: none;">
+                                    <div class="changes-title">
+                                        <i class="fas fa-exchange-alt"></i>
+                                        Changes Summary
+                                    </div>
+                                    <div id="changesList">
+                                        <!-- Changes will be listed here -->
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Preview Table -->
+                            <div class="card">
+                                <div class="card-header">
+                                    <h6 class="card-title mb-0">
+                                        <i class="fas fa-list"></i>
+                                        Student Attendance List
+                                    </h6>
+                                </div>
+                                <div class="card-body p-0">
+                                    <div class="table-responsive">
+                                        <table class="table table-sm mb-0">
+                                            <thead>
+                                                <tr>
+                                                    <th>#</th>
+                                                    <th>Student</th>
+                                                    <th>Admission No.</th>
+                                                    <th>Original Status</th>
+                                                    <th>New Status</th>
+                                                    <th>Remark</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="reviewTableBody">
+                                                <!-- Will be populated dynamically -->
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Step Navigation -->
+                <div class="step-navigation">
+                    <button type="button" class="nav-btn btn-prev" id="prevStepBtn" disabled>
+                        <i class="fas fa-arrow-left"></i> Previous
+                    </button>
+                    
+                    <div class="step-info">
+                        <span class="text-muted">Step</span>
+                        <strong id="currentStep">1</strong>
+                        <span class="text-muted">of 3</span>
+                    </div>
+                    
+                    <button type="button" class="nav-btn btn-next" id="nextStepBtn">
+                        Next <i class="fas fa-arrow-right"></i>
+                    </button>
+                    <button type="button" class="nav-btn btn-update" id="updateSessionBtn" style="display: none;">
+                        <i class="fas fa-save"></i> Update Session
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Loading Overlay -->
+<div class="loading-overlay" id="loadingOverlay">
+    <div class="loading-spinner"></div>
+    <h5 id="loadingMessage">Loading session data...</h5>
+</div>
+
+<!-- Add Remark Modal -->
+<div class="modal fade" id="remarkModal" tabindex="-1" role="dialog">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-comment"></i> Add Remark
+                </h5>
+                <button type="button" class="close" data-dismiss="modal">
+                    <span>&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="remarkText">Remark Text</label>
+                    <textarea class="form-control" id="remarkText" rows="3" 
+                              placeholder="Enter remark for selected students..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="applyRemark">
+                    <i class="fas fa-check"></i> Apply to Selected
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // Global variables
+    const sessionId = {{ session_id }};
+    let currentStep = 1;
+    let selectedClassId = null;
+    let selectedStreamId = null;
+    let selectedSubjectId = null;
+    let studentsData = [];
+    let originalSessionData = {};
+    let originalAttendanceData = {};
+    let selectedStudents = new Set();
+    let studentStatus = {};
+    let isFormReady = false;
+    let isSubjectType = false;
+    
+    // Initialize
+    function initialize() {
+        console.log('Initializing edit session for ID:', sessionId);
+        
+        // Load session data first
+        loadSessionData();
+        
+        // Step navigation
+        $('#nextStepBtn').click(function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            nextStep();
+        });
+        
+        $('#prevStepBtn').click(function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            prevStep();
+        });
+        
+        // Step indicator click handlers
+        $('.step-indicator').click(function() {
+            const step = parseInt($(this).data('step'));
+            console.log(`Step indicator clicked: ${step}, current: ${currentStep}`);
+            
+            if (step <= currentStep) {
+                gotoStep(step);
+            } else if (step === 2 && validateStep1()) {
+                loadStudents().then((success) => {
+                    if (success) {
+                        gotoStep(2);
+                    }
+                });
+            } else if (step === 3 && validateStep2()) {
+                gotoStep(3);
+            }
+        });
+        
+        // Student selection handlers
+        $('#selectAllBtn').click(selectAllStudents);
+        $('#deselectAllBtn').click(deselectAllStudents);
+        
+        // Bulk actions
+        $('#applyBulkStatus').click(applyBulkStatus);
+        $('#addRemarkToAll').click(function() {
+            $('#remarkModal').modal('show');
+        });
+        
+        // Apply remark
+        $('#applyRemark').click(function() {
+            const remark = $('#remarkText').val().trim();
+            if (remark) {
+                applyRemarkToSelected(remark);
+                $('#remarkModal').modal('hide');
+                $('#remarkText').val('');
+            }
+        });
+        
+        // Student search
+        $('#studentSearch').on('keyup', function() {
+            filterStudents($(this).val().toLowerCase());
+        });
+        
+        // Save action
+        $('#updateSessionBtn').click(function(e) {
+            e.preventDefault();
+            updateSession();
+        });
+    }
+    
+    // Load session data
+    function loadSessionData() {
+        console.log('Loading session data...');
+        showLoading('Loading session data...');
+        
+        $.ajax({
+            url: `{% url 'admin_get_edit_attendance_session_api' 0 %}`.replace('/0/', `/${sessionId}/`),
+            method: 'GET',
+            success: function(response) {
+                console.log('Session data response:', response);
+                
+                if (response.success) {
+                    originalSessionData = response.session;
+                    originalAttendanceData = response.student_attendance || {};
+                    
+                    // Store original IDs from context data
+                    selectedClassId = {{ session_data.class_level_id|default:"null" }};
+                    selectedStreamId = {{ session_data.stream_id|default:"null" }};
+                    selectedSubjectId = {{ session_data.subject_id|default:"null" }};
+                    
+                    // Populate display fields
+                    populateDisplayFields();
+                    
+                    hideLoading();
+                    
+                    // Mark form as ready
+                    setTimeout(() => {
+                        isFormReady = true;
+                        console.log('Form is ready');
+                    }, 300);
+                    
+                } else {
+                    showToast(response.message || 'Error loading session', 'error');
+                    setTimeout(() => window.history.back(), 2000);
+                    hideLoading();
+                }
+            },
+            error: function(xhr, status, error) {
+                console.error('Error loading session data:', error);
+                hideLoading();
+                showToast('Error loading session data: ' + error, 'error');
+                setTimeout(() => window.history.back(), 2000);
+            }
+        });
+    }
+    
+    // Populate display fields
+    function populateDisplayFields() {
+        const session = originalSessionData;
+        
+        console.log('Populating display fields with session data:', session);
+        
+        // Set total students from attendance data
+        const totalStudents = Object.keys(originalAttendanceData).length;
+        $('#totalStudentsDisplay').text(totalStudents);
+        
+        // Update review data
+        updateReviewData();
+    }
+    
+    // Load students
+    function loadStudents() {
+        return new Promise((resolve) => {
+            console.log('loadStudents called');
+            
+            if (!selectedClassId || !selectedStreamId) {
+                showToast('Class and stream information is missing', 'warning');
+                resolve(false);
+                return;
+            }
+            
+            $('#loadingStudents').show();
+            $('#noStudentsMessage').hide();
+            $('#studentsGrid').hide();
+            
+            // Construct URL
+            const url = `/attendance/api/students/class/${selectedClassId}/stream/${selectedStreamId}/`;
+            console.log('Fetching students from:', url);
+            
+            $.ajax({
+                url: url,
+                method: 'GET',
+                success: function(response) {
+                    console.log('Students API response:', response);
+                    $('#loadingStudents').hide();
+                    
+                    if (response.success && response.students && response.students.length > 0) {
+                        studentsData = response.students;
+                        
+                        // Reset collections
+                        selectedStudents.clear();
+                        studentStatus = {};
+                        
+                        // Initialize student status from original data
+                        Object.keys(originalAttendanceData).forEach(studentId => {
+                            studentStatus[studentId] = {
+                                status: originalAttendanceData[studentId].status,
+                                remark: originalAttendanceData[studentId].remark || ''
+                            };
+                            selectedStudents.add(studentId);
+                        });
+                        
+                        // For students not in original data, add them with default status
+                        studentsData.forEach(student => {
+                            const studentId = student.id.toString();
+                            if (!originalAttendanceData[studentId]) {
+                                studentStatus[studentId] = {
+                                    status: 'P', // Default to Present
+                                    remark: ''
+                                };
+                                selectedStudents.add(studentId);
+                            }
+                        });
+                        
+                        console.log(`Loaded ${studentsData.length} students`);
+                        console.log(`Selected ${selectedStudents.size} students`);
+                        
+                        // Render students grid
+                        renderStudentsGrid();
+                        updateStudentCounts();
+                        
+                        resolve(true);
+                    } else {
+                        showToast(response.message || 'No students found in this class and stream', 'warning');
+                        $('#noStudentsMessage').show();
+                        resolve(false);
+                    }
+                },
+                error: function(xhr, status, error) {
+                    $('#loadingStudents').hide();
+                    console.error('Error loading students:', error);
+                    showToast('Error loading students: ' + error, 'error');
+                    resolve(false);
+                }
+            });
+        });
+    }
+    
+    // Render students grid
+    function renderStudentsGrid() {
+        const $studentsGrid = $('#studentsGrid');
+        const $noStudentsMessage = $('#noStudentsMessage');
+        
+        if (studentsData.length === 0) {
+            $noStudentsMessage.show();
+            $studentsGrid.hide();
+            return;
+        }
+        
+        $noStudentsMessage.hide();
+        $studentsGrid.show().empty();
+        
+        console.log('Rendering students grid with', studentsData.length, 'students');
+        
+        studentsData.forEach(student => {
+            const studentId = student.id.toString();
+            const isSelected = selectedStudents.has(studentId);
+            const currentStatus = studentStatus[studentId]?.status || 'P';
+            const originalStatus = originalAttendanceData[studentId]?.status;
+            const remark = studentStatus[studentId]?.remark || '';
+            
+            const studentCard = `
+                <div class="student-select-card ${isSelected ? 'selected' : ''}" data-student-id="${studentId}">
+                    <div class="student-header">
+                        <div class="student-avatar-sm">
+                            ${student.full_name?.charAt(0) || '?'}
+                        </div>
+                        <div class="student-info">
+                            <div class="student-name">${student.full_name || 'Unknown Student'}</div>
+                            <div class="student-details">
+                                ${student.admission_number || 'N/A'}
+                            </div>
+                            ${originalStatus ? `
+                            <div class="original-status">
+                                <i class="fas fa-history"></i>
+                                Original: 
+                                <span class="original-status-badge ${getOriginalStatusClass(originalStatus)}">
+                                    ${getStatusText(originalStatus)}
+                                </span>
+                            </div>
+                            ` : ''}
+                        </div>
+                        <div class="custom-control custom-checkbox">
+                            <input type="checkbox" 
+                                   class="custom-control-input student-checkbox" 
+                                   id="student_${studentId}"
+                                   ${isSelected ? 'checked' : ''}>
+                            <label class="custom-control-label" for="student_${studentId}"></label>
+                        </div>
+                    </div>
+                    
+                    <select class="status-select ${getStatusClass(currentStatus)}" data-student-id="${studentId}">
+                        <option value="P" ${currentStatus === 'P' ? 'selected' : ''}>Present</option>
+                        <option value="A" ${currentStatus === 'A' ? 'selected' : ''}>Absent</option>
+                        <option value="L" ${currentStatus === 'L' ? 'selected' : ''}>Late</option>
+                        <option value="E" ${currentStatus === 'E' ? 'selected' : ''}>Excused</option>
+                    </select>
+                    
+                    <input type="text" 
+                           class="remark-input" 
+                           placeholder="Add remark..."
+                           value="${remark}"
+                           data-student-id="${studentId}">
+                </div>
+            `;
+            
+            $studentsGrid.append(studentCard);
+        });
+        
+        // Attach event listeners
+        attachStudentEventListeners();
+    }
+    
+    // Attach student event listeners
+    function attachStudentEventListeners() {
+        $('.student-select-card').off().click(function(e) {
+            if (!$(e.target).closest('select').length && 
+                !$(e.target).closest('.custom-control').length &&
+                !$(e.target).is('input')) {
+                toggleStudentSelection($(this).data('student-id'));
+            }
+        });
+        
+        $('.student-checkbox').off().change(function() {
+            const studentId = $(this).closest('.student-select-card').data('student-id');
+            if ($(this).is(':checked')) {
+                selectStudent(studentId);
+            } else {
+                deselectStudent(studentId);
+            }
+        });
+        
+        $('.status-select').off().change(function() {
+            const studentId = $(this).data('student-id');
+            const status = $(this).val();
+            
+            if (!studentStatus[studentId]) {
+                studentStatus[studentId] = {};
+            }
+            studentStatus[studentId].status = status;
+            
+            $(this).removeClass('status-present status-absent status-late status-excused')
+                   .addClass(getStatusClass(status));
+            
+            updateStudentCounts();
+            updateReviewData();
+        });
+        
+        $('.remark-input').off().on('input', function() {
+            const studentId = $(this).data('student-id');
+            const remark = $(this).val().trim();
+            
+            if (!studentStatus[studentId]) {
+                studentStatus[studentId] = {};
+            }
+            studentStatus[studentId].remark = remark;
+        });
+    }
+    
+    // Get status CSS class
+    function getStatusClass(status) {
+        switch(status) {
+            case 'P': return 'status-present';
+            case 'A': return 'status-absent';
+            case 'L': return 'status-late';
+            case 'E': return 'status-excused';
+            default: return '';
+        }
+    }
+    
+    // Get original status CSS class
+    function getOriginalStatusClass(status) {
+        switch(status) {
+            case 'P': return 'original-status-present';
+            case 'A': return 'original-status-absent';
+            case 'L': return 'original-status-late';
+            case 'E': return 'original-status-excused';
+            default: return '';
+        }
+    }
+    
+    // Get status text
+    function getStatusText(statusCode) {
+        const statusMap = {
+            'P': 'Present',
+            'A': 'Absent',
+            'L': 'Late',
+            'E': 'Excused'
+        };
+        return statusMap[statusCode] || statusCode;
+    }
+    
+    // Toggle student selection
+    function toggleStudentSelection(studentId) {
+        if (selectedStudents.has(studentId)) {
+            deselectStudent(studentId);
+        } else {
+            selectStudent(studentId);
+        }
+    }
+    
+    // Select student
+    function selectStudent(studentId) {
+        selectedStudents.add(studentId);
+        $(`.student-select-card[data-student-id="${studentId}"]`).addClass('selected');
+        $(`#student_${studentId}`).prop('checked', true);
+        
+        if (!studentStatus[studentId]) {
+            studentStatus[studentId] = {
+                status: 'P', // Default to Present
+                remark: ''
+            };
+        }
+        
+        updateStudentCounts();
+    }
+    
+    // Deselect student
+    function deselectStudent(studentId) {
+        selectedStudents.delete(studentId);
+        $(`.student-select-card[data-student-id="${studentId}"]`).removeClass('selected');
+        $(`#student_${studentId}`).prop('checked', false);
+        updateStudentCounts();
+    }
+    
+    // Select all students
+    function selectAllStudents() {
+        studentsData.forEach(student => {
+            selectStudent(student.id.toString());
+        });
+        showToast('All students selected', 'success');
+    }
+    
+    // Deselect all students
+    function deselectAllStudents() {
+        selectedStudents.clear();
+        $('.student-select-card').removeClass('selected');
+        $('.student-checkbox').prop('checked', false);
+        updateStudentCounts();
+        showToast('All students deselected', 'info');
+    }
+    
+    // Apply bulk status
+    function applyBulkStatus() {
+        const status = $('#bulkStatus').val();
+        
+        if (selectedStudents.size === 0) {
+            showToast('No students selected', 'warning');
+            return;
+        }
+        
+        selectedStudents.forEach(studentId => {
+            if (!studentStatus[studentId]) {
+                studentStatus[studentId] = {};
+            }
+            studentStatus[studentId].status = status;
+            
+            $(`.status-select[data-student-id="${studentId}"]`)
+                .val(status)
+                .removeClass('status-present status-absent status-late status-excused')
+                .addClass(getStatusClass(status));
+        });
+        
+        updateStudentCounts();
+        updateReviewData();
+        showToast(`Status applied to ${selectedStudents.size} students`, 'success');
+    }
+    
+    // Apply remark to selected
+    function applyRemarkToSelected(remark) {
+        if (selectedStudents.size === 0) {
+            showToast('No students selected', 'warning');
+            return;
+        }
+        
+        selectedStudents.forEach(studentId => {
+            if (!studentStatus[studentId]) {
+                studentStatus[studentId] = {};
+            }
+            studentStatus[studentId].remark = remark;
+            
+            $(`.remark-input[data-student-id="${studentId}"]`).val(remark);
+        });
+        
+        showToast(`Remark added to ${selectedStudents.size} students`, 'success');
+    }
+    
+    // Filter students
+    function filterStudents(searchTerm) {
+        if (!searchTerm) {
+            $('.student-select-card').show();
+            return;
+        }
+        
+        $('.student-select-card').each(function() {
+            const studentText = $(this).text().toLowerCase();
+            $(this).toggle(studentText.indexOf(searchTerm) > -1);
+        });
+    }
+    
+    // Update student counts
+    function updateStudentCounts() {
+        const totalStudents = studentsData.length;
+        const selectedCount = selectedStudents.size;
+        
+        $('#totalStudentsCount').text(totalStudents);
+        $('#selectedStudentsCount').text(selectedCount);
+        $('#reviewTotal').text(selectedCount);
+        updateReviewData();
+    }
+    
+    // Next step
+    function nextStep() {
+        console.log('Next button clicked, current step:', currentStep);
+        
+        switch(currentStep) {
+            case 1:
+                console.log('Validating step 1...');
+                if (validateStep1()) {
+                    console.log('Step 1 validation passed');
+                    
+                    console.log('Loading students...');
+                    loadStudents().then((success) => {
+                        if (success) {
+                            console.log('Students loaded, going to step 2');
+                            gotoStep(2);
+                        } else {
+                            console.log('Failed to load students');
+                        }
+                    });
+                } else {
+                    console.log('Step 1 validation failed');
+                }
+                break;
+                
+            case 2:
+                console.log('Validating step 2...');
+                if (validateStep2()) {
+                    console.log('Step 2 validation passed, going to step 3');
+                    gotoStep(3);
+                } else {
+                    console.log('Step 2 validation failed');
+                }
+                break;
+                
+            case 3:
+                console.log('Updating session...');
+                updateSession();
+                break;
+        }
+    }
+    
+    // Previous step
+    function prevStep() {
+        if (currentStep > 1) {
+            gotoStep(currentStep - 1);
+        }
+    }
+    
+    // Go to specific step
+    function gotoStep(step) {
+        console.log(`Going to step ${step} from step ${currentStep}`);
+        
+        // Update step indicators
+        $('.step-indicator').removeClass('active completed');
+        
+        for (let i = 1; i <= step; i++) {
+            const $indicator = $(`.step-indicator[data-step="${i}"]`);
+            if (i < step) {
+                $indicator.addClass('completed');
+            } else if (i === step) {
+                $indicator.addClass('active');
+            }
+        }
+        
+        // Hide all steps, show current step
+        $('.step-content').removeClass('active');
+        $(`#step${step}`).addClass('active');
+        
+        // Update navigation buttons
+        currentStep = step;
+        $('#currentStep').text(step);
+        
+        $('#prevStepBtn').prop('disabled', step === 1);
+        
+        if (step === 3) {
+            $('#nextStepBtn').hide();
+            $('#updateSessionBtn').show();
+            updateReviewData();
+        } else {
+            $('#nextStepBtn').show();
+            $('#updateSessionBtn').hide();
+        }
+    }
+    
+    // Validate step 1
+    function validateStep1() {
+        console.log('Validating step 1...');
+        
+        if (!isFormReady) {
+            showToast('Please wait while session data loads', 'warning');
+            return false;
+        }
+        
+        return true;
+    }
+    
+    // Validate step 2
+    function validateStep2() {
+        console.log('Validating step 2...');
+        
+        if (selectedStudents.size === 0) {
+            showToast('Please select at least one student', 'warning');
+            return false;
+        }
+        
+        return true;
+    }
+    
+    // Update review data
+    function updateReviewData() {
+        // Attendance counts
+        let presentCount = 0, absentCount = 0, lateCount = 0, excusedCount = 0;
+        let changes = [];
+        
+        selectedStudents.forEach(studentId => {
+            const newStatus = studentStatus[studentId]?.status || 'P';
+            const originalStatus = originalAttendanceData[studentId]?.status;
+            const student = studentsData.find(s => s.id.toString() === studentId);
+            
+            // Count statistics
+            switch(newStatus) {
+                case 'P': presentCount++; break;
+                case 'A': absentCount++; break;
+                case 'L': lateCount++; break;
+                case 'E': excusedCount++; break;
+            }
+            
+            // Track changes
+            if (originalStatus && originalStatus !== newStatus) {
+                changes.push({
+                    student: student?.full_name || 'Unknown',
+                    from: getStatusText(originalStatus),
+                    to: getStatusText(newStatus)
+                });
+            }
+        });
+        
+        // Update counts
+        $('#reviewPresent').text(presentCount);
+        $('#reviewAbsent').text(absentCount);
+        $('#reviewLate').text(lateCount);
+        $('#reviewExcused').text(excusedCount);
+        $('#reviewTotal').text(selectedStudents.size);
+        
+        // Update review table
+        const $reviewTableBody = $('#reviewTableBody');
+        $reviewTableBody.empty();
+        
+        let index = 1;
+        selectedStudents.forEach(studentId => {
+            const student = studentsData.find(s => s.id.toString() === studentId);
+            if (student) {
+                const newStatus = studentStatus[studentId]?.status || 'P';
+                const originalStatus = originalAttendanceData[studentId]?.status || 'Not Recorded';
+                const remark = studentStatus[studentId]?.remark || '';
+                
+                const newStatusText = getStatusText(newStatus);
+                const originalStatusText = getStatusText(originalStatus);
+                
+                const statusChanged = originalStatus && originalStatus !== newStatus;
+                const rowClass = statusChanged ? 'table-warning' : '';
+                const changeIcon = statusChanged ? '<i class="fas fa-exchange-alt text-warning mr-1"></i>' : '';
+                
+                $reviewTableBody.append(`
+                    <tr class="${rowClass}">
+                        <td>${index++}</td>
+                        <td>${student.full_name}</td>
+                        <td>${student.admission_number || 'N/A'}</td>
+                        <td>${changeIcon}${originalStatusText}</td>
+                        <td><span class="badge ${getStatusBadgeClass(newStatus)}">${newStatusText}</span></td>
+                        <td><small class="text-muted">${remark || '-'}</small></td>
+                    </tr>
+                `);
+            }
+        });
+        
+        // Update changes summary
+        updateChangesSummary(changes);
+    }
+    
+    // Get status badge class
+    function getStatusBadgeClass(status) {
+        const classMap = {
+            'P': 'badge-success',
+            'A': 'badge-danger',
+            'L': 'badge-warning',
+            'E': 'badge-info'
+        };
+        return classMap[status] || 'badge-secondary';
+    }
+    
+    // Update changes summary
+    function updateChangesSummary(changes) {
+        const $changesSummary = $('#changesSummary');
+        const $changesList = $('#changesList');
+        
+        if (changes.length > 0) {
+            $changesSummary.show();
+            $changesList.empty();
+            
+            changes.slice(0, 5).forEach(change => {
+                $changesList.append(`
+                    <div class="change-item small mb-1">
+                        <i class="fas fa-exchange-alt text-warning"></i>
+                        ${change.student}: ${change.from} → ${change.to}
+                    </div>
+                `);
+            });
+            
+            if (changes.length > 5) {
+                $changesList.append(`<div class="small text-muted">...and ${changes.length - 5} more changes</div>`);
+            }
+        } else {
+            $changesSummary.hide();
+        }
+    }
+    
+    // Update session
+    function updateSession() {
+        console.log('Updating session...');
+        
+        if (!validateStep3()) {
+            return;
+        }
+        
+        showLoading('Updating attendance session...');
+        
+        // Prepare student attendance data
+        const studentAttendance = {};
+        selectedStudents.forEach(studentId => {
+            studentAttendance[studentId] = {
+                status: studentStatus[studentId]?.status || 'P',
+                remark: studentStatus[studentId]?.remark || ''
+            };
+        });
+        
+        // Prepare session data (only student attendance can be updated)
+        const sessionData = {
+            student_attendance: studentAttendance
+        };
+        
+        console.log('Updating session with data:', sessionData);
+        
+        $.ajax({
+            url: `{% url 'admin_update_attendance_session_api' 0 %}`.replace('/0/', `/${sessionId}/`),
+            method: 'POST',
+            headers: { 
+                'X-CSRFToken': '{{ csrf_token }}',
+                'Content-Type': 'application/json'
+            },
+            data: JSON.stringify(sessionData),
+            success: function(response) {
+                hideLoading();
+                console.log('Update response:', response);
+                
+                if (response.success) {
+                    showToast('Attendance session updated successfully!', 'success');
+                    
+                    // Redirect after delay
+                    setTimeout(() => {
+                        window.location.href = '{% url "attendance_session_list" %}';
+                    }, 1500);
+                } else {
+                    showToast(response.message || 'Error updating session', 'error');
+                }
+            },
+            error: function(xhr, status, error) {
+                hideLoading();
+                console.error('Update error:', error);
+                showToast('Error updating attendance session: ' + error, 'error');
+            }
+        });
+    }
+    
+    // Validate step 3
+    function validateStep3() {
+        if (selectedStudents.size === 0) {
+            showToast('No students selected for attendance', 'error');
+            return false;
+        }
+        
+        return true;
+    }
+    
+    // Show toast notification
+    function showToast(message, type = 'info') {
+        const toast = $(`
+            <div class="toast" role="alert" style="position: fixed; top: 20px; right: 20px; z-index: 10000;">
+                <div class="toast-header bg-${type} text-white">
+                    <strong class="mr-auto">${type.charAt(0).toUpperCase() + type.slice(1)}</strong>
+                    <button type="button" class="ml-2 mb-1 close text-white" data-dismiss="toast">
+                        <span>&times;</span>
+                    </button>
+                </div>
+                <div class="toast-body">
+                    ${message}
+                </div>
+            </div>
+        `);
+        
+        $('body').append(toast);
+        toast.toast({ delay: 3000 }).toast('show');
+        
+        setTimeout(() => {
+            toast.remove();
+        }, 3000);
+    }
+    
+    // Show loading overlay
+    function showLoading(message = 'Loading...') {
+        $('#loadingMessage').text(message);
+        $('#loadingOverlay').show();
+    }
+    
+    // Hide loading overlay
+    function hideLoading() {
+        $('#loadingOverlay').hide();
+    }
+    
+    // Initialize
+    initialize();
+});
+</script>
+{% endblock extra_js %}

@@ -13,7 +13,7 @@ from django.contrib.auth import update_session_auth_hash
 from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
 from accounts.forms.admin_forms import AdminPreferencesForm, AdminProfileUpdateForm
 from accounts.forms.student_forms import ParentForm, ParentStudentForm, PreviousSchoolForm, StudentEditForm, StudentForm,StudentFilterForm
-from accounts.models import GENDER_CHOICES, ROLE_CHOICES, CustomUser, Notification, Staffs, AdminHOD, SystemLog, TeachingAssignment
+from accounts.models import GENDER_CHOICES, ROLE_CHOICES, CustomUser, Department, Notification, Staffs, AdminHOD, SystemLog, TeachingAssignment
 from core.models import (
     EducationalLevel, AcademicYear, Term, Subject, 
     ClassLevel, StreamClass
@@ -270,28 +270,9 @@ def profile_picture_update(request):
         except Exception as e:
             messages.error(request, f'Error updating profile picture: {str(e)}')
     
-    return redirect('admin:admin_profile')
+    return redirect('admin_profile')
 
-@login_required
-def profile_security(request):
-    """View and manage security settings"""
-    # Get security statistics
-    security_stats = {
-        'last_password_change': request.user.last_password_change if hasattr(request.user, 'last_password_change') else None,
-        'two_factor_enabled': request.user.two_factor_enabled if hasattr(request.user, 'two_factor_enabled') else False,
-        'failed_login_attempts': SystemLog.objects.filter(
-            user=request.user,
-            log_type='login_failed',
-            timestamp__gte=timezone.now() - timedelta(days=30)
-        ).count(),
-        'active_sessions': request.session.session_key,  # Simplified - would use session store in production
-    }
-    
-    context = {
-        'page_title': 'Security Settings',
-        'security_stats': security_stats,
-    }
-    return render(request, 'admin/account/security.html', context)
+
 
 @login_required
 def change_password(request):
@@ -323,178 +304,10 @@ def change_password(request):
     }
     return render(request, 'admin/account/change_password.html', context)
 
-@login_required
-def two_factor_settings(request):
-    """Manage two-factor authentication settings"""
-    if request.method == 'POST':
-        action = request.POST.get('action')
-        
-        if action == 'enable':
-            # Enable 2FA logic would go here
-            messages.success(request, 'Two-factor authentication enabled successfully!')
-        elif action == 'disable':
-            # Disable 2FA logic would go here
-            messages.success(request, 'Two-factor authentication disabled.')
-        elif action == 'generate_backup':
-            # Generate backup codes logic would go here
-            messages.success(request, 'Backup codes generated successfully!')
-        
-        return redirect('admin:admin_two_factor_settings')
-    
-    context = {
-        'page_title': 'Two-Factor Authentication',
-        'two_factor_enabled': request.user.two_factor_enabled if hasattr(request.user, 'two_factor_enabled') else False,
-    }
-    return render(request, 'admin/account/two_factor.html', context)
 
-@login_required
-def account_preferences(request):
-    """Manage account preferences and settings"""
-    if request.method == 'POST':
-        form = AdminPreferencesForm(request.POST, instance=request.user)
-        if form.is_valid():
-            form.save()
-            messages.success(request, 'Preferences updated successfully!')
-            return redirect('admin:admin_preferences')
-    else:
-        form = AdminPreferencesForm(instance=request.user)
-    
-    context = {
-        'page_title': 'Account Preferences',
-        'form': form,
-    }
-    return render(request, 'admin/account/preferences.html', context)
 
-@login_required
-def session_management(request):
-    """View and manage active sessions"""
-    if request.method == 'POST':
-        action = request.POST.get('action')
-        session_key = request.POST.get('session_key')
-        
-        if action == 'logout_other' and session_key:
-            # Logic to logout other sessions would go here
-            messages.success(request, 'Other sessions logged out successfully.')
-        elif action == 'logout_all':
-            # Logic to logout all other sessions would go here
-            messages.success(request, 'All other sessions logged out.')
-        
-        return redirect('admin:admin_session_management')
-    
-    # Get active sessions (simplified - would use session store in production)
-    active_sessions = [
-        {
-            'device': 'Desktop Chrome',
-            'location': 'Nairobi, Kenya',
-            'last_active': timezone.now() - timedelta(minutes=15),
-            'current': True,
-            'ip_address': request.META.get('REMOTE_ADDR')
-        }
-    ]
-    
-    context = {
-        'page_title': 'Session Management',
-        'active_sessions': active_sessions,
-        'current_session_key': request.session.session_key,
-    }
-    return render(request, 'admin/account/sessions.html', context)
 
-@login_required
-def delete_account_request(request):
-    """Handle account deletion requests"""
-    if request.method == 'POST':
-        confirmation = request.POST.get('confirmation')
-        password = request.POST.get('password')
-        
-        if confirmation != 'DELETE MY ACCOUNT':
-            messages.error(request, 'Confirmation text does not match.')
-            return redirect('admin:admin_delete_request')
-        
-        # Verify password
-        if not request.user.check_password(password):
-            messages.error(request, 'Incorrect password.')
-            return redirect('admin:admin_delete_request')
-        
-        # Instead of immediate deletion, schedule it or mark for review
-        messages.success(
-            request,
-            'Account deletion request submitted. '
-            'An administrator will review your request within 24 hours.'
-        )
-        
-        # Log the deletion request
-        SystemLog.objects.create(
-            user=request.user,
-            log_type='security',
-            description='Account deletion request submitted',
-            ip_address=request.META.get('REMOTE_ADDR')
-        )
-        
-        return redirect('admin:admin_dashboard')
-    
-    context = {
-        'page_title': 'Delete Account',
-        'user': request.user,
-    }
-    return render(request, 'admin/account/delete_request.html', context)
 
-@login_required
-def activity_logs(request):
-    """View detailed activity logs for the administrator"""
-    # Get filter parameters
-    log_type = request.GET.get('type', '')
-    date_from = request.GET.get('from', '')
-    date_to = request.GET.get('to', '')
-    
-    # Build queryset
-    activities = SystemLog.objects.filter(user=request.user)
-    
-    if log_type:
-        activities = activities.filter(log_type=log_type)
-    
-    if date_from:
-        try:
-            from_date = timezone.datetime.strptime(date_from, '%Y-%m-%d')
-            activities = activities.filter(timestamp__gte=from_date)
-        except ValueError:
-            pass
-    
-    if date_to:
-        try:
-            to_date = timezone.datetime.strptime(date_to, '%Y-%m-%d')
-            activities = activities.filter(timestamp__lte=to_date)
-        except ValueError:
-            pass
-    
-    # Order and paginate (simplified)
-    activities = activities.order_by('-timestamp')[:50]
-    
-    # Get statistics
-    activity_stats = {
-        'total': SystemLog.objects.filter(user=request.user).count(),
-        'today': SystemLog.objects.filter(
-            user=request.user,
-            timestamp__date=timezone.now().date()
-        ).count(),
-        'logins_today': SystemLog.objects.filter(
-            user=request.user,
-            log_type='login',
-            timestamp__date=timezone.now().date()
-        ).count(),
-    }
-    
-    context = {
-        'page_title': 'Activity Logs',
-        'activities': activities,
-        'activity_stats': activity_stats,
-        'log_types': SystemLog.LOG_TYPES,
-        'filters': {
-            'type': log_type,
-            'from': date_from,
-            'to': date_to,
-        },
-    }
-    return render(request, 'admin/account/activity_logs.html', context)
 
 # ============================================================================
 # AJAX ENDPOINTS FOR PROFILE MANAGEMENT
@@ -2650,6 +2463,268 @@ def delete_stream_class(request):
         })
 
 
+@login_required
+def stream_students(request, stream_id):
+    """
+    View to manage students in a specific stream
+    """
+    # Get the stream
+    stream = get_object_or_404(StreamClass, id=stream_id)
+    
+    # Get all students in this stream
+    students = Student.objects.filter(
+        stream_class=stream,
+    
+        is_active=True
+    ).select_related('class_level', 'academic_year').order_by('first_name', 'last_name')
+    
+    # Get available students who can be added to this stream
+    # Students who are active but not in this stream, and are in the same class level
+    available_students = Student.objects.filter(
+    is_active=True,
+    class_level=stream.class_level,
+    stream_class__isnull=True
+).select_related(
+    'class_level', 'academic_year'
+).order_by('first_name', 'last_name')
+
+    
+    # Get count statistics
+    total_students_in_stream = students.count()
+    available_students_count = available_students.count()
+    capacity_percentage = (total_students_in_stream / stream.capacity * 100) if stream.capacity > 0 else 0
+ 
+    context = {
+        'stream': stream,
+        'students': students,
+        'available_students': available_students,
+        'total_students_in_stream': total_students_in_stream,
+        'available_students_count': available_students_count,
+        'capacity_percentage': capacity_percentage,
+        'page_title': f'Students in {stream.class_level.name}{stream.stream_letter}',
+    }
+    
+    return render(request, 'admin/students/stream_students.html', context)
+
+
+@login_required
+def remove_student_from_stream(request, stream_id):
+    """
+    AJAX view to remove a student from a stream
+    """
+    if request.method == 'POST' and request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        try:
+            # Try to parse as JSON first
+            if request.content_type == 'application/json':
+                data = json.loads(request.body)
+                student_id = data.get('student_id')
+            else:
+                # Fall back to form data
+                student_id = request.POST.get('student_id')
+            
+            if not student_id:
+                return JsonResponse({
+                    'success': False,
+                    'message': 'Student ID is required.'
+                })
+            
+            # Get student and stream
+            student = get_object_or_404(Student, id=student_id, is_active=True)
+            stream = get_object_or_404(StreamClass, id=stream_id)
+            
+            # Verify student is in this stream
+            if student.stream_class != stream:
+                return JsonResponse({
+                    'success': False,
+                    'message': 'Student is not in this stream.'
+                })
+            
+            # Remove student from stream
+            student.stream_class = None
+            student.save()
+            
+            # Update counts
+            total_students_in_stream = Student.objects.filter(stream_class=stream, is_active=True).count()
+            capacity_percentage = (total_students_in_stream / stream.capacity * 100) if stream.capacity > 0 else 0
+            
+            return JsonResponse({
+                'success': True,
+                'message': f'{student.full_name} has been removed from the stream.',
+                'total_students': total_students_in_stream,
+                'capacity_percentage': capacity_percentage,
+                'student_id': student_id
+            })
+            
+        except json.JSONDecodeError:
+            return JsonResponse({
+                'success': False,
+                'message': 'Invalid request data.'
+            })
+        except Exception as e:
+            return JsonResponse({
+                'success': False,
+                'message': f'Error removing student: {str(e)}'
+            })
+    
+    return JsonResponse({
+        'success': False,
+        'message': 'Invalid request method.'
+    })
+
+
+
+@login_required
+def add_student_to_stream(request, stream_id):
+    """
+    AJAX view to add students to a stream
+    """
+    if request.method == 'POST' and request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        try:
+            # Get student IDs from form data
+            student_ids = request.POST.getlist('student_ids[]')
+            
+            if not student_ids:
+                return JsonResponse({
+                    'success': False,
+                    'message': 'No students selected.'
+                })
+            
+            stream = get_object_or_404(StreamClass, id=stream_id)
+            added_count = 0
+            failed_students = []
+            
+            for student_id in student_ids:
+                try:
+                    student = Student.objects.get(id=student_id, is_active=True)
+                    
+                    # Check if student is already in a stream
+                    if student.stream_class:
+                        failed_students.append(f"{student.full_name()} (Already in a stream)")
+                        continue
+                    
+                    # Check capacity
+                    current_count = Student.objects.filter(stream_class=stream, is_active=True).count()
+                    if current_count >= stream.capacity:
+                        failed_students.append(f"{student.full_name()} (Stream at capacity)")
+                        continue
+                    
+                    # Add student to stream
+                    student.stream_class = stream
+                    student.save()
+                    added_count += 1
+                    
+                except Student.DoesNotExist:
+                    failed_students.append(f"Student ID {student_id} (Not found)")
+                    continue
+            
+            message = f"Successfully added {added_count} student(s) to the stream."
+            if failed_students:
+                message += f" Failed to add {len(failed_students)} student(s)."
+            
+            return JsonResponse({
+                'success': True,
+                'message': message,
+                'added_count': added_count,
+                'failed_count': len(failed_students)
+            })
+            
+        except Exception as e:
+            return JsonResponse({
+                'success': False,
+                'message': f'Error adding students: {str(e)}'
+            })
+    
+    return JsonResponse({
+        'success': False,
+        'message': 'Invalid request method.'
+    })
+
+
+@login_required
+def bulk_remove_students_from_stream(request, stream_id):
+    """
+    AJAX view to bulk remove multiple students from a stream
+    """
+    if request.method == 'POST' and request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        try:
+            # Get student IDs from form data
+            student_ids = request.POST.getlist('student_ids[]')
+            
+            if not student_ids:
+                return JsonResponse({
+                    'success': False,
+                    'message': 'No students selected.'
+                })
+            
+            stream = get_object_or_404(StreamClass, id=stream_id)
+            removed_count = 0
+            failed_students = []
+            
+            # Prepare response data
+            removed_student_names = []
+            
+            for student_id in student_ids:
+                try:
+                    student = Student.objects.get(id=student_id, is_active=True)
+                    
+                    # Verify student is in this stream
+                    if student.stream_class != stream:
+                        failed_students.append(f"{student.full_name} (Not in this stream)")
+                        continue
+                    
+                    # Remove student from stream
+                    student.stream_class = None
+                    student.save()
+                    
+                    removed_count += 1
+                    removed_student_names.append(student.full_name)
+                    
+                except Student.DoesNotExist:
+                    failed_students.append(f"Student ID {student_id} (Not found)")
+                    continue
+                except Exception as e:
+                    failed_students.append(f"{student_id} (Error: {str(e)})")
+                    continue
+            
+            # Update counts after all removals
+            total_students_in_stream = Student.objects.filter(stream_class=stream, is_active=True).count()
+            capacity_percentage = (total_students_in_stream / stream.capacity * 100) if stream.capacity > 0 else 0
+            
+            # Prepare success message
+            if removed_count > 0:
+                if removed_count <= 3:
+                    # Show individual names for small removals
+                    student_names_str = ', '.join(removed_student_names)
+                    message = f"Successfully removed {student_names_str} from the stream."
+                else:
+                    # Generic message for larger removals
+                    message = f"Successfully removed {removed_count} students from the stream."
+                
+                if failed_students:
+                    message += f" Failed to remove {len(failed_students)} student(s)."
+            else:
+                message = "No students were removed from the stream."
+            
+            return JsonResponse({
+                'success': True,
+                'message': message,
+                'removed_count': removed_count,
+                'failed_count': len(failed_students),
+                'total_students': total_students_in_stream,
+                'capacity_percentage': capacity_percentage
+            })
+            
+        except Exception as e:
+            return JsonResponse({
+                'success': False,
+                'message': f'Error removing students: {str(e)}'
+            })
+    
+    return JsonResponse({
+        'success': False,
+        'message': 'Invalid request method.'
+    })
+
 # views.py - Simple version
 @login_required
 @require_POST
@@ -2790,7 +2865,7 @@ def students_list(request):
         students_page = paginator.page(paginator.num_pages)
     
     context = {
-        'students': students_page,
+        'students': students,
         'total_students': total_students,
         'active_students': active_students,
         'inactive_students': inactive_students,
@@ -2909,6 +2984,7 @@ def handle_get_request(request):
     context = {
         'form': form,
         'class_levels': ClassLevel.objects.filter(is_active=True).order_by('order'),
+        'academic_years': AcademicYear.objects.all(),
         'stream_classes': StreamClass.objects.filter(is_active=True).order_by('class_level', 'stream_letter'),
         'previous_schools': PreviousSchool.objects.all().order_by('name'),
         'subjects': Subject.objects.filter(is_active=True).order_by('name'),
@@ -3018,7 +3094,7 @@ def handle_form_submission(request, form):
                     'success': False,
                     'message': f'Error saving student: {str(e)}',
                     'errors': {'__all__': 'An unexpected error occurred'}
-                }, status=500)
+                })
             else:
                 # Re-render form with error
                 return render_form_with_error(request, form, str(e))
@@ -3925,7 +4001,7 @@ def get_class_levels(request):
             'success': False,
             'message': 'Failed to load class levels',
             'error': str(e)
-        }, status=500)
+        })
 
 
 @login_required
@@ -4035,7 +4111,7 @@ def remove_parent_from_student(request, student_id):
         return JsonResponse({
             'success': False,
             'message': f'An error occurred: {str(e)}'
-        }, status=500)
+        })
 
 
 @login_required
@@ -4185,6 +4261,8 @@ def student_edit(request, student_id):
     
     # Get related data for the form
     class_levels = ClassLevel.objects.filter(is_active=True).select_related('educational_level')
+    academic_years = AcademicYear.objects.all()
+    previous_schools = PreviousSchool.objects.all()
     
     # Get streams - include student's current stream even if not active
     if student.class_level:
@@ -4200,23 +4278,12 @@ def student_edit(request, student_id):
     else:
         stream_classes = StreamClass.objects.filter(is_active=True).select_related('class_level')
     
-    # Get subjects based on student's class level
-    if student.class_level:
-        subjects = Subject.objects.filter(
-            educational_level=student.class_level.educational_level,
-            is_active=True
-        ).select_related('educational_level')
-    else:
-        subjects = Subject.objects.filter(is_active=True).select_related('educational_level')
-    
-    previous_schools = PreviousSchool.objects.all()
-    
-    # Get student's current subjects
-    student_subjects = student.optional_subjects.all() if hasattr(student, 'optional_subjects') else []
-    student_subjects_ids = [subject.id for subject in student_subjects]
-    
     # Get all streams for JavaScript initialization
     all_streams = StreamClass.objects.filter(is_active=True).select_related('class_level')
+    
+    # Get student's current subjects (from optional_subjects)
+    student_subjects = student.optional_subjects.all() if hasattr(student, 'optional_subjects') else []
+    student_subjects_ids = [subject.id for subject in student_subjects]
     
     if request.method == 'POST':
         form = StudentEditForm(request.POST, request.FILES, instance=student)
@@ -4261,40 +4328,55 @@ def student_edit(request, student_id):
                     
             except Exception as e:
                 # Handle errors
+                error_msg = str(e)
                 if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
                     return JsonResponse({
                         'success': False,
-                        'message': f'Error updating student: {str(e)}'
+                        'message': f'Error updating student: {error_msg}'
                     }, status=400)
                 else:
-                    messages.error(request, f'Error updating student: {str(e)}')
+                    messages.error(request, f'Error updating student: {error_msg}')
         else:
             # Form has errors
             if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                # Convert Django form errors to simpler format for frontend
+                errors_dict = {}
+                for field, errors in form.errors.items():
+                    errors_dict[field] = [str(error) for error in errors]
+                
                 return JsonResponse({
                     'success': False,
                     'message': 'Please correct the errors below',
-                    'errors': form.errors
+                    'errors': errors_dict
                 }, status=400)
             else:
                 # For non-AJAX, we'll show errors in the template
-                pass
+                messages.error(request, 'Please correct the errors below')
     else:
         # GET request - initialize form with student data
         form = StudentEditForm(instance=student)
         
         # Store the current stream ID in form data for JavaScript
         if student.stream_class:
-            form.fields['stream_class'].widget.attrs['data-current-stream-id'] = student.stream_class.id
+            form.fields['stream_class'].widget.attrs['data-current-stream-id'] = str(student.stream_class.id)
         
-        # Manually set initial subjects
-        if student_subjects:
-            form.fields['subjects'].initial = student_subjects
+        # Set initial subjects
+        form.fields['subjects'].initial = student_subjects
+    
+    # Get subjects for the current class level to display in the form
+    if student.class_level:
+        subjects = Subject.objects.filter(
+            educational_level=student.class_level.educational_level,
+            is_active=True
+        ).select_related('educational_level').order_by('name')
+    else:
+        subjects = Subject.objects.filter(is_active=True).select_related('educational_level').order_by('name')
     
     # Prepare context
     context = {
         'student': student,
         'form': form,
+        'academic_years': academic_years,
         'class_levels': class_levels,
         'stream_classes': stream_classes,  # Initial streams for current class
         'all_streams': all_streams,  # All streams for JavaScript
@@ -5803,8 +5885,11 @@ def view_staff(request, staff_id):
 @login_required
 def staff_roles_list(request):
     """Display staff roles management page"""
-    # Get all staff members
-    staff_members = Staffs.objects.select_related('admin').all()
+    # Get all staff members with related data
+    staff_members = Staffs.objects.select_related(
+        'admin',
+        'department'  # Add department relation
+    ).all()
     
     # Get statistics
     total_staff = staff_members.count()
@@ -5814,39 +5899,32 @@ def staff_roles_list(request):
     roles = Staffs.objects.values('position_title').annotate(count=Count('position_title')).order_by('-count')
     total_roles = roles.count()
     
-    # Get unique departments/work places
-    departments_count = Staffs.objects.exclude(work_place='').values('work_place').distinct().count()
+    # Get departments for dropdown
+    departments = Department.objects.filter(is_active=True).order_by('name')
     
     # Role choices from model
     role_choices = ROLE_CHOICES
     
     # Get all staff for dropdowns
-    all_staff = Staffs.objects.select_related('admin').order_by('admin__first_name', 'admin__last_name')
+    all_staff = Staffs.objects.select_related('admin', 'department').order_by('admin__first_name', 'admin__last_name')
     
     # Filter by position_title if specified
     selected_role = request.GET.get('position_title')
     if selected_role:
         staff_members = staff_members.filter(position_title=selected_role)
     
-    # Search functionality
+    # Search functionality for DataTable (if needed for initial load)
     search_query = request.GET.get('search', '')
     if search_query:
         staff_members = staff_members.filter(
             Q(admin__first_name__icontains=search_query) |
             Q(admin__last_name__icontains=search_query) |
             Q(admin__email__icontains=search_query) |
-            Q(admin__username__icontains=search_query)
+            Q(admin__username__icontains=search_query) |
+            Q(phone_number__icontains=search_query) |
+            Q(position_title__icontains=search_query) |
+            Q(department__name__icontains=search_query)
         )
-    
-    # Pagination
-    paginator = Paginator(staff_members, 20)
-    page = request.GET.get('page')
-    try:
-        staff_members = paginator.page(page)
-    except PageNotAnInteger:
-        staff_members = paginator.page(1)
-    except EmptyPage:
-        staff_members = paginator.page(paginator.num_pages)
     
     context = {
         'staff_members': staff_members,
@@ -5858,7 +5936,8 @@ def staff_roles_list(request):
         'total_staff': total_staff,
         'active_staff': active_staff,
         'total_roles': total_roles,
-        'departments_count': departments_count,
+        'departments': departments,  # Pass departments for dropdowns
+        'page_title': 'Staff Positions Management',
     }
     
     return render(request, 'admin/staff/staff_roles_list.html', context)
@@ -5904,7 +5983,9 @@ def assign_staff_role(request):
     """Assign position_title to a staff member"""
     staff_id = request.POST.get('staff')
     position_title = request.POST.get('position_title', '').strip()
-    work_place = request.POST.get('work_place', '').strip()
+    department_id = request.POST.get('department', '').strip()
+    employment_type = request.POST.get('employment_type', '').strip()
+    joining_date = request.POST.get('joining_date', '').strip()
     
     if not staff_id:
         return JsonResponse({
@@ -5915,7 +5996,7 @@ def assign_staff_role(request):
     if not position_title:
         return JsonResponse({
             'success': False,
-            'message': 'Role selection is required.'
+            'message': 'Position selection is required.'
         })
     
     try:
@@ -5931,34 +6012,62 @@ def assign_staff_role(request):
     if position_title not in valid_roles:
         return JsonResponse({
             'success': False,
-            'message': 'Invalid position_title specified.'
+            'message': 'Invalid position specified.'
         })
     
     try:
         # Update staff position_title
         staff.position_title = position_title
-        if work_place:
-            staff.work_place = work_place
+        
+        # Update department if provided
+        if department_id:
+            try:
+                department = Department.objects.get(id=department_id)
+                staff.department = department
+            except Department.DoesNotExist:
+                return JsonResponse({
+                    'success': False,
+                    'message': 'Department not found.'
+                })
+        else:
+            staff.department = None
+        
+        # Update employment type if provided
+        if employment_type:
+            staff.employment_type = employment_type
+        
+        # Update joining date if provided
+        if joining_date:
+            try:
+                staff.joining_date = joining_date
+            except ValueError:
+                return JsonResponse({
+                    'success': False,
+                    'message': 'Invalid joining date format.'
+                })
+        
         staff.save()
         
         return JsonResponse({
             'success': True,
-            'message': f'Role "{position_title}" assigned to {staff.get_full_name()} successfully.',
+            'message': f'Position "{position_title}" assigned to {staff.get_full_name()} successfully.',
             'staff_id': staff.id,
             'position_title': staff.position_title,
-            'work_place': staff.work_place
+            'department_name': staff.department.name if staff.department else None,
+            'department_id': staff.department.id if staff.department else None,
         })
         
     except Exception as e:
         return JsonResponse({
             'success': False,
-            'message': f'Error assigning position_title: {str(e)}'
+            'message': f'Error assigning position: {str(e)}'
         })
 
 def bulk_assign_roles(request):
     """Assign same position_title to multiple staff members"""
     staff_ids = request.POST.getlist('staff_list[]')
     position_title = request.POST.get('position_title', '').strip()
+    department_id = request.POST.get('department', '').strip()
     
     if not staff_ids:
         return JsonResponse({
@@ -5969,7 +6078,7 @@ def bulk_assign_roles(request):
     if not position_title:
         return JsonResponse({
             'success': False,
-            'message': 'Role selection is required.'
+            'message': 'Position selection is required.'
         })
     
     # Validate position_title
@@ -5977,8 +6086,19 @@ def bulk_assign_roles(request):
     if position_title not in valid_roles:
         return JsonResponse({
             'success': False,
-            'message': 'Invalid position_title specified.'
+            'message': 'Invalid position specified.'
         })
+    
+    # Get department if provided
+    department = None
+    if department_id:
+        try:
+            department = Department.objects.get(id=department_id)
+        except Department.DoesNotExist:
+            return JsonResponse({
+                'success': False,
+                'message': 'Department not found.'
+            })
     
     try:
         updated_count = 0
@@ -5988,6 +6108,8 @@ def bulk_assign_roles(request):
             try:
                 staff = Staffs.objects.get(id=staff_id)
                 staff.position_title = position_title
+                if department:
+                    staff.department = department
                 staff.save()
                 updated_count += 1
             except Staffs.DoesNotExist:
@@ -5995,7 +6117,7 @@ def bulk_assign_roles(request):
             except Exception as e:
                 failed_updates.append(f"Staff ID {staff_id}: {str(e)}")
         
-        message = f'Role "{position_title}" assigned to {updated_count} staff member(s) successfully.'
+        message = f'Position "{position_title}" assigned to {updated_count} staff member(s) successfully.'
         if failed_updates:
             message += f' Failed: {", ".join(failed_updates)}'
         
@@ -6009,14 +6131,16 @@ def bulk_assign_roles(request):
     except Exception as e:
         return JsonResponse({
             'success': False,
-            'message': f'Error bulk assigning roles: {str(e)}'
+            'message': f'Error bulk assigning positions: {str(e)}'
         })
 
 def edit_staff_role(request):
     """Edit staff position_title"""
     staff_id = request.POST.get('staff_id')
     position_title = request.POST.get('position_title', '').strip()
-    work_place = request.POST.get('work_place', '').strip()
+    department_id = request.POST.get('department', '').strip()
+    employment_type = request.POST.get('employment_type', '').strip()
+    joining_date = request.POST.get('joining_date', '').strip()
     
     if not staff_id:
         return JsonResponse({
@@ -6038,30 +6162,61 @@ def edit_staff_role(request):
         if position_title not in valid_roles:
             return JsonResponse({
                 'success': False,
-                'message': 'Invalid position_title specified.'
+                'message': 'Invalid position specified.'
             })
     
     try:
-        # Update staff position_title
+        # Update position_title if provided
         if position_title:
             staff.position_title = position_title
-        if work_place is not None:
-            staff.work_place = work_place if work_place.strip() else ''
+        
+        # Update department if provided (empty string clears the department)
+        if department_id is not None:
+            if department_id == '':
+                staff.department = None
+            else:
+                try:
+                    department = Department.objects.get(id=department_id)
+                    staff.department = department
+                except Department.DoesNotExist:
+                    return JsonResponse({
+                        'success': False,
+                        'message': 'Department not found.'
+                    })
+        
+        # Update employment type if provided
+        if employment_type:
+            staff.employment_type = employment_type
+        
+        # Update joining date if provided
+        if joining_date:
+            if joining_date.strip():
+                try:
+                    staff.joining_date = joining_date
+                except ValueError:
+                    return JsonResponse({
+                        'success': False,
+                        'message': 'Invalid joining date format.'
+                    })
+            else:
+                staff.joining_date = None
+        
         staff.save()
         
         action = 'updated' if position_title else 'cleared'
         return JsonResponse({
             'success': True,
-            'message': f'Role {action} for {staff.get_full_name()} successfully.',
+            'message': f'Position {action} for {staff.get_full_name()} successfully.',
             'staff_id': staff.id,
             'position_title': staff.position_title,
-            'work_place': staff.work_place
+            'department_name': staff.department.name if staff.department else None,
+            'department_id': staff.department.id if staff.department else None,
         })
         
     except Exception as e:
         return JsonResponse({
             'success': False,
-            'message': f'Error updating position_title: {str(e)}'
+            'message': f'Error updating position: {str(e)}'
         })
 
 def remove_staff_role(request):
@@ -6083,25 +6238,31 @@ def remove_staff_role(request):
         })
     
     try:
-        # Clear the position_title
-        previous_role = staff.position_title
+        # Clear the position_title and department
+        previous_position = staff.position_title
+        previous_department = staff.department.name if staff.department else None
+        
         staff.position_title = ''
+        staff.department = None
         staff.save()
         
         return JsonResponse({
             'success': True,
-            'message': f'Role removed from {staff.get_full_name()} successfully.',
+            'message': f'Position removed from {staff.get_full_name()} successfully.',
             'staff_id': staff.id,
             'position_title': staff.position_title,
-            'previous_role': previous_role
+            'department_name': None,
+            'department_id': None,
+            'previous_position': previous_position,
+            'previous_department': previous_department
         })
         
     except Exception as e:
         return JsonResponse({
             'success': False,
-            'message': f'Error removing position_title: {str(e)}'
+            'message': f'Error removing position: {str(e)}'
         })
-        
+    
 
 @login_required
 def teaching_assignments_list(request):
@@ -6195,8 +6356,696 @@ def get_assignment_details(request):
         return JsonResponse({'success': False, 'message': 'Assignment not found.'})
     except Exception as e:
         return JsonResponse({'success': False, 'message': str(e)})
+
+
+
+@login_required
+def department_management(request):
+    """
+    Main view for department management
+    """
+    # Get all departments with HOD info
+    departments = Department.objects.select_related('head_of_department__admin').all()
     
+    # Get statistics
+    total_departments = departments.count()
+    active_departments = departments.filter(is_active=True).count()
+    inactive_departments = total_departments - active_departments
+    departments_with_hod = departments.filter(head_of_department__isnull=False).count()
     
+    # Get HOD candidates (active staff members who are not already HODs)
+    hod_candidates = Staffs.objects.filter(
+        admin__is_active=True
+    ).select_related('admin').order_by('admin__first_name')
+    
+    context = {
+        'departments': departments,
+        'total_departments': total_departments,
+        'active_departments': active_departments,
+        'inactive_departments': inactive_departments,
+        'departments_with_hod': departments_with_hod,
+        'hod_candidates': hod_candidates,
+        'page_title': 'Department Management',
+    }
+    
+    return render(request, 'admin/staff/department_management.html', context)
+
+@login_required
+def departments_crud(request):
+    """
+    AJAX view for handling all CRUD operations for departments
+    """
+    if request.method == 'POST' and request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        action = request.POST.get('action')
+        
+        if action == 'create':
+            return create_department(request)
+        elif action == 'update':
+            return update_department(request)
+        elif action == 'toggle_status':
+            return toggle_department_status(request)
+        elif action == 'delete':
+            return delete_department(request)
+        elif action == 'bulk_delete':
+            return bulk_delete_departments(request)
+        elif action == 'bulk_toggle_status':
+            return bulk_toggle_departments_status(request)
+    
+    return JsonResponse({
+        'success': False,
+        'message': 'Invalid request method or action.'
+    })
+
+def create_department(request):
+    """
+    Create a new department
+    """
+    try:
+        # Get form data
+        name = request.POST.get('name', '').strip()
+        code = request.POST.get('code', '').strip().upper()
+        description = request.POST.get('description', '').strip()
+        hod_id = request.POST.get('head_of_department', '').strip()
+        is_active = request.POST.get('is_active') == 'on'
+        
+        # Validate required fields
+        if not name:
+            return JsonResponse({
+                'success': False,
+                'message': 'Department name is required.'
+            })
+        
+        if not code:
+            return JsonResponse({
+                'success': False,
+                'message': 'Department code is required.'
+            })
+        
+        # Check for duplicate name
+        if Department.objects.filter(name__iexact=name).exists():
+            return JsonResponse({
+                'success': False,
+                'message': f'A department with name "{name}" already exists.'
+            })
+        
+        # Check for duplicate code
+        if Department.objects.filter(code__iexact=code).exists():
+            return JsonResponse({
+                'success': False,
+                'message': f'A department with code "{code}" already exists.'
+            })
+        
+        # Get HOD if provided
+        head_of_department = None
+        if hod_id:
+            try:
+                head_of_department = Staffs.objects.get(id=hod_id, admin__is_active=True)
+            except Staffs.DoesNotExist:
+                return JsonResponse({
+                    'success': False,
+                    'message': 'Selected HOD not found or is inactive.'
+                })
+        
+        # Create department
+        department = Department.objects.create(
+            name=name,
+            code=code,
+            description=description,
+            head_of_department=head_of_department,
+            is_active=is_active
+        )
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'Department "{department.name}" has been created successfully.',
+            'department_id': department.id
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'Error creating department: {str(e)}'
+        })
+
+def update_department(request):
+    """
+    Update an existing department
+    """
+    try:
+        department_id = request.POST.get('id')
+        
+        if not department_id:
+            return JsonResponse({
+                'success': False,
+                'message': 'Department ID is required.'
+            })
+        
+        department = get_object_or_404(Department, id=department_id)
+        
+        # Get form data
+        name = request.POST.get('name', '').strip()
+        code = request.POST.get('code', '').strip().upper()
+        description = request.POST.get('description', '').strip()
+        hod_id = request.POST.get('head_of_department', '').strip()
+        is_active = request.POST.get('is_active') == 'on'
+        
+        # Validate required fields
+        if not name:
+            return JsonResponse({
+                'success': False,
+                'message': 'Department name is required.'
+            })
+        
+        if not code:
+            return JsonResponse({
+                'success': False,
+                'message': 'Department code is required.'
+            })
+        
+        # Check for duplicate name (excluding current department)
+        if Department.objects.filter(name__iexact=name).exclude(id=department_id).exists():
+            return JsonResponse({
+                'success': False,
+                'message': f'A department with name "{name}" already exists.'
+            })
+        
+        # Check for duplicate code (excluding current department)
+        if Department.objects.filter(code__iexact=code).exclude(id=department_id).exists():
+            return JsonResponse({
+                'success': False,
+                'message': f'A department with code "{code}" already exists.'
+            })
+        
+        # Get HOD if provided
+        head_of_department = None
+        if hod_id:
+            try:
+                head_of_department = Staffs.objects.get(id=hod_id, admin__is_active=True)
+            except Staffs.DoesNotExist:
+                return JsonResponse({
+                    'success': False,
+                    'message': 'Selected HOD not found or is inactive.'
+                })
+        
+        # Update department
+        department.name = name
+        department.code = code
+        department.description = description
+        department.head_of_department = head_of_department
+        department.is_active = is_active
+        department.save()
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'Department "{department.name}" has been updated successfully.',
+            'department_id': department.id
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'Error updating department: {str(e)}'
+        })
+
+def toggle_department_status(request):
+    """
+    Toggle department active status
+    """
+    try:
+        department_id = request.POST.get('id')
+        
+        if not department_id:
+            return JsonResponse({
+                'success': False,
+                'message': 'Department ID is required.'
+            })
+        
+        department = get_object_or_404(Department, id=department_id)
+        
+        # Toggle status
+        department.is_active = not department.is_active
+        department.save()
+        
+        status_text = "activated" if department.is_active else "deactivated"
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'Department "{department.name}" has been {status_text}.',
+            'is_active': department.is_active
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'Error toggling department status: {str(e)}'
+        })
+
+def delete_department(request):
+    """
+    Delete a department
+    """
+    try:
+        department_id = request.POST.get('id')
+        
+        if not department_id:
+            return JsonResponse({
+                'success': False,
+                'message': 'Department ID is required.'
+            })
+        
+        department = get_object_or_404(Department, id=department_id)
+        department_name = department.name
+        
+        # Check if department has any staff assigned
+        # You might want to add additional checks here based on your requirements
+        
+        # Delete department
+        department.delete()
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'Department "{department_name}" has been deleted successfully.'
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'Error deleting department: {str(e)}'
+        })
+
+def bulk_delete_departments(request):
+    """
+    Bulk delete multiple departments
+    """
+    try:
+        department_ids = request.POST.getlist('department_ids[]')
+        
+        if not department_ids:
+            return JsonResponse({
+                'success': False,
+                'message': 'No departments selected.'
+            })
+        
+        departments = Department.objects.filter(id__in=department_ids)
+        deleted_count = departments.count()
+        department_names = list(departments.values_list('name', flat=True))
+        
+        if deleted_count == 0:
+            return JsonResponse({
+                'success': False,
+                'message': 'No valid departments found to delete.'
+            })
+        
+        # Delete departments
+        departments.delete()
+        
+        message = f'Successfully deleted {deleted_count} department(s).'
+        if deleted_count <= 5:
+            names_str = ', '.join(department_names)
+            message = f'Successfully deleted: {names_str}'
+        
+        return JsonResponse({
+            'success': True,
+            'message': message,
+            'deleted_count': deleted_count
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'Error bulk deleting departments: {str(e)}'
+        })
+
+def bulk_toggle_departments_status(request):
+    """
+    Bulk toggle status for multiple departments
+    """
+    try:
+        department_ids = request.POST.getlist('department_ids[]')
+        status_action = request.POST.get('status_action', 'activate')  # 'activate' or 'deactivate'
+        
+        if not department_ids:
+            return JsonResponse({
+                'success': False,
+                'message': 'No departments selected.'
+            })
+        
+        departments = Department.objects.filter(id__in=department_ids)
+        updated_count = departments.count()
+        
+        if updated_count == 0:
+            return JsonResponse({
+                'success': False,
+                'message': 'No valid departments found.'
+            })
+        
+        # Update status based on action
+        new_status = status_action == 'activate'
+        departments.update(is_active=new_status)
+        
+        status_text = "activated" if new_status else "deactivated"
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'Successfully {status_text} {updated_count} department(s).',
+            'status': new_status
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'Error bulk updating departments: {str(e)}'
+        })
+
+@login_required
+def view_department(request, department_id):
+    """
+    View department details
+    """
+    department = get_object_or_404(Department, id=department_id)
+    
+    # Get staff in this department (if you have a relationship)
+    # staff_in_department = Staffs.objects.filter(department=department)
+    
+    context = {
+        'department': department,
+        # 'staff_in_department': staff_in_department,
+        'page_title': f'{department.name} - Department Details',
+    }
+    
+    return render(request, 'admin/staff/view_department.html', context)
+
+@login_required
+def assign_staff_to_department(request, department_id):
+    """
+    Assign staff to department (if needed)
+    """
+    if request.method == 'POST':
+        department = get_object_or_404(Department, id=department_id)
+        staff_ids = request.POST.getlist('staff_ids[]')
+        
+        try:
+            # Update staff department assignments
+            # This depends on your Staffs model structure
+            # Example: Staffs.objects.filter(id__in=staff_ids).update(department=department)
+            
+            return JsonResponse({
+                'success': True,
+                'message': f'Staff assigned to {department.name} successfully.'
+            })
+        except Exception as e:
+            return JsonResponse({
+                'success': False,
+                'message': f'Error assigning staff: {str(e)}'
+            })
+    
+    return JsonResponse({
+        'success': False,
+        'message': 'Invalid request method.'
+    })
+    
+
+@login_required
+def department_staff_assignment(request, department_id):
+    """
+    View to manage staff assignment in a specific department
+    """
+
+    department = get_object_or_404(
+        Department.objects.select_related('head_of_department__admin'),
+        id=department_id
+    )
+    role_choices = ROLE_CHOICES
+    # Staff already assigned to this department
+    staff_list = Staffs.objects.filter(
+        department=department,
+        admin__is_active=True
+    ).select_related(
+        'admin', 'department'
+    ).order_by(
+        'admin__first_name', 'admin__last_name'
+    )
+
+    # Staff available for assignment (not assigned to ANY department)
+    available_staff = Staffs.objects.filter(
+        admin__is_active=True,
+        department__isnull=True
+    ).select_related(
+        'admin'
+    ).order_by(
+        'admin__first_name', 'admin__last_name'
+    )
+
+    # Counts
+    total_staff_in_department = staff_list.count()
+    available_staff_count = available_staff.count()
+
+    # HOD info
+    hod = department.head_of_department
+    has_hod = hod is not None
+
+    context = {
+        'department': department,
+        'role_choices': role_choices,
+        'staff_list': staff_list,
+        'available_staff': available_staff,
+        'total_staff_in_department': total_staff_in_department,
+        'available_staff_count': available_staff_count,
+        'has_hod': has_hod,
+        'hod_name': hod.get_full_name() if has_hod else None,
+        'page_title': f'{department.name} Department - Staff Assignment',
+        'breadcrumb_title': f'Staff in {department.name}',
+    }
+
+    return render(
+        request,
+        'admin/staff/staff_department_assignment.html',
+        context
+    )
+
+
+@login_required
+def add_staff_to_department(request, department_id):
+    """
+    AJAX view to add staff to a department
+    """
+    if request.method == 'POST' and request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        try:
+            # Get staff IDs from form data
+            staff_ids = request.POST.getlist('staff_ids[]')
+            
+            if not staff_ids:
+                return JsonResponse({
+                    'success': False,
+                    'message': 'No staff selected.'
+                })
+            
+            department = get_object_or_404(Department, id=department_id, is_active=True)
+            added_count = 0
+            failed_staff = []
+            
+            for staff_id in staff_ids:
+                try:
+                    staff = Staffs.objects.get(id=staff_id, admin__is_active=True)
+                    
+                    # Check if staff is already in a department
+                    if staff.department:
+                        failed_staff.append(f"{staff.get_full_name()} (Already in a department)")
+                        continue
+                    
+                    # Add staff to department
+                    staff.department = department
+                    staff.save()
+                    added_count += 1
+                    
+                except Staffs.DoesNotExist:
+                    failed_staff.append(f"Staff ID {staff_id} (Not found)")
+                    continue
+            
+            message = f"Successfully added {added_count} staff member(s) to the department."
+            if failed_staff:
+                message += f" Failed to add {len(failed_staff)} staff member(s)."
+            
+            # Update counts
+            total_staff_in_department = Staffs.objects.filter(department=department, admin__is_active=True).count()
+            
+            return JsonResponse({
+                'success': True,
+                'message': message,
+                'added_count': added_count,
+                'failed_count': len(failed_staff),
+                'total_staff': total_staff_in_department
+            })
+            
+        except Exception as e:
+            return JsonResponse({
+                'success': False,
+                'message': f'Error adding staff: {str(e)}'
+            })
+    
+    return JsonResponse({
+        'success': False,
+        'message': 'Invalid request method.'
+    })
+
+@login_required
+def remove_staff_from_department(request, department_id):
+    """
+    AJAX view to remove a staff from a department
+    """
+    if request.method == 'POST' and request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        try:
+            # Try to parse as JSON first
+            if request.content_type == 'application/json':
+                data = json.loads(request.body)
+                staff_id = data.get('staff_id')
+            else:
+                # Fall back to form data
+                staff_id = request.POST.get('staff_id')
+            
+            if not staff_id:
+                return JsonResponse({
+                    'success': False,
+                    'message': 'Staff ID is required.'
+                })
+            
+            # Get staff and department
+            staff = get_object_or_404(Staffs, id=staff_id, admin__is_active=True)
+            department = get_object_or_404(Department, id=department_id)
+            
+            # Verify staff is in this department
+            if staff.department != department:
+                return JsonResponse({
+                    'success': False,
+                    'message': 'Staff is not in this department.'
+                })
+            
+            # Check if staff is HOD of this department
+            if department.head_of_department == staff:
+                # Remove HOD assignment
+                department.head_of_department = None
+                department.save()
+            
+            # Remove staff from department
+            staff.department = None
+            staff.save()
+            
+            # Update counts
+            total_staff_in_department = Staffs.objects.filter(department=department, admin__is_active=True).count()
+            
+            return JsonResponse({
+                'success': True,
+                'message': f'{staff.get_full_name()} has been removed from the department.',
+                'total_staff': total_staff_in_department,
+                'staff_id': staff_id
+            })
+            
+        except json.JSONDecodeError:
+            return JsonResponse({
+                'success': False,
+                'message': 'Invalid request data.'
+            })
+        except Exception as e:
+            return JsonResponse({
+                'success': False,
+                'message': f'Error removing staff: {str(e)}'
+            })
+    
+    return JsonResponse({
+        'success': False,
+        'message': 'Invalid request method.'
+    })
+
+@login_required
+def bulk_remove_staff_from_department(request, department_id):
+    """
+    AJAX view to bulk remove multiple staff from a department
+    """
+    if request.method == 'POST' and request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        try:
+            # Get staff IDs from form data
+            staff_ids = request.POST.getlist('staff_ids[]')
+            
+            if not staff_ids:
+                return JsonResponse({
+                    'success': False,
+                    'message': 'No staff selected.'
+                })
+            
+            department = get_object_or_404(Department, id=department_id)
+            removed_count = 0
+            failed_staff = []
+            
+            # Prepare response data
+            removed_staff_names = []
+            
+            for staff_id in staff_ids:
+                try:
+                    staff = Staffs.objects.get(id=staff_id, admin__is_active=True)
+                    
+                    # Verify staff is in this department
+                    if staff.department != department:
+                        failed_staff.append(f"{staff.get_full_name()} (Not in this department)")
+                        continue
+                    
+                    # Check if staff is HOD of this department
+                    if department.head_of_department == staff:
+                        # Remove HOD assignment
+                        department.head_of_department = None
+                        department.save()
+                    
+                    # Remove staff from department
+                    staff.department = None
+                    staff.save()
+                    
+                    removed_count += 1
+                    removed_staff_names.append(staff.get_full_name())
+                    
+                except Staffs.DoesNotExist:
+                    failed_staff.append(f"Staff ID {staff_id} (Not found)")
+                    continue
+                except Exception as e:
+                    failed_staff.append(f"{staff_id} (Error: {str(e)})")
+                    continue
+            
+            # Update counts after all removals
+            total_staff_in_department = Staffs.objects.filter(department=department, admin__is_active=True).count()
+            
+            # Prepare success message
+            if removed_count > 0:
+                if removed_count <= 3:
+                    # Show individual names for small removals
+                    staff_names_str = ', '.join(removed_staff_names)
+                    message = f"Successfully removed {staff_names_str} from the department."
+                else:
+                    # Generic message for larger removals
+                    message = f"Successfully removed {removed_count} staff members from the department."
+                
+                if failed_staff:
+                    message += f" Failed to remove {len(failed_staff)} staff member(s)."
+            else:
+                message = "No staff members were removed from the department."
+            
+            return JsonResponse({
+                'success': True,
+                'message': message,
+                'removed_count': removed_count,
+                'failed_count': len(failed_staff),
+                'total_staff': total_staff_in_department
+            })
+            
+        except Exception as e:
+            return JsonResponse({
+                'success': False,
+                'message': f'Error removing staff: {str(e)}'
+            })
+    
+    return JsonResponse({
+        'success': False,
+        'message': 'Invalid request method.'
+    })
+
+
 @login_required
 @require_http_methods(["GET"])
 def get_streams_for_class(request):
@@ -6225,14 +7074,10 @@ def teaching_assignments_crud(request):
     try:
         if action == 'create_assignment':
             return create_teaching_assignment(request)
-        elif action == 'edit_assignment':
-            return edit_teaching_assignment(request)
         elif action == 'toggle_assignment':
             return toggle_assignment_status(request)
         elif action == 'delete_assignment':
-            return delete_teaching_assignment(request)
-        elif action == 'clone_assignments':
-            return clone_assignments(request)
+            return delete_teaching_assignment(request)        
         else:
             return JsonResponse({
                 'success': False,
@@ -6343,61 +7188,7 @@ def create_teaching_assignment(request):
     except Exception as e:
         return JsonResponse({'success': False, 'message': str(e)})
 
-def edit_teaching_assignment(request):
-    """Edit an existing teaching assignment"""
-    assignment_id = request.POST.get('assignment_id')
-    
-    try:
-        assignment = TeachingAssignment.objects.get(id=assignment_id)
-        
-        # Update fields from request
-        if 'staff' in request.POST:
-            assignment.staff = Staffs.objects.get(id=request.POST['staff'])
-        
-        if 'subject' in request.POST:
-            subject_id = request.POST['subject']
-            if subject_id and not assignment.is_class_teacher:
-                assignment.subject = Subject.objects.get(id=subject_id)
-            else:
-                assignment.subject = None
-        
-        if 'class_level' in request.POST:
-            assignment.class_level = ClassLevel.objects.get(id=request.POST['class_level'])
-        
-        if 'stream_class' in request.POST:
-            stream_class_id = request.POST['stream_class']
-            if stream_class_id:
-                assignment.stream_class = StreamClass.objects.get(id=stream_class_id)
-            else:
-                assignment.stream_class = None
-        
-        if 'assignment_type' in request.POST:
-            assignment.assignment_type = request.POST['assignment_type']
-        
-        if 'period_count' in request.POST:
-            assignment.period_count = request.POST['period_count']
-        
-        if 'start_date' in request.POST:
-            start_date = request.POST['start_date']
-            assignment.start_date = start_date if start_date else None
-        
-        if 'end_date' in request.POST:
-            end_date = request.POST['end_date']
-            assignment.end_date = end_date if end_date else None
-        
-        assignment.clean()  # Run validation
-        assignment.save()
-        
-        return JsonResponse({
-            'success': True,
-            'message': 'Teaching assignment updated successfully.',
-            'assignment_id': assignment.id
-        })
-        
-    except TeachingAssignment.DoesNotExist:
-        return JsonResponse({'success': False, 'message': 'Assignment not found.'})
-    except Exception as e:
-        return JsonResponse({'success': False, 'message': str(e)})
+
 
 def toggle_assignment_status(request):
     """Toggle assignment active status"""
@@ -6440,315 +7231,7 @@ def delete_teaching_assignment(request):
     except Exception as e:
         return JsonResponse({'success': False, 'message': str(e)})
 
-def clone_assignments(request):
-    """Clone assignments from one academic year to another"""
-    source_year_id = request.POST.get('source_academic_year')
-    target_year_id = request.POST.get('target_academic_year')
-    
-    if not source_year_id or not target_year_id:
-        return JsonResponse({
-            'success': False,
-            'message': 'Source and target academic years are required.'
-        })
-    
-    if source_year_id == target_year_id:
-        return JsonResponse({
-            'success': False,
-            'message': 'Source and target academic years must be different.'
-        })
-    
-    try:
-        source_year = AcademicYear.objects.get(id=source_year_id)
-        target_year = AcademicYear.objects.get(id=target_year_id)
-        
-        # Get active assignments from source year
-        source_assignments = TeachingAssignment.objects.filter(
-            academic_year=source_year,
-            is_active=True
-        )
-        
-        cloned_count = 0
-        skipped_count = 0
-        
-        for source_assignment in source_assignments:
-            # Check if similar assignment already exists in target year
-            exists = TeachingAssignment.objects.filter(
-                staff=source_assignment.staff,
-                subject=source_assignment.subject,
-                class_level=source_assignment.class_level,
-                stream_class=source_assignment.stream_class,
-                academic_year=target_year,
-                is_class_teacher=source_assignment.is_class_teacher
-            ).exists()
-            
-            if not exists:
-                # Clone the assignment
-                new_assignment = TeachingAssignment(
-                    staff=source_assignment.staff,
-                    subject=source_assignment.subject,
-                    class_level=source_assignment.class_level,
-                    stream_class=source_assignment.stream_class,
-                    academic_year=target_year,
-                    assignment_type=source_assignment.assignment_type,
-                    is_class_teacher=source_assignment.is_class_teacher,
-                    period_count=source_assignment.period_count,
-                    start_date=None,  # Reset start date for new year
-                    end_date=None,
-                    is_active=True
-                )
-                new_assignment.save()
-                cloned_count += 1
-            else:
-                skipped_count += 1
-        
-        return JsonResponse({
-            'success': True,
-            'message': f'Successfully cloned {cloned_count} assignments. {skipped_count} were skipped (already exist).',
-            'cloned_count': cloned_count,
-            'skipped_count': skipped_count
-        })
-        
-    except AcademicYear.DoesNotExist:
-        return JsonResponse({'success': False, 'message': 'Academic year not found.'})
-    except Exception as e:
-        return JsonResponse({'success': False, 'message': str(e)})
 
-# ============================================================================
-# USER MANAGEMENT VIEWS
-# ============================================================================
-
-@login_required
-def users_list(request):
-    """List all system users"""
-    users = CustomUser.objects.select_related('adminhod', 'staff').all()
-    
-    context = {
-        'page_title': 'Users List',
-        'users': users,
-    }
-    return render(request, 'admin/users/list.html', context)
-
-@login_required
-def users_add(request):
-    """Add new system user"""
-    if request.method == 'POST':
-        try:
-            username = request.POST.get('username')
-            email = request.POST.get('email')
-            password = request.POST.get('password')
-            user_type = request.POST.get('user_type')
-            
-            user = CustomUser.objects.create_user(
-                username=username,
-                email=email,
-                password=password,
-                user_type=user_type
-            )
-            
-            messages.success(request, f'User "{username}" created successfully.')
-            return redirect('admin:admin_users_list')
-            
-        except Exception as e:
-            messages.error(request, f'Error creating user: {str(e)}')
-    
-    context = {
-        'page_title': 'Add User',
-        'user_type_choices': CustomUser._meta.get_field('user_type').choices,
-    }
-    return render(request, 'admin/users/add.html', context)
-
-@login_required
-def users_roles(request):
-    """Manage user roles and permissions"""
-    context = {
-        'page_title': 'User Roles',
-    }
-    return render(request, 'admin/users/roles.html', context)
-
-@login_required
-def permissions(request):
-    """Manage system permissions"""
-    context = {
-        'page_title': 'Permissions',
-    }
-    return render(request, 'admin/users/permissions.html', context)
-
-@login_required
-def user_activity(request):
-    """View user activity logs"""
-    context = {
-        'page_title': 'User Activity',
-    }
-    return render(request, 'admin/users/activity.html', context)
-
-# ============================================================================
-# SYSTEM SETTINGS VIEWS
-# ============================================================================
-
-@login_required
-def system_config(request):
-    """System configuration settings"""
-    if request.method == 'POST':
-        # Handle configuration updates
-        messages.success(request, 'System configuration updated successfully.')
-        return redirect('admin:admin_system_config')
-    
-    context = {
-        'page_title': 'System Configuration',
-    }
-    return render(request, 'admin/settings/system.html', context)
-
-@login_required
-def email_settings(request):
-    """Email server configuration"""
-    if request.method == 'POST':
-        messages.success(request, 'Email settings updated successfully.')
-        return redirect('admin:admin_email_settings')
-    
-    context = {
-        'page_title': 'Email Settings',
-    }
-    return render(request, 'admin/settings/email.html', context)
-
-@login_required
-def sms_settings(request):
-    """SMS gateway configuration"""
-    context = {
-        'page_title': 'SMS Settings',
-    }
-    return render(request, 'admin/settings/sms.html', context)
-
-@login_required
-def notifications(request):
-    """Notification settings"""
-    context = {
-        'page_title': 'Notification Settings',
-    }
-    return render(request, 'admin/settings/notifications.html', context)
-
-@login_required
-def backup(request):
-    """System backup and restore"""
-    context = {
-        'page_title': 'Backup & Restore',
-    }
-    return render(request, 'admin/settings/backup.html', context)
-
-# ============================================================================
-# SECURITY & LOGS VIEWS
-# ============================================================================
-
-@login_required
-def audit_logs(request):
-    """View system audit logs"""
-    context = {
-        'page_title': 'Audit Logs',
-    }
-    return render(request, 'admin/security/audit_logs.html', context)
-
-@login_required
-def login_history(request):
-    """View user login history"""
-    context = {
-        'page_title': 'Login History',
-    }
-    return render(request, 'admin/security/login_history.html', context)
-
-@login_required
-def security_settings(request):
-    """Security configuration"""
-    context = {
-        'page_title': 'Security Settings',
-    }
-    return render(request, 'admin/security/settings.html', context)
-
-@login_required
-def api_settings(request):
-    """API configuration"""
-    context = {
-        'page_title': 'API Settings',
-    }
-    return render(request, 'admin/security/api.html', context)
-
-# ============================================================================
-# REPORTS & ANALYTICS VIEWS
-# ============================================================================
-
-@login_required
-def financial_reports(request):
-    """Financial reports"""
-    context = {
-        'page_title': 'Financial Reports',
-    }
-    return render(request, 'admin/reports/financial.html', context)
-
-@login_required
-def academic_reports(request):
-    """Academic performance reports"""
-    context = {
-        'page_title': 'Academic Reports',
-    }
-    return render(request, 'admin/reports/academic.html', context)
-
-@login_required
-def attendance_reports(request):
-    """Attendance reports"""
-    context = {
-        'page_title': 'Attendance Reports',
-    }
-    return render(request, 'admin/reports/attendance.html', context)
-
-@login_required
-def custom_reports(request):
-    """Custom report generation"""
-    context = {
-        'page_title': 'Custom Reports',
-    }
-    return render(request, 'admin/reports/custom.html', context)
-
-@login_required
-def export_data(request):
-    """Data export functionality"""
-    context = {
-        'page_title': 'Export Data',
-    }
-    return render(request, 'admin/reports/export.html', context)
-
-# ============================================================================
-# HELP & SUPPORT VIEWS
-# ============================================================================
-
-@login_required
-def documentation(request):
-    """System documentation"""
-    context = {
-        'page_title': 'Documentation',
-    }
-    return render(request, 'admin/help/documentation.html', context)
-
-@login_required
-def faq(request):
-    """Frequently Asked Questions"""
-    context = {
-        'page_title': 'FAQ',
-    }
-    return render(request, 'admin/help/faq.html', context)
-
-@login_required
-def support_tickets(request):
-    """Support ticket management"""
-    context = {
-        'page_title': 'Support Tickets',
-    }
-    return render(request, 'admin/help/support.html', context)
-
-@login_required
-def system_status(request):
-    """System status and health"""
-    context = {
-        'page_title': 'System Status',
-    }
-    return render(request, 'admin/help/system_status.html', context)
 
 # ============================================================================
 # AJAX/API ENDPOINTS

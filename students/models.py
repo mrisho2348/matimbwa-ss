@@ -1,8 +1,8 @@
 from django.db import models
 from django.core.validators import RegexValidator
 from django.utils import timezone
-from accounts.models import GENDER_CHOICES, CustomUser
-from core.models import ClassLevel, StreamClass, Subject
+from accounts.models import GENDER_CHOICES, CustomUser, Staffs
+from core.models import AcademicYear, ClassLevel, StreamClass, Subject
 
 class PreviousSchool(models.Model):
     SCHOOL_LEVEL_CHOICES = [
@@ -50,13 +50,21 @@ class Student(models.Model):
     profile_pic = models.FileField(upload_to='student_profile_pic', null=True, blank=True)
     physical_disabilities_condition = models.CharField(max_length=100, null=True, blank=True)
 
-    # Academic info
+    # Academic info & Relationships
+    # Link to AcademicYear (The year the student joined/is currently registered in)
+    academic_year = models.ForeignKey(
+        AcademicYear, 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True, 
+        related_name='students'
+    )
     class_level = models.ForeignKey(ClassLevel, on_delete=models.SET_NULL, null=True, blank=True, related_name='students')
     stream_class = models.ForeignKey(StreamClass, on_delete=models.SET_NULL, null=True, blank=True, related_name='students')
     
-    previous_school = models.ForeignKey('PreviousSchool', on_delete=models.SET_NULL, null=True, blank=True, related_name='students')
+    previous_school = models.ForeignKey(PreviousSchool, on_delete=models.SET_NULL, null=True, blank=True, related_name='students')
     previous_class_level = models.ForeignKey(ClassLevel, on_delete=models.SET_NULL, null=True, blank=True, related_name='previous_students')
-    transfer_from_school = models.ForeignKey('PreviousSchool', on_delete=models.SET_NULL, null=True, blank=True, related_name='transferred_students')
+    transfer_from_school = models.ForeignKey(PreviousSchool, on_delete=models.SET_NULL, null=True, blank=True, related_name='transferred_students')
     
     optional_subjects = models.ManyToManyField(Subject, blank=True, related_name='optional_students')
 
@@ -65,9 +73,9 @@ class Student(models.Model):
     examination_number = models.CharField(max_length=30, null=True, blank=True)
     previously_examination_number = models.CharField(max_length=30, null=True, blank=True)
 
-    # Auto-increment serial per year
+    # Auto-increment logic
     serial_number = models.PositiveIntegerField(editable=False, null=True, blank=True)
-    admission_year = models.IntegerField(null=True, blank=True)
+    admission_year = models.IntegerField(null=True, blank=True, help_text="Generated from Academic Year")
 
     # Status
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='active')
@@ -99,36 +107,32 @@ class Student(models.Model):
             return today.year - self.date_of_birth.year - ((today.month, today.day) < (self.date_of_birth.month, self.date_of_birth.day))
         return None
 
-    # Get primary contact number from parent
-    @property
-    def primary_contact(self):
-        fee_responsible = self.parents.filter(is_fee_responsible=True).first()
-        if fee_responsible:
-            return fee_responsible.phone
-        first_parent = self.parents.first()
-        return first_parent.phone if first_parent else None
-
-    @property
-    def emergency_contact(self):
-        fee_responsible = self.parents.filter(is_fee_responsible=True).first()
-        if fee_responsible and fee_responsible.first_phone_number:
-            return fee_responsible.first_phone_number
-        first_parent = self.parents.first()
-        return first_parent.first_phone_number if first_parent else None
-
     def save(self, *args, **kwargs):
-        # Set admission year if not provided
-        if not self.admission_year:
+        from .models import AcademicYear  # Local import to prevent circularity
+
+        # 1. Logic to set Academic Year and Admission Year
+        if not self.academic_year:
+            active_year = AcademicYear.objects.filter(is_active=True).first()
+            if active_year:
+                self.academic_year = active_year
+        
+        # Sync admission_year (integer) with the linked academic_year
+        if self.academic_year and not self.admission_year:
+            self.admission_year = self.academic_year.start_date.year
+        elif not self.admission_year:
             self.admission_year = timezone.now().year
 
-        # Auto-generate serial number per year
+        # 2. Auto-generate serial number per admission year
         if not self.serial_number:
             last_student = Student.objects.filter(admission_year=self.admission_year).order_by('-serial_number').first()
-            self.serial_number = 1 if not last_student else last_student.serial_number + 1
+            if last_student and last_student.serial_number:
+                self.serial_number = last_student.serial_number + 1
+            else:
+                self.serial_number = 1
 
-        # Auto-generate registration number if blank
+        # 3. Auto-generate registration number (S2348/SERIAL/YEAR)
         if not self.registration_number:
-            school_code = 'S2348'  # Your school code
+            school_code = 'S2348'
             serial_str = str(self.serial_number).zfill(4)
             self.registration_number = f'{school_code}/{serial_str}/{self.admission_year}'
 
@@ -182,3 +186,66 @@ class Parent(models.Model):
 
 
 
+class AttendanceSession(models.Model):
+    ATTENDANCE_TYPE_CHOICES = (
+        ('CLASS', 'Class Wise'),
+        ('SUBJECT', 'Subject Wise'),
+    )
+
+    class_level = models.ForeignKey(ClassLevel, on_delete=models.CASCADE)
+    stream = models.ForeignKey(StreamClass, on_delete=models.CASCADE)
+
+    subject = models.ForeignKey(
+        Subject,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True
+    )
+
+    attendance_type = models.CharField(
+        max_length=10,
+        choices=ATTENDANCE_TYPE_CHOICES
+    )
+
+    date = models.DateField()
+    period = models.PositiveIntegerField(null=True, blank=True)
+
+    # 🔹 timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        if self.attendance_type == 'CLASS':
+            return f"{self.class_level}-{self.stream} Class Attendance {self.date}"
+        return f"{self.subject} - {self.class_level}-{self.stream} ({self.date})"
+
+    
+
+class StudentAttendance(models.Model):
+    STATUS_CHOICES = (
+        ('P', 'Present'),
+        ('A', 'Absent'),
+        ('L', 'Late'),
+        ('E', 'Excused'),
+    )
+
+    attendance_session = models.ForeignKey(
+        AttendanceSession,
+        on_delete=models.CASCADE,
+        related_name='attendances'
+    )
+
+    student = models.ForeignKey(
+        Student,
+        on_delete=models.CASCADE
+    )
+
+    status = models.CharField(
+        max_length=1,
+        choices=STATUS_CHOICES
+    )
+
+    remark = models.CharField(max_length=255, blank=True, null=True)
+
+    class Meta:
+        unique_together = ('attendance_session', 'student')

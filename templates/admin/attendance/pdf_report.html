@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Attendance Report - {{ student.full_name }}</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 2cm;
+            @top-center {
+                content: "{{ school_name }}";
+                font-size: 12px;
+                font-weight: bold;
+            }
+            @bottom-center {
+                content: "Page " counter(page) " of " counter(pages);
+                font-size: 10px;
+                color: #666;
+            }
+        }
+        
+        body {
+            font-family: 'Helvetica', 'Arial', sans-serif;
+            font-size: 12px;
+            line-height: 1.4;
+            color: #333;
+            margin: 0;
+            padding: 0;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #2c3e50;
+        }
+        
+        .header h1 {
+            font-size: 24px;
+            color: #2c3e50;
+            margin: 10px 0 5px 0;
+            font-weight: bold;
+        }
+        
+        .header .subtitle {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 5px;
+        }
+        
+        .header .date {
+            font-size: 11px;
+            color: #888;
+        }
+        
+        .student-info {
+            background: #f8f9fa;
+            border-radius: 5px;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-left: 4px solid #007bff;
+        }
+        
+        .student-info h3 {
+            font-size: 16px;
+            color: #2c3e50;
+            margin: 0 0 10px 0;
+            font-weight: bold;
+        }
+        
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+            font-size: 11px;
+        }
+        
+        .info-item {
+            display: flex;
+        }
+        
+        .info-label {
+            font-weight: bold;
+            min-width: 120px;
+            color: #555;
+        }
+        
+        .info-value {
+            color: #333;
+        }
+        
+        .section {
+            margin-bottom: 25px;
+            page-break-inside: avoid;
+        }
+        
+        .section-title {
+            font-size: 16px;
+            font-weight: bold;
+            color: #2c3e50;
+            margin: 0 0 15px 0;
+            padding-bottom: 5px;
+            border-bottom: 1px solid #dee2e6;
+        }
+        
+        .stats-container {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .stat-card {
+            background: white;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 12px;
+            text-align: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        
+        .stat-number {
+            font-size: 24px;
+            font-weight: bold;
+            display: block;
+            line-height: 1;
+        }
+        
+        .stat-present .stat-number { color: #28a745; }
+        .stat-absent .stat-number { color: #dc3545; }
+        .stat-late .stat-number { color: #ffc107; }
+        .stat-excused .stat-number { color: #17a2b8; }
+        
+        .stat-label {
+            font-size: 11px;
+            color: #6c757d;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-top: 5px;
+        }
+        
+        .overall-stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin-top: 20px;
+        }
+        
+        .overall-stat {
+            text-align: center;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 5px;
+            border: 1px solid #dee2e6;
+        }
+        
+        .overall-stat-number {
+            font-size: 20px;
+            font-weight: bold;
+            color: #007bff;
+            display: block;
+        }
+        
+        .overall-stat-label {
+            font-size: 11px;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+            font-size: 10px;
+        }
+        
+        th {
+            background-color: #2c3e50;
+            color: white;
+            font-weight: bold;
+            text-align: left;
+            padding: 8px 6px;
+            border: 1px solid #dee2e6;
+        }
+        
+        td {
+            padding: 6px;
+            border: 1px solid #dee2e6;
+            vertical-align: top;
+        }
+        
+        tr:nth-child(even) {
+            background-color: #f8f9fa;
+        }
+        
+        .attendance-badge {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 10px;
+            font-size: 9px;
+            font-weight: 600;
+            text-align: center;
+            min-width: 50px;
+        }
+        
+        .badge-present {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .badge-absent {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .badge-late {
+            background: #fff3cd;
+            color: #856404;
+        }
+        
+        .badge-excused {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+        
+        .page-break {
+            page-break-before: always;
+        }
+        
+        .summary-note {
+            font-size: 10px;
+            color: #666;
+            font-style: italic;
+            margin-top: 10px;
+            text-align: center;
+        }
+        
+        .footer-note {
+            font-size: 9px;
+            color: #888;
+            text-align: center;
+            margin-top: 20px;
+            padding-top: 10px;
+            border-top: 1px solid #dee2e6;
+        }
+        
+        .monthly-trends {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-top: 15px;
+        }
+        
+        .month-card {
+            background: white;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 10px;
+            font-size: 10px;
+        }
+        
+        .month-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 5px;
+        }
+        
+        .month-name {
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        
+        .month-rate {
+            font-size: 11px;
+            font-weight: bold;
+            padding: 2px 8px;
+            border-radius: 10px;
+        }
+        
+        .rate-high { background: #d4edda; color: #155724; }
+        .rate-medium { background: #fff3cd; color: #856404; }
+        .rate-low { background: #f8d7da; color: #721c24; }
+        
+        .progress-bar {
+            height: 6px;
+            background: #e9ecef;
+            border-radius: 3px;
+            margin: 5px 0;
+            overflow: hidden;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: #28a745;
+        }
+        
+        .text-center { text-align: center; }
+        .text-right { text-align: right; }
+        .mb-10 { margin-bottom: 10px; }
+        .mt-10 { margin-top: 10px; }
+        .mb-20 { margin-bottom: 20px; }
+        
+        /* Status colors in detailed table */
+        .status-present { color: #28a745; }
+        .status-absent { color: #dc3545; }
+        .status-late { color: #ffc107; }
+        .status-excused { color: #17a2b8; }
+    </style>
+</head>
+<body>
+    <!-- Header Section -->
+    <div class="header">
+        <h1>STUDENT ATTENDANCE REPORT</h1>
+        <div class="subtitle">{{ school_name }}</div>
+        <div class="subtitle">{{ school_address }}</div>
+        <div class="date">Generated on: {{ generation_date }}</div>
+    </div>
+    
+    <!-- Student Information -->
+    <div class="student-info">
+        <h3>Student Information</h3>
+        <div class="info-grid">
+            <div class="info-item">
+                <span class="info-label">Name:</span>
+                <span class="info-value">{{ student.full_name }}</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Admission No:</span>
+                <span class="info-value">{{ student.registration_number|default:"N/A" }}</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Class:</span>
+                <span class="info-value">{{ student.class_level.name|default:"Not assigned" }}</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Stream:</span>
+                <span class="info-value">{{ student.stream_class.stream_letter|default:"N/A" }}</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Gender:</span>
+                <span class="info-value">{{ student.get_gender_display|default:"N/A" }}</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Report Period:</span>
+                <span class="info-value">{{ start_date }} to {{ end_date }}</span>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Attendance Statistics -->
+    <div class="section">
+        <h3 class="section-title">Attendance Statistics</h3>
+        
+        <div class="stats-container">
+            <div class="stat-card stat-present">
+                <span class="stat-number">{{ stats.present|default:0 }}</span>
+                <span class="stat-label">Present</span>
+            </div>
+            <div class="stat-card stat-absent">
+                <span class="stat-number">{{ stats.absent|default:0 }}</span>
+                <span class="stat-label">Absent</span>
+            </div>
+            <div class="stat-card stat-late">
+                <span class="stat-number">{{ stats.late|default:0 }}</span>
+                <span class="stat-label">Late</span>
+            </div>
+            <div class="stat-card stat-excused">
+                <span class="stat-number">{{ stats.excused|default:0 }}</span>
+                <span class="stat-label">Excused</span>
+            </div>
+        </div>
+        
+        <div class="overall-stats">
+            <div class="overall-stat">
+                <span class="overall-stat-number">{{ attendance_rate }}%</span>
+                <span class="overall-stat-label">Attendance Rate</span>
+            </div>
+            <div class="overall-stat">
+                <span class="overall-stat-number">{{ total_sessions }}</span>
+                <span class="overall-stat-label">Total Sessions</span>
+            </div>
+            <div class="overall-stat">
+                <span class="overall-stat-number">{{ total_days }}</span>
+                <span class="overall-stat-label">Days with Attendance</span>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Daily Summary Table -->
+    {% if daily_summary %}
+    <div class="section page-break">
+        <h3 class="section-title">Daily Attendance Summary</h3>
+        
+        <table>
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Day</th>
+                    <th class="text-center">Present</th>
+                    <th class="text-center">Absent</th>
+                    <th class="text-center">Late</th>
+                    <th class="text-center">Excused</th>
+                    <th class="text-center">Total</th>
+                    <th class="text-center">Rate</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for day in daily_summary %}
+                <tr>
+                    <td>{{ day.date|date:"M d, Y" }}</td>
+                    <td>{{ day.date|date:"D" }}</td>
+                    <td class="text-center">
+                        <span class="attendance-badge badge-present">{{ day.present }}</span>
+                    </td>
+                    <td class="text-center">
+                        <span class="attendance-badge badge-absent">{{ day.absent }}</span>
+                    </td>
+                    <td class="text-center">
+                        <span class="attendance-badge badge-late">{{ day.late }}</span>
+                    </td>
+                    <td class="text-center">
+                        <span class="attendance-badge badge-excused">{{ day.excused }}</span>
+                    </td>
+                    <td class="text-center">{{ day.total }}</td>
+                    <td class="text-center">
+                        {% if day.total > 0 %}
+                            {% widthratio day.present day.total 100 %}%
+                        {% else %}
+                            0%
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <div class="summary-note">
+            Showing {{ daily_summary|length }} days with attendance records
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- Monthly Trends -->
+    {% if monthly_trends %}
+    <div class="section">
+        <h3 class="section-title">Monthly Attendance Trends</h3>
+        
+        <div class="monthly-trends">
+            {% for month in monthly_trends %}
+            <div class="month-card">
+                <div class="month-header">
+                    <span class="month-name">{{ month.month }}</span>
+                    <span class="month-rate 
+                        {% if month.attendance_rate >= 80 %}rate-high
+                        {% elif month.attendance_rate >= 60 %}rate-medium
+                        {% else %}rate-low{% endif %}">
+                        {{ month.attendance_rate }}%
+                    </span>
+                </div>
+                <div class="mb-10">
+                    Present: {{ month.stats.present|default:0 }} / Total: {{ month.stats.total|default:0 }}
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill" style="width: {% if month.stats.total > 0 %}{% widthratio month.stats.present month.stats.total 100 %}%{% else %}0%{% endif %}"></div>
+                </div>
+                <div class="text-center mt-10" style="font-size: 9px; color: #666;">
+                    {{ month.total_days }} days with attendance
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- Detailed Records Table -->
+    {% if attendance_records %}
+    <div class="section page-break">
+        <h3 class="section-title">Detailed Attendance Records</h3>
+        
+        <table>
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Type</th>
+                    <th>Class</th>
+                    <th>Subject</th>
+                    <th class="text-center">Period</th>
+                    <th class="text-center">Status</th>
+                    <th>Remark</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for record in attendance_records %}
+                <tr>
+                    <td>{{ record.attendance_session.date|date:"M d, Y" }}</td>
+                    <td>{{ record.attendance_session.get_attendance_type_display }}</td>
+                    <td>
+                        {{ record.attendance_session.class_level.name }}
+                        {% if record.attendance_session.stream %}
+                            - {{ record.attendance_session.stream.stream_letter }}
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if record.attendance_session.subject %}
+                            {{ record.attendance_session.subject.name }}
+                        {% else %}
+                            Class Attendance
+                        {% endif %}
+                    </td>
+                    <td class="text-center">{{ record.attendance_session.period|default:"-" }}</td>
+                    <td class="text-center">
+                        {% if record.status == 'P' %}
+                            <span class="status-present">● Present</span>
+                        {% elif record.status == 'A' %}
+                            <span class="status-absent">● Absent</span>
+                        {% elif record.status == 'L' %}
+                            <span class="status-late">● Late</span>
+                        {% elif record.status == 'E' %}
+                            <span class="status-excused">● Excused</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ record.remark|default:"-" }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <div class="summary-note">
+            Showing {{ attendance_records.count }} detailed attendance records
+            {% if attendance_type_filter != 'ALL' %}
+                | Type: {{ attendance_type_filter }}
+            {% endif %}
+            {% if status_filter != 'ALL' %}
+                | Status: {{ status_filter }}
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- Footer -->
+    <div class="footer-note">
+        This is an official attendance report generated by the school management system.<br>
+        Report ID: ATT-{{ student.id }}-{{ start_date|date:"Ymd" }}-{{ end_date|date:"Ymd" }}
+    </div>
+</body>
+</html>

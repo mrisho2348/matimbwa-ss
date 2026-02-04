@@ -1,0 +1,958 @@
+{% extends 'admin/base.html' %}
+{% load static %}
+{% block title %} {{ department.name }} - Staff Assignment {% endblock title %}
+
+{% block breadcrumb %}
+    <a href="{% url 'admin_department_management' %}" class="btn btn-secondary">
+        <i class="fas fa-arrow-left"></i> Back to Departments
+    </a>
+{% endblock breadcrumb %}
+
+{% block extra_css %}
+<style>
+    /* Department Header */
+    .department-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 20px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+    }
+    .dept-title {
+        font-size: 1.8rem;
+        font-weight: 600;
+        margin-bottom: 5px;
+    }
+    .dept-subtitle {
+        opacity: 0.9;
+        font-size: 1rem;
+    }
+    .badge-dept {
+        background: rgba(255,255,255,0.2);
+        color: white;
+        padding: 5px 12px;
+        border-radius: 20px;
+        font-size: 0.9rem;
+    }
+    
+    /* Success and error toasts */
+    .custom-toast {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 99999;
+        min-width: 300px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        display: none;
+    }
+    
+    /* Bulk Actions Styles */
+    .bulk-actions-container {
+        background: #f8fafc;
+        border-radius: 10px;
+        padding: 15px;
+        margin-bottom: 20px;
+        border: 1px solid #e2e8f0;
+        display: none;
+        align-items: center;
+        gap: 15px;
+        flex-wrap: wrap;
+    }
+    
+    .selected-count {
+        background: #667eea;
+        color: white;
+        padding: 5px 15px;
+        border-radius: 20px;
+        font-weight: 600;
+        font-size: 0.9rem;
+    }
+    
+    .bulk-action-btn {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    
+    /* Checkbox column styling */
+    .checkbox-column {
+        width: 30px;
+        text-align: center;
+    }
+    
+    /* Staff photo styling */
+    .staff-photo {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        object-fit: cover;
+    }
+    .photo-placeholder {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background-color: #6c757d;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-weight: bold;
+    }
+    
+    /* Badge styles */
+    .badge-hod {
+        background: #dc3545;
+        color: white;
+        font-size: 0.75rem;
+        padding: 3px 8px;
+        border-radius: 10px;
+        margin-left: 5px;
+    }
+    .badge-role {
+        background: #6c757d;
+        color: white;
+        font-size: 0.75rem;
+        padding: 3px 8px;
+        border-radius: 10px;
+    }
+    
+    /* Action buttons */
+    .action-buttons .btn {
+        margin: 0 2px;
+        padding: 0.25rem 0.5rem;
+        font-size: 0.875rem;
+    }
+    
+    /* Responsive adjustments */
+    @media (max-width: 768px) {
+        .bulk-actions-container {
+            flex-direction: column;
+            align-items: stretch;
+        }
+        
+        .bulk-action-btn {
+            width: 100%;
+            justify-content: center;
+        }
+    }
+</style>
+{% endblock extra_css %}
+
+{% block content %}
+<section class="content">
+    <div class="container-fluid">
+        <!-- Hidden CSRF Token Field -->
+        <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf_token }}">
+        <input type="hidden" id="department-id" value="{{ department.id }}">
+
+        <!-- Success and Error Toasts -->
+        <div id="success-toast" class="alert alert-success alert-dismissible custom-toast" role="alert">
+            <strong><i class="fas fa-check-circle"></i> Success!</strong> 
+            <span id="success-message"></span>
+            <button type="button" class="close" onclick="hideToast('success')">
+                <span aria-hidden="true">&times;</span>
+            </button>
+        </div>
+
+        <div id="error-toast" class="alert alert-danger alert-dismissible custom-toast" role="alert">
+            <strong><i class="fas fa-exclamation-circle"></i> Error!</strong> 
+            <span id="error-message"></span>
+            <button type="button" class="close" onclick="hideToast('error')">
+                <span aria-hidden="true">&times;</span>
+            </button>
+        </div>
+
+        <!-- Department Header -->
+        <div class="department-header">
+            <div class="row align-items-center">
+                <div class="col-md-8">
+                    <h1 class="dept-title">{{ department.name }}</h1>
+                    <p class="dept-subtitle mb-0">
+                        <i class="fas fa-hashtag"></i> Code: {{ department.code }}
+                        {% if has_hod %}
+                        <span class="badge badge-warning ml-2">
+                            <i class="fas fa-crown"></i> HOD: {{ hod_name }}
+                        </span>
+                        {% endif %}
+                    </p>
+                </div>
+                <div class="col-md-4 text-right">
+                    <span class="badge-dept">
+                        <i class="fas fa-users"></i> 
+                        <span id="current-staff">{{ total_staff_in_department }}</span> Staff
+                    </span>
+                </div>
+            </div>
+            
+            <!-- Department Info -->
+            <div class="row mt-3">
+                <div class="col-12">
+                    <div class="d-flex justify-content-between align-items-center flex-wrap">
+                        <div>
+                            <small class="mr-3">
+                                <i class="fas fa-graduation-cap"></i> {{ department.courses.count }} Courses
+                            </small>
+                            <small>
+                                <i class="fas fa-check-circle"></i> 
+                                {% if department.is_active %}Active{% else %}Inactive{% endif %}
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bulk Actions Section -->
+        <div class="bulk-actions-container" id="bulkActionsContainer">
+            <div class="d-flex align-items-center flex-wrap gap-2">
+                <span class="selected-count" id="selectedCount">0 selected</span>
+                
+                <button class="btn btn-danger bulk-action-btn" id="bulkRemoveBtn" title="Remove selected staff from department">
+                    <i class="fas fa-user-minus"></i> Remove from Department
+                </button>
+                
+                <button class="btn btn-secondary bulk-action-btn" id="clearSelectionBtn">
+                    <i class="fas fa-times"></i> Clear Selection
+                </button>
+                
+                <button class="btn btn-outline-secondary bulk-action-btn" id="closeBulkActionsBtn">
+                    <i class="fas fa-times-circle"></i> Close
+                </button>
+            </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="d-flex flex-wrap gap-3 align-items-center">
+                    <button type="button" class="btn btn-primary" data-toggle="modal" data-target="#addStaffModal">
+                        <i class="fas fa-user-plus"></i> Add Staff
+                    </button>
+                    
+                    <button type="button" class="btn btn-outline-primary" id="bulkSelectToggleBtn">
+                        <i class="fas fa-check-square"></i> Bulk Select
+                    </button>
+                    
+                    <button type="button" class="btn btn-outline-secondary" onclick="window.location.reload()">
+                        <i class="fas fa-sync-alt"></i> Refresh
+                    </button>
+                    
+                    <div class="ml-auto">
+                        <div class="input-group input-group-sm" style="width: 250px;">
+                            <input type="text" class="form-control" placeholder="Search in department..." id="tableSearch">
+                            <div class="input-group-append">
+                                <button class="btn btn-outline-secondary" type="button" id="tableSearchBtn">
+                                    <i class="fas fa-search"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <!-- Current Staff in Department (MAIN TABLE) -->
+            <div class="col-lg-12">
+                <div class="card shadow-lg">
+                    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                        <h6 class="header-title mb-0 text-uppercase">
+                            <i class="fas fa-users"></i> Staff in {{ department.name }}
+                            <span class="badge badge-light ml-2" id="staff-count">{{ total_staff_in_department }}</span>
+                        </h6>
+                        <div class="d-flex align-items-center">
+                            <span class="mr-2">Select All:</span>
+                            <input type="checkbox" id="selectAllStaff" class="form-check-input">
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover text-nowrap table-bordered table-striped display" id="staff-table">
+                                <thead class="bg-light">
+                                    <tr>
+                                        <th class="checkbox-column">
+                                            <input type="checkbox" id="selectAllHeader">
+                                        </th>
+                                        <th>Photo</th>
+                                        <th>Name</th>
+                                        <th>Staff ID</th>
+                                        <th>Role</th>
+                                        <th>Email</th>
+                                        <th>Status</th>
+                                        <th class="text-center">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for staff in staff_list %}
+                                    <tr id="staff-row-{{ staff.id }}">
+                                        <td class="checkbox-column">
+                                            <input type="checkbox" class="staff-checkbox-remove" value="{{ staff.id }}" 
+                                                   data-id="{{ staff.id }}" data-name="{{ staff.get_full_name }}">
+                                        </td>
+                                        <td>
+                                            {% if staff.profile_picture %}
+                                                <img src="{{ staff.profile_picture.url }}" class="staff-photo" alt="{{ staff.get_full_name }}">
+                                            {% else %}
+                                                <div class="photo-placeholder">
+                                                    {{ staff.admin.first_name|first }}{{ staff.admin.last_name|first }}
+                                                </div>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <strong>{{ staff.get_full_name }}</strong>
+                                            {% if department.head_of_department == staff %}
+                                                <span class="badge-hod">HOD</span>
+                                            {% endif %}
+                                            <br>
+                                            <small class="text-muted">{{ staff.admin.username }}</small>
+                                        </td>
+                                        <td>{{ staff.staff_id|default:"N/A" }}</td>
+                                        <td>
+                                            {% if staff.role %}
+                                                <span class="badge-role">{{ staff.position_title|default:staff.role }}</span>
+                                            {% else %}
+                                                <span class="text-muted">Not specified</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ staff.admin.email }}</td>
+                                        <td>
+                                            {% if staff.admin.is_active %}
+                                                <span class="badge badge-success">
+                                                    <i class="fas fa-check-circle"></i> Active
+                                                </span>
+                                            {% else %}
+                                                <span class="badge badge-secondary">
+                                                    <i class="fas fa-times-circle"></i> Inactive
+                                                </span>
+                                            {% endif %}
+                                        </td>
+                                        <td class="text-center action-buttons">
+                                            <button class="btn btn-sm btn-danger remove-staff-btn" 
+                                                    data-id="{{ staff.id }}"
+                                                    data-name="{{ staff.get_full_name }}"
+                                                    title="Remove from department">
+                                                <i class="fas fa-user-minus"></i> Remove
+                                            </button>
+                                            <a href="{% url 'admin_view_staff' staff.id %}" class="btn btn-sm btn-info" 
+                                               title="View Profile">
+                                                <i class="fas fa-eye"></i> View
+                                            </a>
+                                        </td>
+                                    </tr>                                    
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Add Staff Modal -->
+<div class="modal fade" id="addStaffModal" tabindex="-1" role="dialog" aria-labelledby="addStaffModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title" id="addStaffModalLabel">
+                    <i class="fas fa-user-plus"></i> Add Staff to {{ department.name }}
+                </h5>
+                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <div class="input-group">
+                            <div class="input-group-prepend">
+                                <span class="input-group-text"><i class="fas fa-search"></i></span>
+                            </div>
+                            <input type="text" class="form-control" id="search-available-staff" placeholder="Search by name or staff ID...">
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="input-group">
+                            <div class="input-group-prepend">
+                                <span class="input-group-text"><i class="fas fa-filter"></i></span>
+                            </div>
+                            <select class="form-control" id="filter-role">
+                                <option value="">All Roles</option>
+                                {% for role_value, role_display in role_choices %}
+                                <option value="{{ role_value }}">{{ role_display }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="table-responsive">
+                    <table class="table table-hover text-nowrap table-bordered table-striped display" id="available-staff-table">
+                        <thead class="bg-light">
+                            <tr>
+                                <th width="5%">Select</th>
+                                <th>Name</th>
+                                <th>Staff ID</th>
+                                <th>Role</th>
+                                <th>Email</th>
+                                <th>Current Department</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for staff in available_staff %}
+                            <tr>
+                                <td>
+                                    <div class="text-center">
+                                        <input type="checkbox" class="staff-checkbox-add" value="{{ staff.id }}" 
+                                               data-name="{{ staff.get_full_name }}">
+                                    </div>
+                                </td>
+                                <td>{{ staff.get_full_name }}</td>
+                                <td>{{ staff.staff_id|default:"N/A" }}</td>
+                                <td>{{ staff.position_title|default:"Not specified" }}</td>
+                                <td>{{ staff.admin.email }}</td>
+                                <td>
+                                    {% if staff.department %}
+                                        <span class="badge badge-info">{{ staff.department.name }}</span>
+                                    {% else %}
+                                        <span class="text-muted">Unassigned</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if staff.admin.is_active %}
+                                        <span class="badge badge-success">Active</span>
+                                    {% else %}
+                                        <span class="badge badge-secondary">Inactive</span>
+                                    {% endif %}
+                                </td>
+                            </tr>                           
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-success" id="add-selected-staff" disabled>
+                    <i class="fas fa-user-plus"></i> Add Selected Staff
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Confirm Bulk Remove Modal -->
+<div class="modal fade" id="confirmBulkRemoveModal" tabindex="-1" role="dialog" aria-labelledby="confirmBulkRemoveModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="confirmBulkRemoveModalLabel">
+                    <i class="fas fa-exclamation-triangle"></i> Confirm Bulk Removal
+                </h5>
+                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to remove <strong id="bulk-remove-count">0</strong> selected staff member(s) from this department?</p>
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-circle me-2"></i>
+                    <strong>Warning:</strong> This action cannot be undone. The staff will become available for assignment to other departments.
+                </div>
+                <div id="selectedStaffList" class="mt-3" style="max-height: 150px; overflow-y: auto;">
+                    <!-- Selected staff will be listed here -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirm-bulk-remove-btn">
+                    <i class="fas fa-user-minus"></i> Remove Selected
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Confirm Single Remove Modal -->
+<div class="modal fade" id="confirmRemoveModal" tabindex="-1" role="dialog" aria-labelledby="confirmRemoveModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="confirmRemoveModalLabel">
+                    <i class="fas fa-exclamation-triangle"></i> Confirm Removal
+                </h5>
+                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to remove <strong id="staff-name"></strong> from this department?</p>
+                <p class="text-muted"><small>The staff member will become available for assignment to other departments.</small></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirm-remove-btn">
+                    <i class="fas fa-user-minus"></i> Remove from Department
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+<script>
+    // Function to get CSRF token
+    function getCSRFToken() {
+        return $('input[name="csrfmiddlewaretoken"]').val();
+    }
+
+    // Function to show/hide toast
+    function showToast(message, type = 'success') {
+        const toastId = type === 'success' ? 'success-toast' : 'error-toast';
+        const messageId = type === 'success' ? 'success-message' : 'error-message';
+        
+        $('#' + messageId).text(message);
+        $('#' + toastId).fadeIn();
+        
+        setTimeout(() => {
+            hideToast(type);
+        }, type === 'success' ? 3000 : 5000);
+    }
+
+    function hideToast(type) {
+        const toastId = type === 'success' ? 'success-toast' : 'error-toast';
+        $('#' + toastId).fadeOut();
+    }
+
+    // Function to update selected count for REMOVE action
+    function updateSelectedCount() {
+        const count = $('.staff-checkbox-remove:checked').length;
+        $('#selectedCount').text(`${count} selected`);
+        $('#bulkRemoveBtn').prop('disabled', count === 0);
+        $('#bulkActionsContainer').toggle(count > 0);
+        
+        // Update bulk remove modal count
+        $('#bulk-remove-count').text(count);
+        
+        // Update staff list in modal
+        const selectedStaff = [];
+        $('.staff-checkbox-remove:checked').each(function() {
+            const staffId = $(this).data('id');
+            const staffName = $(this).data('name');
+            selectedStaff.push({ id: staffId, name: staffName });
+        });
+        
+        const staffList = $('#selectedStaffList');
+        staffList.empty();
+        
+        if (selectedStaff.length > 0) {
+            const list = $('<div></div>');
+            selectedStaff.slice(0, 10).forEach(staff => {
+                list.append(`<div class="mb-1"><i class="fas fa-user mr-2"></i>${staff.name}</div>`);
+            });
+            
+            if (selectedStaff.length > 10) {
+                list.append(`<div class="text-muted">...and ${selectedStaff.length - 10} more</div>`);
+            }
+            
+            staffList.append(list);
+        }
+    }
+
+    $(document).ready(function() {
+        // Initialize DataTables
+        var staffTable = $('#staff-table').DataTable({
+            "dom": "<'row'<'col-sm-12 col-md-6'l><'col-sm-12 col-md-6'f>>" +
+                   "<'row'<'col-sm-12'tr>>" +
+                   "<'row'<'col-sm-12 col-md-5'i><'col-sm-12 col-md-7'p>>",
+            "lengthMenu": [[10, 25, 50, -1], [10, 25, 50, "All"]],
+            "pageLength": 10,
+            "responsive": true,
+            "autoWidth": false,
+            "order": [[2, 'asc']], // Sort by name column
+            "language": {
+                "emptyTable": "<div class='text-center py-4'><i class='fas fa-users fa-2x mb-2'></i><br>No staff in this department.</div>",
+                "searchPlaceholder": "Search staff..."
+            },
+            "columnDefs": [
+                {
+                    "targets": [0, 7], // Checkbox and Actions columns
+                    "orderable": false
+                }
+            ]
+        });
+        
+        var availableTable = $('#available-staff-table').DataTable({
+            "dom": "<'row'<'col-sm-12 col-md-6'l><'col-sm-12 col-md-6'f>>" +
+                   "<'row'<'col-sm-12'tr>>" +
+                   "<'row'<'col-sm-12 col-md-5'i><'col-sm-12 col-md-7'p>>",
+            "lengthMenu": [[10, 25, 50, -1], [10, 25, 50, "All"]],
+            "pageLength": 10,
+            "responsive": true,
+            "autoWidth": false,
+            "order": [[1, 'asc']],
+            "columnDefs": [
+                {
+                    "targets": 0,
+                    "orderable": false,
+                    "searchable": false
+                }
+            ],
+            "language": {
+                "emptyTable": "<div class='text-center py-4'><i class='fas fa-user-check fa-2x mb-2'></i><br>No available staff.</div>"
+            }
+        });
+        
+        // Table search functionality for main table
+        $('#tableSearch').on('keyup', function() {
+            staffTable.search(this.value).draw();
+        });
+        
+        $('#tableSearchBtn').on('click', function() {
+            staffTable.search($('#tableSearch').val()).draw();
+        });
+        
+        // Role filter for available staff
+        $('#filter-role').on('change', function() {
+            var role = $(this).val();
+            
+            // Store the current search value
+            var searchText = $('#search-available-staff').val();
+            
+            // Clear table
+            availableTable.search('');
+            availableTable.columns().search('');
+            
+            // Re-apply the search text if exists
+            if (searchText) {
+                availableTable.search(searchText);
+            }
+            
+            // Apply role filter
+            if (role) {
+                availableTable.column(3).search(role, true, false).draw();
+            } else {
+                availableTable.column(3).search('').draw();
+            }
+        });
+        
+        // Search filter for available staff table
+        $('#search-available-staff').on('keyup', function() {
+            availableTable.search(this.value).draw();
+        });
+        
+        // Checkbox selection for ADDING staff (modal table)
+        $(document).on('change', '.staff-checkbox-add', function() {
+            var anyChecked = $('.staff-checkbox-add:checked').length > 0;
+            $('#add-selected-staff').prop('disabled', !anyChecked);
+        });
+        
+        // Bulk selection functionality for REMOVING staff
+        var isBulkMode = false;
+        
+        $('#bulkSelectToggleBtn').on('click', function() {
+            isBulkMode = !isBulkMode;
+            
+            if (isBulkMode) {
+                $(this).html('<i class="fas fa-check-square"></i> Exit Bulk Mode');
+                $(this).removeClass('btn-outline-primary').addClass('btn-primary');
+                $('.checkbox-column').show();
+                $('#selectAllHeader').prop('checked', false);
+                $('#selectAllStaff').prop('checked', false);
+                updateSelectedCount();
+            } else {
+                $(this).html('<i class="fas fa-check-square"></i> Bulk Select');
+                $(this).removeClass('btn-primary').addClass('btn-outline-primary');
+                $('.checkbox-column').hide();
+                $('.staff-checkbox-remove').prop('checked', false);
+                $('#bulkActionsContainer').hide();
+            }
+            
+            // Trigger DataTable redraw
+            staffTable.columns.adjust().draw();
+        });
+        
+        // Initially hide checkbox column
+        $('.checkbox-column').hide();
+        
+        // Select all header checkbox (for REMOVE)
+        $('#selectAllHeader').on('change', function() {
+            const isChecked = $(this).prop('checked');
+            $('#selectAllStaff').prop('checked', isChecked);
+            $('.staff-checkbox-remove').prop('checked', isChecked);
+            updateSelectedCount();
+        });
+        
+        // Select all staff checkbox (outside table - for REMOVE)
+        $('#selectAllStaff').on('change', function() {
+            const isChecked = $(this).prop('checked');
+            $('#selectAllHeader').prop('checked', isChecked);
+            $('.staff-checkbox-remove').prop('checked', isChecked);
+            updateSelectedCount();
+        });
+        
+        // Individual checkbox change (for REMOVE)
+        $(document).on('change', '.staff-checkbox-remove', function() {
+            updateSelectedCount();
+            
+            // Update select all header
+            const totalCheckboxes = $('.staff-checkbox-remove').length;
+            const checkedCheckboxes = $('.staff-checkbox-remove:checked').length;
+            $('#selectAllHeader').prop('checked', totalCheckboxes === checkedCheckboxes);
+            $('#selectAllStaff').prop('checked', totalCheckboxes === checkedCheckboxes);
+        });
+        
+        // Clear selection button (for REMOVE)
+        $('#clearSelectionBtn').on('click', function() {
+            $('.staff-checkbox-remove, #selectAllHeader, #selectAllStaff').prop('checked', false);
+            updateSelectedCount();
+        });
+        
+        // Close bulk actions button
+        $('#closeBulkActionsBtn').on('click', function() {
+            $('#bulkActionsContainer').hide();
+            $('.staff-checkbox-remove, #selectAllHeader, #selectAllStaff').prop('checked', false);
+        });
+        
+        // Bulk remove button
+        $('#bulkRemoveBtn').on('click', function() {
+            const selectedCount = $('.staff-checkbox-remove:checked').length;
+            if (selectedCount === 0) {
+                showToast('No staff selected', 'error');
+                return;
+            }
+            
+            $('#confirmBulkRemoveModal').modal('show');
+        });
+        
+        // Confirm bulk remove
+        $('#confirm-bulk-remove-btn').click(function(e) {
+            e.preventDefault();
+            
+            const selectedStaff = [];
+            $('.staff-checkbox-remove:checked').each(function() {
+                selectedStaff.push({
+                    id: $(this).data('id'),
+                    name: $(this).data('name')
+                });
+            });
+            
+            if (selectedStaff.length === 0) return;
+            
+            const $btn = $(this);
+            const originalText = $btn.html();
+            $btn.html('<i class="fas fa-spinner fa-spin"></i> Removing...');
+            $btn.prop('disabled', true);
+            
+            // Create form data
+            const formData = new FormData();
+            selectedStaff.forEach(function(staff) {
+                formData.append('staff_ids[]', staff.id);
+            });
+            formData.append('csrfmiddlewaretoken', getCSRFToken());
+            formData.append('action', 'bulk_remove');
+            
+            // Send AJAX request
+            $.ajax({
+                url: '{% url "admin_bulk_remove_staff_from_department" department.id %}',
+                type: 'POST',
+                data: formData,
+                processData: false,
+                contentType: false,
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                success: function(response) {
+                    if (response.success) {
+                        // Remove rows from table
+                        selectedStaff.forEach(function(staff) {
+                            staffTable.row('#staff-row-' + staff.id).remove().draw();
+                        });
+                        
+                        // Update counts
+                        $('#current-staff').text(response.total_staff);
+                        $('#staff-count').text(response.total_staff);
+                        
+                        // Hide modals and reset selection
+                        $('#confirmBulkRemoveModal').modal('hide');
+                        $('#bulkActionsContainer').hide();
+                        $('.staff-checkbox-remove, #selectAllHeader, #selectAllStaff').prop('checked', false);
+                        isBulkMode = false;
+                        $('#bulkSelectToggleBtn').html('<i class="fas fa-check-square"></i> Bulk Select')
+                            .removeClass('btn-primary').addClass('btn-outline-primary');
+                        $('.checkbox-column').hide();
+                        staffTable.columns.adjust().draw();
+                        
+                        showToast(response.message, 'success');
+                        
+                    } else {
+                        showToast(response.message, 'error');
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error:', error);
+                    showToast('An error occurred. Please try again.', 'error');
+                },
+                complete: function() {
+                    $btn.html(originalText).prop('disabled', false);
+                }
+            });
+        });
+        
+        // SINGLE STAFF REMOVAL
+        var staffToRemove = null;
+        
+        // Handle single remove button click
+        $(document).on('click', '.remove-staff-btn', function(e) {
+            e.preventDefault();
+            
+            staffToRemove = {
+                id: $(this).data('id'),
+                name: $(this).data('name')
+            };
+            
+            $('#staff-name').text(staffToRemove.name);
+            $('#confirmRemoveModal').modal('show');
+        });
+        
+        // Handle confirm single remove button click
+        $('#confirm-remove-btn').click(function(e) {
+            e.preventDefault();
+            if (!staffToRemove) return;
+            
+            const $btn = $(this);
+            const originalText = $btn.html();
+            $btn.html('<i class="fas fa-spinner fa-spin"></i> Removing...');
+            $btn.prop('disabled', true);
+            
+            // Create form data with CSRF token
+            const formData = new FormData();
+            formData.append('staff_id', staffToRemove.id);
+            formData.append('csrfmiddlewaretoken', getCSRFToken());
+            
+            // Send AJAX request
+            $.ajax({
+                url: '{% url "admin_remove_staff_from_department" department.id %}',
+                type: 'POST',
+                data: formData,
+                processData: false,
+                contentType: false,
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                success: function(response) {
+                    if (response.success) {
+                        // Remove row from table
+                        staffTable.row('#staff-row-' + staffToRemove.id).remove().draw();
+                        
+                        // Update counts
+                        $('#current-staff').text(response.total_staff);
+                        $('#staff-count').text(response.total_staff);
+                        
+                        // Hide modal and show success message
+                        $('#confirmRemoveModal').modal('hide');
+                        showToast(response.message, 'success');
+                        
+                    } else {
+                        showToast(response.message, 'error');
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error:', error);
+                    showToast('An error occurred. Please try again.', 'error');
+                },
+                complete: function() {
+                    $btn.html(originalText).prop('disabled', false);
+                    staffToRemove = null;
+                }
+            });
+        });
+        
+        // Add selected staff (for ADD modal)
+        $('#add-selected-staff').click(function(e) {
+            e.preventDefault();
+            
+            const selectedStaff = [];
+            $('.staff-checkbox-add:checked').each(function() {
+                selectedStaff.push({
+                    id: $(this).val(),
+                    name: $(this).data('name')
+                });
+            });
+            
+            if (selectedStaff.length === 0) return;
+            
+            const $btn = $(this);
+            const originalText = $btn.html();
+            $btn.html('<i class="fas fa-spinner fa-spin"></i> Adding...');
+            $btn.prop('disabled', true);
+            
+            // Create form data with CSRF token
+            const formData = new FormData();
+            selectedStaff.forEach(function(staff) {
+                formData.append('staff_ids[]', staff.id);
+            });
+            formData.append('csrfmiddlewaretoken', getCSRFToken());
+            formData.append('action', 'add');
+            
+            // Send AJAX request
+            $.ajax({
+                url: '{% url "admin_add_staff_to_department" department.id %}',
+                type: 'POST',
+                data: formData,
+                processData: false,
+                contentType: false,
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                success: function(response) {
+                    if (response.success) {
+                        $('#addStaffModal').modal('hide');
+                        showToast(response.message, 'success');
+                        
+                        // Reload the page to show updated staff list
+                        setTimeout(function() {
+                            window.location.reload();
+                        }, 1500);
+                    } else {
+                        showToast(response.message, 'error');
+                        $btn.html(originalText).prop('disabled', false);
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error:', error);
+                    showToast('An error occurred. Please try again.', 'error');
+                    $btn.html(originalText).prop('disabled', false);
+                }
+            });
+        });
+        
+        // Handle modal close/cancel buttons
+        $(document).on('click', '[data-dismiss="modal"]', function(e) {
+            e.preventDefault();
+            $(this).closest('.modal').modal('hide');
+        });
+        
+        // Clear modals when hidden
+        $('#addStaffModal').on('hidden.bs.modal', function() {
+            $('.staff-checkbox-add').prop('checked', false);
+            $('#add-selected-staff').prop('disabled', true);
+            $('#search-available-staff').val('');
+            $('#filter-role').val('');
+            availableTable.search('').columns().search('').draw();
+        });
+        
+        $('#confirmRemoveModal').on('hidden.bs.modal', function() {
+            staffToRemove = null;
+            $('#confirm-remove-btn').html('<i class="fas fa-user-minus"></i> Remove from Department').prop('disabled', false);
+        });
+        
+        $('#confirmBulkRemoveModal').on('hidden.bs.modal', function() {
+            $('#confirm-bulk-remove-btn').html('<i class="fas fa-user-minus"></i> Remove Selected').prop('disabled', false);
+        });
+    });
+</script>
+{% endblock extra_js %}

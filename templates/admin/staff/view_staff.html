@@ -398,16 +398,16 @@
                         <div class="info-item">
                             <span class="info-label">Role:</span>
                             <span class="info-value" id="role-display">
-                                {% if staff.role == 'teacher' %}
+                                {% if staff.position_title == 'teacher' %}
                                     Teacher
-                                {% elif staff.role == 'admin' %}
+                                {% elif staff.position_title == 'admin' %}
                                     Administrator
-                                {% elif staff.role == 'support' %}
+                                {% elif staff.position_title == 'support' %}
                                     Support Staff
-                                {% elif staff.role == 'other' %}
+                                {% elif staff.position_title == 'other' %}
                                     Other
-                                {% elif staff.role %}
-                                    {{ staff.role|title }}
+                                {% elif staff.position_title %}
+                                    {{ staff.position_title|title }}
                                 {% else %}
                                     <span class="text-muted">Not specified</span>
                                 {% endif %}

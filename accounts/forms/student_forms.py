@@ -4,7 +4,7 @@ import re
 from django import forms
 from accounts.models import GENDER_CHOICES
 from students.models import RELATIONSHIP_CHOICES, STATUS_CHOICES, Student, Parent, PreviousSchool
-from core.models import ClassLevel, StreamClass, Subject
+from core.models import AcademicYear, ClassLevel, StreamClass, Subject
 from django.core.exceptions import ValidationError
 from django.utils import timezone
 from django.db.models import Q
@@ -154,20 +154,30 @@ class StudentForm(forms.ModelForm):
             'class': 'form-control',
             'max': date.today().isoformat()
         }),
-        required=False
+        required=False,
+        help_text="Format: YYYY-MM-DD"
+    )
+    
+    academic_year = forms.ModelChoiceField(
+        queryset=AcademicYear.objects.all(),
+        required=True,
+        widget=forms.Select(attrs={'class': 'form-control select2'}),
+        help_text="This determines the student's admission year and registration number",
+        empty_label="Select Academic Year"
     )
     
     # Optional subjects field
     optional_subjects = forms.ModelMultipleChoiceField(
         queryset=Subject.objects.filter(is_active=True),
         required=False,
-        widget=forms.SelectMultiple(attrs={'class': 'form-control select2'}),
-        help_text="Hold Ctrl/Cmd to select multiple subjects"
+        widget=forms.SelectMultiple(attrs={'class': 'form-control select2', 'multiple': 'multiple'}),
+        help_text="Select optional subjects for the student"
     )
     
     class Meta:
         model = Student
         fields = [
+            'academic_year',  # Added academic_year as first field
             'first_name', 'middle_name', 'last_name',
             'date_of_birth', 'gender', 'address',
             'profile_pic', 'physical_disabilities_condition',
@@ -176,42 +186,101 @@ class StudentForm(forms.ModelForm):
             'transfer_from_school',
             'registration_number', 'examination_number',
             'previously_examination_number',
-            'status', 'is_active'
+            'status', 'is_active',
+            'optional_subjects'  # Moved to fields to be saved properly
         ]
         widgets = {
-            'first_name': forms.TextInput(attrs={'class': 'form-control'}),
-            'middle_name': forms.TextInput(attrs={'class': 'form-control'}),
-            'last_name': forms.TextInput(attrs={'class': 'form-control'}),
-            'gender': forms.Select(attrs={'class': 'form-control'}),
-            'address': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
-            'profile_pic': forms.FileInput(attrs={'class': 'form-control'}),
-            'physical_disabilities_condition': forms.Textarea(attrs={'class': 'form-control', 'rows': 2}),
-            'class_level': forms.Select(attrs={'class': 'form-control'}),
-            'stream_class': forms.Select(attrs={'class': 'form-control'}),
-            'previous_school': forms.Select(attrs={'class': 'form-control'}),
-            'previous_class_level': forms.Select(attrs={'class': 'form-control'}),
-            'transfer_from_school': forms.Select(attrs={'class': 'form-control'}),
-            'registration_number': forms.TextInput(attrs={'class': 'form-control'}),
-            'examination_number': forms.TextInput(attrs={'class': 'form-control'}),
-            'previously_examination_number': forms.TextInput(attrs={'class': 'form-control'}),
-            'status': forms.Select(attrs={'class': 'form-control'}),
+            'first_name': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Enter first name'
+            }),
+            'middle_name': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Enter middle name (optional)'
+            }),
+            'last_name': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Enter last name'
+            }),
+            'gender': forms.Select(attrs={'class': 'form-control select2'}),
+            'address': forms.Textarea(attrs={
+                'class': 'form-control',
+                'rows': 3,
+                'placeholder': 'Enter residential address'
+            }),
+            'profile_pic': forms.FileInput(attrs={'class': 'form-control-file'}),
+            'physical_disabilities_condition': forms.Textarea(attrs={
+                'class': 'form-control',
+                'rows': 2,
+                'placeholder': 'Enter any physical disabilities or conditions'
+            }),
+            'class_level': forms.Select(attrs={'class': 'form-control select2'}),
+            'stream_class': forms.Select(attrs={'class': 'form-control select2'}),
+            'previous_school': forms.Select(attrs={'class': 'form-control select2'}),
+            'previous_class_level': forms.Select(attrs={'class': 'form-control select2'}),
+            'transfer_from_school': forms.Select(attrs={'class': 'form-control select2'}),
+            'registration_number': forms.TextInput(attrs={
+                'class': 'form-control',
+                'readonly': 'readonly',
+                'placeholder': 'Auto-generated based on academic year'
+            }),
+            'examination_number': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Enter examination number'
+            }),
+            'previously_examination_number': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Enter previous examination number'
+            }),
+            'status': forms.Select(attrs={'class': 'form-control select2'}),
             'is_active': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
         }
         help_texts = {
-            'registration_number': 'Leave blank to auto-generate',
-            'admission_year': 'Leave blank to use current year',
+            'registration_number': 'Auto-generated based on academic year and serial number',
+            'examination_number': 'Leave blank if not applicable',
+            'previously_examination_number': 'Required only for transferred students',
         }
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        
+        # Set academic year initial value - prioritize active academic year
+        if not self.instance.pk:  # Only for new students
+            active_year = AcademicYear.objects.filter(is_active=True).first()
+            if active_year:
+                self.fields['academic_year'].initial = active_year
+        
         # Set initial for optional subjects if editing
         if self.instance and self.instance.pk:
             self.fields['optional_subjects'].initial = self.instance.optional_subjects.all()
+            
+            # Set admission year preview if academic year exists
+            if self.instance.academic_year:
+                self.fields['registration_number'].help_text = (
+                    f'Auto-generated based on academic year: {self.instance.academic_year.name}'
+                )
         
         # Filter active class levels and streams
         self.fields['class_level'].queryset = ClassLevel.objects.filter(is_active=True)
         self.fields['stream_class'].queryset = StreamClass.objects.filter(is_active=True)
         self.fields['previous_class_level'].queryset = ClassLevel.objects.filter(is_active=True)
+        
+        # Filter active academic years, order by most recent first
+        self.fields['academic_year'].queryset = AcademicYear.objects.all().order_by('-start_date')
+        
+        # If editing, make academic_year read-only (can't change admission year)
+        if self.instance and self.instance.pk:
+            self.fields['academic_year'].disabled = True
+            self.fields['academic_year'].help_text = 'Cannot change academic year after student is created'
+        
+        # Disable registration number field (it's auto-generated)
+        self.fields['registration_number'].disabled = True
+        
+        # Set up custom error messages
+        self.fields['academic_year'].error_messages = {
+            'required': 'Please select an academic year',
+            'invalid_choice': 'Please select a valid academic year'
+        }
     
     def clean_date_of_birth(self):
         dob = self.cleaned_data.get('date_of_birth')
@@ -230,9 +299,28 @@ class StudentForm(forms.ModelForm):
         
         return dob
     
+    def clean_academic_year(self):
+        academic_year = self.cleaned_data.get('academic_year')
+        
+        if not academic_year:
+            raise ValidationError("Academic year is required.")
+        
+        # Validate that academic year is active (optional check)
+        if not self.instance.pk:  # Only for new students
+            if not academic_year.is_active:
+                raise ValidationError(
+                    "Selected academic year is not active. "
+                    "Please select an active academic year for new admissions."
+                )
+        
+        return academic_year
+    
     def clean_registration_number(self):
+        # Registration number is auto-generated, so skip validation
+        # unless a specific number is provided (which should be validated)
         reg_no = self.cleaned_data.get('registration_number')
-        if reg_no:
+        
+        if reg_no and reg_no.strip():  # If user provided a custom registration number
             # Check if registration number already exists (excluding current instance)
             query = Student.objects.filter(registration_number=reg_no)
             if self.instance and self.instance.pk:
@@ -253,13 +341,14 @@ class StudentForm(forms.ModelForm):
         if class_level and stream_class:
             if stream_class.class_level != class_level:
                 raise ValidationError({
-                    'stream_class': f"Selected stream class doesn't belong to {class_level.name}"
+                    'stream_class': f"Selected stream class '{stream_class.name}' "
+                                   f"doesn't belong to class level '{class_level.name}'"
                 })
         
         # Validate examination number uniqueness if provided
         exam_no = cleaned_data.get('examination_number')
         if exam_no:
-            query = Student.objects.filter(examination_number=exam_no)
+            query = Student.objects.filter(examination_number=exam_no.strip())
             if self.instance and self.instance.pk:
                 query = query.exclude(pk=self.instance.pk)
             
@@ -268,17 +357,58 @@ class StudentForm(forms.ModelForm):
                     'examination_number': f"Examination number '{exam_no}' already exists."
                 })
         
+        # Validate previous examination number if provided
+        prev_exam_no = cleaned_data.get('previously_examination_number')
+        if prev_exam_no:
+            prev_exam_no = prev_exam_no.strip()
+            if prev_exam_no:
+                query = Student.objects.filter(previously_examination_number=prev_exam_no)
+                if self.instance and self.instance.pk:
+                    query = query.exclude(pk=self.instance.pk)
+                
+                if query.exists():
+                    raise ValidationError({
+                        'previously_examination_number': f"Previous examination number '{prev_exam_no}' already exists."
+                    })
+        
+        # Validate that if transfer_from_school is provided, previously_examination_number should also be provided
+        transfer_school = cleaned_data.get('transfer_from_school')
+        prev_exam_num = cleaned_data.get('previously_examination_number')
+        
+        if transfer_school and not prev_exam_num:
+            self.add_error(
+                'previously_examination_number',
+                "Previous examination number is required for transferred students."
+            )
+        
+        # Set admission_year from academic_year
+        academic_year = cleaned_data.get('academic_year')
+        if academic_year:
+            # Extract year from academic year name (assuming format like "2023-2024")
+            # We'll use the start year as admission year
+            cleaned_data['admission_year'] = academic_year.start_date.year
+            
+            # Auto-generate registration number if not provided
+            if not cleaned_data.get('registration_number'):
+                # This will be handled in the save() method
+                pass
+        
         return cleaned_data
     
     def save(self, commit=True):
         # Get the instance without saving yet
         student = super().save(commit=False)
         
-        # Handle optional subjects
+        # Get optional subjects from cleaned data
         optional_subjects = self.cleaned_data.get('optional_subjects', [])
+        
+        # Set admission year from academic year if not already set
+        if student.academic_year and not student.admission_year:
+            student.admission_year = student.academic_year.start_date.year
         
         if commit:
             # Save student first (this will trigger the save() method in model)
+            # The model's save() method will generate registration number and serial number
             student.save()
             
             # Save many-to-many relationships
@@ -293,6 +423,15 @@ class StudentForm(forms.ModelForm):
 
 
 class StudentEditForm(forms.ModelForm):
+    # Add academic year field (read-only for editing)
+    academic_year = forms.ModelChoiceField(
+        queryset=AcademicYear.objects.all().order_by('-start_date'),
+        required=True,
+        widget=forms.Select(attrs={'class': 'select2', 'disabled': 'disabled'}),
+        help_text="Academic year cannot be changed after student is created",
+        empty_label="Select Academic Year"
+    )
+    
     # Add custom fields for multi-select subjects
     subjects = forms.ModelMultipleChoiceField(
         queryset=Subject.objects.none(),
@@ -304,6 +443,7 @@ class StudentEditForm(forms.ModelForm):
     class Meta:
         model = Student
         fields = [
+            'academic_year',  # Added academic year
             'first_name', 'middle_name', 'last_name',
             'date_of_birth', 'gender', 'address',
             'profile_pic', 'physical_disabilities_condition',
@@ -314,7 +454,10 @@ class StudentEditForm(forms.ModelForm):
             'status', 'is_active'
         ]
         widgets = {
-            'date_of_birth': forms.DateInput(attrs={'type': 'date', 'max': timezone.now().date()}),
+            'date_of_birth': forms.DateInput(attrs={
+                'type': 'date', 
+                'max': timezone.now().date()
+            }),
             'gender': forms.Select(attrs={'class': 'select2bs4'}),
             'address': forms.Textarea(attrs={'rows': 3}),
             'class_level': forms.Select(attrs={'class': 'select2', 'data-current-value': ''}),
@@ -324,28 +467,45 @@ class StudentEditForm(forms.ModelForm):
             'transfer_from_school': forms.Select(attrs={'class': 'select2'}),
             'status': forms.Select(attrs={'class': 'select2'}),
             'physical_disabilities_condition': forms.Textarea(attrs={'rows': 2}),
+            'registration_number': forms.TextInput(attrs={
+                'readonly': 'readonly',
+                'placeholder': 'Auto-generated registration number'
+            }),
         }
         help_texts = {
             'registration_number': 'Registration number cannot be changed',
+            'academic_year': 'Academic year determines admission year and registration number',
         }
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         
-        # Set registration number as readonly
-        self.fields['registration_number'].widget.attrs['readonly'] = True
+        # Get instance (student) if exists
+        student = self.instance
         
-        # Filter querysets
+        # Set academic year as required and disabled for editing
+        self.fields['academic_year'].required = True
+        self.fields['academic_year'].disabled = True
+        
+        # Filter academic years - show only active ones for selection
+        academic_years = AcademicYear.objects.all().order_by('-start_date')
+        self.fields['academic_year'].queryset = academic_years
+        
+        # Filter other querysets
         self.fields['previous_class_level'].queryset = ClassLevel.objects.filter(is_active=True)
         self.fields['transfer_from_school'].queryset = PreviousSchool.objects.all()
         self.fields['previous_school'].queryset = PreviousSchool.objects.all()
         
-        # Get instance (student) if exists
-        student = self.instance
+        # Set registration number as readonly
+        self.fields['registration_number'].widget.attrs['readonly'] = True
         
         # If student exists, set up form fields
         if student and student.pk:
-            # Set initial subjects
+            # Set academic year initial value
+            if student.academic_year:
+                self.fields['academic_year'].initial = student.academic_year
+            
+            # Set initial subjects (from optional_subjects)
             if hasattr(student, 'optional_subjects'):
                 self.fields['subjects'].initial = student.optional_subjects.all()
             
@@ -378,18 +538,42 @@ class StudentEditForm(forms.ModelForm):
                 # If no class level, show all active subjects
                 self.fields['subjects'].queryset = Subject.objects.filter(is_active=True)
                 self.fields['stream_class'].queryset = StreamClass.objects.filter(is_active=True)
+            
+            # Update help text for academic year
+            if student.academic_year:
+                self.fields['academic_year'].help_text = (
+                    f'Current academic year: {student.academic_year.name}. '
+                    f'Admission year: {student.admission_year}. Cannot be changed.'
+                )
         else:
-            # For new students, show no subjects initially
+            # For new students (shouldn't happen in edit form, but just in case)
             self.fields['subjects'].queryset = Subject.objects.none()
             self.fields['stream_class'].queryset = StreamClass.objects.none()
+            
+            # Set active academic year as default for new students
+            active_year = AcademicYear.objects.filter(is_active=True).first()
+            if active_year:
+                self.fields['academic_year'].initial = active_year
+                self.fields['academic_year'].disabled = False  # Enable for new students
+                self.fields['academic_year'].help_text = (
+                    f'Selected academic year: {active_year.name}. '
+                    'This determines admission year and registration number.'
+                )
         
         # Set today's date as max for date of birth
         self.fields['date_of_birth'].widget.attrs['max'] = timezone.now().date().isoformat()
         
         # Add form-control class to all fields
         for field_name, field in self.fields.items():
-            if field_name != 'is_active':  # Don't add to checkbox
-                field.widget.attrs['class'] = field.widget.attrs.get('class', '') + ' form-control'
+            if field_name not in ['is_active', 'academic_year']:  # Don't add to checkbox and academic_year (already has select2)
+                if isinstance(field.widget, (forms.Select, forms.SelectMultiple)):
+                    field.widget.attrs['class'] = field.widget.attrs.get('class', '') + ' form-control select2'
+                else:
+                    field.widget.attrs['class'] = field.widget.attrs.get('class', '') + ' form-control'
+        
+        # Add Bootstrap classes to academic year select
+        if 'class' not in self.fields['academic_year'].widget.attrs:
+            self.fields['academic_year'].widget.attrs['class'] = 'form-control select2'
     
     def clean_date_of_birth(self):
         dob = self.cleaned_data.get('date_of_birth')
@@ -407,6 +591,15 @@ class StudentEditForm(forms.ModelForm):
                 raise ValidationError("Student age seems unrealistic (over 25 years).")
         
         return dob
+    
+    def clean_academic_year(self):
+        academic_year = self.cleaned_data.get('academic_year')
+        
+        # Validate that academic year is selected
+        if not academic_year:
+            raise ValidationError("Academic year is required.")
+        
+        return academic_year
     
     def clean(self):
         cleaned_data = super().clean()
@@ -436,6 +629,42 @@ class StudentEditForm(forms.ModelForm):
                     'registration_number': 'This registration number is already assigned to another student.'
                 })
         
+        # Validate examination number uniqueness if provided
+        examination_number = cleaned_data.get('examination_number')
+        if examination_number and self.instance.pk:
+            # Clean the examination number
+            examination_number = examination_number.strip().upper()
+            if examination_number:
+                if Student.objects.filter(examination_number=examination_number).exclude(pk=self.instance.pk).exists():
+                    raise ValidationError({
+                        'examination_number': 'This examination number is already assigned to another student.'
+                    })
+        
+        # Validate previous examination number if provided
+        prev_exam_number = cleaned_data.get('previously_examination_number')
+        if prev_exam_number and self.instance.pk:
+            # Clean the previous examination number
+            prev_exam_number = prev_exam_number.strip().upper()
+            if prev_exam_number:
+                if Student.objects.filter(previously_examination_number=prev_exam_number).exclude(pk=self.instance.pk).exists():
+                    raise ValidationError({
+                        'previously_examination_number': 'This previous examination number is already assigned to another student.'
+                    })
+        
+        # Validate that if transfer_from_school is provided, previously_examination_number should also be provided
+        transfer_school = cleaned_data.get('transfer_from_school')
+        prev_exam_num = cleaned_data.get('previously_examination_number')
+        
+        if transfer_school and not prev_exam_num:
+            raise ValidationError({
+                'previously_examination_number': 'Previous examination number is required for transferred students.'
+            })
+        
+        # Auto-generate admission year from academic year if not set
+        academic_year = cleaned_data.get('academic_year')
+        if academic_year and not self.instance.admission_year:
+            cleaned_data['admission_year'] = academic_year.start_date.year
+        
         return cleaned_data
     
     def save(self, commit=True):
@@ -448,6 +677,11 @@ class StudentEditForm(forms.ModelForm):
             student.profile_pic.delete(save=False)
             student.profile_pic = None
         
+        # Update admission year from academic year if changed
+        academic_year = self.cleaned_data.get('academic_year')
+        if academic_year:
+            student.admission_year = academic_year.start_date.year
+        
         # Save the student instance
         if commit:
             student.save()
@@ -455,12 +689,15 @@ class StudentEditForm(forms.ModelForm):
             # Save many-to-many relationships
             self.save_m2m()
             
-            # Update subjects
+            # Update subjects (optional_subjects)
             subjects = self.cleaned_data.get('subjects', [])
             if subjects:
                 student.optional_subjects.set(subjects)
+            else:
+                student.optional_subjects.clear()
         
         return student
+
     
     
 class ParentForm(forms.ModelForm):

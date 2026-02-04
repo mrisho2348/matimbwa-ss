@@ -1,0 +1,1436 @@
+{% extends 'admin/base.html' %}
+{% load static %}
+{% block title %} Staff Department Assignment {% endblock title %}
+
+{% block breadcrumb %}
+    <button type="button" class="btn btn-primary" data-toggle="modal" data-target="#assignStaffModal">
+        <i class="fas fa-user-plus"></i> Assign to Department
+    </button>
+    <a href="{% url 'admin_department_management' %}" class="btn btn-info ml-2">
+        <i class="fas fa-building"></i> Manage Departments
+    </a>
+{% endblock breadcrumb %}
+
+{% block extra_css %}
+<style>
+    .card-header {
+        border-bottom: 2px solid rgba(0,0,0,.125);
+    }
+    .stat-card {
+        background: #f8f9fa;
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 20px;
+        border: 1px solid #dee2e6;
+        text-align: center;
+    }
+    .stat-number {
+        font-size: 2.5rem;
+        font-weight: 700;
+        color: #007bff;
+        line-height: 1;
+    }
+    .stat-label {
+        color: #6c757d;
+        font-size: 0.9rem;
+        margin-top: 8px;
+    }
+    
+    /* Profile Picture */
+    .profile-picture {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        object-fit: cover;
+        border: 2px solid #dee2e6;
+    }
+    .photo-placeholder {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background-color: #6c757d;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+    }
+    
+    /* Department badges */
+    .department-badge {
+        background-color: #17a2b8;
+        color: white;
+        font-size: 0.85em;
+        padding: 0.4em 0.8em;
+    }
+    .no-department-badge {
+        background-color: #6c757d;
+        color: white;
+        font-size: 0.85em;
+        padding: 0.4em 0.8em;
+    }
+    .hod-badge {
+        background-color: #dc3545;
+        color: white;
+        font-size: 0.75em;
+        padding: 0.2em 0.6em;
+        margin-left: 5px;
+    }
+    
+    /* Action buttons */
+    .action-buttons .btn {
+        margin: 0 2px;
+        padding: 0.25rem 0.5rem;
+        font-size: 0.875rem;
+    }
+    
+    /* Stream header */
+    .stats-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 20px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+    }
+    
+    /* Success and error toasts */
+    .custom-toast {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 99999;
+        min-width: 300px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        display: none;
+    }
+    
+    /* Modal styles */
+    .modal-header {
+        border-radius: 0;
+    }
+    
+    /* Progress bar colors */
+    .progress-bar.bg-success {
+        background-color: #28a745 !important;
+    }
+    .progress-bar.bg-warning {
+        background-color: #ffc107 !important;
+    }
+    .progress-bar.bg-danger {
+        background-color: #dc3545 !important;
+    }
+    
+    /* Bulk Actions Styles */
+    .bulk-actions-container {
+        background: #f8fafc;
+        border-radius: 10px;
+        padding: 15px;
+        margin-bottom: 20px;
+        border: 1px solid #e2e8f0;
+        display: none;
+        align-items: center;
+        gap: 15px;
+        flex-wrap: wrap;
+    }
+    
+    .selected-count {
+        background: #667eea;
+        color: white;
+        padding: 5px 15px;
+        border-radius: 20px;
+        font-weight: 600;
+        font-size: 0.9rem;
+    }
+    
+    .bulk-action-btn {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    
+    /* Checkbox column styling */
+    .checkbox-column {
+        width: 30px;
+        text-align: center;
+    }
+    
+    /* Quick actions container */
+    .quick-actions {
+        display: flex;
+        gap: 4px;
+        justify-content: center;
+        align-items: center;
+    }
+    
+    /* Quick action buttons */
+    .quick-action-btn {
+        width: 28px;
+        height: 28px;
+        padding: 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        border: none;
+        transition: all 0.2s ease;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+    }
+    .quick-action-btn i {
+        font-size: 0.75rem;
+        color: #ffffff !important;
+    }
+    .btn-warning.quick-action-btn i {
+        color: #212529 !important;
+    }
+    .quick-action-btn:hover {
+        transform: scale(1.1);
+        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        filter: brightness(1.05);
+    }
+    .btn-success.quick-action-btn { background-color: #28a745; }
+    .btn-primary.quick-action-btn { background-color: #007bff; }
+    .btn-danger.quick-action-btn  { background-color: #dc3545; }
+    .btn-warning.quick-action-btn { background-color: #ffc107; }
+    .btn-info.quick-action-btn    { background-color: #17a2b8; }
+    .btn-secondary.quick-action-btn { background-color: #6c757d; }
+    
+    /* Responsive adjustments */
+    @media (max-width: 768px) {
+        .bulk-actions-container {
+            flex-direction: column;
+            align-items: stretch;
+        }
+        
+        .bulk-action-btn {
+            width: 100%;
+            justify-content: center;
+        }
+    }
+    
+    /* Role badges */
+    .role-badge {
+        font-size: 0.75em;
+        margin-right: 5px;
+    }
+    .teacher-badge {
+        background-color: #17a2b8;
+        color: white;
+    }
+    .admin-badge {
+        background-color: #6f42c1;
+        color: white;
+    }
+    .support-badge {
+        background-color: #20c997;
+        color: white;
+    }
+    
+    /* Status badges */
+    .active-badge {
+        background-color: #28a745;
+        color: white;
+    }
+    .inactive-badge {
+        background-color: #6c757d;
+        color: white;
+    }
+</style>
+{% endblock extra_css %}
+
+{% block content %}
+<section class="content">
+    <div class="container-fluid">
+        <!-- Hidden CSRF Token Field -->
+        <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf_token }}">
+
+        <!-- Success and Error Toasts -->
+        <div id="success-toast" class="alert alert-success alert-dismissible custom-toast" role="alert">
+            <strong><i class="fas fa-check-circle"></i> Success!</strong> 
+            <span id="success-message"></span>
+            <button type="button" class="close" onclick="hideToast('success')">
+                <span aria-hidden="true">&times;</span>
+            </button>
+        </div>
+
+        <div id="error-toast" class="alert alert-danger alert-dismissible custom-toast" role="alert">
+            <strong><i class="fas fa-exclamation-circle"></i> Error!</strong> 
+            <span id="error-message"></span>
+            <button type="button" class="close" onclick="hideToast('error')">
+                <span aria-hidden="true">&times;</span>
+            </button>
+        </div>
+
+        <!-- Statistics Header -->
+        <div class="stats-header">
+            <div class="row align-items-center">
+                <div class="col-md-8">
+                    <h1 class="stream-title">
+                        <i class="fas fa-user-tie"></i> Staff Department Assignment
+                    </h1>
+                    <p class="stream-subtitle mb-0">
+                        Manage staff assignments to different departments
+                    </p>
+                </div>
+                <div class="col-md-4 text-right">
+                    <span class="badge-stream">
+                        <i class="fas fa-users"></i> 
+                        <span id="total-staff">{{ total_staff }}</span> Staff Members
+                    </span>
+                </div>
+            </div>
+            
+            <!-- Statistics Row -->
+            <div class="row mt-3">
+                <div class="col-md-3 col-sm-6">
+                    <div class="text-center text-white">
+                        <h4 class="mb-0">{{ assigned_staff }}</h4>
+                        <small>Assigned to Departments</small>
+                    </div>
+                </div>
+                <div class="col-md-3 col-sm-6">
+                    <div class="text-center text-white">
+                        <h4 class="mb-0">{{ unassigned_staff }}</h4>
+                        <small>Unassigned Staff</small>
+                    </div>
+                </div>
+                <div class="col-md-3 col-sm-6">
+                    <div class="text-center text-white">
+                        <h4 class="mb-0">{{ total_departments }}</h4>
+                        <small>Total Departments</small>
+                    </div>
+                </div>
+                <div class="col-md-3 col-sm-6">
+                    <div class="text-center text-white">
+                        <h4 class="mb-0">{{ hod_count }}</h4>
+                        <small>Head of Departments</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bulk Actions Section -->
+        <div class="bulk-actions-container" id="bulkActionsContainer">
+            <div class="d-flex align-items-center flex-wrap gap-2">
+                <span class="selected-count" id="selectedCount">0 selected</span>
+                
+                <button class="btn btn-primary bulk-action-btn" id="bulkAssignBtn" title="Assign selected staff to department">
+                    <i class="fas fa-user-plus"></i> Assign to Department
+                </button>
+                
+                <button class="btn btn-warning bulk-action-btn" id="bulkRemoveBtn" title="Remove selected staff from departments">
+                    <i class="fas fa-user-minus"></i> Remove from Department
+                </button>
+                
+                <button class="btn btn-secondary bulk-action-btn" id="clearSelectionBtn">
+                    <i class="fas fa-times"></i> Clear Selection
+                </button>
+                
+                <button class="btn btn-outline-secondary bulk-action-btn" id="closeBulkActionsBtn">
+                    <i class="fas fa-times-circle"></i> Close
+                </button>
+            </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="d-flex flex-wrap gap-3 align-items-center">
+                    <button type="button" class="btn btn-primary" data-toggle="modal" data-target="#assignStaffModal">
+                        <i class="fas fa-user-plus"></i> Assign to Department
+                    </button>
+                    
+                    <button type="button" class="btn btn-outline-primary" id="bulkSelectToggleBtn">
+                        <i class="fas fa-check-square"></i> Bulk Select
+                    </button>
+                    
+                    <button type="button" class="btn btn-outline-info" id="exportBtn">
+                        <i class="fas fa-file-export"></i> Export
+                    </button>
+                    
+                    <button type="button" class="btn btn-outline-secondary" onclick="window.location.reload()">
+                        <i class="fas fa-sync-alt"></i> Refresh
+                    </button>
+                    
+                    <div class="ml-auto">
+                        <div class="input-group input-group-sm" style="width: 250px;">
+                            <input type="text" class="form-control" placeholder="Search staff..." id="tableSearch">
+                            <div class="input-group-append">
+                                <button class="btn btn-outline-secondary" type="button" id="tableSearchBtn">
+                                    <i class="fas fa-search"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-lg-12">
+                <div class="card shadow-lg">
+                    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                        <h6 class="header-title mb-0 text-uppercase">
+                            <i class="fas fa-user-tie"></i> Staff Department Assignments
+                            <span class="badge badge-light ml-2" id="staff-count">{{ staff_list|length }}</span>
+                        </h6>
+                        <div class="d-flex align-items-center">
+                            <span class="mr-2">Select All:</span>
+                            <input type="checkbox" id="selectAllStaff" class="form-check-input">
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover text-nowrap table-bordered table-striped display" id="staff-table">
+                                <thead class="bg-light">
+                                    <tr>
+                                        <th class="checkbox-column">
+                                            <input type="checkbox" id="selectAllHeader">
+                                        </th>
+                                        <th>Photo</th>
+                                        <th>Staff Name</th>
+                                        <th>Username</th>
+                                        <th>Role</th>
+                                        <th>Department</th>
+                                        <th>HOD Status</th>
+                                        <th>Staff Status</th>
+                                        <th class="text-center">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for staff in staff_list %}
+                                    <tr id="staff-row-{{ staff.id }}">
+                                        <td class="checkbox-column">
+                                            <input type="checkbox" class="staff-checkbox" 
+                                                   value="{{ staff.id }}" 
+                                                   data-id="{{ staff.id }}" 
+                                                   data-name="{{ staff.get_full_name }}"
+                                                   {% if not staff.admin.is_active %}disabled{% endif %}>
+                                        </td>
+                                        <td>
+                                            {% if staff.profile_picture %}
+                                                <img src="{{ staff.profile_picture.url }}" class="profile-picture" alt="{{ staff.get_full_name }}">
+                                            {% else %}
+                                                <div class="photo-placeholder">
+                                                    <i class="fas fa-user"></i>
+                                                </div>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <strong>{{ staff.get_full_name }}</strong>
+                                            <br>
+                                            <small class="text-muted">{{ staff.work_place|default:"No workplace" }}</small>
+                                        </td>
+                                        <td>{{ staff.admin.username }}</td>
+                                        <td>
+                                            {% if staff.admin.user_type == '1' %}
+                                                <span class="badge hod-badge">HOD</span>
+                                            {% endif %}
+                                            {% if staff.role %}
+                                                <span class="badge role-badge 
+                                                    {% if staff.role == 'teacher' %}teacher-badge
+                                                    {% elif staff.role == 'admin' %}admin-badge
+                                                    {% else %}support-badge{% endif %}">
+                                                    {{ staff.get_role_display|default:staff.role }}
+                                                </span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if staff.department %}
+                                                <span class="badge department-badge">
+                                                    <i class="fas fa-building"></i> {{ staff.department.name }}
+                                                    {% if staff.department.head_of_department == staff %}
+                                                        <span class="badge hod-badge">HOD</span>
+                                                    {% endif %}
+                                                </span>
+                                                <br>
+                                                <small class="text-muted">Code: {{ staff.department.code }}</small>
+                                            {% else %}
+                                                <span class="badge no-department-badge">
+                                                    <i class="fas fa-question-circle"></i> Not Assigned
+                                                </span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if staff.departments_heading.exists %}
+                                                <span class="badge hod-badge">
+                                                    <i class="fas fa-crown"></i> HOD of {{ staff.departments_heading.count }} dept(s)
+                                                </span>
+                                            {% else %}
+                                                <span class="badge badge-secondary">Not HOD</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if staff.admin.is_active %}
+                                                <span class="badge active-badge">
+                                                    <i class="fas fa-check-circle"></i> Active
+                                                </span>
+                                            {% else %}
+                                                <span class="badge inactive-badge">
+                                                    <i class="fas fa-times-circle"></i> Inactive
+                                                </span>
+                                            {% endif %}
+                                        </td>
+                                        <td class="text-center">
+                                            <div class="quick-actions">
+                                                <!-- Assign/Change Department Button -->
+                                                <button class="btn btn-sm btn-primary quick-action-btn assign-btn" 
+                                                        data-id="{{ staff.id }}"
+                                                        data-name="{{ staff.get_full_name }}"
+                                                        data-current-dept-id="{{ staff.department.id|default:'' }}"
+                                                        data-current-dept-name="{{ staff.department.name|default:'Not Assigned' }}"
+                                                        title="{% if staff.department %}Change Department{% else %}Assign to Department{% endif %}">
+                                                    <i class="fas fa-{% if staff.department %}exchange-alt{% else %}user-plus{% endif %}"></i>
+                                                </button>
+                                                
+                                                <!-- Remove from Department Button (if assigned) -->
+                                                {% if staff.department %}
+                                                <button class="btn btn-sm btn-warning quick-action-btn remove-btn" 
+                                                        data-id="{{ staff.id }}"
+                                                        data-name="{{ staff.get_full_name }}"
+                                                        data-dept-name="{{ staff.department.name }}"
+                                                        title="Remove from Department">
+                                                    <i class="fas fa-user-minus"></i>
+                                                </button>
+                                                {% endif %}
+                                                
+                                                <!-- View Details Button -->
+                                                <a href="{% url 'admin_view_staff' staff.id %}" class="btn btn-sm btn-info quick-action-btn" title="View Details">
+                                                    <i class="fas fa-eye"></i>
+                                                </a>
+                                                
+                                                <!-- Edit Staff Button -->
+                                                <a href="{% url 'admin_staffs_crud' %}?action=edit&id={{ staff.id }}" class="btn btn-sm btn-secondary quick-action-btn" title="Edit Staff">
+                                                    <i class="fas fa-edit"></i>
+                                                </a>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% empty %}
+                                    <tr>
+                                        <td colspan="9" class="text-center">
+                                            <div class="py-4">
+                                                <i class="fas fa-user-tie fa-3x mb-3 text-muted"></i>
+                                                <h5 class="text-muted">No staff members found</h5>
+                                                <p class="text-muted">Staff members will appear here once added.</p>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Assign Staff Modal -->
+<div class="modal fade" id="assignStaffModal" tabindex="-1" role="dialog" aria-labelledby="assignStaffModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="assignStaffModalLabel">
+                    <i class="fas fa-user-plus"></i> Assign Staff to Department
+                </h5>
+                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <form id="assign-form" novalidate>
+                {% csrf_token %}
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="staff_id">Select Staff <span class="text-danger">*</span></label>
+                        <select class="form-control select2bs4" id="staff_id" name="staff_id" required style="width: 100%;">
+                            <option value="">Select Staff Member</option>
+                            {% for staff in unassigned_staff_list %}
+                            <option value="{{ staff.id }}">
+                                {{ staff.get_full_name }} - {{ staff.role|default:"Staff" }}
+                                {% if staff.admin.user_type == '1' %}(HOD){% endif %}
+                            </option>
+                            {% endfor %}
+                        </select>
+                        <div class="invalid-feedback">Please select a staff member.</div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="department_id">Select Department <span class="text-danger">*</span></label>
+                        <select class="form-control select2bs4" id="department_id" name="department_id" required style="width: 100%;">
+                            <option value="">Select Department</option>
+                            {% for department in departments %}
+                            <option value="{{ department.id }}">
+                                {{ department.name }} ({{ department.code }})
+                                {% if department.head_of_department %}
+                                    - HOD: {{ department.head_of_department.get_full_name }}
+                                {% endif %}
+                            </option>
+                            {% endfor %}
+                        </select>
+                        <div class="invalid-feedback">Please select a department.</div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="set_as_hod">Set as Head of Department (HOD)</label>
+                        <div class="custom-control custom-checkbox mt-2">
+                            <input type="checkbox" class="custom-control-input" id="set_as_hod" name="set_as_hod">
+                            <label class="custom-control-label" for="set_as_hod">
+                                Make this staff the Head of Department
+                            </label>
+                        </div>
+                        <small class="form-text text-muted">
+                            <i class="fas fa-info-circle"></i> If checked, this staff will replace the current HOD (if any).
+                        </small>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="assign-btn">
+                        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="display: none;"></span>
+                        Assign to Department
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Bulk Assign Modal -->
+<div class="modal fade" id="bulkAssignModal" tabindex="-1" role="dialog" aria-labelledby="bulkAssignModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="bulkAssignModalLabel">
+                    <i class="fas fa-users"></i> Bulk Assign to Department
+                </h5>
+                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p>Assign <strong id="bulk-assign-count">0</strong> selected staff member(s) to department:</p>
+                
+                <div class="form-group">
+                    <label for="bulk-department_id">Select Department <span class="text-danger">*</span></label>
+                    <select class="form-control select2bs4" id="bulk-department_id" name="department_id" required style="width: 100%;">
+                        <option value="">Select Department</option>
+                        {% for department in departments %}
+                        <option value="{{ department.id }}">
+                            {{ department.name }} ({{ department.code }})
+                        </option>
+                        {% endfor %}
+                    </select>
+                    <div class="invalid-feedback">Please select a department.</div>
+                </div>
+                
+                <div id="selectedStaffList" class="mt-3" style="max-height: 150px; overflow-y: auto;">
+                    <!-- Selected staff will be listed here -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="confirm-bulk-assign-btn">
+                    <i class="fas fa-user-plus"></i> Assign Selected
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Change/Assign Individual Modal -->
+<div class="modal fade" id="changeDeptModal" tabindex="-1" role="dialog" aria-labelledby="changeDeptModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-warning text-dark">
+                <h5 class="modal-title" id="changeDeptModalLabel">
+                    <i class="fas fa-exchange-alt"></i> Change Department
+                </h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <form id="change-form" novalidate>
+                {% csrf_token %}
+                <input type="hidden" id="change-staff-id" name="staff_id">
+                <div class="modal-body">
+                    <p>Assign <strong id="change-staff-name"></strong> to department:</p>
+                    
+                    <div class="form-group">
+                        <label for="change-department_id">Select Department <span class="text-danger">*</span></label>
+                        <select class="form-control select2bs4" id="change-department_id" name="department_id" required style="width: 100%;">
+                            <option value="">Select Department</option>
+                            {% for department in departments %}
+                            <option value="{{ department.id }}">
+                                {{ department.name }} ({{ department.code }})
+                            </option>
+                            {% endfor %}
+                        </select>
+                        <div class="invalid-feedback">Please select a department.</div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="change-set_as_hod">Set as Head of Department (HOD)</label>
+                        <div class="custom-control custom-checkbox mt-2">
+                            <input type="checkbox" class="custom-control-input" id="change-set_as_hod" name="set_as_hod">
+                            <label class="custom-control-label" for="change-set_as_hod">
+                                Make this staff the Head of Department
+                            </label>
+                        </div>
+                        <small class="form-text text-muted">
+                            If checked, this staff will replace the current HOD (if any).
+                        </small>
+                    </div>
+                    
+                    <div class="current-info alert alert-info mt-3">
+                        <strong>Current:</strong> 
+                        <span id="current-dept-info">Not assigned to any department</span>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-warning" id="confirm-change-btn">
+                        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="display: none;"></span>
+                        Update Assignment
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Confirm Remove Modal -->
+<div class="modal fade" id="confirmRemoveModal" tabindex="-1" role="dialog" aria-labelledby="confirmRemoveModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="confirmRemoveModalLabel">
+                    <i class="fas fa-user-minus"></i> Confirm Removal
+                </h5>
+                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to remove <strong id="remove-staff-name"></strong> from <strong id="remove-dept-name"></strong> department?</p>
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-circle me-2"></i>
+                    <strong>Note:</strong> This will only remove the department assignment. The staff member will remain in the system.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal" id="cancel-remove-btn">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirm-remove-btn">
+                    <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="display: none;"></span>
+                    Remove from Department
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Confirm Bulk Remove Modal -->
+<div class="modal fade" id="confirmBulkRemoveModal" tabindex="-1" role="dialog" aria-labelledby="confirmBulkRemoveModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="confirmBulkRemoveModalLabel">
+                    <i class="fas fa-user-minus"></i> Confirm Bulk Removal
+                </h5>
+                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to remove <strong id="bulk-remove-count">0</strong> selected staff member(s) from their departments?</p>
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-circle me-2"></i>
+                    <strong>Note:</strong> This will only remove department assignments. Staff members will remain in the system.
+                </div>
+                <div id="selectedRemoveStaffList" class="mt-3" style="max-height: 150px; overflow-y: auto;">
+                    <!-- Selected staff for removal will be listed here -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirm-bulk-remove-btn">
+                    <i class="fas fa-user-minus"></i> Remove Selected
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+<script>
+    // Function to get CSRF token
+    function getCSRFToken() {
+        return $('input[name="csrfmiddlewaretoken"]').val();
+    }
+
+    // Function to show/hide toast
+    function showToast(message, type = 'success') {
+        const toastId = type === 'success' ? 'success-toast' : 'error-toast';
+        const messageId = type === 'success' ? 'success-message' : 'error-message';
+        
+        $('#' + messageId).text(message);
+        $('#' + toastId).fadeIn();
+        
+        setTimeout(() => {
+            hideToast(type);
+        }, type === 'success' ? 3000 : 5000);
+    }
+
+    function hideToast(type) {
+        const toastId = type === 'success' ? 'success-toast' : 'error-toast';
+        $('#' + toastId).fadeOut();
+    }
+
+    // Function to update selected count for BULK actions
+    function updateSelectedCount() {
+        const count = $('.staff-checkbox:checked').length;
+        $('#selectedCount').text(`${count} selected`);
+        
+        // Enable/disable bulk buttons
+        $('#bulkAssignBtn').prop('disabled', count === 0);
+        $('#bulkRemoveBtn').prop('disabled', count === 0);
+        $('#bulkActionsContainer').toggle(count > 0);
+        
+        // Update modal counts
+        $('#bulk-assign-count').text(count);
+        $('#bulk-remove-count').text(count);
+        
+        // Update staff lists in modals
+        updateSelectedStaffLists();
+    }
+
+    function updateSelectedStaffLists() {
+        const selectedStaff = [];
+        $('.staff-checkbox:checked').each(function() {
+            const staffId = $(this).data('id');
+            const staffName = $(this).data('name');
+            selectedStaff.push({ id: staffId, name: staffName });
+        });
+        
+        // Update assign modal list
+        const assignList = $('#selectedStaffList');
+        assignList.empty();
+        
+        if (selectedStaff.length > 0) {
+            const list = $('<div></div>');
+            selectedStaff.slice(0, 10).forEach(staff => {
+                list.append(`<div class="mb-1"><i class="fas fa-user mr-2"></i>${staff.name}</div>`);
+            });
+            
+            if (selectedStaff.length > 10) {
+                list.append(`<div class="text-muted">...and ${selectedStaff.length - 10} more</div>`);
+            }
+            
+            assignList.append(list);
+        }
+        
+        // Update remove modal list
+        const removeList = $('#selectedRemoveStaffList');
+        removeList.empty();
+        
+        if (selectedStaff.length > 0) {
+            const list = $('<div></div>');
+            selectedStaff.slice(0, 10).forEach(staff => {
+                list.append(`<div class="mb-1"><i class="fas fa-user mr-2"></i>${staff.name}</div>`);
+            });
+            
+            if (selectedStaff.length > 10) {
+                list.append(`<div class="text-muted">...and ${selectedStaff.length - 10} more</div>`);
+            }
+            
+            removeList.append(list);
+        }
+    }
+
+    $(document).ready(function() {
+        // Initialize DataTable
+        var table = $('#staff-table').DataTable({
+            "dom": "<'row'<'col-sm-12 col-md-6'l><'col-sm-12 col-md-6'f>>" +
+                   "<'row'<'col-sm-12'tr>>" +
+                   "<'row'<'col-sm-12 col-md-5'i><'col-sm-12 col-md-7'p>>",
+            "lengthMenu": [[10, 25, 50, -1], [10, 25, 50, "All"]],
+            "pageLength": 10,
+            "responsive": true,
+            "autoWidth": false,
+            "order": [[2, 'asc']], // Sort by staff name
+            
+            "destroy": true,
+            "retrieve": true,
+            "deferRender": true,
+            
+            "columnDefs": [
+                { 
+                    "targets": [0, 8], // Checkbox and Actions columns
+                    "orderable": false,
+                    "searchable": false
+                }
+            ],
+            
+            "language": {
+                "emptyTable": "<div class='text-center py-4'><i class='fas fa-user-tie fa-2x mb-2'></i><br>No staff members found.</div>",
+                "search": "_INPUT_",
+                "searchPlaceholder": "Search staff...",
+                "lengthMenu": "_MENU_ staff per page",
+                "info": "Showing _START_ to _END_ of _TOTAL_ staff",
+                "infoEmpty": "Showing 0 to 0 of 0 staff",
+                "infoFiltered": "(filtered from _MAX_ total staff)",
+                "paginate": {
+                    "first": "First",
+                    "last": "Last",
+                    "next": "Next",
+                    "previous": "Previous"
+                }
+            }
+        });
+
+        // Table search functionality
+        $('#tableSearch').on('keyup', function() {
+            table.search(this.value).draw();
+        });
+        
+        $('#tableSearchBtn').on('click', function() {
+            table.search($('#tableSearch').val()).draw();
+        });
+
+        // Select2 initialization
+        function initializeSelect2() {
+            $('.select2bs4').each(function() {
+                $(this).select2({
+                    theme: 'bootstrap4',
+                    dropdownParent: $(this).closest('.modal'),
+                    width: '100%',
+                    placeholder: $(this).attr('placeholder') || 'Select an option',
+                    allowClear: false
+                });
+            });
+        }
+        
+        // Reinitialize Select2 when modals are shown
+        $('#assignStaffModal').on('shown.bs.modal', function() {
+            $('#assignStaffModal .select2bs4').each(function() {
+                if ($(this).hasClass('select2-hidden-accessible')) {
+                    $(this).select2('destroy');
+                }
+                $(this).select2({
+                    theme: 'bootstrap4',
+                    dropdownParent: $('#assignStaffModal'),
+                    width: '100%',
+                    placeholder: $(this).attr('placeholder') || 'Select an option',
+                    allowClear: false
+                });
+            });
+            
+            // Reset form
+            $('#assign-form')[0].reset();
+            $('#assign-form').find('.is-invalid').removeClass('is-invalid');
+            $('#assign-form').find('.invalid-feedback').hide();
+        });
+
+        $('#bulkAssignModal').on('shown.bs.modal', function() {
+            $('#bulkAssignModal .select2bs4').each(function() {
+                if ($(this).hasClass('select2-hidden-accessible')) {
+                    $(this).select2('destroy');
+                }
+                $(this).select2({
+                    theme: 'bootstrap4',
+                    dropdownParent: $('#bulkAssignModal'),
+                    width: '100%',
+                    placeholder: $(this).attr('placeholder') || 'Select an option',
+                    allowClear: false
+                });
+            });
+        });
+
+        $('#changeDeptModal').on('shown.bs.modal', function() {
+            $('#changeDeptModal .select2bs4').each(function() {
+                if ($(this).hasClass('select2-hidden-accessible')) {
+                    $(this).select2('destroy');
+                }
+                $(this).select2({
+                    theme: 'bootstrap4',
+                    dropdownParent: $('#changeDeptModal'),
+                    width: '100%',
+                    placeholder: $(this).attr('placeholder') || 'Select an option',
+                    allowClear: false
+                });
+            });
+        });
+
+        // Destroy Select2 when modals are hidden
+        $('#assignStaffModal').on('hidden.bs.modal', function() {
+            $('#assignStaffModal .select2bs4').select2('destroy');
+        });
+
+        $('#bulkAssignModal').on('hidden.bs.modal', function() {
+            $('#bulkAssignModal .select2bs4').select2('destroy');
+        });
+
+        $('#changeDeptModal').on('hidden.bs.modal', function() {
+            $('#changeDeptModal .select2bs4').select2('destroy');
+            $('#change-form')[0].reset();
+            $('#change-form').find('.is-invalid').removeClass('is-invalid');
+            $('#change-form').find('.invalid-feedback').hide();
+        });
+
+        // Helper function to handle button loading state
+        function setButtonLoading(btn, isLoading) {
+            const spinner = btn.find('.spinner-border');
+            if (isLoading) {
+                btn.data('original-text', btn.html());
+                btn.prop('disabled', true);
+                spinner.show();
+                btn.html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>');
+            } else {
+                btn.prop('disabled', false);
+                spinner.hide();
+                if (btn.data('original-text')) {
+                    btn.html(btn.data('original-text'));
+                }
+            }
+        }
+
+        // BULK SELECTION FUNCTIONALITY
+        var isBulkMode = false;
+        
+        $('#bulkSelectToggleBtn').on('click', function() {
+            isBulkMode = !isBulkMode;
+            
+            if (isBulkMode) {
+                $(this).html('<i class="fas fa-check-square"></i> Exit Bulk Mode');
+                $(this).removeClass('btn-outline-primary').addClass('btn-primary');
+                $('.checkbox-column').show();
+                $('#selectAllHeader').prop('checked', false);
+                $('#selectAllStaff').prop('checked', false);
+                updateSelectedCount();
+            } else {
+                $(this).html('<i class="fas fa-check-square"></i> Bulk Select');
+                $(this).removeClass('btn-primary').addClass('btn-outline-primary');
+                $('.checkbox-column').hide();
+                $('.staff-checkbox').prop('checked', false);
+                $('#bulkActionsContainer').hide();
+            }
+            
+            // Trigger DataTable redraw
+            table.columns.adjust().draw();
+        });
+        
+        // Initially hide checkbox column
+        $('.checkbox-column').hide();
+        
+        // Select all header checkbox (for BULK)
+        $('#selectAllHeader').on('change', function() {
+            const isChecked = $(this).prop('checked');
+            $('#selectAllStaff').prop('checked', isChecked);
+            $('.staff-checkbox:enabled').prop('checked', isChecked);
+            updateSelectedCount();
+        });
+        
+        // Select all staff checkbox (outside table - for BULK)
+        $('#selectAllStaff').on('change', function() {
+            const isChecked = $(this).prop('checked');
+            $('#selectAllHeader').prop('checked', isChecked);
+            $('.staff-checkbox:enabled').prop('checked', isChecked);
+            updateSelectedCount();
+        });
+        
+        // Individual checkbox change (for BULK)
+        $(document).on('change', '.staff-checkbox', function() {
+            updateSelectedCount();
+            
+            // Update select all header
+            const totalCheckboxes = $('.staff-checkbox:enabled').length;
+            const checkedCheckboxes = $('.staff-checkbox:checked').length;
+            $('#selectAllHeader').prop('checked', totalCheckboxes > 0 && totalCheckboxes === checkedCheckboxes);
+            $('#selectAllStaff').prop('checked', totalCheckboxes > 0 && totalCheckboxes === checkedCheckboxes);
+        });
+        
+        // Clear selection button (for BULK)
+        $('#clearSelectionBtn').on('click', function() {
+            $('.staff-checkbox, #selectAllHeader, #selectAllStaff').prop('checked', false);
+            updateSelectedCount();
+        });
+        
+        // Close bulk actions button
+        $('#closeBulkActionsBtn').on('click', function() {
+            $('#bulkActionsContainer').hide();
+            $('.staff-checkbox, #selectAllHeader, #selectAllStaff').prop('checked', false);
+        });
+
+        // BULK ASSIGN
+        $('#bulkAssignBtn').on('click', function() {
+            const selectedCount = $('.staff-checkbox:checked').length;
+            if (selectedCount === 0) {
+                showToast('No staff selected', 'error');
+                return;
+            }
+            
+            $('#bulkAssignModal').modal('show');
+        });
+        
+        // Confirm bulk assign
+        $('#confirm-bulk-assign-btn').click(function(e) {
+            e.preventDefault();
+            
+            const selectedStaff = [];
+            $('.staff-checkbox:checked').each(function() {
+                selectedStaff.push({
+                    id: $(this).data('id'),
+                    name: $(this).data('name')
+                });
+            });
+            
+            if (selectedStaff.length === 0) return;
+            
+            const departmentId = $('#bulk-department_id').val();
+            if (!departmentId) {
+                showToast('Please select a department', 'error');
+                return;
+            }
+            
+            const $btn = $(this);
+            const originalText = $btn.html();
+            $btn.html('<i class="fas fa-spinner fa-spin"></i> Assigning...');
+            $btn.prop('disabled', true);
+            
+            // Create form data
+            const formData = new FormData();
+            selectedStaff.forEach(function(staff) {
+                formData.append('staff_ids[]', staff.id);
+            });
+            formData.append('department_id', departmentId);
+            formData.append('action', 'bulk_assign');
+            formData.append('csrfmiddlewaretoken', getCSRFToken());
+            
+            // Send AJAX request
+            $.ajax({
+                url: '{% url "admin_staff_department_assign" %}',
+                type: 'POST',
+                data: formData,
+                processData: false,
+                contentType: false,
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                success: function(response) {
+                    if (response.success) {
+                        // Reload the page to show updated assignments
+                        $('#bulkAssignModal').modal('hide');
+                        showToast(response.message, 'success');
+                        setTimeout(function() {
+                            window.location.reload();
+                        }, 1500);
+                        
+                    } else {
+                        showToast(response.message, 'error');
+                        $btn.html(originalText).prop('disabled', false);
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error:', error);
+                    showToast('An error occurred. Please try again.', 'error');
+                    $btn.html(originalText).prop('disabled', false);
+                }
+            });
+        });
+
+        // BULK REMOVE
+        $('#bulkRemoveBtn').on('click', function() {
+            const selectedCount = $('.staff-checkbox:checked').length;
+            if (selectedCount === 0) {
+                showToast('No staff selected', 'error');
+                return;
+            }
+            
+            $('#confirmBulkRemoveModal').modal('show');
+        });
+        
+        // Confirm bulk remove
+        $('#confirm-bulk-remove-btn').click(function(e) {
+            e.preventDefault();
+            
+            const selectedStaff = [];
+            $('.staff-checkbox:checked').each(function() {
+                selectedStaff.push({
+                    id: $(this).data('id'),
+                    name: $(this).data('name')
+                });
+            });
+            
+            if (selectedStaff.length === 0) return;
+            
+            const $btn = $(this);
+            const originalText = $btn.html();
+            $btn.html('<i class="fas fa-spinner fa-spin"></i> Removing...');
+            $btn.prop('disabled', true);
+            
+            // Create form data
+            const formData = new FormData();
+            selectedStaff.forEach(function(staff) {
+                formData.append('staff_ids[]', staff.id);
+            });
+            formData.append('action', 'bulk_remove');
+            formData.append('csrfmiddlewaretoken', getCSRFToken());
+            
+            // Send AJAX request
+            $.ajax({
+                url: '{% url "admin_staff_department_assign" %}',
+                type: 'POST',
+                data: formData,
+                processData: false,
+                contentType: false,
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                success: function(response) {
+                    if (response.success) {
+                        // Reload the page to show updated assignments
+                        $('#confirmBulkRemoveModal').modal('hide');
+                        showToast(response.message, 'success');
+                        setTimeout(function() {
+                            window.location.reload();
+                        }, 1500);
+                        
+                    } else {
+                        showToast(response.message, 'error');
+                        $btn.html(originalText).prop('disabled', false);
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error:', error);
+                    showToast('An error occurred. Please try again.', 'error');
+                    $btn.html(originalText).prop('disabled', false);
+                }
+            });
+        });
+
+        // INDIVIDUAL ASSIGN/CHANGE
+        let staffToChange = null;
+        
+        $(document).on('click', '.assign-btn', function() {
+            const btn = $(this);
+            
+            staffToChange = {
+                id: btn.data('id'),
+                name: btn.data('name'),
+                currentDeptId: btn.data('current-dept-id'),
+                currentDeptName: btn.data('current-dept-name')
+            };
+            
+            $('#change-staff-id').val(staffToChange.id);
+            $('#change-staff-name').text(staffToChange.name);
+            
+            // Set current department info
+            const currentInfo = staffToChange.currentDeptName ? 
+                `Currently assigned to: ${staffToChange.currentDeptName}` : 
+                'Not currently assigned to any department';
+            $('#current-dept-info').text(currentInfo);
+            
+            // Pre-select current department if exists
+            setTimeout(function() {
+                if (staffToChange.currentDeptId) {
+                    $('#change-department_id').val(staffToChange.currentDeptId).trigger('change.select2');
+                }
+            }, 300);
+            
+            $('#changeDeptModal').modal('show');
+        });
+
+        // Change/Assign Individual
+        $('#change-form').on('submit', function(e) {
+            e.preventDefault();
+            
+            const departmentId = $('#change-department_id').val();
+            if (!departmentId) {
+                showToast('Please select a department', 'error');
+                return;
+            }
+            
+            const changeBtn = $('#confirm-change-btn');
+            setButtonLoading(changeBtn, true);
+            
+            const formData = new FormData(this);
+            formData.append('action', 'assign');
+            formData.append('set_as_hod', $('#change-set_as_hod').is(':checked') ? 'true' : 'false');
+            
+            $.ajax({
+                url: '{% url "admin_staff_department_assign" %}',
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCSRFToken(),
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function(data) {
+                    if (data.success) {
+                        $('#changeDeptModal').modal('hide');
+                        showToast(data.message, 'success');
+                        setTimeout(function() {
+                            window.location.reload();
+                        }, 1500);
+                    } else {
+                        showToast(data.message, 'danger');
+                        setButtonLoading(changeBtn, false);
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error:', error);
+                    showToast('An error occurred while updating. Please try again.', 'danger');
+                    setButtonLoading(changeBtn, false);
+                }
+            });
+        });
+
+        // INDIVIDUAL REMOVE
+        let staffToRemove = null;
+        
+        $(document).on('click', '.remove-btn', function() {
+            const btn = $(this);
+            
+            staffToRemove = {
+                id: btn.data('id'),
+                name: btn.data('name'),
+                deptName: btn.data('dept-name')
+            };
+            
+            $('#remove-staff-name').text(staffToRemove.name);
+            $('#remove-dept-name').text(staffToRemove.deptName);
+            $('#confirmRemoveModal').modal('show');
+        });
+
+        // Confirm individual remove
+        $('#confirm-remove-btn').on('click', function() {
+            if (!staffToRemove) return;
+            
+            const removeBtn = $(this);
+            setButtonLoading(removeBtn, true);
+            
+            $.ajax({
+                url: '{% url "admin_staff_department_assign" %}',
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCSRFToken(),
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                data: {
+                    'action': 'remove',
+                    'staff_id': staffToRemove.id,
+                    'csrfmiddlewaretoken': getCSRFToken()
+                },
+                success: function(data) {
+                    if (data.success) {
+                        $('#confirmRemoveModal').modal('hide');
+                        showToast(data.message, 'success');
+                        setTimeout(function() {
+                            window.location.reload();
+                        }, 1500);
+                    } else {
+                        showToast(data.message, 'danger');
+                        setButtonLoading(removeBtn, false);
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error:', error);
+                    showToast('An error occurred while removing. Please try again.', 'danger');
+                    setButtonLoading(removeBtn, false);
+                }
+            });
+        });
+
+        // ASSIGN NEW STAFF (from modal)
+        $('#assign-form').on('submit', function(e) {
+            e.preventDefault();
+            
+            const staffId = $('#staff_id').val();
+            const departmentId = $('#department_id').val();
+            
+            if (!staffId || !departmentId) {
+                showToast('Please select both staff and department', 'error');
+                return;
+            }
+            
+            const assignBtn = $('#assign-btn');
+            setButtonLoading(assignBtn, true);
+            
+            const formData = new FormData(this);
+            formData.append('action', 'assign');
+            formData.append('set_as_hod', $('#set_as_hod').is(':checked') ? 'true' : 'false');
+            
+            $.ajax({
+                url: '{% url "admin_staff_department_assign" %}',
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCSRFToken(),
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function(data) {
+                    if (data.success) {
+                        $('#assignStaffModal').modal('hide');
+                        showToast(data.message, 'success');
+                        setTimeout(function() {
+                            window.location.reload();
+                        }, 1500);
+                    } else {
+                        showToast(data.message, 'danger');
+                        setButtonLoading(assignBtn, false);
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error:', error);
+                    showToast('An error occurred while assigning. Please try again.', 'danger');
+                    setButtonLoading(assignBtn, false);
+                }
+            });
+        });
+
+        // Export functionality
+        $('#exportBtn').on('click', function() {
+            showToast('Export feature coming soon!', 'info');
+        });
+
+        // Handle modal close/cancel buttons
+        $(document).on('click', '[data-dismiss="modal"]', function(e) {
+            e.preventDefault();
+            $(this).closest('.modal').modal('hide');
+        });
+
+        // Clear form and reset button state on modal close
+        $('#assignStaffModal').on('hidden.bs.modal', function() {
+            $('#assign-form')[0].reset();
+            $('#assign-form').find('.is-invalid').removeClass('is-invalid');
+            $('#assign-form').find('.invalid-feedback').hide();
+            setButtonLoading($('#assign-btn'), false);
+        });
+        
+        $('#confirmRemoveModal').on('hidden.bs.modal', function() {
+            staffToRemove = null;
+            setButtonLoading($('#confirm-remove-btn'), false);
+        });
+        
+        $('#confirmBulkRemoveModal').on('hidden.bs.modal', function() {
+            $('#confirm-bulk-remove-btn').html('<i class="fas fa-user-minus"></i> Remove Selected').prop('disabled', false);
+        });
+        
+        $('#bulkAssignModal').on('hidden.bs.modal', function() {
+            $('#confirm-bulk-assign-btn').html('<i class="fas fa-user-plus"></i> Assign Selected').prop('disabled', false);
+        });
+
+        // Real-time validation
+        $('input, select, textarea').on('blur', function() {
+            if ($(this).hasClass('is-invalid')) {
+                $(this).removeClass('is-invalid');
+                $(this).next('.invalid-feedback').hide();
+            }
+        });
+    });
+</script>
+{% endblock extra_js %}

@@ -81,6 +81,10 @@
                     <i class="bi bi-people-fill"></i>
                     <span>Stream Classes</span>
                 </a>
+                <a class="nav-link" href="{% url 'admin_department_management' %}">
+                    <i class="bi bi-people-fill"></i>
+                    <span>Department</span>
+                </a>
             </div>
         </div>
 
@@ -143,181 +147,191 @@
             </div>
         </div>
 
-        <!-- User Management -->
-        <div class="nav-section">
+       <!-- ATTENDANCE MANAGEMENT SECTION -->
+        <div class="nav-section active">
             <div class="nav-section-header">
-                <i class="bi bi-person-gear"></i>
-                <span>User Management</span>
+                <i class="fas fa-calendar-check"></i>
+                <span>Attendance Management</span>
             </div>
             <div class="nav-section-content">
-                <a class="nav-link" href="{% url 'admin_users_list' %}">
-                    <i class="bi bi-people"></i>
-                    <span>All Users</span>
-                    <span class="nav-counter">{{ user_count|default:0 }}</span>
+                <!-- Session Management -->
+                <a class="nav-link {% if request.resolver_match.url_name == 'attendance_session_list' %}active{% endif %}" href="{% url 'attendance_session_list' %}">
+                    <i class="fas fa-list-alt"></i>
+                    <span>Session Records</span>
                 </a>
-                <a class="nav-link" href="{% url 'admin_users_add' %}">
-                    <i class="bi bi-person-add"></i>
-                    <span>Create User</span>
-                </a>
-                <a class="nav-link" href="{% url 'admin_users_roles' %}">
-                    <i class="bi bi-shield-check"></i>
-                    <span>User Roles</span>
-                </a>
-                <a class="nav-link" href="{% url 'admin_permissions' %}">
-                    <i class="bi bi-key"></i>
-                    <span>Permissions</span>
-                </a>
-                <a class="nav-link" href="{% url 'admin_user_activity' %}">
-                    <i class="bi bi-clock-history"></i>
-                    <span>User Activity</span>
+
+                <!-- Create Attendance -->
+                <a class="nav-link {% if request.resolver_match.url_name == 'attendance_create' %}active{% endif %}" href="{% url 'attendance_create' %}">
+                    <i class="fas fa-calendar-plus"></i>
+                    <span>Create Session</span>
+                    <span class="nav-badge success-badge">New</span>
                 </a>
             </div>
         </div>
 
-        <!-- System Settings -->
+        <!-- Attendance Reports -->
         <div class="nav-section">
             <div class="nav-section-header">
-                <i class="bi bi-gear-fill"></i>
-                <span>System Settings</span>
+                <i class="fas fa-chart-line"></i>
+                <span>Attendance Reports</span>
             </div>
             <div class="nav-section-content">
-                <a class="nav-link" href="{% url 'admin_system_config' %}">
-                    <i class="bi bi-sliders"></i>
-                    <span>Configuration</span>
+                <!-- Daily Report -->
+                <a class="nav-link {% if request.resolver_match.url_name == 'attendance_report_daily' %}active{% endif %}" href="{% url 'attendance_report_daily' %}">
+                    <i class="fas fa-calendar-day"></i>
+                    <span>Daily Report</span>
+                    <span class="nav-badge info-badge">Daily</span>
                 </a>
-                <a class="nav-link" href="{% url 'admin_email_settings' %}">
-                    <i class="bi bi-envelope"></i>
-                    <span>Email Settings</span>
+
+                <!-- Monthly Report -->
+                <a class="nav-link {% if request.resolver_match.url_name == 'attendance_report_monthly' %}active{% endif %}" href="{% url 'attendance_report_monthly' %}">
+                    <i class="fas fa-calendar-week"></i>
+                    <span>Monthly Report</span>
                 </a>
-                <a class="nav-link" href="{% url 'admin_sms_settings' %}">
-                    <i class="bi bi-chat-dots"></i>
-                    <span>SMS Settings</span>
-                </a>
-                <a class="nav-link" href="{% url 'admin_notifications' %}">
-                    <i class="bi bi-bell"></i>
-                    <span>Notifications</span>
-                </a>
-                <a class="nav-link" href="{% url 'admin_backup' %}">
-                    <i class="bi bi-hdd"></i>
-                    <span>Backup & Restore</span>
+                 <!-- Student Reports -->
+                <a class="nav-link {% if 'student_attendance_list' in request.resolver_match.url_name %}active{% endif %}"  href="{% url 'student_attendance_list' %}">
+                    <i class="fas fa-user-graduate"></i>
+                    <span>Student Reports</span>
                 </a>
             </div>
         </div>
 
-        <!-- Security & Logs -->
+        <!-- Examination & Results -->
         <div class="nav-section">
             <div class="nav-section-header">
-                <i class="bi bi-shield-check"></i>
-                <span>Security & Logs</span>
+                <i class="bi bi-clipboard-data"></i>
+                <span>Examination & Results</span>
             </div>
             <div class="nav-section-content">
-                <a class="nav-link" href="{% url 'admin_audit_logs' %}">
+                <a class="nav-link" href="#">
+                    <i class="bi bi-calendar-event"></i>
+                    <span>Exam Schedule</span>
+                </a>
+                <a class="nav-link" href="#">
                     <i class="bi bi-journal-text"></i>
-                    <span>Audit Logs</span>
+                    <span>Exam Setup</span>
                 </a>
-                <a class="nav-link" href="{% url 'admin_login_history' %}">
-                    <i class="bi bi-door-open"></i>
-                    <span>Login History</span>
+                <a class="nav-link" href="#">
+                    <i class="bi bi-pencil-square"></i>
+                    <span>Enter Marks</span>
                 </a>
-                <a class="nav-link" href="{% url 'admin_security_settings' %}">
-                    <i class="bi bi-shield-lock"></i>
-                    <span>Security Settings</span>
+                <a class="nav-link" href="#">
+                    <i class="bi bi-award"></i>
+                    <span>Results Processing</span>
                 </a>
-                <a class="nav-link" href="{% url 'admin_api_settings' %}">
-                    <i class="bi bi-plug"></i>
-                    <span>API Settings</span>
+                <a class="nav-link" href="#">
+                    <i class="bi bi-printer"></i>
+                    <span>Report Cards</span>
+                </a>
+                <a class="nav-link" href="#">
+                    <i class="bi bi-graph-up-arrow"></i>
+                    <span>Performance Analysis</span>
                 </a>
             </div>
         </div>
 
-        <!-- Reports & Analytics -->
+        <!-- Library Management -->
         <div class="nav-section">
             <div class="nav-section-header">
-                <i class="bi bi-pie-chart-fill"></i>
-                <span>Reports & Analytics</span>
+                <i class="bi bi-book"></i>
+                <span>Library</span>
             </div>
             <div class="nav-section-content">
-                <a class="nav-link" href="{% url 'admin_financial_reports' %}">
+                <a class="nav-link {% if request.resolver_match.url_name == 'admin_book_categories_list' %}active{% endif %}" href="{% url 'admin_book_categories_list' %}">
+                    <i class="bi bi-book-half"></i>
+                    <span>Book Catalog</span>
+                </a>
+                <a class="nav-link {% if request.resolver_match.url_name == 'admin_books_list' %}active{% endif %}" href="{% url 'admin_books_list' %}">
+                    <i class="bi bi-book-half"></i>
+                    <span>Book </span>
+                </a>
+                <a class="nav-link" href="#">
+                    <i class="bi bi-person-plus"></i>
+                    <span>Issue Books</span>
+                </a>
+                <a class="nav-link" href="#">
+                    <i class="bi bi-arrow-return-left"></i>
+                    <span>Return Books</span>
+                </a>
+                <a class="nav-link" href="#">
+                    <i class="bi bi-clock-history"></i>
+                    <span>Overdue Books</span>
+                </a>
+                <a class="nav-link" href="#">
+                    <i class="bi bi-people"></i>
+                    <span>Library Members</span>
+                </a>
+                <a class="nav-link" href="#">
+                    <i class="bi bi-bar-chart"></i>
+                    <span>Library Reports</span>
+                </a>
+            </div>
+        </div>
+
+        <!-- Financial Management -->
+        <div class="nav-section">
+            <div class="nav-section-header">
+                <i class="bi bi-cash-stack"></i>
+                <span>Financial Management</span>
+            </div>
+            <div class="nav-section-content">
+                <a class="nav-link" href="#">
+                    <i class="bi bi-currency-dollar"></i>
+                    <span>Fee Structure</span>
+                </a>
+                <a class="nav-link" href="#">
+                    <i class="bi bi-receipt"></i>
+                    <span>Fee Collection</span>
+                </a>
+                <a class="nav-link" href="#">
+                    <i class="bi bi-clock-history"></i>
+                    <span>Pending Fees</span>
+                </a>
+                <a class="nav-link" href="#">
+                    <i class="bi bi-credit-card"></i>
+                    <span>Payments</span>
+                </a>
+                <a class="nav-link" href="#">
                     <i class="bi bi-cash-coin"></i>
+                    <span>Expenses</span>
+                </a>
+                <a class="nav-link" href="#">
+                    <i class="bi bi-graph-up"></i>
                     <span>Financial Reports</span>
                 </a>
-                <a class="nav-link" href="{% url 'admin_academic_reports' %}">
-                    <i class="bi bi-bar-chart"></i>
-                    <span>Academic Reports</span>
-                </a>
-                <a class="nav-link" href="{% url 'admin_attendance_reports' %}">
-                    <i class="bi bi-calendar-check"></i>
-                    <span>Attendance Reports</span>
-                </a>
-                <a class="nav-link" href="{% url 'admin_custom_reports' %}">
-                    <i class="bi bi-file-earmark-plus"></i>
-                    <span>Custom Reports</span>
-                </a>
-                <a class="nav-link" href="{% url 'admin_export_data' %}">
-                    <i class="bi bi-download"></i>
-                    <span>Export Data</span>
-                </a>
             </div>
         </div>
 
-        <!-- Help & Support -->
+        <!-- School Shop -->
         <div class="nav-section">
             <div class="nav-section-header">
-                <i class="bi bi-question-circle-fill"></i>
-                <span>Help & Support</span>
+                <i class="bi bi-shop"></i>
+                <span>School Shop</span>
             </div>
             <div class="nav-section-content">
-                <a class="nav-link" href="{% url 'admin_documentation' %}">
-                    <i class="bi bi-book"></i>
-                    <span>Documentation</span>
+                <a class="nav-link" href="#">
+                    <i class="bi bi-box"></i>
+                    <span>Inventory</span>
                 </a>
-                <a class="nav-link" href="{% url 'admin_faq' %}">
-                    <i class="bi bi-question-square"></i>
-                    <span>FAQ</span>
+                <a class="nav-link" href="#">
+                    <i class="bi bi-cart-plus"></i>
+                    <span>Sales</span>
                 </a>
-                <a class="nav-link" href="{% url 'admin_support_tickets' %}">
-                    <i class="bi bi-ticket-detailed"></i>
-                    <span>Support Tickets</span>
-                    <span class="nav-badge urgent-badge">3</span>
+                <a class="nav-link" href="#">
+                    <i class="bi bi-truck"></i>
+                    <span>Suppliers</span>
                 </a>
-                <a class="nav-link" href="{% url 'admin_system_status' %}">
-                    <i class="bi bi-heart-pulse"></i>
-                    <span>System Status</span>
-                    <span class="nav-badge success-badge">Online</span>
+                <a class="nav-link" href="#">
+                    <i class="bi bi-basket"></i>
+                    <span>Orders</span>
+                </a>
+                <a class="nav-link" href="#">
+                    <i class="bi bi-cash-stack"></i>
+                    <span>Shop Reports</span>
                 </a>
             </div>
         </div>
     </nav>
-
-    <!-- Sidebar Footer -->
-    <div class="sidebar-footer">
-        <div class="system-status">
-            <div class="status-item">
-                <span class="status-label">Database</span>
-                <span class="status-value healthy">Healthy</span>
-            </div>
-            <div class="status-item">
-                <span class="status-label">Storage</span>
-                <span class="status-value warning">85%</span>
-            </div>
-            <div class="status-item">
-                <span class="status-label">Users Online</span>
-                <span class="status-value">{{ online_users|default:12 }}</span>
-            </div>
-        </div>
-        <div class="quick-actions">
-            <button class="quick-action-btn" title="Quick Settings">
-                <i class="bi bi-lightning-charge"></i>
-            </button>
-            <button class="quick-action-btn" title="Notifications">
-                <i class="bi bi-bell"></i>
-                <span class="notification-badge">5</span>
-            </button>
-            <button class="quick-action-btn" title="Support">
-                <i class="bi bi-headset"></i>
-            </button>
-        </div>
-    </div>
 </aside>
 
 <style>
@@ -450,21 +464,6 @@
         animation: pulse 2s infinite;
     }
 
-    @keyframes pulse {
-        0% {
-            transform: scale(1);
-            opacity: 1;
-        }
-        70% {
-            transform: scale(2);
-            opacity: 0;
-        }
-        100% {
-            transform: scale(2);
-            opacity: 0;
-        }
-    }
-
     /* Navigation Sections */
     .sidebar-nav {
         flex: 1;
@@ -578,6 +577,16 @@
         color: white;
     }
 
+    .nav-badge.info-badge {
+        background: #17a2b8;
+        color: white;
+    }
+
+    .nav-badge.warning-badge {
+        background: #ffc107;
+        color: #212529;
+    }
+
     .nav-counter {
         margin-left: auto;
         background: rgba(255, 255, 255, 0.15);
@@ -589,98 +598,19 @@
         text-align: center;
     }
 
-    /* Sidebar Footer */
-    .sidebar-footer {
-        padding: 1rem;
-        border-top: 1px solid rgba(255, 255, 255, 0.1);
-        background: rgba(0, 0, 0, 0.2);
-    }
-
-    .system-status {
-        margin-bottom: 1rem;
-    }
-
-    .status-item {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 0.5rem;
-        font-size: 0.8rem;
-    }
-
-    .status-label {
-        opacity: 0.8;
-    }
-
-    .status-value {
-        font-weight: 500;
-    }
-
-    .status-value.healthy {
-        color: #2ecc71;
-    }
-
-    .status-value.warning {
-        color: #f39c12;
-    }
-
-    .quick-actions {
-        display: flex;
-        justify-content: space-around;
-        gap: 0.5rem;
-    }
-
-    .quick-action-btn {
-        background: rgba(255, 255, 255, 0.1);
-        border: none;
-        color: white;
-        width: 36px;
-        height: 36px;
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        cursor: pointer;
-        transition: all 0.3s ease;
-        position: relative;
-    }
-
-    .quick-action-btn:hover {
-        background: rgba(255, 255, 255, 0.2);
-        transform: translateY(-2px);
-    }
-
-    .notification-badge {
-        position: absolute;
-        top: -5px;
-        right: -5px;
-        background: #e74c3c;
-        color: white;
-        font-size: 0.6rem;
-        padding: 0.15rem 0.4rem;
-        border-radius: 50%;
-        min-width: 18px;
-        height: 18px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    }
-
-    /* Collapsible functionality */
-    .nav-section-header {
-        position: relative;
-    }
-
-    .nav-section-header:after {
-        content: '\f282';
-        font-family: 'bootstrap-icons';
-        position: absolute;
-        right: 1.5rem;
-        transition: transform 0.3s ease;
-    }
-
-    .nav-section.active .nav-section-header:after {
-        transform: rotate(180deg);
+    @keyframes pulse {
+        0% {
+            transform: scale(1);
+            opacity: 1;
+        }
+        70% {
+            transform: scale(2);
+            opacity: 0;
+        }
+        100% {
+            transform: scale(2);
+            opacity: 0;
+        }
     }
 
     /* Responsive Design */
@@ -815,19 +745,5 @@
                 document.querySelector('.sidebar').classList.remove('active');
             }
         });
-        
-        // Update online users counter (simulated)
-        function updateOnlineUsers() {
-            const counter = document.querySelector('.status-value:last-child');
-            if (counter) {
-                const base = parseInt(counter.textContent) || 12;
-                const variation = Math.floor(Math.random() * 5) - 2;
-                const newCount = Math.max(1, base + variation);
-                counter.textContent = newCount;
-            }
-        }
-        
-        // Update every 30 seconds
-        setInterval(updateOnlineUsers, 30000);
     });
 </script>

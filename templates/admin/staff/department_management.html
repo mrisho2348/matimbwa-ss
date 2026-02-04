@@ -1,0 +1,1655 @@
+{% extends 'admin/base.html' %}
+{% load static %}
+{% block title %} Department Management {% endblock title %}
+
+{% block breadcrumb %}
+    <button type="button" class="btn btn-primary" data-toggle="modal" data-target="#addDepartmentModal">
+        <i class="fas fa-plus"></i> Add Department
+    </button>
+{% endblock breadcrumb %}
+
+{% block extra_css %}
+<style>
+    /* General Table Styles */
+    .table th {
+        font-weight: 600;
+        border-bottom-width: 2px;
+    }
+    .table td {
+        vertical-align: middle;
+    }
+    .badge {
+        font-size: 0.85em;
+        padding: 0.4em 0.8em;
+    }
+    
+    /* Modal Fixes */
+    .modal-dialog {
+        max-height: 90vh;
+        display: flex;
+        flex-direction: column;
+    }
+    .modal-content {
+        max-height: 90vh;
+        display: flex;
+        flex-direction: column;
+    }
+    .modal-header {
+        flex-shrink: 0;
+    }
+    .modal-body {
+        overflow-y: auto;
+        flex: 1 1 auto;
+        max-height: calc(90vh - 140px);
+        padding-right: 15px;
+        padding-left: 15px;
+    }
+    .modal-footer {
+        flex-shrink: 0;
+    }
+    
+    /* Fix Select2 dropdown z-index in modals */
+    .select2-container--open {
+        z-index: 1060 !important;
+    }
+    .select2-dropdown {
+        z-index: 1060 !important;
+    }
+    
+    /* DataTable Styles */
+    .dataTables_wrapper .dataTables_filter {
+        float: right;
+        text-align: right;
+    }
+    .dataTables_wrapper .dataTables_length {
+        float: left;
+    }
+    .dataTables_wrapper .dataTables_paginate {
+        float: right;
+        margin-top: 10px;
+    }
+    
+    /* Toast Messages */
+    .success-toast, .error-toast {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 9999;
+        min-width: 300px;
+    }
+    
+    /* Status badges */
+    .active-badge {
+        background-color: #28a745;
+        color: white;
+    }
+    .inactive-badge {
+        background-color: #6c757d;
+        color: white;
+    }
+    
+    /* Department code badge */
+    .code-badge {
+        background-color: #17a2b8;
+        color: white;
+        font-family: monospace;
+    }
+    
+    /* Action buttons */
+    .action-btn-sm {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.75rem;
+        border-radius: 0.2rem;
+    }
+    
+    /* Quick actions container */
+    .quick-actions {
+        display: flex;
+        gap: 4px;
+        justify-content: center;
+        align-items: center;
+    }
+    
+    /* Quick action buttons */
+    .quick-action-btn {
+        width: 28px;
+        height: 28px;
+        padding: 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        border: none;
+        transition: all 0.2s ease;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+    }
+    .quick-action-btn i {
+        font-size: 0.75rem;
+        color: #ffffff !important;
+    }
+    .btn-warning.quick-action-btn i {
+        color: #212529 !important;
+    }
+    .quick-action-btn:hover {
+        transform: scale(1.1);
+        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        filter: brightness(1.05);
+    }
+    .btn-success.quick-action-btn { background-color: #28a745; }
+    .btn-primary.quick-action-btn { background-color: #007bff; }
+    .btn-danger.quick-action-btn  { background-color: #dc3545; }
+    .btn-warning.quick-action-btn { background-color: #ffc107; }
+    .btn-info.quick-action-btn    { background-color: #17a2b8; }
+    .btn-secondary.quick-action-btn { background-color: #6c757d; }
+    
+    /* Form validation */
+    .is-invalid {
+        border-color: #dc3545 !important;
+    }
+    .invalid-feedback {
+        display: none;
+        width: 100%;
+        margin-top: 0.25rem;
+        font-size: 80%;
+        color: #dc3545;
+    }
+    .was-validated .form-control:invalid ~ .invalid-feedback {
+        display: block;
+    }
+    
+    /* Description text area */
+    .description-text {
+        max-height: 100px;
+        overflow-y: auto;
+    }
+    
+    /* Stats cards */
+    .stat-card {
+        border-radius: 10px;
+        padding: 20px;
+        margin-bottom: 20px;
+        color: white;
+        text-align: center;
+    }
+    .stat-card.total {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+    .stat-card.active {
+        background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+    }
+    .stat-card.inactive {
+        background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+    }
+    .stat-card.staff {
+        background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+    }
+    .stat-number {
+        font-size: 2.5rem;
+        font-weight: 800;
+        margin: 10px 0;
+    }
+    .stat-label {
+        font-size: 1rem;
+        opacity: 0.9;
+        margin-bottom: 5px;
+    }
+    
+    /* HOD info */
+    .hod-info {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    .hod-avatar {
+        width: 35px;
+        height: 35px;
+        border-radius: 50%;
+        object-fit: cover;
+        border: 2px solid #dee2e6;
+    }
+    .hod-placeholder {
+        width: 35px;
+        height: 35px;
+        border-radius: 50%;
+        background-color: #6c757d;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 0.9rem;
+    }
+    
+    /* Ensure modal backdrop covers everything */
+    .modal-backdrop {
+        z-index: 1040;
+    }
+    .modal {
+        z-index: 1050;
+    }
+    
+    /* Scrollbar styling for modal */
+    .modal-body::-webkit-scrollbar {
+        width: 8px;
+    }
+    .modal-body::-webkit-scrollbar-track {
+        background: #f1f1f1;
+        border-radius: 4px;
+    }
+    .modal-body::-webkit-scrollbar-thumb {
+        background: #888;
+        border-radius: 4px;
+    }
+    .modal-body::-webkit-scrollbar-thumb:hover {
+        background: #555;
+    }
+    
+    /* Bulk Actions */
+    .bulk-actions-container {
+        background: #f8fafc;
+        border-radius: 10px;
+        padding: 15px;
+        margin-bottom: 20px;
+        border: 1px solid #e2e8f0;
+        display: none;
+        align-items: center;
+        gap: 15px;
+        flex-wrap: wrap;
+    }
+    
+    .selected-count {
+        background: #667eea;
+        color: white;
+        padding: 5px 15px;
+        border-radius: 20px;
+        font-weight: 600;
+        font-size: 0.9rem;
+    }
+    
+    .bulk-action-btn {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    
+    /* Checkbox column styling */
+    .checkbox-column {
+        width: 30px;
+        text-align: center;
+    }
+    
+    /* Responsive adjustments */
+    @media (max-width: 768px) {
+        .bulk-actions-container {
+            flex-direction: column;
+            align-items: stretch;
+        }
+        
+        .bulk-action-btn {
+            width: 100%;
+            justify-content: center;
+        }
+        
+        .hod-info {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 5px;
+        }
+    }
+</style>
+{% endblock extra_css %}
+
+{% block content %}
+<section class="content">
+    <div class="container-fluid">
+        <!-- Success Toast -->
+        <div id="success-toast" class="alert alert-success alert-dismissible fade success-toast" style="display: none;" role="alert">
+            <strong><i class="fas fa-check-circle"></i> Success!</strong> 
+            <span id="success-message"></span>
+            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                <span aria-hidden="true">&times;</span>
+            </button>
+        </div>
+
+        <!-- Error Toast -->
+        <div id="error-toast" class="alert alert-danger alert-dismissible fade error-toast" style="display: none;" role="alert">
+            <strong><i class="fas fa-exclamation-circle"></i> Error!</strong> 
+            <span id="error-message"></span>
+            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                <span aria-hidden="true">&times;</span>
+            </button>
+        </div>
+
+        <!-- Statistics Cards -->
+        <div class="row mb-4">
+            <div class="col-md-3 col-sm-6">
+                <div class="stat-card total">
+                    <div class="stat-label"><i class="fas fa-building me-2"></i> Total Departments</div>
+                    <div class="stat-number">{{ total_departments }}</div>
+                </div>
+            </div>
+            <div class="col-md-3 col-sm-6">
+                <div class="stat-card active">
+                    <div class="stat-label"><i class="fas fa-check-circle me-2"></i> Active</div>
+                    <div class="stat-number">{{ active_departments }}</div>
+                </div>
+            </div>
+            <div class="col-md-3 col-sm-6">
+                <div class="stat-card inactive">
+                    <div class="stat-label"><i class="fas fa-times-circle me-2"></i> Inactive</div>
+                    <div class="stat-number">{{ inactive_departments }}</div>
+                </div>
+            </div>
+            <div class="col-md-3 col-sm-6">
+                <div class="stat-card staff">
+                    <div class="stat-label"><i class="fas fa-user-tie me-2"></i> With HOD</div>
+                    <div class="stat-number">{{ departments_with_hod }}</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bulk Actions Section -->
+        <div class="bulk-actions-container" id="bulkActionsContainer">
+            <div class="d-flex align-items-center flex-wrap gap-2">
+                <span class="selected-count" id="selectedCount">0 selected</span>
+                
+                <button class="btn btn-danger bulk-action-btn" id="bulkDeleteBtn" title="Delete selected departments">
+                    <i class="fas fa-trash"></i> Delete
+                </button>
+                
+                <button class="btn btn-warning bulk-action-btn" id="bulkDeactivateBtn" title="Deactivate selected departments">
+                    <i class="fas fa-toggle-off"></i> Deactivate
+                </button>
+                
+                <button class="btn btn-success bulk-action-btn" id="bulkActivateBtn" title="Activate selected departments">
+                    <i class="fas fa-toggle-on"></i> Activate
+                </button>
+                
+                <button class="btn btn-secondary bulk-action-btn" id="clearSelectionBtn">
+                    <i class="fas fa-times"></i> Clear Selection
+                </button>
+                
+                <button class="btn btn-outline-secondary bulk-action-btn" id="closeBulkActionsBtn">
+                    <i class="fas fa-times-circle"></i> Close
+                </button>
+            </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="d-flex flex-wrap gap-3 align-items-center">
+                    <button type="button" class="btn btn-primary" data-toggle="modal" data-target="#addDepartmentModal">
+                        <i class="fas fa-plus"></i> Add Department
+                    </button>
+                    
+                    <button type="button" class="btn btn-outline-primary" id="bulkSelectToggleBtn">
+                        <i class="fas fa-check-square"></i> Bulk Select
+                    </button>
+                    
+                    <button type="button" class="btn btn-outline-info" id="exportBtn">
+                        <i class="fas fa-file-export"></i> Export
+                    </button>
+                    
+                    <button type="button" class="btn btn-outline-secondary" onclick="window.location.reload()">
+                        <i class="fas fa-sync-alt"></i> Refresh
+                    </button>
+                    
+                    <div class="ml-auto">
+                        <div class="input-group input-group-sm" style="width: 250px;">
+                            <input type="text" class="form-control" placeholder="Search departments..." id="tableSearch">
+                            <div class="input-group-append">
+                                <button class="btn btn-outline-secondary" type="button" id="tableSearchBtn">
+                                    <i class="fas fa-search"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-lg-12">
+                <div class="card shadow-lg">
+                    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                        <h6 class="header-title mb-0 text-uppercase">
+                            <i class="fas fa-building"></i> Department Management
+                        </h6>
+                        <div class="d-flex align-items-center">
+                            <span class="badge badge-light mr-2">Select All:</span>
+                            <input type="checkbox" id="selectAllDepartments" class="form-check-input">
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover text-nowrap table-bordered table-striped display" id="departments-table">
+                                <thead class="bg-light">
+                                    <tr>
+                                        <th class="checkbox-column">
+                                            <input type="checkbox" id="selectAllHeader">
+                                        </th>
+                                        <th>Department Name</th>
+                                        <th>Code</th>
+                                        <th>Description</th>
+                                        <th>Head of Department</th>
+                                        <th>Status</th>
+                                        <th>Created</th>
+                                        <th class="text-center">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for department in departments %}
+                                    <tr id="row-{{ department.id }}">
+                                        <td class="checkbox-column">
+                                            <input type="checkbox" class="department-checkbox" 
+                                                   value="{{ department.id }}" 
+                                                   data-id="{{ department.id }}" 
+                                                   data-name="{{ department.name }}"
+                                                   {% if not department.is_active %}disabled{% endif %}>
+                                        </td>
+                                        <td>
+                                            <strong>{{ department.name }}</strong>
+                                            {% if department.code %}
+                                            <br>
+                                            <small class="text-muted">Ref: {{ department.code }}</small>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <span class="badge code-badge">{{ department.code|default:"N/A" }}</span>
+                                        </td>
+                                        <td>
+                                            <div class="description-text">
+                                                {% if department.description %}
+                                                    {{ department.description|truncatechars:100 }}
+                                                {% else %}
+                                                    <span class="text-muted">No description</span>
+                                                {% endif %}
+                                            </div>
+                                        </td>
+                                        <td>
+                                            {% if department.head_of_department %}
+                                            <div class="hod-info">
+                                                {% if department.head_of_department.profile_picture %}
+                                                    <img src="{{ department.head_of_department.profile_picture.url }}" 
+                                                         alt="{{ department.head_of_department.get_full_name }}" 
+                                                         class="hod-avatar">
+                                                {% else %}
+                                                    <div class="hod-placeholder">
+                                                        <i class="fas fa-user"></i>
+                                                    </div>
+                                                {% endif %}
+                                                <div>
+                                                    <strong>{{ department.head_of_department.get_full_name }}</strong>
+                                                    <br>
+                                                    <small class="text-muted">
+                                                        {{ department.head_of_department.role|default:"Staff" }}
+                                                    </small>
+                                                </div>
+                                            </div>
+                                            {% else %}
+                                            <span class="text-muted">Not assigned</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if department.is_active %}
+                                                <span class="badge active-badge" id="status-badge-{{ department.id }}">
+                                                    <i class="fas fa-check-circle"></i> Active
+                                                </span>
+                                            {% else %}
+                                                <span class="badge inactive-badge" id="status-badge-{{ department.id }}">
+                                                    <i class="fas fa-times-circle"></i> Inactive
+                                                </span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <small>{{ department.created_at|date:"M d, Y" }}</small>
+                                            <br>
+                                            <small class="text-muted">{{ department.created_at|date:"h:i A" }}</small>
+                                        </td>
+                                        <td class="text-center">
+                                            <div class="quick-actions">
+                                                <!-- Quick Status Toggle -->
+                                                {% if department.is_active %}
+                                                <button class="btn btn-sm btn-warning quick-action-btn toggle-status-btn" 
+                                                        data-id="{{ department.id }}"
+                                                        data-name="{{ department.name }}"
+                                                        data-current-status="active"
+                                                        title="Deactivate Department">
+                                                    <i class="fas fa-toggle-off"></i>
+                                                </button>
+                                                {% else %}
+                                                <button class="btn btn-sm btn-success quick-action-btn toggle-status-btn" 
+                                                        data-id="{{ department.id }}"
+                                                        data-name="{{ department.name }}"
+                                                        data-current-status="inactive"
+                                                        title="Activate Department">
+                                                    <i class="fas fa-toggle-on"></i>
+                                                </button>
+                                                {% endif %}
+                                                
+                                                 <!-- View Students Button -->
+                                                <a href="{% url 'admin_department_staff' department.id %}" class="btn btn-sm btn-info quick-action-btn" 
+                                                   title="View Students">
+                                                    <i class="fas fa-users"></i>
+                                                </a>
+                                                
+                                                <!-- Edit Button -->
+                                                <button class="btn btn-sm btn-primary quick-action-btn edit-btn" 
+                                                        data-id="{{ department.id }}"
+                                                        data-name="{{ department.name }}"
+                                                        data-code="{{ department.code }}"
+                                                        data-description="{{ department.description }}"
+                                                        data-hod-id="{{ department.head_of_department.id|default:'' }}"
+                                                        data-is-active="{{ department.is_active|yesno:'true,false' }}"
+                                                        title="Edit Department">
+                                                    <i class="fas fa-edit"></i>
+                                                </button>
+                                                
+                                                <!-- Delete Button -->
+                                                <button class="btn btn-sm btn-danger quick-action-btn delete-btn" 
+                                                        data-id="{{ department.id }}"
+                                                        data-name="{{ department.name }}"
+                                                        title="Delete Department">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>                                 
+                                
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Add Department Modal -->
+<div class="modal fade" id="addDepartmentModal" tabindex="-1" role="dialog" aria-labelledby="addModalLabel" aria-hidden="true" data-backdrop="static" data-keyboard="false">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="addModalLabel">
+                    <i class="fas fa-plus"></i> Add New Department
+                </h5>
+                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <form id="add-form" novalidate>
+                {% csrf_token %}
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-8">
+                            <div class="form-group">
+                                <label for="name">Department Name <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="name" name="name" required 
+                                       placeholder="e.g., Computer Science Department" 
+                                       minlength="3" maxlength="100">
+                                <div class="invalid-feedback">Please enter a department name (3-100 characters).</div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label for="code">Department Code <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="code" name="code" required 
+                                       placeholder="e.g., CS" 
+                                       minlength="2" maxlength="20">
+                                <div class="invalid-feedback">Please enter a department code (2-20 characters).</div>
+                                <small class="form-text text-muted">Short unique code for the department</small>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-12">
+                            <div class="form-group">
+                                <label for="description">Description</label>
+                                <textarea class="form-control" id="description" name="description" 
+                                          rows="4" placeholder="Enter department description..."
+                                          maxlength="500"></textarea>
+                                <small class="form-text text-muted">Optional. Max 500 characters.</small>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-8">
+                            <div class="form-group">
+                                <label for="head_of_department">Head of Department (HOD)</label>
+                                <select class="form-control select2bs4" id="head_of_department" name="head_of_department" style="width: 100%;">
+                                    <option value="">Select HOD (Optional)</option>
+                                    {% for staff in hod_candidates %}
+                                    <option value="{{ staff.id }}">
+                                        {{ staff.get_full_name }} - {{ staff.role|default:"Staff" }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                                <small class="form-text text-muted">Optional. Assign a head of department.</small>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label>Status</label>
+                                <div class="custom-control custom-switch mt-2">
+                                    <input type="checkbox" class="custom-control-input" id="is_active" name="is_active" checked>
+                                    <label class="custom-control-label" for="is_active">
+                                        <span id="active-label">Active</span>
+                                    </label>
+                                    <small class="form-text text-muted d-block">Toggle to activate/deactivate department</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal" id="cancel-add-btn">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="save-btn">
+                        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="display: none;"></span>
+                        Save Department
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Department Modal -->
+<div class="modal fade" id="editDepartmentModal" tabindex="-1" role="dialog" aria-labelledby="editModalLabel" aria-hidden="true" data-backdrop="static" data-keyboard="false">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-warning text-dark">
+                <h5 class="modal-title" id="editModalLabel">
+                    <i class="fas fa-edit"></i> Edit Department
+                </h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <form id="edit-form" novalidate>
+                {% csrf_token %}
+                <input type="hidden" id="edit-id" name="id">
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-8">
+                            <div class="form-group">
+                                <label for="edit-name">Department Name <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="edit-name" name="name" required 
+                                       placeholder="e.g., Computer Science Department" 
+                                       minlength="3" maxlength="100">
+                                <div class="invalid-feedback">Please enter a department name (3-100 characters).</div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label for="edit-code">Department Code <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="edit-code" name="code" required 
+                                       placeholder="e.g., CS" 
+                                       minlength="2" maxlength="20">
+                                <div class="invalid-feedback">Please enter a department code (2-20 characters).</div>
+                                <small class="form-text text-muted">Short unique code for the department</small>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-12">
+                            <div class="form-group">
+                                <label for="edit-description">Description</label>
+                                <textarea class="form-control" id="edit-description" name="description" 
+                                          rows="4" placeholder="Enter department description..."
+                                          maxlength="500"></textarea>
+                                <small class="form-text text-muted">Optional. Max 500 characters.</small>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-8">
+                            <div class="form-group">
+                                <label for="edit-head_of_department">Head of Department (HOD)</label>
+                                <select class="form-control select2bs4" id="edit-head_of_department" name="head_of_department" style="width: 100%;">
+                                    <option value="">Select HOD (Optional)</option>
+                                    {% for staff in hod_candidates %}
+                                    <option value="{{ staff.id }}">
+                                        {{ staff.get_full_name }} - {{ staff.role|default:"Staff" }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                                <small class="form-text text-muted">Optional. Assign a head of department.</small>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label>Status</label>
+                                <div class="custom-control custom-switch mt-2">
+                                    <input type="checkbox" class="custom-control-input" id="edit-is_active" name="is_active">
+                                    <label class="custom-control-label" for="edit-is_active">
+                                        <span id="edit-active-label">Inactive</span>
+                                    </label>
+                                    <small class="form-text text-muted d-block">Toggle to activate/deactivate department</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal" id="cancel-edit-btn">Cancel</button>
+                    <button type="submit" class="btn btn-warning" id="update-btn">
+                        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="display: none;"></span>
+                        Update Department
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- View Details Modal -->
+<div class="modal fade" id="viewDetailsModal" tabindex="-1" role="dialog" aria-labelledby="viewModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-info text-white">
+                <h5 class="modal-title" id="viewModalLabel">
+                    <i class="fas fa-info-circle"></i> Department Details
+                </h5>
+                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="row mb-3">
+                    <div class="col-12">
+                        <h4 id="detail-name" class="text-primary"></h4>
+                        <h5><span class="badge code-badge" id="detail-code"></span></h5>
+                    </div>
+                </div>
+                
+                <div class="row mb-3">
+                    <div class="col-12">
+                        <h6><i class="fas fa-align-left mr-2"></i>Description:</h6>
+                        <p id="detail-description" class="text-muted"></p>
+                    </div>
+                </div>
+                
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <h6><i class="fas fa-user-tie mr-2"></i>Head of Department:</h6>
+                        <p id="detail-hod" class="text-muted"></p>
+                    </div>
+                    <div class="col-md-6">
+                        <h6><i class="fas fa-user-tag mr-2"></i>HOD Role:</h6>
+                        <p id="detail-hod-role" class="text-muted"></p>
+                    </div>
+                </div>
+                
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <h6><i class="fas fa-calendar-alt mr-2"></i>Created:</h6>
+                        <p id="detail-created" class="text-muted"></p>
+                    </div>
+                    <div class="col-md-6">
+                        <h6><i class="fas fa-history mr-2"></i>Last Updated:</h6>
+                        <p id="detail-updated" class="text-muted"></p>
+                    </div>
+                </div>
+                
+                <div class="row">
+                    <div class="col-12">
+                        <h6><i class="fas fa-circle mr-2"></i>Status:</h6>
+                        <span id="detail-status-badge" class="badge"></span>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Department Modal -->
+<div class="modal fade" id="deleteDepartmentModal" tabindex="-1" role="dialog" aria-labelledby="deleteModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="deleteModalLabel">
+                    <i class="fas fa-exclamation-triangle"></i> Confirm Deletion
+                </h5>
+                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete department <strong id="delete-dept-name"></strong>?</p>
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-circle me-2"></i>
+                    <strong>Warning:</strong> This action cannot be undone. Associated staff assignments may be affected.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal" id="cancel-delete-btn">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirm-delete-btn">
+                    <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="display: none;"></span>
+                    Delete
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Confirm Bulk Delete Modal -->
+<div class="modal fade" id="confirmBulkDeleteModal" tabindex="-1" role="dialog" aria-labelledby="confirmBulkDeleteModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="confirmBulkDeleteModalLabel">
+                    <i class="fas fa-exclamation-triangle"></i> Confirm Bulk Deletion
+                </h5>
+                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete <strong id="bulk-delete-count">0</strong> selected department(s)?</p>
+                <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    <strong>Critical Warning:</strong> This action cannot be undone. All selected departments and their associated data will be permanently deleted.
+                </div>
+                <div id="selectedDepartmentsList" class="mt-3" style="max-height: 150px; overflow-y: auto;">
+                    <!-- Selected departments will be listed here -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirm-bulk-delete-btn">
+                    <i class="fas fa-trash"></i> Delete Selected
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+<script>
+    $(document).ready(function() {
+        // CSRF token for AJAX requests
+        function getCSRFToken() {
+            return $('input[name="csrfmiddlewaretoken"]').val();
+        }
+
+        // Show toast message
+        function showToast(message, type = 'success') {
+            const toastId = type === 'success' ? '#success-toast' : '#error-toast';
+            const messageId = type === 'success' ? '#success-message' : '#error-message';
+            
+            $(messageId).text(message);
+            $(toastId).fadeIn().addClass('show');
+            
+            setTimeout(function() {
+                $(toastId).fadeOut(function() {
+                    $(this).removeClass('show');
+                });
+            }, type === 'success' ? 3000 : 5000);
+        }
+
+        // Function to update selected count for BULK actions
+        function updateSelectedCount() {
+            const count = $('.department-checkbox:checked').length;
+            $('#selectedCount').text(`${count} selected`);
+            
+            // Enable/disable bulk buttons
+            $('#bulkDeleteBtn').prop('disabled', count === 0);
+            $('#bulkDeactivateBtn').prop('disabled', count === 0);
+            $('#bulkActivateBtn').prop('disabled', count === 0);
+            $('#bulkActionsContainer').toggle(count > 0);
+            
+            // Update bulk delete modal count
+            $('#bulk-delete-count').text(count);
+            
+            // Update departments list in modal
+            const selectedDepartments = [];
+            $('.department-checkbox:checked').each(function() {
+                const deptId = $(this).data('id');
+                const deptName = $(this).data('name');
+                selectedDepartments.push({ id: deptId, name: deptName });
+            });
+            
+            const deptsList = $('#selectedDepartmentsList');
+            deptsList.empty();
+            
+            if (selectedDepartments.length > 0) {
+                const list = $('<div></div>');
+                selectedDepartments.slice(0, 10).forEach(dept => {
+                    list.append(`<div class="mb-1"><i class="fas fa-building mr-2"></i>${dept.name}</div>`);
+                });
+                
+                if (selectedDepartments.length > 10) {
+                    list.append(`<div class="text-muted">...and ${selectedDepartments.length - 10} more</div>`);
+                }
+                
+                deptsList.append(list);
+            }
+        }
+
+        // Initialize DataTable
+        var table = $('#departments-table').DataTable({
+            "dom": "<'row'<'col-sm-12 col-md-6'l><'col-sm-12 col-md-6'f>>" +
+                   "<'row'<'col-sm-12'tr>>" +
+                   "<'row'<'col-sm-12 col-md-5'i><'col-sm-12 col-md-7'p>>",
+            "lengthMenu": [[10, 25, 50, -1], [10, 25, 50, "All"]],
+            "pageLength": 10,
+            "responsive": true,
+            "autoWidth": false,
+            "ordering": true,
+            "order": [[1, 'asc']], // Sort by department name
+            
+            "destroy": true,
+            "retrieve": true,
+            "deferRender": true,
+            
+            "columnDefs": [
+                { 
+                    "targets": [0, 7], // Checkbox and Actions columns
+                    "orderable": false,
+                    "searchable": false
+                }
+            ],
+            
+            "language": {
+                "emptyTable": "<div class='text-center py-4'><i class='fas fa-building fa-2x mb-2'></i><br>No departments found. Click \"Add Department\" to create one.</div>",
+                "search": "_INPUT_",
+                "searchPlaceholder": "Search departments...",
+                "lengthMenu": "_MENU_ departments per page",
+                "info": "Showing _START_ to _END_ of _TOTAL_ departments",
+                "infoEmpty": "Showing 0 to 0 of 0 departments",
+                "infoFiltered": "(filtered from _MAX_ total departments)",
+                "paginate": {
+                    "first": "First",
+                    "last": "Last",
+                    "next": "Next",
+                    "previous": "Previous"
+                }
+            },
+            "drawCallback": function(settings) {
+                // Update stats if needed
+            }
+        });
+
+        // Table search functionality
+        $('#tableSearch').on('keyup', function() {
+            table.search(this.value).draw();
+        });
+        
+        $('#tableSearchBtn').on('click', function() {
+            table.search($('#tableSearch').val()).draw();
+        });
+
+        // Toggle switch label updates
+        function updateSwitchLabels() {
+            $('#is_active').on('change', function() {
+                $('#active-label').text($(this).is(':checked') ? 'Active' : 'Inactive');
+            });
+            
+            $('#edit-is_active').on('change', function() {
+                $('#edit-active-label').text($(this).is(':checked') ? 'Active' : 'Inactive');
+            });
+        }
+        
+        // Initialize switch labels
+        updateSwitchLabels();
+
+        // Select2 initialization
+        function initializeSelect2() {
+            $('.select2bs4').each(function() {
+                $(this).select2({
+                    theme: 'bootstrap4',
+                    dropdownParent: $(this).closest('.modal'),
+                    width: '100%',
+                    placeholder: $(this).attr('placeholder') || 'Select an option',
+                    allowClear: false
+                });
+            });
+        }
+        
+        // Reinitialize Select2 when modals are shown
+        $('#addDepartmentModal').on('shown.bs.modal', function() {
+            $('#addDepartmentModal .select2bs4').each(function() {
+                if ($(this).hasClass('select2-hidden-accessible')) {
+                    $(this).select2('destroy');
+                }
+                $(this).select2({
+                    theme: 'bootstrap4',
+                    dropdownParent: $('#addDepartmentModal'),
+                    width: '100%',
+                    placeholder: $(this).attr('placeholder') || 'Select an option',
+                    allowClear: false
+                });
+            });
+            
+            // Reset form
+            $('#add-form')[0].reset();
+            $('#add-form').find('.is-invalid').removeClass('is-invalid');
+            $('#add-form').find('.invalid-feedback').hide();
+            $('#active-label').text('Active');
+            $('#is_active').prop('checked', true);
+        });
+
+        $('#editDepartmentModal').on('shown.bs.modal', function() {
+            $('#editDepartmentModal .select2bs4').each(function() {
+                if ($(this).hasClass('select2-hidden-accessible')) {
+                    $(this).select2('destroy');
+                }
+                $(this).select2({
+                    theme: 'bootstrap4',
+                    dropdownParent: $('#editDepartmentModal'),
+                    width: '100%',
+                    placeholder: $(this).attr('placeholder') || 'Select an option',
+                    allowClear: false
+                });
+            });
+        });
+
+        // Destroy Select2 when modals are hidden
+        $('#addDepartmentModal').on('hidden.bs.modal', function() {
+            $('#addDepartmentModal .select2bs4').select2('destroy');
+        });
+
+        $('#editDepartmentModal').on('hidden.bs.modal', function() {
+            $('#editDepartmentModal .select2bs4').select2('destroy');
+            $('#edit-form')[0].reset();
+            $('#edit-form').find('.is-invalid').removeClass('is-invalid');
+            $('#edit-form').find('.invalid-feedback').hide();
+            setButtonLoading($('#update-btn'), false);
+        });
+
+        // Helper function to handle button loading state
+        function setButtonLoading(btn, isLoading) {
+            const spinner = btn.find('.spinner-border');
+            if (isLoading) {
+                btn.data('original-text', btn.html());
+                btn.prop('disabled', true);
+                spinner.show();
+                btn.html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>');
+            } else {
+                btn.prop('disabled', false);
+                spinner.hide();
+                if (btn.data('original-text')) {
+                    btn.html(btn.data('original-text'));
+                }
+            }
+        }
+
+        // Form validation
+        function validateDepartmentForm(formId, isEdit = false) {
+            const form = $('#' + formId);
+            let isValid = true;
+            
+            // Clear previous validation
+            form.find('.is-invalid').removeClass('is-invalid');
+            form.find('.invalid-feedback').hide();
+            
+            // Required fields
+            const requiredFields = ['name', 'code'];
+            
+            requiredFields.forEach(field => {
+                const input = form.find('[name="' + field + '"]');
+                if (input.length && (!input.val() || input.val().trim() === '')) {
+                    input.addClass('is-invalid');
+                    input.next('.invalid-feedback').show().text('This field is required.');
+                    isValid = false;
+                }
+            });
+            
+            // Name length validation
+            const nameInput = form.find('[name="name"]');
+            if (nameInput.val() && nameInput.val().length < 3) {
+                nameInput.addClass('is-invalid');
+                nameInput.next('.invalid-feedback').show().text('Department name must be at least 3 characters long.');
+                isValid = false;
+            }
+            
+            // Code length validation
+            const codeInput = form.find('[name="code"]');
+            if (codeInput.val() && codeInput.val().length < 2) {
+                codeInput.addClass('is-invalid');
+                codeInput.next('.invalid-feedback').show().text('Department code must be at least 2 characters long.');
+                isValid = false;
+            }
+            
+            return isValid;
+        }
+
+        // BULK SELECTION FUNCTIONALITY
+        var isBulkMode = false;
+        
+        $('#bulkSelectToggleBtn').on('click', function() {
+            isBulkMode = !isBulkMode;
+            
+            if (isBulkMode) {
+                $(this).html('<i class="fas fa-check-square"></i> Exit Bulk Mode');
+                $(this).removeClass('btn-outline-primary').addClass('btn-primary');
+                $('.checkbox-column').show();
+                $('#selectAllHeader').prop('checked', false);
+                $('#selectAllDepartments').prop('checked', false);
+                updateSelectedCount();
+            } else {
+                $(this).html('<i class="fas fa-check-square"></i> Bulk Select');
+                $(this).removeClass('btn-primary').addClass('btn-outline-primary');
+                $('.checkbox-column').hide();
+                $('.department-checkbox').prop('checked', false);
+                $('#bulkActionsContainer').hide();
+            }
+            
+            // Trigger DataTable redraw
+            table.columns.adjust().draw();
+        });
+        
+        // Initially hide checkbox column
+        $('.checkbox-column').hide();
+        
+        // Select all header checkbox (for BULK)
+        $('#selectAllHeader').on('change', function() {
+            const isChecked = $(this).prop('checked');
+            $('#selectAllDepartments').prop('checked', isChecked);
+            $('.department-checkbox:enabled').prop('checked', isChecked);
+            updateSelectedCount();
+        });
+        
+        // Select all departments checkbox (outside table - for BULK)
+        $('#selectAllDepartments').on('change', function() {
+            const isChecked = $(this).prop('checked');
+            $('#selectAllHeader').prop('checked', isChecked);
+            $('.department-checkbox:enabled').prop('checked', isChecked);
+            updateSelectedCount();
+        });
+        
+        // Individual checkbox change (for BULK)
+        $(document).on('change', '.department-checkbox', function() {
+            updateSelectedCount();
+            
+            // Update select all header
+            const totalCheckboxes = $('.department-checkbox:enabled').length;
+            const checkedCheckboxes = $('.department-checkbox:checked').length;
+            $('#selectAllHeader').prop('checked', totalCheckboxes > 0 && totalCheckboxes === checkedCheckboxes);
+            $('#selectAllDepartments').prop('checked', totalCheckboxes > 0 && totalCheckboxes === checkedCheckboxes);
+        });
+        
+        // Clear selection button (for BULK)
+        $('#clearSelectionBtn').on('click', function() {
+            $('.department-checkbox, #selectAllHeader, #selectAllDepartments').prop('checked', false);
+            updateSelectedCount();
+        });
+        
+        // Close bulk actions button
+        $('#closeBulkActionsBtn').on('click', function() {
+            $('#bulkActionsContainer').hide();
+            $('.department-checkbox, #selectAllHeader, #selectAllDepartments').prop('checked', false);
+        });
+
+        // BULK DELETE
+        $('#bulkDeleteBtn').on('click', function() {
+            const selectedCount = $('.department-checkbox:checked').length;
+            if (selectedCount === 0) {
+                showToast('No departments selected', 'error');
+                return;
+            }
+            
+            $('#confirmBulkDeleteModal').modal('show');
+        });
+        
+        // Confirm bulk delete
+        $('#confirm-bulk-delete-btn').click(function(e) {
+            e.preventDefault();
+            
+            const selectedDepartments = [];
+            $('.department-checkbox:checked').each(function() {
+                selectedDepartments.push({
+                    id: $(this).data('id'),
+                    name: $(this).data('name')
+                });
+            });
+            
+            if (selectedDepartments.length === 0) return;
+            
+            const $btn = $(this);
+            const originalText = $btn.html();
+            $btn.html('<i class="fas fa-spinner fa-spin"></i> Deleting...');
+            $btn.prop('disabled', true);
+            
+            // Create form data
+            const formData = new FormData();
+            selectedDepartments.forEach(function(dept) {
+                formData.append('department_ids[]', dept.id);
+            });
+            formData.append('action', 'bulk_delete');
+            formData.append('csrfmiddlewaretoken', getCSRFToken());
+            
+            // Send AJAX request
+            $.ajax({
+                url: '{% url "admin_departments_crud" %}',
+                type: 'POST',
+                data: formData,
+                processData: false,
+                contentType: false,
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                success: function(response) {
+                    if (response.success) {
+                        // Remove rows from table
+                        selectedDepartments.forEach(function(dept) {
+                            table.row('#row-' + dept.id).remove().draw();
+                        });
+                        
+                        // Hide modals and reset selection
+                        $('#confirmBulkDeleteModal').modal('hide');
+                        $('#bulkActionsContainer').hide();
+                        $('.department-checkbox, #selectAllHeader, #selectAllDepartments').prop('checked', false);
+                        isBulkMode = false;
+                        $('#bulkSelectToggleBtn').html('<i class="fas fa-check-square"></i> Bulk Select')
+                            .removeClass('btn-primary').addClass('btn-outline-primary');
+                        $('.checkbox-column').hide();
+                        table.columns.adjust().draw();
+                        
+                        showToast(response.message, 'success');
+                        
+                    } else {
+                        showToast(response.message, 'error');
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error:', error);
+                    showToast('An error occurred. Please try again.', 'error');
+                },
+                complete: function() {
+                    $btn.html(originalText).prop('disabled', false);
+                }
+            });
+        });
+
+        // BULK ACTIVATE/DEACTIVATE
+        $('#bulkActivateBtn').on('click', function() {
+            bulkToggleStatus('activate');
+        });
+        
+        $('#bulkDeactivateBtn').on('click', function() {
+            bulkToggleStatus('deactivate');
+        });
+        
+        function bulkToggleStatus(action) {
+            const selectedCount = $('.department-checkbox:checked').length;
+            if (selectedCount === 0) {
+                showToast('No departments selected', 'error');
+                return;
+            }
+            
+            const actionText = action === 'activate' ? 'activate' : 'deactivate';
+            if (!confirm(`Are you sure you want to ${actionText} ${selectedCount} department(s)?`)) {
+                return;
+            }
+            
+            const selectedDepartments = [];
+            $('.department-checkbox:checked').each(function() {
+                selectedDepartments.push({
+                    id: $(this).data('id'),
+                    name: $(this).data('name')
+                });
+            });
+            
+            const formData = new FormData();
+            selectedDepartments.forEach(function(dept) {
+                formData.append('department_ids[]', dept.id);
+            });
+            formData.append('action', 'bulk_toggle_status');
+            formData.append('status_action', action);
+            formData.append('csrfmiddlewaretoken', getCSRFToken());
+            
+            $.ajax({
+                url: '{% url "admin_departments_crud" %}',
+                type: 'POST',
+                data: formData,
+                processData: false,
+                contentType: false,
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                success: function(response) {
+                    if (response.success) {
+                        // Update UI for each department
+                        selectedDepartments.forEach(function(dept) {
+                            updateDepartmentUI(dept.id, { is_active: response.status });
+                        });
+                        
+                        // Hide bulk actions and reset selection
+                        $('#bulkActionsContainer').hide();
+                        $('.department-checkbox, #selectAllHeader, #selectAllDepartments').prop('checked', false);
+                        
+                        showToast(response.message, 'success');
+                        
+                    } else {
+                        showToast(response.message, 'error');
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error:', error);
+                    showToast('An error occurred. Please try again.', 'error');
+                }
+            });
+        }
+
+        // Function to update UI without reload
+        function updateDepartmentUI(deptId, data) {
+            const statusBadge = $('#status-badge-' + deptId);
+            const statusBtn = $('.toggle-status-btn[data-id="' + deptId + '"]');
+            const checkbox = $('.department-checkbox[data-id="' + deptId + '"]');
+            
+            if (data.hasOwnProperty('is_active')) {
+                if (data.is_active) {
+                    statusBadge.removeClass('badge-secondary inactive-badge').addClass('badge-success active-badge')
+                        .html('<i class="fas fa-check-circle"></i> Active');
+                    statusBtn.removeClass('btn-success').addClass('btn-warning')
+                        .attr('title', 'Deactivate Department')
+                        .html('<i class="fas fa-toggle-off"></i>')
+                        .attr('data-current-status', 'active');
+                    checkbox.prop('disabled', false);
+                } else {
+                    statusBadge.removeClass('badge-success active-badge').addClass('badge-secondary inactive-badge')
+                        .html('<i class="fas fa-times-circle"></i> Inactive');
+                    statusBtn.removeClass('btn-warning').addClass('btn-success')
+                        .attr('title', 'Activate Department')
+                        .html('<i class="fas fa-toggle-on"></i>')
+                        .attr('data-current-status', 'inactive');
+                    checkbox.prop('disabled', true);
+                }
+            }
+        }
+
+        // Add Department
+        $('#add-form').on('submit', function(e) {
+            e.preventDefault();
+            
+            if (!validateDepartmentForm('add-form')) {
+                return;
+            }
+            
+            const saveBtn = $('#save-btn');
+            setButtonLoading(saveBtn, true);
+            
+            const formData = new FormData(this);
+            formData.append('action', 'create');
+            
+            $.ajax({
+                url: '{% url "admin_departments_crud" %}',
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCSRFToken(),
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function(data) {
+                    if (data.success) {
+                        $('#addDepartmentModal').modal('hide');
+                        showToast(data.message, 'success');
+                        setTimeout(function() {
+                            location.reload();
+                        }, 1500);
+                    } else {
+                        showToast(data.message, 'danger');
+                        setButtonLoading(saveBtn, false);
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error:', error);
+                    showToast('An error occurred while saving. Please try again.', 'danger');
+                    setButtonLoading(saveBtn, false);
+                }
+            });
+        });
+
+        // Edit Department - Setup modal
+        $(document).on('click', '.edit-btn', function() {
+            const btn = $(this);
+            
+            $('#edit-id').val(btn.data('id'));
+            $('#edit-name').val(btn.data('name'));
+            $('#edit-code').val(btn.data('code'));
+            $('#edit-description').val(btn.data('description'));
+            
+            // Set HOD
+            const hodId = btn.data('hod-id');
+            const isActive = btn.data('is-active') === 'true';
+            
+            // Show modal first
+            $('#editDepartmentModal').modal('show');
+            
+            // Set values after a short delay
+            setTimeout(function() {
+                if (hodId) {
+                    $('#edit-head_of_department').val(hodId).trigger('change.select2');
+                }
+                
+                // Set checkbox state
+                $('#edit-is_active').prop('checked', isActive);
+                $('#edit-active-label').text(isActive ? 'Active' : 'Inactive');
+                
+            }, 300);
+        });
+
+        // Edit Department - Submit form
+        $('#edit-form').on('submit', function(e) {
+            e.preventDefault();
+            
+            if (!validateDepartmentForm('edit-form', true)) {
+                return;
+            }
+            
+            const updateBtn = $('#update-btn');
+            setButtonLoading(updateBtn, true);
+            
+            const formData = new FormData(this);
+            formData.append('action', 'update');
+            
+            $.ajax({
+                url: '{% url "admin_departments_crud" %}',
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCSRFToken(),
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function(data) {
+                    if (data.success) {
+                        $('#editDepartmentModal').modal('hide');
+                        showToast(data.message, 'success');
+                        setTimeout(function() {
+                            location.reload();
+                        }, 1500);
+                    } else {
+                        showToast(data.message, 'danger');
+                        setButtonLoading(updateBtn, false);
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error:', error);
+                    showToast('An error occurred while updating. Please try again.', 'danger');
+                    setButtonLoading(updateBtn, false);
+                }
+            });
+        });
+
+        // View Department Details
+        $(document).on('click', '.view-details-btn', function() {
+            const btn = $(this);
+            
+            $('#detail-name').text(btn.data('name'));
+            $('#detail-code').text(btn.data('code'));
+            
+            // Description
+            const description = btn.data('description') || 'No description provided';
+            $('#detail-description').text(description);
+            
+            // HOD Details
+            $('#detail-hod').text(btn.data('hod-name'));
+            $('#detail-hod-role').text(btn.data('hod-role') || 'Not specified');
+            
+            // Dates
+            $('#detail-created').text(btn.data('created'));
+            $('#detail-updated').text(btn.data('updated'));
+            
+            // Status
+            const status = btn.data('status');
+            const statusBadge = $('#detail-status-badge');
+            statusBadge.removeClass('badge-success badge-secondary');
+            
+            if (status === 'Active') {
+                statusBadge.addClass('badge-success').html('<i class="fas fa-check-circle"></i> Active');
+            } else {
+                statusBadge.addClass('badge-secondary').html('<i class="fas fa-times-circle"></i> Inactive');
+            }
+            
+            $('#viewDetailsModal').modal('show');
+        });
+
+        // Toggle Department Status (single)
+        $(document).on('click', '.toggle-status-btn', function() {
+            const btn = $(this);
+            const deptId = btn.data('id');
+            const deptName = btn.data('name');
+            const currentStatus = btn.data('current-status');
+            const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
+            const actionText = currentStatus === 'active' ? 'deactivate' : 'activate';
+            
+            if (confirm(`Are you sure you want to ${actionText} "${deptName}"?`)) {
+                setButtonLoading(btn, true);
+                
+                $.ajax({
+                    url: '{% url "admin_departments_crud" %}',
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': getCSRFToken(),
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    data: {
+                        'action': 'toggle_status',
+                        'id': deptId,
+                        'csrfmiddlewaretoken': getCSRFToken()
+                    },
+                    success: function(data) {
+                        if (data.success) {
+                            updateDepartmentUI(deptId, { is_active: data.is_active });
+                            showToast(data.message, 'success');
+                        } else {
+                            showToast(data.message, 'danger');
+                        }
+                        setButtonLoading(btn, false);
+                    },
+                    error: function(xhr, status, error) {
+                        console.error('Error:', error);
+                        showToast('An error occurred while updating status. Please try again.', 'danger');
+                        setButtonLoading(btn, false);
+                    }
+                });
+            }
+        });
+
+        // Delete Department - Setup modal
+        let deptToDelete = null;
+        
+        $(document).on('click', '.delete-btn', function() {
+            const btn = $(this);
+            
+            deptToDelete = {
+                id: btn.data('id'),
+                name: btn.data('name')
+            };
+            
+            $('#delete-dept-name').text(btn.data('name'));
+            $('#deleteDepartmentModal').modal('show');
+        });
+
+        // Delete Department - Confirm
+        $('#confirm-delete-btn').on('click', function() {
+            if (!deptToDelete) return;
+            
+            const deleteBtn = $(this);
+            setButtonLoading(deleteBtn, true);
+            
+            $.ajax({
+                url: '{% url "admin_departments_crud" %}',
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCSRFToken(),
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                data: {
+                    'action': 'delete',
+                    'id': deptToDelete.id,
+                    'csrfmiddlewaretoken': getCSRFToken()
+                },
+                success: function(data) {
+                    if (data.success) {
+                        $('#deleteDepartmentModal').modal('hide');
+                        showToast(data.message, 'success');
+                        setTimeout(function() {
+                            location.reload();
+                        }, 1500);
+                    } else {
+                        showToast(data.message, 'danger');
+                        setButtonLoading(deleteBtn, false);
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error:', error);
+                    showToast('An error occurred while deleting. Please try again.', 'danger');
+                    setButtonLoading(deleteBtn, false);
+                }
+            });
+        });
+
+        // Export functionality
+        $('#exportBtn').on('click', function() {
+            showToast('Export feature coming soon!', 'info');
+        });
+
+        // Handle modal close/cancel buttons
+        $(document).on('click', '[data-dismiss="modal"]', function(e) {
+            e.preventDefault();
+            $(this).closest('.modal').modal('hide');
+        });
+
+        // Clear form and reset button state on modal close
+        $('#addDepartmentModal').on('hidden.bs.modal', function() {
+            $('#add-form')[0].reset();
+            $('#add-form').find('.is-invalid').removeClass('is-invalid');
+            $('#add-form').find('.invalid-feedback').hide();
+            setButtonLoading($('#save-btn'), false);
+        });
+        
+        $('#deleteDepartmentModal').on('hidden.bs.modal', function() {
+            deptToDelete = null;
+            setButtonLoading($('#confirm-delete-btn'), false);
+        });
+        
+        $('#confirmBulkDeleteModal').on('hidden.bs.modal', function() {
+            $('#confirm-bulk-delete-btn').html('<i class="fas fa-trash"></i> Delete Selected').prop('disabled', false);
+        });
+
+        // Real-time validation
+        $('input, select, textarea').on('blur', function() {
+            if ($(this).hasClass('is-invalid')) {
+                $(this).removeClass('is-invalid');
+                $(this).next('.invalid-feedback').hide();
+            }
+        });
+    });
+</script>
+{% endblock extra_js %}

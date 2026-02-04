@@ -1,0 +1,3318 @@
+{% extends 'admin/base.html' %}
+{% load static %}
+{% load custom_filters %}
+
+{% block title %}Monthly Attendance Report - {{ month_name }}{% endblock %}
+
+{% block breadcrumb %}
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'admin_dashboard' %}">Dashboard</a></li>        
+        <li class="breadcrumb-item"><a href="{% url 'attendance_report_monthly' %}">Monthly Reports</a></li>
+        <li class="breadcrumb-item active" aria-current="page">{{ month_name }}</li>
+    </ol>
+</nav>
+{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.1/font/bootstrap-icons.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css">
+<style>
+    /* ===== ROOT VARIABLES ===== */
+    :root {
+        --primary-color: #2c3e50;
+        --secondary-color: #3498db;
+        --success-color: #27ae60;
+        --danger-color: #e74c3c;
+        --warning-color: #f39c12;
+        --info-color: #17a2b8;
+        --light-color: #f8f9fa;
+        --dark-color: #343a40;
+        --border-radius: 10px;
+        --box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        --transition: all 0.3s ease;
+        --sidebar-width: 280px;
+    }
+
+    /* ===== RESPONSIVE BREAKPOINTS ===== */
+    @media (max-width: 576px) {
+        .container-fluid {
+            padding-left: 0.5rem;
+            padding-right: 0.5rem;
+        }
+        
+        .report-header {
+            padding: 1rem;
+            margin-bottom: 1rem;
+        }
+        
+        .report-title {
+            font-size: 1.5rem;
+        }
+    }
+
+    /* ===== PAGE HEADER ===== */
+    .report-header {
+        background: linear-gradient(135deg, var(--primary-color) 0%, #34495e 100%);
+        color: white;
+        border-radius: var(--border-radius);
+        padding: 1.5rem;
+        margin-bottom: 2rem;
+        box-shadow: var(--box-shadow);
+        position: relative;
+        overflow: hidden;
+    }
+
+    .report-header::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        right: 0;
+        width: 200px;
+        height: 200px;
+        background: rgba(255,255,255,0.1);
+        border-radius: 50%;
+        transform: translate(30%, -30%);
+    }
+
+    .report-header::after {
+        content: '';
+        position: absolute;
+        bottom: -50px;
+        left: -50px;
+        width: 150px;
+        height: 150px;
+        background: rgba(255,255,255,0.05);
+        border-radius: 50%;
+    }
+
+    .report-title {
+        font-size: 2rem;
+        font-weight: 700;
+        margin-bottom: 0.5rem;
+        position: relative;
+        z-index: 1;
+    }
+
+    .report-subtitle {
+        font-size: 1rem;
+        opacity: 0.9;
+        margin-bottom: 0.5rem;
+        position: relative;
+        z-index: 1;
+    }
+
+    .month-display {
+        background: rgba(255,255,255,0.15);
+        backdrop-filter: blur(10px);
+        border-radius: 8px;
+        padding: 0.75rem 1.5rem;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.75rem;
+        font-weight: 600;
+        position: relative;
+        z-index: 1;
+        border: 1px solid rgba(255,255,255,0.2);
+    }
+
+    .month-display i {
+        font-size: 1.25rem;
+    }
+
+    /* ===== FILTER SECTION ===== */
+    .filter-section {
+        background: white;
+        border-radius: var(--border-radius);
+        padding: 1.5rem;
+        margin-bottom: 2rem;
+        box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+        border: 1px solid #e9ecef;
+        position: relative;
+    }
+
+    .filter-section .form-label {
+        font-weight: 600;
+        color: var(--primary-color);
+        margin-bottom: 0.5rem;
+        font-size: 0.9rem;
+    }
+
+    .form-control, .form-select {
+        border: 1px solid #dee2e6;
+        border-radius: 6px;
+        padding: 0.6rem 0.75rem;
+        transition: var(--transition);
+        font-size: 0.9rem;
+    }
+
+    .form-control:focus, .form-select:focus {
+        border-color: var(--secondary-color);
+        box-shadow: 0 0 0 0.2rem rgba(52, 152, 219, 0.25);
+        outline: none;
+    }
+
+    /* ===== STATISTICS CARDS ===== */
+    .stats-container {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 1.25rem;
+        margin-bottom: 2rem;
+    }
+
+    .stat-card {
+        background: white;
+        border-radius: var(--border-radius);
+        padding: 1.25rem;
+        box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+        border: 1px solid #e9ecef;
+        transition: var(--transition);
+        position: relative;
+        overflow: hidden;
+        cursor: pointer;
+    }
+
+    .stat-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+    }
+
+    .stat-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 4px;
+    }
+
+    .stat-card.overall::before { background: linear-gradient(90deg, var(--secondary-color), #2980b9); }
+    .stat-card.present::before { background: linear-gradient(90deg, var(--success-color), #219653); }
+    .stat-card.absent::before { background: linear-gradient(90deg, var(--danger-color), #c0392b); }
+    .stat-card.late::before { background: linear-gradient(90deg, var(--warning-color), #e67e22); }
+    .stat-card.excused::before { background: linear-gradient(90deg, var(--info-color), #16a085); }
+    .stat-card.days::before { background: linear-gradient(90deg, #6f42c1, #8e44ad); }
+
+    .stat-card-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 0.75rem;
+    }
+
+    .stat-card-icon {
+        width: 44px;
+        height: 44px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.25rem;
+        transition: var(--transition);
+    }
+
+    .stat-card:hover .stat-card-icon {
+        transform: scale(1.1);
+    }
+
+    .stat-card.overall .stat-card-icon { background: rgba(52, 152, 219, 0.15); color: var(--secondary-color); }
+    .stat-card.present .stat-card-icon { background: rgba(39, 174, 96, 0.15); color: var(--success-color); }
+    .stat-card.absent .stat-card-icon { background: rgba(231, 76, 60, 0.15); color: var(--danger-color); }
+    .stat-card.late .stat-card-icon { background: rgba(243, 156, 18, 0.15); color: var(--warning-color); }
+    .stat-card.excused .stat-card-icon { background: rgba(23, 162, 184, 0.15); color: var(--info-color); }
+    .stat-card.days .stat-card-icon { background: rgba(111, 66, 193, 0.15); color: #6f42c1; }
+
+    .stat-value {
+        font-size: 2.25rem;
+        font-weight: 800;
+        line-height: 1;
+        margin-bottom: 0.25rem;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        transition: var(--transition);
+    }
+
+    .stat-card:hover .stat-value {
+        transform: scale(1.05);
+    }
+
+    .stat-card.overall .stat-value { color: var(--secondary-color); }
+    .stat-card.present .stat-value { color: var(--success-color); }
+    .stat-card.absent .stat-value { color: var(--danger-color); }
+    .stat-card.late .stat-value { color: var(--warning-color); }
+    .stat-card.excused .stat-value { color: var(--info-color); }
+    .stat-card.days .stat-value { color: #6f42c1; }
+
+    .stat-label {
+        font-size: 0.85rem;
+        color: #6c757d;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        font-weight: 600;
+        margin-bottom: 0.5rem;
+    }
+
+    .stat-detail {
+        font-size: 0.8rem;
+        color: #adb5bd;
+        margin-top: 0.5rem;
+    }
+
+    .progress {
+        height: 6px;
+        border-radius: 3px;
+        background: #e9ecef;
+        overflow: hidden;
+        margin-top: 0.75rem;
+    }
+
+    .progress-bar {
+        border-radius: 3px;
+        transition: width 1s ease-in-out;
+    }
+
+    /* ===== CALENDAR NAVIGATION ===== */
+    .calendar-navigation {
+        background: white;
+        border-radius: var(--border-radius);
+        padding: 1rem 1.5rem;
+        margin-bottom: 2rem;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        border: 1px solid #e9ecef;
+    }
+
+    .nav-arrow {
+        width: 40px;
+        height: 40px;
+        border-radius: 8px;
+        background: var(--light-color);
+        border: 1px solid #dee2e6;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--primary-color);
+        text-decoration: none;
+        transition: var(--transition);
+    }
+
+    .nav-arrow:hover {
+        background: var(--secondary-color);
+        color: white;
+        border-color: var(--secondary-color);
+        transform: translateY(-2px);
+    }
+
+    .current-month {
+        font-size: 1.5rem;
+        font-weight: 600;
+        color: var(--primary-color);
+        margin: 0;
+    }
+
+    .month-indicator {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.9rem;
+        color: #6c757d;
+    }
+
+    /* ===== VIEW TOGGLE ===== */
+    .view-toggle-container {
+        background: white;
+        border-radius: var(--border-radius);
+        padding: 1rem;
+        margin-bottom: 2rem;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        border: 1px solid #e9ecef;
+    }
+
+    .view-toggle {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 0.5rem;
+    }
+
+    .view-btn {
+        padding: 0.75rem;
+        border: 2px solid #e9ecef;
+        border-radius: 8px;
+        background: white;
+        color: #6c757d;
+        font-weight: 500;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        transition: var(--transition);
+        cursor: pointer;
+        text-decoration: none;
+    }
+
+    .view-btn:hover {
+        border-color: var(--secondary-color);
+        color: var(--secondary-color);
+        transform: translateY(-2px);
+    }
+
+    .view-btn.active {
+        background: var(--secondary-color);
+        border-color: var(--secondary-color);
+        color: white;
+        box-shadow: 0 4px 12px rgba(52, 152, 219, 0.3);
+    }
+
+    /* ===== WEEKLY SUMMARY ===== */
+    .weekly-summary-section {
+        margin-bottom: 2rem;
+    }
+
+    .week-card {
+        background: white;
+        border-radius: var(--border-radius);
+        padding: 1.25rem;
+        margin-bottom: 1rem;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        border: 1px solid #e9ecef;
+        border-left: 4px solid var(--secondary-color);
+        transition: var(--transition);
+        cursor: pointer;
+    }
+
+    .week-card:hover {
+        transform: translateX(5px);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }
+
+    .week-card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 0.75rem;
+    }
+
+    .week-title {
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: var(--primary-color);
+        margin: 0;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .week-date {
+        font-size: 0.85rem;
+        color: #6c757d;
+    }
+
+    .week-rate {
+        font-size: 1rem;
+        font-weight: 600;
+        padding: 0.4rem 1rem;
+        border-radius: 20px;
+    }
+
+    .rate-high { background: #d4edda; color: #155724; }
+    .rate-medium { background: #fff3cd; color: #856404; }
+    .rate-low { background: #f8d7da; color: #721c24; }
+
+    .week-stats {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 1rem;
+        font-size: 0.85rem;
+    }
+
+    .week-stat-item {
+        text-align: center;
+    }
+
+    .week-stat-value {
+        font-weight: 600;
+        color: var(--primary-color);
+        display: block;
+    }
+
+    .week-stat-label {
+        color: #6c757d;
+        font-size: 0.8rem;
+        margin-top: 0.25rem;
+    }
+
+    /* ===== MONTHLY CALENDAR ===== */
+    .monthly-calendar-section {
+        background: white;
+        border-radius: var(--border-radius);
+        padding: 1.5rem;
+        margin-bottom: 2rem;
+        box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+        border: 1px solid #e9ecef;
+    }
+
+    .calendar-header {
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        gap: 0.25rem;
+        margin-bottom: 0.5rem;
+        text-align: center;
+    }
+
+    .calendar-day-header {
+        font-weight: 600;
+        color: var(--primary-color);
+        padding: 0.5rem;
+        background: #f8f9fa;
+        border-radius: 6px;
+        font-size: 0.9rem;
+        text-overflow: ellipsis;
+        overflow: hidden;
+        white-space: nowrap;
+    }
+
+    .calendar-body {
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        gap: 0.25rem;
+        min-height: 300px;
+    }
+
+    .calendar-day {
+        background: white;
+        border: 1px solid #e9ecef;
+        border-radius: 6px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+        transition: var(--transition);
+        cursor: pointer;
+        min-height: 60px;
+        padding: 0.25rem;
+    }
+
+    .calendar-day:hover {
+        border-color: var(--secondary-color);
+        transform: scale(1.02);
+    }
+
+    .calendar-day.has-data {
+        border-color: var(--success-color);
+        background: rgba(39, 174, 96, 0.05);
+    }
+
+    .calendar-day.empty {
+        background: #f8f9fa;
+        border-color: #e9ecef;
+        cursor: default;
+    }
+
+    .calendar-date {
+        font-weight: 600;
+        color: var(--primary-color);
+        font-size: 1rem;
+        margin-bottom: 0.25rem;
+    }
+
+    .calendar-stats {
+        font-size: 0.65rem;
+        color: #6c757d;
+        text-align: center;
+        line-height: 1.2;
+    }
+
+    .calendar-day.current-day .calendar-date {
+        background: var(--secondary-color);
+        color: white;
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 0.25rem;
+    }
+
+    /* ===== CLASS SUMMARY ===== */
+    .class-summary-section {
+        margin-bottom: 2rem;
+    }
+
+    .class-summary-card {
+        background: white;
+        border-radius: var(--border-radius);
+        padding: 1.25rem;
+        margin-bottom: 1rem;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        border: 1px solid #e9ecef;
+        transition: var(--transition);
+        cursor: pointer;
+    }
+
+    .class-summary-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }
+
+    .class-summary-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 0.75rem;
+    }
+
+    .class-name {
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: var(--primary-color);
+        margin: 0;
+    }
+
+    .class-stream {
+        font-size: 0.9rem;
+        color: #6c757d;
+    }
+
+    .class-rate {
+        font-size: 1rem;
+        font-weight: 600;
+        padding: 0.4rem 1rem;
+        border-radius: 20px;
+        background: #e8f5e9;
+        color: var(--success-color);
+    }
+
+    .class-rate.low { background: #f8d7da; color: var(--danger-color); }
+    .class-rate.medium { background: #fff3cd; color: var(--warning-color); }
+
+    .class-stats-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 0.75rem;
+        font-size: 0.85rem;
+    }
+
+    .class-stat-item {
+        text-align: center;
+        padding: 0.5rem;
+        background: #f8f9fa;
+        border-radius: 6px;
+    }
+
+    .class-stat-value {
+        font-weight: 600;
+        color: var(--primary-color);
+        display: block;
+    }
+
+    .class-stat-label {
+        color: #6c757d;
+        font-size: 0.8rem;
+        margin-top: 0.25rem;
+    }
+
+    /* ===== DAILY DETAILS SECTION ===== */
+    .daily-details-section {
+        margin-bottom: 2rem;
+    }
+
+    .daily-card {
+        background: white;
+        border-radius: var(--border-radius);
+        padding: 1.25rem;
+        margin-bottom: 1rem;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        border: 1px solid #e9ecef;
+        border-left: 4px solid var(--info-color);
+        transition: var(--transition);
+    }
+
+    .daily-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }
+
+    .daily-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 0.75rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 1px solid #e9ecef;
+    }
+
+    .daily-date {
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: var(--primary-color);
+        margin: 0;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+    }
+
+    .daily-day {
+        font-size: 0.9rem;
+        color: #6c757d;
+        font-weight: 500;
+    }
+
+    .daily-rate {
+        font-size: 0.9rem;
+        font-weight: 600;
+        padding: 0.3rem 0.8rem;
+        border-radius: 20px;
+        background: #e8f5e9;
+        color: var(--success-color);
+    }
+
+    .daily-stats {
+        display: flex;
+        gap: 0.5rem;
+        align-items: center;
+        flex-wrap: wrap;
+    }
+
+    .daily-stat-badge {
+        padding: 0.3rem 0.6rem;
+        border-radius: 12px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+    }
+
+    .badge-present { background: rgba(39, 174, 96, 0.15); color: #27ae60; }
+    .badge-absent { background: rgba(231, 76, 60, 0.15); color: #e74c3c; }
+    .badge-late { background: rgba(243, 156, 18, 0.15); color: #f39c12; }
+    .badge-excused { background: rgba(52, 152, 219, 0.15); color: #3498db; }
+
+    /* ===== STUDENT SUMMARY TABLE ===== */
+    .student-summary-section {
+        margin-bottom: 2rem;
+    }
+
+    .student-table-container {
+        background: white;
+        border-radius: var(--border-radius);
+        padding: 1.25rem;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        border: 1px solid #e9ecef;
+        overflow: hidden;
+    }
+
+    .student-table {
+        width: 100%;
+        font-size: 0.85rem;
+        border-collapse: separate;
+        border-spacing: 0;
+        margin-bottom: 0;
+    }
+
+    .student-table thead {
+        background: linear-gradient(135deg, var(--primary-color) 0%, #34495e 100%);
+    }
+
+    .student-table th {
+        font-weight: 600;
+        color: white;
+        padding: 0.75rem;
+        border: none;
+        text-align: left;
+        white-space: nowrap;
+    }
+
+    .student-table td {
+        padding: 0.75rem;
+        border-bottom: 1px solid #e9ecef;
+        vertical-align: middle;
+        background: white;
+        transition: var(--transition);
+    }
+
+    .student-table tbody tr {
+        transition: var(--transition);
+    }
+
+    .student-table tbody tr:hover {
+        background-color: #f8f9fa;
+    }
+
+    .student-table tbody tr:hover td {
+        transform: translateX(2px);
+    }
+
+    .rate-badge {
+        font-size: 0.8rem;
+        font-weight: 600;
+        padding: 0.3rem 0.75rem;
+        border-radius: 20px;
+        display: inline-block;
+        min-width: 60px;
+        text-align: center;
+    }
+
+    .rate-high { background: #d4edda; color: #155724; }
+    .rate-medium { background: #fff3cd; color: #856404; }
+    .rate-low { background: #f8d7da; color: #721c24; }
+
+    /* ===== MODAL TABLES ===== */
+    .modal-table-responsive {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .modal-table {
+        width: 100%;
+        font-size: 0.85rem;
+        border-collapse: separate;
+        border-spacing: 0;
+        min-width: 600px; /* Ensure table has minimum width */
+    }
+
+    .modal-table th {
+        font-weight: 600;
+        background: #f8f9fa;
+        padding: 0.75rem;
+        border-bottom: 2px solid #dee2e6;
+        text-align: left;
+        white-space: nowrap;
+        position: sticky;
+        top: 0;
+        z-index: 10;
+    }
+
+    .modal-table td {
+        padding: 0.75rem;
+        border-bottom: 1px solid #e9ecef;
+        vertical-align: middle;
+    }
+
+    .modal-table tbody tr:hover {
+        background-color: #f8f9fa;
+    }
+
+    /* ===== SECTION HEADERS ===== */
+    .section-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1.5rem;
+        padding-bottom: 0.75rem;
+        border-bottom: 2px solid #f1f3f4;
+    }
+
+    .section-title {
+        font-size: 1.5rem;
+        font-weight: 600;
+        color: var(--primary-color);
+        margin: 0;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+
+    .section-badge {
+        font-size: 0.9rem;
+        font-weight: 600;
+        padding: 0.25rem 0.75rem;
+        border-radius: 20px;
+        background: var(--light-color);
+        color: var(--primary-color);
+    }
+
+    /* ===== EMPTY STATE ===== */
+    .empty-state {
+        text-align: center;
+        padding: 3rem;
+        background: white;
+        border-radius: var(--border-radius);
+        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        border: 1px solid #e9ecef;
+        margin-bottom: 2rem;
+    }
+
+    .empty-state-icon {
+        font-size: 4rem;
+        color: #dee2e6;
+        margin-bottom: 1.5rem;
+        opacity: 0.5;
+    }
+
+    .empty-state-title {
+        font-size: 1.5rem;
+        margin-bottom: 0.75rem;
+        color: #495057;
+        font-weight: 600;
+    }
+
+    .empty-state-text {
+        margin-bottom: 1.5rem;
+        max-width: 500px;
+        margin-left: auto;
+        margin-right: auto;
+        color: #6c757d;
+        line-height: 1.6;
+    }
+
+    /* ===== ACTION BUTTONS ===== */
+    .action-buttons {
+        display: flex;
+        gap: 0.75rem;
+        align-items: center;
+        flex-wrap: wrap;
+    }
+
+    .btn-custom {
+        padding: 0.6rem 1.25rem;
+        border-radius: 6px;
+        font-weight: 500;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        transition: var(--transition);
+        border: none;
+        cursor: pointer;
+        text-decoration: none;
+    }
+
+    .btn-custom:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+
+    .btn-primary {
+        background: var(--secondary-color);
+        color: white;
+    }
+
+    .btn-primary:hover {
+        background: #2980b9;
+        color: white;
+    }
+
+    .btn-success {
+        background: var(--success-color);
+        color: white;
+    }
+
+    .btn-success:hover {
+        background: #219653;
+        color: white;
+    }
+
+    .btn-danger {
+        background: var(--danger-color);
+        color: white;
+    }
+
+    .btn-danger:hover {
+        background: #c82333;
+        color: white;
+    }
+
+    .btn-outline-secondary {
+        background: transparent;
+        color: #6c757d;
+        border: 1px solid #dee2e6;
+    }
+
+    .btn-outline-secondary:hover {
+        background: #f8f9fa;
+        color: var(--primary-color);
+        border-color: #adb5bd;
+    }
+
+    /* ===== PDF DOWNLOAD BUTTON ===== */
+    .btn-pdf {
+        background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+        color: white;
+        border: none;
+        padding: 0.6rem 1.5rem;
+        border-radius: 6px;
+        font-weight: 500;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        transition: var(--transition);
+        text-decoration: none;
+    }
+
+    .btn-pdf:hover {
+        background: linear-gradient(135deg, #c82333 0%, #bd2130 100%);
+        color: white;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(220, 53, 69, 0.3);
+    }
+
+    .pdf-loading {
+        display: none;
+        align-items: center;
+        gap: 0.75rem;
+        color: var(--secondary-color);
+        font-weight: 500;
+        padding: 0.6rem 1.5rem;
+    }
+
+    .spinner-border {
+        width: 1rem;
+        height: 1rem;
+        border-width: 0.15em;
+    }
+
+    /* ===== PRINT STYLES ===== */
+    @media print {
+        .no-print {
+            display: none !important;
+        }
+        
+        .report-header {
+            background: white !important;
+            color: black !important;
+            box-shadow: none;
+            border: 2px solid #000;
+        }
+        
+        .filter-section, .view-toggle-container, .action-buttons {
+            display: none !important;
+        }
+        
+        .stat-card, .class-summary-card, .week-card {
+            box-shadow: none !important;
+            border: 1px solid #dee2e6 !important;
+            page-break-inside: avoid;
+        }
+        
+        body {
+            font-size: 12px;
+            padding: 0;
+            margin: 0;
+        }
+        
+        .container-fluid {
+            padding: 0 !important;
+        }
+        
+        .student-table {
+            font-size: 10px;
+        }
+    }
+
+    /* ===== RESPONSIVE DESIGN ===== */
+    @media (max-width: 768px) {
+        .stats-container {
+            grid-template-columns: repeat(2, 1fr);
+        }
+        
+        .view-toggle {
+            grid-template-columns: 1fr;
+        }
+        
+        .week-stats, .class-stats-grid {
+            grid-template-columns: repeat(2, 1fr);
+        }
+        
+        .calendar-header {
+            font-size: 0.8rem;
+        }
+        
+        .calendar-day-header {
+            padding: 0.25rem;
+        }
+        
+        .calendar-day {
+            min-height: 50px;
+        }
+        
+        .calendar-date {
+            font-size: 0.9rem;
+        }
+        
+        .calendar-stats {
+            font-size: 0.6rem;
+        }
+        
+        .action-buttons {
+            flex-direction: column;
+            align-items: stretch;
+        }
+        
+        .btn-custom, .btn-pdf {
+            justify-content: center;
+        }
+        
+        .section-header {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 1rem;
+        }
+        
+        .daily-header {
+            flex-direction: column;
+            gap: 0.75rem;
+            align-items: flex-start;
+        }
+        
+        .daily-stats {
+            justify-content: flex-start;
+        }
+        
+        /* Student table responsiveness */
+        .student-table-container {
+            padding: 0.75rem;
+        }
+        
+        .student-table {
+            display: block;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+        
+        .student-table thead {
+            display: none;
+        }
+        
+        .student-table tbody tr {
+            display: block;
+            margin-bottom: 1rem;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            padding: 0.75rem;
+        }
+        
+        .student-table tbody tr:hover {
+            background: #f8f9fa;
+        }
+        
+        .student-table td {
+            display: block;
+            text-align: left;
+            border-bottom: none;
+            padding: 0.5rem;
+            position: relative;
+            padding-left: 45%;
+        }
+        
+        .student-table td::before {
+            content: attr(data-label);
+            position: absolute;
+            left: 0.75rem;
+            width: 40%;
+            padding-right: 1rem;
+            font-weight: 600;
+            color: var(--primary-color);
+            font-size: 0.8rem;
+        }
+        
+        /* Modal tables on mobile */
+        .modal-dialog {
+            margin: 0.5rem;
+        }
+        
+        .modal-content {
+            border-radius: 10px;
+        }
+        
+        .modal-table {
+            min-width: 100%;
+        }
+        
+        .modal-table th {
+            padding: 0.5rem;
+            font-size: 0.75rem;
+        }
+        
+        .modal-table td {
+            padding: 0.5rem;
+            font-size: 0.75rem;
+        }
+        
+        .modal-table-responsive {
+            margin: -1rem;
+            padding: 1rem;
+        }
+    }
+
+    @media (max-width: 576px) {
+        .stats-container {
+            grid-template-columns: 1fr;
+        }
+        
+        .calendar-day {
+            min-height: 40px;
+        }
+        
+        .calendar-date {
+            font-size: 0.8rem;
+        }
+        
+        .calendar-stats {
+            font-size: 0.55rem;
+            display: none; /* Hide stats on very small screens */
+        }
+        
+        .week-stats, .class-stats-grid {
+            grid-template-columns: 1fr;
+            gap: 0.5rem;
+        }
+        
+        .student-table td {
+            padding-left: 50%;
+        }
+        
+        .student-table td::before {
+            width: 45%;
+        }
+    }
+
+    /* ===== ANIMATIONS ===== */
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    .fade-in {
+        animation: fadeIn 0.5s ease-out;
+    }
+
+    /* ===== LOADING STATES ===== */
+    .loading {
+        opacity: 0.6;
+        pointer-events: none;
+    }
+
+    .loading::after {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 20px;
+        height: 20px;
+        border: 2px solid #f3f3f3;
+        border-top: 2px solid var(--secondary-color);
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+        0% { transform: translate(-50%, -50%) rotate(0deg); }
+        100% { transform: translate(-50%, -50%) rotate(360deg); }
+    }
+
+    /* ===== TOOLTIPS ===== */
+    [data-bs-toggle="tooltip"] {
+        cursor: help;
+        border-bottom: 1px dotted #6c757d;
+    }
+
+    /* ===== SCROLLBAR STYLING ===== */
+    ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+    }
+
+    ::-webkit-scrollbar-track {
+        background: #f1f1f1;
+        border-radius: 4px;
+    }
+
+    ::-webkit-scrollbar-thumb {
+        background: #c1c1c1;
+        border-radius: 4px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+        background: #a8a8a8;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid fade-in">
+    <!-- Page Header -->
+    <div class="report-header">
+        <div class="d-flex justify-content-between align-items-start">
+            <div>
+                <h1 class="report-title">Monthly Attendance Report</h1>
+                <div class="report-subtitle">
+                    Comprehensive analysis of student attendance patterns for the selected month
+                </div>
+                <div class="mt-3">
+                    <span class="month-indicator">
+                        <i class="bi bi-calendar-range"></i>
+                        <span>{{ total_stats.days }} days with data out of {{ total_days_in_month }} total days</span>
+                    </span>
+                </div>
+            </div>
+            <div class="month-display">
+                <i class="bi bi-calendar-month"></i>
+                <span>{{ month_name }}</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filter Section -->
+    <div class="filter-section no-print">
+        <form method="GET" id="reportFilters" class="needs-validation" novalidate>
+            <div class="row g-3">
+                <div class="col-md-2">
+                    <label for="month" class="form-label">
+                        <i class="bi bi-calendar me-1"></i> Month
+                    </label>
+                    <select class="form-select" id="month" name="month" required>
+                        {% for m in "1 2 3 4 5 6 7 8 9 10 11 12"|split %}
+                        <option value="{{ m }}" {% if m|add:0 == month %}selected{% endif %}>
+                            {{ m|month_name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                    <div class="invalid-feedback">Please select a month.</div>
+                </div>
+                
+                <div class="col-md-2">
+                    <label for="year" class="form-label">
+                        <i class="bi bi-calendar-year me-1"></i> Year
+                    </label>
+                    <select class="form-select" id="year" name="year" required>
+                        <option value="">Select Year</option>
+                        {% for y in years %}
+                        <option value="{{ y }}" {% if y == year %}selected{% endif %}>{{ y }}</option>
+                        {% endfor %}
+                    </select>
+                    <div class="invalid-feedback">Please select a year.</div>
+                </div>
+                
+                <div class="col-md-3">
+                    <label for="class_level" class="form-label">
+                        <i class="bi bi-mortarboard me-1"></i> Class
+                    </label>
+                    <select class="form-select" id="class_level" name="class_level">
+                        <option value="">All Classes</option>
+                        {% for class in class_levels %}
+                        <option value="{{ class.id }}" 
+                                {% if class.id|stringformat:"s" == filter_class %}selected{% endif %}>
+                            {{ class.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div class="col-md-2">
+                    <label for="stream" class="form-label">
+                        <i class="bi bi-diagram-3 me-1"></i> Stream
+                    </label>
+                    <select class="form-select" id="stream" name="stream" 
+                            {% if not filter_class %}disabled{% endif %}>
+                        <option value="">All Streams</option>
+                        {% for stream in streams %}
+                        <option value="{{ stream.id }}" 
+                                {% if stream.id|stringformat:"s" == filter_stream %}selected{% endif %}>
+                            {{ stream.stream_letter }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div class="col-md-2">
+                    <label for="attendance_type" class="form-label">
+                        <i class="bi bi-card-checklist me-1"></i> Type
+                    </label>
+                    <select class="form-select" id="attendance_type" name="attendance_type">
+                        {% for type_id, type_name in attendance_types %}
+                        <option value="{{ type_id }}" 
+                                {% if type_id == filter_type %}selected{% endif %}>
+                            {{ type_name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div class="col-md-1">
+                    <label for="view" class="form-label">
+                        <i class="bi bi-eye me-1"></i> View
+                    </label>
+                    <select class="form-select" id="view" name="view">
+                        {% for view_id, view_name in view_modes %}
+                        <option value="{{ view_id }}" 
+                                {% if view_id == filter_view %}selected{% endif %}>
+                            {{ view_name|slice:":1" }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            
+            <div class="row mt-3">
+                <div class="col-12">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div class="action-buttons">
+                            <button type="submit" class="btn-custom btn-primary">
+                                <i class="bi bi-filter-circle"></i> Apply Filters
+                            </button>
+                            <a href="?" class="btn-custom btn-outline-secondary">
+                                <i class="bi bi-x-circle"></i> Clear Filters
+                            </a>
+                        </div>
+                        
+                        <div class="action-buttons">
+                            {% if has_data %}
+                            <a href="{% url 'attendance_report_monthly_pdf' %}?{{ request.GET.urlencode }}"
+                               class="btn-pdf" id="pdfDownloadBtn" onclick="showPDFLoading()">
+                                <i class="bi bi-file-earmark-pdf"></i> Download PDF
+                            </a>
+                            <div class="pdf-loading" id="pdfLoading">
+                                <div class="spinner-border spinner-border-sm" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                                Generating PDF...
+                            </div>
+                            {% endif %}
+                            <button type="button" class="btn-custom btn-outline-secondary" onclick="window.print()">
+                                <i class="bi bi-printer"></i> Print
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    {% if not has_data %}
+    <!-- Empty State -->
+    <div class="empty-state">
+        <div class="empty-state-icon">
+            <i class="bi bi-calendar-x"></i>
+        </div>
+        <h3 class="empty-state-title">No Attendance Data Found</h3>
+        <p class="empty-state-text">
+            No attendance records available for <strong>{{ month_name }}</strong> 
+            with the selected filters. Please try a different month or adjust your filters.
+        </p>
+        <div class="action-buttons justify-content-center">
+            <a href="?month={% now 'n' %}&year={% now 'Y' %}" class="btn-custom btn-primary">
+                <i class="bi bi-calendar-plus me-2"></i> View Current Month
+            </a>
+            <a href="{% url 'attendance_report_daily' %}" class="btn-custom btn-outline-secondary">
+                <i class="bi bi-calendar-day me-2"></i> Go to Daily Report
+            </a>
+        </div>
+    </div>
+    {% else %}
+    <!-- Statistics Overview -->
+    <div class="stats-container mb-4">
+        <div class="stat-card overall" onclick="toggleSection('overview')" data-bs-toggle="tooltip" 
+             title="Click to view detailed overview" style="cursor: pointer;">
+            <div class="stat-card-header">
+                <div class="stat-card-icon">
+                    <i class="bi bi-graph-up-arrow"></i>
+                </div>
+            </div>
+            <div class="stat-value">{{ total_stats.attendance_rate|default:"0" }}%</div>
+            <div class="stat-label">Overall Attendance Rate</div>
+            <div class="progress">
+                <div class="progress-bar bg-success" role="progressbar" 
+                     style="width: {{ total_stats.attendance_rate|default:'0' }}%">
+                </div>
+            </div>
+            <div class="stat-detail">{{ total_stats.sessions|default:"0" }} sessions analyzed</div>
+        </div>
+        
+        <div class="stat-card present" onclick="filterByStatus('present')" data-bs-toggle="tooltip" 
+             title="Click to filter by present status" style="cursor: pointer;">
+            <div class="stat-card-header">
+                <div class="stat-card-icon">
+                    <i class="bi bi-check-circle-fill"></i>
+                </div>
+            </div>
+            <div class="stat-value">{{ total_stats.present|default:"0" }}</div>
+            <div class="stat-label">Present</div>
+            {% if total_stats.students > 0 %}
+            <div class="progress">
+                <div class="progress-bar bg-success" role="progressbar" 
+                     style="width: {% widthratio total_stats.present total_stats.students 100 %}%">
+                </div>
+            </div>
+            <div class="stat-detail">
+                {% widthratio total_stats.present total_stats.students 100 %}% of total
+            </div>
+            {% endif %}
+        </div>
+        
+        <div class="stat-card absent" onclick="filterByStatus('absent')" data-bs-toggle="tooltip" 
+             title="Click to filter by absent status" style="cursor: pointer;">
+            <div class="stat-card-header">
+                <div class="stat-card-icon">
+                    <i class="bi bi-x-circle-fill"></i>
+                </div>
+            </div>
+            <div class="stat-value">{{ total_stats.absent|default:"0" }}</div>
+            <div class="stat-label">Absent</div>
+            {% if total_stats.students > 0 %}
+            <div class="progress">
+                <div class="progress-bar bg-danger" role="progressbar" 
+                     style="width: {% widthratio total_stats.absent total_stats.students 100 %}%">
+                </div>
+            </div>
+            <div class="stat-detail">
+                {% widthratio total_stats.absent total_stats.students 100 %}% of total
+            </div>
+            {% endif %}
+        </div>
+        
+        <div class="stat-card late" onclick="filterByStatus('late')" data-bs-toggle="tooltip" 
+             title="Click to filter by late status" style="cursor: pointer;">
+            <div class="stat-card-header">
+                <div class="stat-card-icon">
+                    <i class="bi bi-clock-fill"></i>
+                </div>
+            </div>
+            <div class="stat-value">{{ total_stats.late|default:"0" }}</div>
+            <div class="stat-label">Late</div>
+            {% if total_stats.students > 0 %}
+            <div class="progress">
+                <div class="progress-bar bg-warning" role="progressbar" 
+                     style="width: {% widthratio total_stats.late total_stats.students 100 %}%">
+                </div>
+            </div>
+            <div class="stat-detail">
+                {% widthratio total_stats.late total_stats.students 100 %}% of total
+            </div>
+            {% endif %}
+        </div>
+        
+        <div class="stat-card excused" onclick="filterByStatus('excused')" data-bs-toggle="tooltip" 
+             title="Click to filter by excused status" style="cursor: pointer;">
+            <div class="stat-card-header">
+                <div class="stat-card-icon">
+                    <i class="bi bi-envelope-paper-fill"></i>
+                </div>
+            </div>
+            <div class="stat-value">{{ total_stats.excused|default:"0" }}</div>
+            <div class="stat-label">Excused</div>
+            {% if total_stats.students > 0 %}
+            <div class="progress">
+                <div class="progress-bar bg-info" role="progressbar" 
+                     style="width: {% widthratio total_stats.excused total_stats.students 100 %}%">
+                </div>
+            </div>
+            <div class="stat-detail">
+                {% widthratio total_stats.excused total_stats.students 100 %}% of total
+            </div>
+            {% endif %}
+        </div>
+        
+        <div class="stat-card days" onclick="toggleSection('calendar')" data-bs-toggle="tooltip" 
+             title="Click to view calendar" style="cursor: pointer;">
+            <div class="stat-card-header">
+                <div class="stat-card-icon">
+                    <i class="bi bi-calendar-check"></i>
+                </div>
+            </div>
+            <div class="stat-value">{{ total_stats.days }}/{{ total_days_in_month }}</div>
+            <div class="stat-label">Days with Data</div>
+            <div class="progress">
+                <div class="progress-bar bg-primary" role="progressbar" 
+                     style="width: {% widthratio total_stats.days total_days_in_month 100 %}%">
+                </div>
+            </div>
+            <div class="stat-detail">
+                {% widthratio total_stats.days total_days_in_month 100 %}% coverage
+            </div>
+        </div>
+    </div>
+
+    <!-- Calendar Navigation -->
+    <div class="calendar-navigation no-print">
+        <div class="d-flex justify-content-between align-items-center">
+            <a href="?month={{ month|add:'-1' }}&year={{ year }}{% if filter_class %}&class_level={{ filter_class }}{% endif %}{% if filter_stream %}&stream={{ filter_stream }}{% endif %}{% if filter_type != 'ALL' %}&attendance_type={{ filter_type }}{% endif %}&view={{ filter_view }}"
+               class="nav-arrow" data-bs-toggle="tooltip" title="Previous Month">
+                <i class="bi bi-chevron-left"></i>
+            </a>
+            
+            <div class="text-center">
+                <h2 class="current-month">{{ month_name }}</h2>
+                <div class="month-indicator">
+                    <span>{{ start_date|date:"F j" }} - {{ end_date|date:"j, Y" }}</span>
+                </div>
+            </div>
+            
+            <a href="?month={{ month|add:'1' }}&year={{ year }}{% if filter_class %}&class_level={{ filter_class }}{% endif %}{% if filter_stream %}&stream={{ filter_stream }}{% endif %}{% if filter_type != 'ALL' %}&attendance_type={{ filter_type }}{% endif %}&view={{ filter_view }}"
+               class="nav-arrow" data-bs-toggle="tooltip" title="Next Month">
+                <i class="bi bi-chevron-right"></i>
+            </a>
+        </div>
+    </div>
+
+    <!-- View Toggle -->
+    <div class="view-toggle-container no-print">
+        <div class="view-toggle">
+            <a href="?month={{ month }}&year={{ year }}{% if filter_class %}&class_level={{ filter_class }}{% endif %}{% if filter_stream %}&stream={{ filter_stream }}{% endif %}{% if filter_type != 'ALL' %}&attendance_type={{ filter_type }}{% endif %}&view=summary"
+               class="view-btn {% if filter_view == 'summary' %}active{% endif %}">
+                <i class="bi bi-grid-3x3-gap"></i> Summary
+            </a>
+            <a href="?month={{ month }}&year={{ year }}{% if filter_class %}&class_level={{ filter_class }}{% endif %}{% if filter_stream %}&stream={{ filter_stream }}{% endif %}{% if filter_type != 'ALL' %}&attendance_type={{ filter_type }}{% endif %}&view=detailed"
+               class="view-btn {% if filter_view == 'detailed' %}active{% endif %}">
+                <i class="bi bi-list-task"></i> Detailed
+            </a>
+            <a href="?month={{ month }}&year={{ year }}{% if filter_class %}&class_level={{ filter_class }}{% endif %}{% if filter_stream %}&stream={{ filter_stream }}{% endif %}{% if filter_type != 'ALL' %}&attendance_type={{ filter_type }}{% endif %}&view=both"
+               class="view-btn {% if filter_view == 'both' %}active{% endif %}">
+                <i class="bi bi-collection"></i> Both
+            </a>
+        </div>
+    </div>
+
+    <!-- Summary View Content -->
+    {% if filter_view == 'summary' or filter_view == 'both' %}
+    <div id="summaryView" class="{% if filter_view == 'both' %}mb-5{% endif %}">
+        <!-- Weekly Summary -->
+        <div class="weekly-summary-section">
+            <div class="section-header">
+                <h3 class="section-title">
+                    <i class="bi bi-calendar-week"></i> Weekly Summary
+                    <span class="section-badge">{{ weekly_summary|length }} weeks</span>
+                </h3>
+            </div>
+            
+            {% for week in weekly_summary %}
+            <div class="week-card" onclick="viewWeekDetails('{{ week.week_start|date:"Y-m-d" }}', '{{ week.week_end|date:"Y-m-d" }}')" 
+                 style="cursor: pointer;" data-bs-toggle="tooltip" title="Click to view week details">
+                <div class="week-card-header">
+                    <div>
+                        <h5 class="week-title">
+                            Week {{ week.week_number }}
+                            <span class="week-date">({{ week.week_start|date:"M d" }} - {{ week.week_end|date:"M d" }})</span>
+                        </h5>
+                    </div>
+                    <div class="week-rate 
+                        {% if week.attendance_rate >= 80 %}rate-high
+                        {% elif week.attendance_rate >= 60 %}rate-medium
+                        {% else %}rate-low{% endif %}">
+                        {{ week.attendance_rate }}%
+                    </div>
+                </div>
+                
+                <div class="week-stats">
+                    <div class="week-stat-item">
+                        <span class="week-stat-value">{{ week.days }}</span>
+                        <span class="week-stat-label">Days</span>
+                    </div>
+                    <div class="week-stat-item">
+                        <span class="week-stat-value">{{ week.sessions }}</span>
+                        <span class="week-stat-label">Sessions</span>
+                    </div>
+                    <div class="week-stat-item">
+                        <span class="week-stat-value">{{ week.present }}/{{ week.students }}</span>
+                        <span class="week-stat-label">Present</span>
+                    </div>
+                    <div class="week-stat-item">
+                        <span class="week-stat-value">{{ week.attendance_rate }}%</span>
+                        <span class="week-stat-label">Rate</span>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- Class Summary -->
+        <div class="class-summary-section">
+            <div class="section-header">
+                <h3 class="section-title">
+                    <i class="bi bi-people"></i> Class Summary
+                    <span class="section-badge">{{ class_data|length }} classes</span>
+                </h3>
+                <div class="action-buttons">
+                    <button class="btn-custom btn-outline-secondary" onclick="exportClassSummary()">
+                        <i class="bi bi-download"></i> Export
+                    </button>
+                </div>
+            </div>
+            
+            {% for class in class_data %}
+            <div class="class-summary-card" onclick="viewClassDetails('{{ class.class_level.id }}', '{{ class.stream.id }}')" 
+                 style="cursor: pointer;" data-bs-toggle="tooltip" title="Click to view class details">
+                <div class="class-summary-header">
+                    <div>
+                        <h5 class="class-name">{{ class.class_level.name }}</h5>
+                        <div class="class-stream">
+                            Stream: {{ class.stream.stream_letter|default:"All" }}
+                            | {{ class.sessions }} sessions across {{ class.days }} days
+                        </div>
+                    </div>
+                    <div class="class-rate 
+                        {% if class.attendance_rate >= 80 %}high
+                        {% elif class.attendance_rate >= 60 %}medium
+                        {% else %}low{% endif %}">
+                        {{ class.attendance_rate }}%
+                    </div>
+                </div>
+                
+                <div class="class-stats-grid">
+                    <div class="class-stat-item">
+                        <span class="class-stat-value">{{ class.days }}</span>
+                        <span class="class-stat-label">Days</span>
+                    </div>
+                    <div class="class-stat-item">
+                        <span class="class-stat-value">{{ class.sessions }}</span>
+                        <span class="class-stat-label">Sessions</span>
+                    </div>
+                    <div class="class-stat-item">
+                        <span class="class-stat-value">{{ class.students }}</span>
+                        <span class="class-stat-label">Students</span>
+                    </div>
+                    <div class="class-stat-item">
+                        <span class="class-stat-value">{{ class.attendance_rate }}%</span>
+                        <span class="class-stat-label">Rate</span>
+                    </div>
+                </div>
+                
+                <div class="d-flex justify-content-between mt-2">
+                    <div class="d-flex gap-2 flex-wrap">
+                        <span class="badge-present">{{ class.present }} Present</span>
+                        <span class="badge-absent">{{ class.absent }} Absent</span>
+                        <span class="badge-late">{{ class.late }} Late</span>
+                        <span class="badge-excused">{{ class.excused }} Excused</span>
+                    </div>
+                    <div class="progress" style="width: 150px;">
+                        <div class="progress-bar bg-success" role="progressbar" 
+                             style="width: {{ class.attendance_rate }}%">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- Monthly Calendar -->
+        <div class="monthly-calendar-section">
+            <div class="section-header">
+                <h3 class="section-title">
+                    <i class="bi bi-calendar3"></i> Monthly Calendar
+                </h3>
+                <div class="action-buttons">
+                    <button class="btn-custom btn-outline-secondary" onclick="toggleCalendarView()">
+                        <i class="bi bi-arrows-fullscreen"></i> Expand
+                    </button>
+                </div>
+            </div>
+            
+            <div class="calendar-header">
+                <div class="calendar-day-header">Sun</div>
+                <div class="calendar-day-header">Mon</div>
+                <div class="calendar-day-header">Tue</div>
+                <div class="calendar-day-header">Wed</div>
+                <div class="calendar-day-header">Thu</div>
+                <div class="calendar-day-header">Fri</div>
+                <div class="calendar-day-header">Sat</div>
+            </div>
+            
+            <div class="calendar-body" id="monthCalendar">
+                <!-- Calendar days will be populated by JavaScript -->
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Detailed View Content -->
+    {% if filter_view == 'detailed' or filter_view == 'both' %}
+    <div id="detailedView" class="{% if filter_view == 'both' %}mt-5{% endif %}">
+        <!-- Daily Details -->
+        <div class="daily-details-section">
+            <div class="section-header">
+                <h3 class="section-title">
+                    <i class="bi bi-calendar-day"></i> Daily Attendance Details
+                    <span class="section-badge">{{ daily_data|length }} days</span>
+                </h3>
+                <div class="action-buttons">
+                    <button class="btn-custom btn-outline-secondary" onclick="toggleDailyDetails()">
+                        <i class="bi bi-chevron-down"></i> Collapse All
+                    </button>
+                </div>
+            </div>
+            
+            {% for day in daily_data %}
+            <div class="daily-card">
+                <div class="daily-header">
+                    <div>
+                        <h5 class="daily-date">
+                            <i class="bi bi-calendar-date"></i>
+                            {{ day.date|date:"F j, Y" }}
+                            <span class="daily-day">({{ day.day_name }})</span>
+                        </h5>
+                    </div>
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="daily-rate">
+                            {{ day.attendance_rate }}%
+                        </div>
+                        <div class="daily-stats">
+                            <span class="daily-stat-badge badge-present">{{ day.present }}P</span>
+                            <span class="daily-stat-badge badge-absent">{{ day.absent }}A</span>
+                            <span class="daily-stat-badge badge-late">{{ day.late }}L</span>
+                            <span class="daily-stat-badge badge-excused">{{ day.excused }}E</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row mt-2">
+                    <div class="col-md-6">
+                        <div class="d-flex align-items-center gap-3">
+                            <div class="text-muted">Sessions:</div>
+                            <div class="fw-semibold">{{ day.sessions }}</div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="d-flex align-items-center gap-3">
+                            <div class="text-muted">Total Students:</div>
+                            <div class="fw-semibold">{{ day.students }}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- Student Summary -->
+        {% if student_data %}
+        <div class="student-summary-section">
+            <div class="section-header">
+                <h3 class="section-title">
+                    <i class="bi bi-person-lines-fill"></i> Student Attendance Summary
+                    <span class="section-badge">{{ student_data|length }} students</span>
+                </h3>
+                <div class="action-buttons">
+                    <button class="btn-custom btn-outline-secondary" onclick="searchStudents()">
+                        <i class="bi bi-search"></i> Search
+                    </button>
+                </div>
+            </div>
+            
+            <div class="row mb-3">
+                <div class="col-12">
+                    <input type="text" class="form-control" id="studentSearch" 
+                           placeholder="Search students by name or admission number..." 
+                           onkeyup="filterStudents()">
+                </div>
+            </div>
+            
+            <div class="student-table-container">
+                <div class="modal-table-responsive">
+                    <table class="student-table" id="studentTable">
+                        <thead>
+                            <tr>
+                                <th>Student Name</th>
+                                <th>Admission No.</th>
+                                <th>Class</th>
+                                <th>Days</th>
+                                <th>Sessions</th>
+                                <th>Present</th>
+                                <th>Absent</th>
+                                <th>Late</th>
+                                <th>Excused</th>
+                                <th>Attendance Rate</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for student in student_data %}
+                            <tr class="student-row" 
+                                data-name="{{ student.student.full_name|lower }}"
+                                data-admission="{{ student.student.registration_number|default:''|lower }}">
+                                <td data-label="Student Name">
+                                    {{ student.student.full_name }}
+                                </td>
+                                <td data-label="Admission No.">
+                                    {{ student.student.registration_number|default:"N/A" }}
+                                </td>
+                                <td data-label="Class">
+                                    {% if student.student.class_level %}
+                                        {{ student.student.class_level.name }}
+                                        {% if student.student.stream_class %}
+                                            - {{ student.student.stream_class.stream_letter }}
+                                        {% endif %}
+                                    {% else %}
+                                        N/A
+                                    {% endif %}
+                                </td>
+                                <td data-label="Days">{{ student.days|default:"0" }}</td>
+                                <td data-label="Sessions">{{ student.sessions|default:"0" }}</td>
+                                <td data-label="Present" class="text-success">{{ student.present|default:"0" }}</td>
+                                <td data-label="Absent" class="text-danger">{{ student.absent|default:"0" }}</td>
+                                <td data-label="Late" class="text-warning">{{ student.late|default:"0" }}</td>
+                                <td data-label="Excused" class="text-info">{{ student.excused|default:"0" }}</td>
+                                <td data-label="Attendance Rate">
+                                    <span class="rate-badge 
+                                        {% if student.attendance_rate >= 80 %}rate-high
+                                        {% elif student.attendance_rate >= 60 %}rate-medium
+                                        {% else %}rate-low{% endif %}">
+                                        {{ student.attendance_rate|default:"0" }}%
+                                    </span>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <div class="text-center mt-3">
+                <div class="text-muted" id="studentCount">
+                    Showing {{ student_data|length }} students
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+    
+    <!-- Report Footer -->
+    <div class="mt-5 pt-4 border-top">
+        <div class="row">
+            <div class="col-md-6">
+                <div class="text-muted">
+                    <small>
+                        <i class="bi bi-info-circle me-1"></i>
+                        Report generated on {% now "F j, Y" %} at {% now "g:i A" %}
+                    </small>
+                </div>
+            </div>
+            <div class="col-md-6 text-end">
+                <div class="text-muted">
+                    <small>
+                        <i class="bi bi-bar-chart me-1"></i>
+                        {{ total_stats.sessions|default:"0" }} sessions analyzed across 
+                        {{ total_stats.days|default:"0" }} days
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Modal for Week Details -->
+<div class="modal fade" id="weekDetailsModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Week Details</h5>
+                <button type="button" class="btn-close" data-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="weekDetailsContent">
+                <!-- Week details will be loaded here -->
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal for Class Details -->
+<div class="modal fade" id="classDetailsModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Class Attendance Details</h5>
+                <button type="button" class="btn-close" data-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="classDetailsContent">
+                <!-- Class details will be loaded here -->
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+<script>
+    // Global variables
+let currentClassId = null;
+let currentStreamId = null;
+let currentWeekStart = null;
+let currentWeekEnd = null;
+let weekDetailsModal = null;
+let classDetailsModal = null;
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize core functionality
+    initializeCore();
+    
+    // Setup event listeners
+    setupEventListeners();
+    
+    // Initialize modals
+    initializeModals();
+    
+    // Handle initial responsive adjustments
+    handleResponsive();
+    
+    // Add resize listener
+    window.addEventListener('resize', handleResponsive);
+    
+    // Add keyboard shortcuts
+    setupKeyboardShortcuts();
+});
+
+function initializeCore() {
+    // Initialize calendar
+    initializeCalendar();
+    
+    // Initialize form validation
+    initializeFormValidation();
+    
+    // Initialize tooltips
+    initializeTooltips();
+    
+    // Enable stream dropdown based on class selection
+    const classSelect = document.getElementById('class_level');
+    const streamSelect = document.getElementById('stream');
+    
+    if (classSelect && streamSelect) {
+        classSelect.addEventListener('change', function() {
+            streamSelect.disabled = !this.value;
+            if (!this.value) {
+                streamSelect.value = '';
+            }
+        });
+    }
+    
+    // Initialize year dropdown
+    initializeYearDropdown();
+}
+
+function initializeCalendar() {
+    const calendarEl = document.getElementById('monthCalendar');
+    if (!calendarEl) return;
+    
+    // Clear existing calendar
+    calendarEl.innerHTML = '';
+    
+    // Get month details
+    const firstDay = new Date({{ year }}, {{ month }} - 1, 1);
+    const lastDay = new Date({{ year }}, {{ month }}, 0);
+    const totalDays = lastDay.getDate();
+    const startingDay = firstDay.getDay(); // 0 = Sunday
+    
+    // Add empty cells for days before the first of month
+    for (let i = 0; i < startingDay; i++) {
+        const emptyDay = document.createElement('div');
+        emptyDay.className = 'calendar-day empty';
+        calendarEl.appendChild(emptyDay);
+    }
+    
+    // Create daily data lookup
+    const dailyData = {};
+    {% for day in daily_data %}
+    dailyData['{{ day.date|date:"Y-m-d" }}'] = {
+        sessions: {{ day.sessions|default:"0" }},
+        attendance_rate: {{ day.attendance_rate|default:"0" }},
+        present: {{ day.present|default:"0" }},
+        absent: {{ day.absent|default:"0" }},
+        late: {{ day.late|default:"0" }},
+        excused: {{ day.excused|default:"0" }}
+    };
+    {% endfor %}
+    
+    // Add days of the month
+    const today = new Date();
+    const todayString = today.toISOString().split('T')[0];
+    
+    for (let day = 1; day <= totalDays; day++) {
+        const date = new Date({{ year }}, {{ month }} - 1, day);
+        const dateString = date.toISOString().split('T')[0];
+        const dayData = dailyData[dateString];
+        
+        const dayEl = createCalendarDay(day, date, dayData, dateString === todayString);
+        calendarEl.appendChild(dayEl);
+    }
+    
+    // Initialize calendar day tooltips
+    initializeCalendarTooltips();
+}
+
+function createCalendarDay(dayNumber, date, dayData, isToday = false) {
+    const dayEl = document.createElement('div');
+    dayEl.className = 'calendar-day';
+    
+    if (dayData) {
+        dayEl.classList.add('has-data');
+        dayEl.dataset.date = date.toISOString().split('T')[0];
+        dayEl.dataset.sessions = dayData.sessions;
+        dayEl.dataset.rate = dayData.attendance_rate;
+        dayEl.dataset.present = dayData.present;
+        dayEl.dataset.absent = dayData.absent;
+        dayEl.dataset.late = dayData.late;
+        dayEl.dataset.excused = dayData.excused;
+    }
+    
+    if (isToday) {
+        dayEl.classList.add('current-day');
+    }
+    
+    // Create date element
+    const dateEl = document.createElement('div');
+    dateEl.className = 'calendar-date';
+    dateEl.textContent = dayNumber;
+    
+    if (isToday) {
+        const todayBadge = document.createElement('div');
+        todayBadge.className = 'calendar-date';
+        todayBadge.textContent = dayNumber;
+        dateEl.replaceWith(todayBadge);
+    }
+    
+    dayEl.appendChild(dateEl);
+    
+    // Add stats if data exists
+    if (dayData) {
+        const statsEl = document.createElement('div');
+        statsEl.className = 'calendar-stats';
+        
+        if (window.innerWidth >= 576) {
+            statsEl.textContent = `${dayData.sessions}s ${dayData.attendance_rate}%`;
+        } else {
+            statsEl.textContent = `${dayData.sessions}s`;
+        }
+        
+        dayEl.appendChild(statsEl);
+    }
+    
+    // Add click event
+    dayEl.addEventListener('click', function() {
+        viewDayDetails(date.toISOString().split('T')[0]);
+    });
+    
+    return dayEl;
+}
+
+function initializeCalendarTooltips() {
+    const calendarDays = document.querySelectorAll('.calendar-day.has-data');
+    calendarDays.forEach(day => {
+        if (day.dataset.date) {
+            const date = new Date(day.dataset.date);
+            const dateStr = date.toLocaleDateString('en-US', { 
+                weekday: 'long', 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric' 
+            });
+            
+            const tooltipContent = `
+                <strong>${dateStr}</strong><br>
+                Sessions: ${day.dataset.sessions}<br>
+                Attendance Rate: ${day.dataset.rate}%<br>
+                Present: ${day.dataset.present}<br>
+                Absent: ${day.dataset.absent}<br>
+                Late: ${day.dataset.late}<br>
+                Excused: ${day.dataset.excused}
+            `;
+            
+            day.setAttribute('data-bs-toggle', 'tooltip');
+            day.setAttribute('data-bs-html', 'true');
+            day.setAttribute('title', tooltipContent);
+        }
+    });
+    
+    // Initialize Bootstrap tooltips for calendar
+    const calendarTooltips = [].slice.call(document.querySelectorAll('.calendar-day[data-bs-toggle="tooltip"]'));
+    calendarTooltips.map(function(tooltipEl) {
+        return new bootstrap.Tooltip(tooltipEl, {
+            html: true,
+            placement: 'top'
+        });
+    });
+}
+
+function initializeFormValidation() {
+    const form = document.getElementById('reportFilters');
+    if (!form) return;
+    
+    form.addEventListener('submit', function(event) {
+        if (!form.checkValidity()) {
+            event.preventDefault();
+            event.stopPropagation();
+        }
+        form.classList.add('was-validated');
+    }, false);
+    
+    // Real-time validation for required fields
+    const requiredFields = form.querySelectorAll('[required]');
+    requiredFields.forEach(field => {
+        field.addEventListener('blur', function() {
+            validateField(this);
+        });
+    });
+}
+
+function validateField(field) {
+    if (!field.value.trim()) {
+        field.classList.add('is-invalid');
+        field.classList.remove('is-valid');
+    } else {
+        field.classList.remove('is-invalid');
+        field.classList.add('is-valid');
+    }
+}
+
+function initializeTooltips() {
+    const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    tooltipTriggerList.map(function(tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+}
+
+function initializeYearDropdown() {
+    const yearSelect = document.getElementById('year');
+    if (!yearSelect) return;
+    
+    const currentYear = new Date().getFullYear();
+    const selectedYear = parseInt('{{ year }}') || currentYear;
+    
+    // Clear existing options except the first one
+    while (yearSelect.options.length > 1) {
+        yearSelect.remove(1);
+    }
+    
+    // Add years (current year - 5 to current year + 1)
+    for (let year = currentYear - 5; year <= currentYear + 1; year++) {
+        const option = document.createElement('option');
+        option.value = year;
+        option.textContent = year;
+        if (year === selectedYear) {
+            option.selected = true;
+        }
+        yearSelect.appendChild(option);
+    }
+}
+
+function setupEventListeners() {
+    // Auto-submit on filter changes (except view)
+    const filterElements = document.querySelectorAll('#reportFilters select:not(#view), #reportFilters input');
+    filterElements.forEach(element => {
+        element.addEventListener('change', function() {
+            if (this.id !== 'view') {
+                showLoading();
+                this.form.submit();
+            }
+        });
+    });
+    
+    // Student search functionality
+    const studentSearch = document.getElementById('studentSearch');
+    if (studentSearch) {
+        studentSearch.addEventListener('input', debounce(filterStudents, 300));
+    }
+    
+    // Print functionality
+    const printBtn = document.querySelector('[onclick="window.print()"]');
+    if (printBtn) {
+        printBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            window.print();
+        });
+    }
+    
+    // PDF download functionality
+    const pdfBtn = document.getElementById('pdfDownloadBtn');
+    if (pdfBtn) {
+        pdfBtn.addEventListener('click', handlePDFDownload);
+    }
+}
+
+function initializeModals() {
+    // Week Details Modal
+    const weekModalElement = document.getElementById('weekDetailsModal');
+    if (weekModalElement) {
+        weekDetailsModal = new bootstrap.Modal(weekModalElement, {
+            backdrop: true,
+            keyboard: true,
+            focus: true
+        });
+        
+        // Cleanup modal on hide
+        weekModalElement.addEventListener('hidden.bs.modal', function() {
+            const content = document.getElementById('weekDetailsContent');
+            if (content) content.innerHTML = '';
+        });
+    }
+    
+    // Class Details Modal
+    const classModalElement = document.getElementById('classDetailsModal');
+    if (classModalElement) {
+        classDetailsModal = new bootstrap.Modal(classModalElement, {
+            backdrop: true,
+            keyboard: true,
+            focus: true
+        });
+        
+        // Cleanup modal on hide
+        classModalElement.addEventListener('hidden.bs.modal', function() {
+            const content = document.getElementById('classDetailsContent');
+            if (content) content.innerHTML = '';
+            currentClassId = null;
+            currentStreamId = null;
+        });
+    }
+    
+    // Check URL parameters for modal opening
+    checkURLParamsForModals();
+}
+
+function checkURLParamsForModals() {
+    const urlParams = new URLSearchParams(window.location.search);
+    
+    if (urlParams.has('show_week_details')) {
+        const startDate = urlParams.get('start_date');
+        const endDate = urlParams.get('end_date');
+        if (startDate && endDate) {
+            setTimeout(() => viewWeekDetails(startDate, endDate), 500);
+        }
+    }
+    
+    if (urlParams.has('show_class_details')) {
+        const classId = urlParams.get('class_id');
+        const streamId = urlParams.get('stream_id');
+        if (classId) {
+            setTimeout(() => viewClassDetails(classId, streamId), 500);
+        }
+    }
+}
+
+function handleResponsive() {
+    adjustCalendarForScreenSize();
+    adjustTablesForScreenSize();
+    adjustStudentTableForMobile();
+}
+
+function adjustCalendarForScreenSize() {
+    const calendar = document.getElementById('monthCalendar');
+    if (!calendar) return;
+    
+    const calendarDays = calendar.querySelectorAll('.calendar-day');
+    const statsElements = calendar.querySelectorAll('.calendar-stats');
+    
+    if (window.innerWidth < 768) {
+        // Mobile adjustments
+        calendarDays.forEach(day => {
+            day.style.minHeight = window.innerWidth < 576 ? '40px' : '50px';
+            day.style.padding = window.innerWidth < 576 ? '0.125rem' : '0.25rem';
+        });
+        
+        // Show/hide stats based on screen size
+        statsElements.forEach(stats => {
+            if (window.innerWidth < 576) {
+                stats.style.display = 'none';
+            } else {
+                stats.style.display = 'block';
+            }
+        });
+    } else {
+        // Desktop adjustments
+        calendarDays.forEach(day => {
+            day.style.minHeight = '60px';
+            day.style.padding = '0.25rem';
+        });
+        
+        statsElements.forEach(stats => {
+            stats.style.display = 'block';
+        });
+    }
+}
+
+function adjustTablesForScreenSize() {
+    const modalTables = document.querySelectorAll('.modal-table');
+    modalTables.forEach(table => {
+        if (window.innerWidth < 768) {
+            table.style.minWidth = '600px';
+        } else {
+            table.style.minWidth = '';
+        }
+    });
+}
+
+function adjustStudentTableForMobile() {
+    const studentTable = document.getElementById('studentTable');
+    if (!studentTable) return;
+    
+    if (window.innerWidth < 768) {
+        // Convert table to mobile-friendly format
+        const rows = studentTable.querySelectorAll('tbody tr');
+        rows.forEach(row => {
+            const cells = row.querySelectorAll('td');
+            cells.forEach((cell, index) => {
+                const header = studentTable.querySelector(`th:nth-child(${index + 1})`);
+                if (header) {
+                    cell.setAttribute('data-label', header.textContent);
+                }
+            });
+        });
+    }
+}
+
+function setupKeyboardShortcuts() {
+    document.addEventListener('keydown', function(e) {
+        // Ctrl/Cmd + P for print
+        if ((e.ctrlKey || e.metaKey) && e.key === 'p') {
+            e.preventDefault();
+            window.print();
+        }
+        
+        // Ctrl/Cmd + F for search
+        if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+            e.preventDefault();
+            const searchInput = document.getElementById('studentSearch');
+            if (searchInput) {
+                searchInput.focus();
+                searchInput.select();
+            }
+        }
+        
+        // Escape key
+        if (e.key === 'Escape') {
+            // Close active modals
+            if (weekDetailsModal && document.querySelector('#weekDetailsModal.show')) {
+                weekDetailsModal.hide();
+            }
+            if (classDetailsModal && document.querySelector('#classDetailsModal.show')) {
+                classDetailsModal.hide();
+            }
+            
+            // Clear search
+            const searchInput = document.getElementById('studentSearch');
+            if (searchInput && document.activeElement === searchInput) {
+                searchInput.value = '';
+                filterStudents();
+            }
+        }
+        
+        // Arrow keys for calendar navigation
+        if (!e.ctrlKey && !e.metaKey && !e.altKey) {
+            if (e.key === 'ArrowLeft') {
+                navigateToPreviousMonth();
+            } else if (e.key === 'ArrowRight') {
+                navigateToNextMonth();
+            }
+        }
+    });
+}
+
+function navigateToPreviousMonth() {
+    const currentMonth = parseInt('{{ month }}');
+    const currentYear = parseInt('{{ year }}');
+    let prevMonth = currentMonth - 1;
+    let prevYear = currentYear;
+    
+    if (prevMonth < 1) {
+        prevMonth = 12;
+        prevYear = currentYear - 1;
+    }
+    
+    const url = buildNavigationURL(prevMonth, prevYear);
+    window.location.href = url;
+}
+
+function navigateToNextMonth() {
+    const currentMonth = parseInt('{{ month }}');
+    const currentYear = parseInt('{{ year }}');
+    let nextMonth = currentMonth + 1;
+    let nextYear = currentYear;
+    
+    if (nextMonth > 12) {
+        nextMonth = 1;
+        nextYear = currentYear + 1;
+    }
+    
+    const url = buildNavigationURL(nextMonth, nextYear);
+    window.location.href = url;
+}
+
+function buildNavigationURL(month, year) {
+    const baseParams = {
+        month: month,
+        year: year
+    };
+    
+    // Add current filters
+    const classLevel = document.getElementById('class_level')?.value;
+    const stream = document.getElementById('stream')?.value;
+    const attendanceType = document.getElementById('attendance_type')?.value;
+    const view = document.getElementById('view')?.value;
+    
+    if (classLevel) baseParams.class_level = classLevel;
+    if (stream) baseParams.stream = stream;
+    if (attendanceType && attendanceType !== 'ALL') baseParams.attendance_type = attendanceType;
+    if (view) baseParams.view = view;
+    
+    const params = new URLSearchParams(baseParams);
+    return `?${params.toString()}`;
+}
+
+// ===== UTILITY FUNCTIONS =====
+
+function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+        const later = () => {
+            clearTimeout(timeout);
+            func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+    };
+}
+
+function showLoading() {
+    const container = document.querySelector('.container-fluid');
+    container.classList.add('loading');
+}
+
+function hideLoading() {
+    const container = document.querySelector('.container-fluid');
+    container.classList.remove('loading');
+}
+
+function showAlert(message, type = 'info', duration = 5000) {
+    // Remove existing alerts
+    const existingAlerts = document.querySelectorAll('.custom-alert');
+    existingAlerts.forEach(alert => alert.remove());
+    
+    // Create alert element
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `custom-alert alert alert-${type} alert-dismissible fade show position-fixed`;
+    alertDiv.style.cssText = `
+        top: 20px;
+        right: 20px;
+        z-index: 9999;
+        min-width: 300px;
+        max-width: 400px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    `;
+    
+    // Icons for different alert types
+    const icons = {
+        'success': 'check-circle',
+        'danger': 'exclamation-triangle',
+        'warning': 'exclamation-circle',
+        'info': 'info-circle'
+    };
+    
+    alertDiv.innerHTML = `
+        <div class="d-flex align-items-center">
+            <i class="bi bi-${icons[type] || 'info-circle'} me-2"></i>
+            <div>${message}</div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    `;
+    
+    document.body.appendChild(alertDiv);
+    
+    // Auto-remove after duration
+    setTimeout(() => {
+        if (alertDiv.parentNode) {
+            const bsAlert = new bootstrap.Alert(alertDiv);
+            bsAlert.close();
+        }
+    }, duration);
+}
+
+// ===== MAIN FEATURE FUNCTIONS =====
+
+function toggleSection(sectionId) {
+    const sections = ['overview', 'calendar'];
+    sections.forEach(section => {
+        const element = document.getElementById(section + 'Section');
+        if (element) {
+            if (section === sectionId) {
+                element.classList.toggle('d-none');
+            } else {
+                element.classList.add('d-none');
+            }
+        }
+    });
+}
+
+function filterByStatus(status) {
+    const statusMap = {
+        'present': 'PRESENT',
+        'absent': 'ABSENT',
+        'late': 'LATE',
+        'excused': 'EXCUSED'
+    };
+    
+    if (statusMap[status]) {
+        const attendanceTypeSelect = document.getElementById('attendance_type');
+        if (attendanceTypeSelect) {
+            attendanceTypeSelect.value = statusMap[status];
+            attendanceTypeSelect.form.submit();
+        }
+    }
+}
+
+async function viewWeekDetails(startDate, endDate) {
+    // Store week dates for PDF export
+    currentWeekStart = startDate;
+    currentWeekEnd = endDate;
+    
+    const content = document.getElementById('weekDetailsContent');
+    if (!content) return;
+    
+    // Show loading state
+    content.innerHTML = createLoadingSpinner('Loading week details...');
+    
+    try {
+        // Show modal
+        if (weekDetailsModal) {
+            weekDetailsModal.show();
+        }
+        
+        // Get current filters
+        const filters = getCurrentFilters();
+        filters.start_date = startDate;
+        filters.end_date = endDate;
+        
+        // Fetch week details
+        const data = await fetchData('{% url 'api_week_details' %}', filters);
+        
+        if (data.success) {
+            renderWeekDetails(data);
+        } else {
+            content.innerHTML = createErrorMessage(
+                'Error Loading Week Details',
+                data.message || 'Failed to load week details'
+            );
+        }
+    } catch (error) {
+        console.error('Error fetching week details:', error);
+        content.innerHTML = createErrorMessage(
+            'Network Error',
+            'Failed to connect to the server. Please try again later.',
+            error.message
+        );
+    }
+}
+
+function renderWeekDetails(data) {
+    const content = document.getElementById('weekDetailsContent');
+    if (!content) return;
+    
+    const week = data.week || {};
+    const dailyBreakdown = data.daily_breakdown || [];
+    const classBreakdown = data.class_breakdown || [];
+    const studentBreakdown = data.student_breakdown || [];
+    
+    let html = `
+        <div class="week-details">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-calendar-week me-2"></i>
+                    Week Details: ${formatDate(currentWeekStart)} to ${formatDate(currentWeekEnd)}
+                </h5>
+            </div>
+            <div class="modal-body">
+                <!-- Week Summary -->
+                <div class="alert alert-primary mb-3">
+                    <div class="row">
+                        <div class="col-6 col-md-3 mb-2">
+                            <small class="text-muted">Days:</small>
+                            <div class="fw-bold">${week.totals?.days || 0}</div>
+                        </div>
+                        <div class="col-6 col-md-3 mb-2">
+                            <small class="text-muted">Sessions:</small>
+                            <div class="fw-bold">${week.totals?.sessions || 0}</div>
+                        </div>
+                        <div class="col-6 col-md-3 mb-2">
+                            <small class="text-muted">Attendance Rate:</small>
+                            <div class="fw-bold text-${getRateColorClass(week.totals?.attendance_rate || 0)}">
+                                ${week.totals?.attendance_rate || 0}%
+                            </div>
+                        </div>
+                        <div class="col-6 col-md-3 mb-2">
+                            <small class="text-muted">Total Students:</small>
+                            <div class="fw-bold">${week.totals?.students || 0}</div>
+                        </div>
+                    </div>
+                </div>
+    `;
+    
+    // Daily Breakdown
+    if (dailyBreakdown.length > 0) {
+        html += `
+            <h6 class="mb-3"><i class="bi bi-calendar-day me-2"></i> Daily Breakdown</h6>
+            <div class="modal-table-responsive">
+                <table class="modal-table">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Day</th>
+                            <th class="text-center">Sessions</th>
+                            <th class="text-center">Students</th>
+                            <th class="text-center">Present</th>
+                            <th class="text-center">Absent</th>
+                            <th class="text-center">Late</th>
+                            <th class="text-center">Excused</th>
+                            <th class="text-center">Rate</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+        `;
+        
+        dailyBreakdown.forEach(day => {
+            html += `
+                <tr>
+                    <td>${day.date || ''}</td>
+                    <td>${day.day_name || ''}</td>
+                    <td class="text-center">${day.sessions || 0}</td>
+                    <td class="text-center">${day.students || 0}</td>
+                    <td class="text-center text-success">${day.present || 0}</td>
+                    <td class="text-center text-danger">${day.absent || 0}</td>
+                    <td class="text-center text-warning">${day.late || 0}</td>
+                    <td class="text-center text-info">${day.excused || 0}</td>
+                    <td class="text-center">
+                        <span class="badge bg-${getRateColorClass(day.attendance_rate || 0)}">
+                            ${day.attendance_rate || 0}%
+                        </span>
+                    </td>
+                </tr>
+            `;
+        });
+        
+        html += `
+                    </tbody>
+                </table>
+            </div>
+        `;
+    }
+    
+    // Class Breakdown
+    if (classBreakdown.length > 0) {
+        html += `
+            <h6 class="mb-3 mt-4"><i class="bi bi-people me-2"></i> Class Breakdown</h6>
+            <div class="row mb-4">
+        `;
+        
+        classBreakdown.forEach(cls => {
+            html += `
+                <div class="col-12 col-md-6 mb-3">
+                    <div class="card h-100">
+                        <div class="card-body">
+                            <h6 class="card-title">${cls.class_level || ''} ${cls.stream || ''}</h6>
+                            <div class="row">
+                                <div class="col-6">
+                                    <small class="text-muted">Sessions:</small>
+                                    <div class="fw-bold">${cls.sessions || 0}</div>
+                                </div>
+                                <div class="col-6">
+                                    <small class="text-muted">Rate:</small>
+                                    <div class="fw-bold text-${getRateColorClass(cls.attendance_rate || 0)}">
+                                        ${cls.attendance_rate || 0}%
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="progress mt-2" style="height: 6px;">
+                                <div class="progress-bar bg-success" style="width: ${cls.attendance_rate || 0}%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+        
+        html += `</div>`;
+    }
+    
+    // Student Summary
+    if (studentBreakdown.length > 0) {
+        html += `
+            <h6 class="mb-3"><i class="bi bi-person-lines-fill me-2"></i> Top Students</h6>
+            <div class="modal-table-responsive">
+                <table class="modal-table">
+                    <thead>
+                        <tr>
+                            <th>Student</th>
+                            <th>Admission No.</th>
+                            <th class="text-center">Sessions</th>
+                            <th class="text-center">Present</th>
+                            <th class="text-center">Rate</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+        `;
+        
+        // Sort by attendance rate
+        const sortedStudents = [...studentBreakdown].sort((a, b) => 
+            (b.attendance_rate || 0) - (a.attendance_rate || 0)
+        );
+        
+        sortedStudents.slice(0, 10).forEach(student => {
+            html += `
+                <tr>
+                    <td>${student.name || ''}</td>
+                    <td>${student.admission_number || 'N/A'}</td>
+                    <td class="text-center">${student.sessions || 0}</td>
+                    <td class="text-center">${student.present || 0}/${student.sessions || 0}</td>
+                    <td class="text-center">
+                        <span class="badge bg-${getRateColorClass(student.attendance_rate || 0)}">
+                            ${student.attendance_rate || 0}%
+                        </span>
+                    </td>
+                </tr>
+            `;
+        });
+        
+        html += `
+                    </tbody>
+                </table>
+            </div>
+            <div class="mt-3 text-end">
+                <small class="text-muted">Showing ${Math.min(sortedStudents.length, 10)} of ${data.total_students || 0} students</small>
+            </div>
+        `;
+    }
+    
+    html += `
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline-primary" onclick="exportWeekDetails()">
+                    <i class="bi bi-file-earmark-pdf me-1"></i> Export PDF
+                </button>
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+            </div>
+        </div>
+    `;
+    
+    content.innerHTML = html;
+    initializeModalTooltips();
+}
+
+function exportWeekDetails() {
+    if (!currentWeekStart || !currentWeekEnd) {
+        showAlert('Week details not available for export', 'danger');
+        return;
+    }
+    
+    const filters = getCurrentFilters();
+    let exportUrl = `{% url 'attendance_report_weekly_pdf' %}?start_date=${currentWeekStart}&end_date=${currentWeekEnd}`;
+    
+    // Add current filters to URL
+    if (filters.class_level) {
+        exportUrl += `&class_level=${filters.class_level}`;
+    }
+    if (filters.stream) {
+        exportUrl += `&stream=${filters.stream}`;
+    }
+    if (filters.attendance_type && filters.attendance_type !== 'ALL') {
+        exportUrl += `&attendance_type=${filters.attendance_type}`;
+    }
+    
+    // Open PDF in new tab
+    window.open(exportUrl, '_blank');
+    
+    showAlert('Week details PDF export started.', 'success');
+}
+
+async function viewClassDetails(classId, streamId) {
+    // Store IDs for export
+    currentClassId = classId;
+    currentStreamId = streamId;
+    
+    const content = document.getElementById('classDetailsContent');
+    if (!content) return;
+    
+    // Show loading state
+    content.innerHTML = createLoadingSpinner('Loading class details...');
+    
+    try {
+        // Show modal
+        if (classDetailsModal) {
+            classDetailsModal.show();
+        }
+        
+        // Get current filters
+        const filters = getCurrentFilters();
+        filters.class_id = classId;
+        if (streamId) filters.stream_id = streamId;
+        
+        // Fetch class details
+        const data = await fetchData('{% url 'api_class_details' %}', filters);
+        
+        if (data.success) {
+            renderClassDetails(data);
+        } else {
+            content.innerHTML = createErrorMessage(
+                'Error Loading Class Details',
+                data.message || 'Failed to load class details'
+            );
+        }
+    } catch (error) {
+        console.error('Error fetching class details:', error);
+        content.innerHTML = createErrorMessage(
+            'Network Error',
+            'Failed to connect to the server. Please try again later.',
+            error.message
+        );
+    }
+}
+
+function renderClassDetails(data) {
+    const content = document.getElementById('classDetailsContent');
+    if (!content) return;
+    
+    const classInfo = data.class_info || {};
+    const monthTotals = data.month_totals || {};
+    const dailyBreakdown = data.daily_breakdown || [];
+    const studentBreakdown = data.student_breakdown || [];
+    
+    let html = `
+        <div class="class-details">
+            <!-- Modal Header -->
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-mortarboard me-2"></i>
+                    ${classInfo.class_name || ''} - ${classInfo.stream_name || 'All Streams'}
+                </h5>                   
+            </div>
+            
+            <!-- Modal Body -->
+            <div class="modal-body">
+                <!-- Class Header -->
+                <div class="alert alert-primary mb-3">
+                    <div class="row">
+                        <div class="col-6 col-md-3 mb-2">
+                            <small class="text-muted">Month:</small>
+                            <div class="fw-bold">${classInfo.month || ''}</div>
+                        </div>
+                        <div class="col-6 col-md-3 mb-2">
+                            <small class="text-muted">Total Students:</small>
+                            <div class="fw-bold">${classInfo.total_students || 0}</div>
+                        </div>
+                        <div class="col-6 col-md-3 mb-2">
+                            <small class="text-muted">Days with Data:</small>
+                            <div class="fw-bold">${monthTotals.days || 0}</div>
+                        </div>
+                        <div class="col-6 col-md-3 mb-2">
+                            <small class="text-muted">Overall Rate:</small>
+                            <div class="fw-bold text-${getRateColorClass(monthTotals.attendance_rate || 0)}">
+                                ${monthTotals.attendance_rate || 0}%
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Statistics Summary -->
+                <div class="row mb-4">
+                    <div class="col-6 col-md-3 mb-3">
+                        <div class="card text-center">
+                            <div class="card-body p-2">
+                                <h3 class="card-title text-success mb-1">${monthTotals.present || 0}</h3>
+                                <p class="card-text text-muted mb-0">Present</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3 mb-3">
+                        <div class="card text-center">
+                            <div class="card-body p-2">
+                                <h3 class="card-title text-danger mb-1">${monthTotals.absent || 0}</h3>
+                                <p class="card-text text-muted mb-0">Absent</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3 mb-3">
+                        <div class="card text-center">
+                            <div class="card-body p-2">
+                                <h3 class="card-title text-warning mb-1">${monthTotals.late || 0}</h3>
+                                <p class="card-text text-muted mb-0">Late</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3 mb-3">
+                        <div class="card text-center">
+                            <div class="card-body p-2">
+                                <h3 class="card-title text-info mb-1">${monthTotals.excused || 0}</h3>
+                                <p class="card-text text-muted mb-0">Excused</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+    `;
+    
+    // Daily Breakdown
+    if (dailyBreakdown.length > 0) {
+        html += `
+            <h6 class="mb-3"><i class="bi bi-calendar-day me-2"></i> Daily Attendance</h6>
+            <div class="modal-table-responsive">
+                <table class="modal-table">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Day</th>
+                            <th class="text-center">Sessions</th>
+                            <th class="text-center">Students</th>
+                            <th class="text-center">Present</th>
+                            <th class="text-center">Absent</th>
+                            <th class="text-center">Late</th>
+                            <th class="text-center">Excused</th>
+                            <th class="text-center">Rate</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+        `;
+        
+        dailyBreakdown.forEach(day => {
+            html += `
+                <tr>
+                    <td>${day.date || ''}</td>
+                    <td>${day.day_name || ''}</td>
+                    <td class="text-center">${day.sessions || 0}</td>
+                    <td class="text-center">${day.students || 0}</td>
+                    <td class="text-center text-success">${day.present || 0}</td>
+                    <td class="text-center text-danger">${day.absent || 0}</td>
+                    <td class="text-center text-warning">${day.late || 0}</td>
+                    <td class="text-center text-info">${day.excused || 0}</td>
+                    <td class="text-center">
+                        <span class="badge bg-${getRateColorClass(day.attendance_rate || 0)}">
+                            ${day.attendance_rate || 0}%
+                        </span>
+                    </td>
+                </tr>
+            `;
+        });
+        
+        html += `
+                    </tbody>
+                </table>
+            </div>
+        `;
+    }
+    
+    // Student Breakdown
+    if (studentBreakdown.length > 0) {
+        html += `
+            <h6 class="mb-3 mt-4"><i class="bi bi-person-lines-fill me-2"></i> Student Performance</h6>
+            <div class="modal-table-responsive">
+                <table class="modal-table">
+                    <thead>
+                        <tr>
+                            <th>Student</th>
+                            <th>Admission No.</th>
+                            <th class="text-center">Days</th>
+                            <th class="text-center">Sessions</th>
+                            <th class="text-center">Present</th>
+                            <th class="text-center">Absent</th>
+                            <th class="text-center">Late</th>
+                            <th class="text-center">Excused</th>
+                            <th class="text-center">Rate</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+        `;
+        
+        // Sort by attendance rate
+        const sortedStudents = [...studentBreakdown].sort((a, b) => 
+            (b.attendance_rate || 0) - (a.attendance_rate || 0)
+        );
+        
+        sortedStudents.forEach(student => {
+            html += `
+                <tr>
+                    <td>${student.name || ''}</td>
+                    <td>${student.admission_number || 'N/A'}</td>
+                    <td class="text-center">${student.days || 0}</td>
+                    <td class="text-center">${student.sessions || 0}</td>
+                    <td class="text-center text-success">${student.present || 0}</td>
+                    <td class="text-center text-danger">${student.absent || 0}</td>
+                    <td class="text-center text-warning">${student.late || 0}</td>
+                    <td class="text-center text-info">${student.excused || 0}</td>
+                    <td class="text-center">
+                        <span class="badge bg-${getRateColorClass(student.attendance_rate || 0)}">
+                            ${student.attendance_rate || 0}%
+                        </span>
+                    </td>
+                </tr>
+            `;
+        });
+        
+        html += `
+                    </tbody>
+                </table>
+            </div>
+        `;
+    }
+    
+    // Export buttons
+    html += `
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline-primary" onclick="exportClassDetails()">
+                    <i class="bi bi-file-earmark-pdf me-1"></i> Export Class Report
+                </button>
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+            </div>
+        </div>
+    `;
+    
+    content.innerHTML = html;
+    initializeModalTooltips();
+}
+
+function exportClassDetails() {
+    if (!currentClassId) {
+        showAlert('No class selected for export', 'danger');
+        return;
+    }
+    
+    const filters = getCurrentFilters();
+    let exportUrl = `{% url 'attendance_report_class_monthly_pdf' %}?class_level=${currentClassId}`;
+    
+    if (currentStreamId) {
+        exportUrl += `&stream=${currentStreamId}`;
+    }
+    
+    exportUrl += `&month=${filters.month || '{{ month }}'}&year=${filters.year || '{{ year }}'}`;
+    
+    if (filters.attendance_type && filters.attendance_type !== 'ALL') {
+        exportUrl += `&attendance_type=${filters.attendance_type}`;
+    }
+    
+    // Open in new tab
+    window.open(exportUrl, '_blank');
+    
+    showAlert('Class details PDF export started.', 'success');
+}
+
+function viewDayDetails(dateString) {
+    const filters = getCurrentFilters();
+    let url = `{% url 'attendance_report_daily' %}?date=${dateString}`;
+    
+    // Add current filters to URL
+    if (filters.class_level) url += `&class_level=${filters.class_level}`;
+    if (filters.stream) url += `&stream=${filters.stream}`;
+    if (filters.attendance_type && filters.attendance_type !== 'ALL') {
+        url += `&attendance_type=${filters.attendance_type}`;
+    }
+    
+    window.location.href = url;
+}
+
+function filterStudents() {
+    const searchInput = document.getElementById('studentSearch');
+    if (!searchInput) return;
+    
+    const searchTerm = searchInput.value.toLowerCase().trim();
+    const rows = document.querySelectorAll('#studentTable tbody tr');
+    let visibleCount = 0;
+    
+    rows.forEach(row => {
+        const name = row.getAttribute('data-name') || '';
+        const admission = row.getAttribute('data-admission') || '';
+        
+        if (searchTerm === '' || name.includes(searchTerm) || admission.includes(searchTerm)) {
+            row.style.display = '';
+            visibleCount++;
+        } else {
+            row.style.display = 'none';
+        }
+    });
+    
+    const countElement = document.getElementById('studentCount');
+    if (countElement) {
+        countElement.textContent = `Showing ${visibleCount} of ${rows.length} students`;
+    }
+}
+
+function searchStudents() {
+    const searchInput = document.getElementById('studentSearch');
+    if (searchInput) {
+        searchInput.focus();
+        searchInput.select();
+    }
+}
+
+function toggleCalendarView() {
+    const calendar = document.getElementById('monthCalendar');
+    if (calendar) {
+        const isExpanded = calendar.classList.toggle('expanded');
+        
+        if (isExpanded) {
+            calendar.style.gridTemplateColumns = 'repeat(7, 1fr)';
+            calendar.style.gap = '0.5rem';
+            showAlert('Calendar expanded. Click again to return to normal view.', 'info', 3000);
+        } else {
+            calendar.style.gridTemplateColumns = 'repeat(7, 1fr)';
+            calendar.style.gap = '0.25rem';
+        }
+    }
+}
+
+function toggleDailyDetails() {
+    const dailyCards = document.querySelectorAll('.daily-card');
+    if (dailyCards.length === 0) return;
+    
+    const firstCard = dailyCards[0];
+    const details = firstCard.querySelector('.daily-details');
+    const isCollapsed = details && !details.classList.contains('d-none');
+    
+    dailyCards.forEach(card => {
+        const cardDetails = card.querySelector('.daily-details');
+        if (cardDetails) {
+            if (isCollapsed) {
+                cardDetails.classList.add('d-none');
+            } else {
+                cardDetails.classList.remove('d-none');
+            }
+        }
+    });
+    
+    const button = document.querySelector('[onclick="toggleDailyDetails()"]');
+    if (button) {
+        const icon = button.querySelector('i');
+        if (icon) {
+            icon.className = isCollapsed ? 'bi bi-chevron-down' : 'bi bi-chevron-up';
+        }
+        button.innerHTML = isCollapsed ? 
+            '<i class="bi bi-chevron-down"></i> Expand All' : 
+            '<i class="bi bi-chevron-up"></i> Collapse All';
+    }
+}
+
+function exportClassReport() {
+    if (!currentClassId) {
+        showAlert('No class selected for export', 'danger');
+        return;
+    }
+    
+    const filters = getCurrentFilters();
+    let exportUrl = `{% url 'attendance_report_monthly_pdf' %}?class_level=${currentClassId}`;
+    
+    if (currentStreamId) {
+        exportUrl += `&stream=${currentStreamId}`;
+    }
+    
+    exportUrl += `&month=${filters.month || '{{ month }}'}&year=${filters.year || '{{ year }}'}`;
+    
+    if (filters.attendance_type && filters.attendance_type !== 'ALL') {
+        exportUrl += `&attendance_type=${filters.attendance_type}`;
+    }
+    
+    // Open in new tab
+    window.open(exportUrl, '_blank');
+    
+    showAlert('Export started. The PDF will download shortly.', 'success');
+}
+
+function exportClassSummary() {
+    const filters = getCurrentFilters();
+    let exportUrl = `{% url 'attendance_report_monthly_pdf' %}?`;
+    
+    const params = new URLSearchParams({
+        month: filters.month || '{{ month }}',
+        year: filters.year || '{{ year }}'
+    });
+    
+    if (filters.class_level) params.append('class_level', filters.class_level);
+    if (filters.stream) params.append('stream', filters.stream);
+    if (filters.attendance_type && filters.attendance_type !== 'ALL') {
+        params.append('attendance_type', filters.attendance_type);
+    }
+    
+    exportUrl += params.toString();
+    window.open(exportUrl, '_blank');
+    
+    showAlert('Class summary export started.', 'success');
+}
+
+function handlePDFDownload(e) {
+    e.preventDefault();
+    
+    const pdfBtn = document.getElementById('pdfDownloadBtn');
+    const pdfLoading = document.getElementById('pdfLoading');
+    
+    if (pdfBtn && pdfLoading) {
+        pdfBtn.style.display = 'none';
+        pdfLoading.style.display = 'flex';
+        
+        // Open PDF in new tab
+        const url = pdfBtn.getAttribute('href');
+        window.open(url, '_blank');
+        
+        // Re-enable button after delay
+        setTimeout(() => {
+            pdfBtn.style.display = 'inline-flex';
+            pdfLoading.style.display = 'none';
+        }, 3000);
+    }
+}
+
+// ===== HELPER FUNCTIONS =====
+
+function getCurrentFilters() {
+    return {
+        class_level: document.getElementById('class_level')?.value || '',
+        stream: document.getElementById('stream')?.value || '',
+        attendance_type: document.getElementById('attendance_type')?.value || 'ALL',
+        month: document.getElementById('month')?.value || '{{ month }}',
+        year: document.getElementById('year')?.value || '{{ year }}',
+        view: document.getElementById('view')?.value || 'summary'
+    };
+}
+
+async function fetchData(url, params = {}) {
+    const queryString = new URLSearchParams(params).toString();
+    const fullUrl = `${url}?${queryString}`;
+    
+    const response = await fetch(fullUrl);
+    if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    return await response.json();
+}
+
+function getRateColorClass(rate) {
+    if (rate >= 80) return 'success';
+    if (rate >= 60) return 'warning';
+    return 'danger';
+}
+
+function createLoadingSpinner(message = 'Loading...') {
+    return `
+        <div class="text-center py-5">
+            <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-3">${message}</p>
+        </div>
+    `;
+}
+
+function createErrorMessage(title, message, details = '') {
+    return `
+        <div class="alert alert-danger m-0">
+            <h6>${title}</h6>
+            <p>${message}</p>
+            ${details ? `<small>Error details: ${details}</small>` : ''}
+            <button type="button" class="btn btn-sm btn-outline-secondary mt-2" onclick="window.location.reload()">
+                <i class="bi bi-arrow-clockwise me-1"></i> Retry
+            </button>
+        </div>
+    `;
+}
+
+function initializeModalTooltips() {
+    // Reinitialize tooltips inside modal
+    const modalTooltips = [].slice.call(
+        document.querySelectorAll('#weekDetailsModal [data-bs-toggle="tooltip"], #classDetailsModal [data-bs-toggle="tooltip"]')
+    );
+    modalTooltips.map(function(tooltipEl) {
+        return new bootstrap.Tooltip(tooltipEl);
+    });
+}
+
+function formatDate(dateString) {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', { 
+        month: 'short', 
+        day: 'numeric', 
+        year: 'numeric' 
+    });
+}
+</script>
+{% endblock %}
+ 

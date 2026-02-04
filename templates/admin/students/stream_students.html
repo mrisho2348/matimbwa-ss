@@ -1,0 +1,980 @@
+{% extends 'admin/base.html' %}
+{% load static %}
+{% block title %} {{ stream.class_level.name }}{{ stream.stream_letter }} Students {% endblock title %}
+
+{% block breadcrumb %}
+    <a href="{% url 'admin_stream_classes' %}" class="btn btn-secondary">
+        <i class="fas fa-arrow-left"></i> Back to Streams
+    </a>
+{% endblock breadcrumb %}
+
+{% block extra_css %}
+<style>
+    .card-header {
+        border-bottom: 2px solid rgba(0,0,0,.125);
+    }
+    .stat-card {
+        background: #f8f9fa;
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 20px;
+        border: 1px solid #dee2e6;
+        text-align: center;
+    }
+    .stat-number {
+        font-size: 2.5rem;
+        font-weight: 700;
+        color: #007bff;
+        line-height: 1;
+    }
+    .stat-label {
+        color: #6c757d;
+        font-size: 0.9rem;
+        margin-top: 8px;
+    }
+    .capacity-progress {
+        height: 10px;
+        margin-top: 5px;
+    }
+    .student-photo {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        object-fit: cover;
+    }
+    .photo-placeholder {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background-color: #6c757d;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .action-buttons .btn {
+        margin: 0 2px;
+        padding: 0.25rem 0.5rem;
+        font-size: 0.875rem;
+    }
+    .stream-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 20px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+    }
+    .stream-title {
+        font-size: 1.8rem;
+        font-weight: 600;
+        margin-bottom: 5px;
+    }
+    .stream-subtitle {
+        opacity: 0.9;
+        font-size: 1rem;
+    }
+    .badge-stream {
+        background: rgba(255,255,255,0.2);
+        color: white;
+        padding: 5px 12px;
+        border-radius: 20px;
+        font-size: 0.9rem;
+    }
+    /* Success and error toasts */
+    .custom-toast {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 99999;
+        min-width: 300px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        display: none;
+    }
+    /* Modal styles */
+    .modal-header {
+        border-radius: 0;
+    }
+    /* Progress bar colors */
+    .progress-bar.bg-success {
+        background-color: #28a745 !important;
+    }
+    .progress-bar.bg-warning {
+        background-color: #ffc107 !important;
+    }
+    .progress-bar.bg-danger {
+        background-color: #dc3545 !important;
+    }
+    
+    /* Bulk Actions Styles */
+    .bulk-actions-container {
+        background: #f8fafc;
+        border-radius: 10px;
+        padding: 15px;
+        margin-bottom: 20px;
+        border: 1px solid #e2e8f0;
+        display: none;
+        align-items: center;
+        gap: 15px;
+        flex-wrap: wrap;
+    }
+    
+    .selected-count {
+        background: #667eea;
+        color: white;
+        padding: 5px 15px;
+        border-radius: 20px;
+        font-weight: 600;
+        font-size: 0.9rem;
+    }
+    
+    .bulk-action-btn {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    
+    /* Checkbox column styling */
+    .checkbox-column {
+        width: 30px;
+        text-align: center;
+    }
+    
+    /* Responsive adjustments */
+    @media (max-width: 768px) {
+        .bulk-actions-container {
+            flex-direction: column;
+            align-items: stretch;
+        }
+        
+        .bulk-action-btn {
+            width: 100%;
+            justify-content: center;
+        }
+    }
+</style>
+{% endblock extra_css %}
+
+{% block content %}
+<section class="content">
+    <div class="container-fluid">
+        <!-- Hidden CSRF Token Field -->
+        <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf_token }}">
+
+        <!-- Success and Error Toasts -->
+        <div id="success-toast" class="alert alert-success alert-dismissible custom-toast" role="alert">
+            <strong><i class="fas fa-check-circle"></i> Success!</strong> 
+            <span id="success-message"></span>
+            <button type="button" class="close" onclick="hideToast('success')">
+                <span aria-hidden="true">&times;</span>
+            </button>
+        </div>
+
+        <div id="error-toast" class="alert alert-danger alert-dismissible custom-toast" role="alert">
+            <strong><i class="fas fa-exclamation-circle"></i> Error!</strong> 
+            <span id="error-message"></span>
+            <button type="button" class="close" onclick="hideToast('error')">
+                <span aria-hidden="true">&times;</span>
+            </button>
+        </div>
+
+        <!-- Stream Header -->
+        <div class="stream-header">
+            <div class="row align-items-center">
+                <div class="col-md-8">
+                    <h1 class="stream-title">{{ stream.class_level.name }}{{ stream.stream_letter }}</h1>
+                    <p class="stream-subtitle mb-0">
+                        <i class="fas fa-layer-group"></i> {{ stream.class_level.educational_level.name }} 
+                        <span class="mx-2">•</span>
+                        <i class="fas fa-stream"></i> Stream {{ stream.stream_letter }}
+                    </p>
+                </div>
+                <div class="col-md-4 text-right">
+                    <span class="badge-stream">
+                        <i class="fas fa-users"></i> 
+                        <span id="current-students">{{ total_students_in_stream }}</span> / {{ stream.capacity }} Students
+                    </span>
+                </div>
+            </div>
+            
+            <!-- Capacity Progress -->
+            <div class="row mt-3">
+                <div class="col-12">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <small>Capacity Usage</small>
+                        <small id="capacity-percentage">{{ capacity_percentage|floatformat:1 }}%</small>
+                    </div>
+                    <div class="progress capacity-progress">
+                        <div id="capacity-progress-bar" 
+                             class="progress-bar {% if capacity_percentage < 70 %}bg-success{% elif capacity_percentage < 90 %}bg-warning{% else %}bg-danger{% endif %}" 
+                             role="progressbar" 
+                             style="width: {{ capacity_percentage|floatformat:0 }}%"
+                             aria-valuenow="{{ capacity_percentage }}" 
+                             aria-valuemin="0" 
+                             aria-valuemax="100">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bulk Actions Section (for REMOVE) -->
+        <div class="bulk-actions-container" id="bulkActionsContainer">
+            <div class="d-flex align-items-center flex-wrap gap-2">
+                <span class="selected-count" id="selectedCount">0 selected</span>
+                
+                <button class="btn btn-danger bulk-action-btn" id="bulkRemoveBtn" title="Remove selected students from stream">
+                    <i class="fas fa-user-minus"></i> Remove from Stream
+                </button>
+                
+                <button class="btn btn-secondary bulk-action-btn" id="clearSelectionBtn">
+                    <i class="fas fa-times"></i> Clear Selection
+                </button>
+                
+                <button class="btn btn-outline-secondary bulk-action-btn" id="closeBulkActionsBtn">
+                    <i class="fas fa-times-circle"></i> Close
+                </button>
+            </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="d-flex flex-wrap gap-3 align-items-center">
+                    <button type="button" class="btn btn-primary" data-toggle="modal" data-target="#addStudentModal">
+                        <i class="fas fa-user-plus"></i> Add Students
+                    </button>
+                    
+                    <button type="button" class="btn btn-outline-primary" id="bulkSelectToggleBtn">
+                        <i class="fas fa-check-square"></i> Bulk Select
+                    </button>
+                    
+                    <button type="button" class="btn btn-outline-secondary" onclick="window.location.reload()">
+                        <i class="fas fa-sync-alt"></i> Refresh
+                    </button>
+                    
+                    <div class="ml-auto">
+                        <div class="input-group input-group-sm" style="width: 250px;">
+                            <input type="text" class="form-control" placeholder="Search in stream..." id="tableSearch">
+                            <div class="input-group-append">
+                                <button class="btn btn-outline-secondary" type="button" id="tableSearchBtn">
+                                    <i class="fas fa-search"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <!-- Current Students in Stream (MAIN TABLE - for BULK REMOVE) -->
+            <div class="col-lg-12">
+                <div class="card shadow-lg">
+                    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                        <h6 class="header-title mb-0 text-uppercase">
+                            <i class="fas fa-user-graduate"></i> Students in {{ stream.class_level.name }}{{ stream.stream_letter }}
+                            <span class="badge badge-light ml-2" id="student-count">{{ total_students_in_stream }}</span>
+                        </h6>
+                        <div class="d-flex align-items-center">
+                            <span class="mr-2">Select All:</span>
+                            <input type="checkbox" id="selectAllStudents" class="form-check-input">
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover text-nowrap table-bordered table-striped display" id="students-table">
+                                <thead class="bg-light">
+                                    <tr>
+                                        <th class="checkbox-column">
+                                            <input type="checkbox" id="selectAllHeader">
+                                        </th>
+                                        <th>Photo</th>
+                                        <th>Name</th>
+                                        <th>Reg. Number</th>
+                                        <th>Gender</th>
+                                        <th>Age</th>
+                                        <th>Status</th>
+                                        <th class="text-center">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for student in students %}
+                                    <tr id="student-row-{{ student.id }}">
+                                        <td class="checkbox-column">
+                                            <!-- UNIQUE CLASS for main table checkboxes -->
+                                            <input type="checkbox" class="student-checkbox-remove" value="{{ student.id }}" data-id="{{ student.id }}" data-name="{{ student.full_name }}">
+                                        </td>
+                                        <td>
+                                            {% if student.photo %}
+                                                <img src="{{ student.photo.url }}" class="student-photo" alt="{{ student.get_full_name }}">
+                                            {% else %}
+                                                <div class="photo-placeholder">
+                                                    <i class="fas fa-user text-white"></i>
+                                                </div>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <strong>{{ student.full_name }}</strong>
+                                            <br>
+                                            <small class="text-muted">{{ student.class_level.name }}</small>
+                                        </td>
+                                        <td>{{ student.registration_number }}</td>
+                                        <td>{{ student.get_gender_display }}</td>
+                                        <td>{{ student.age|default:"N/A" }}</td>
+                                        <td>
+                                            {% if student.is_active %}
+                                                <span class="badge badge-success">
+                                                    <i class="fas fa-check-circle"></i> Active
+                                                </span>
+                                            {% else %}
+                                                <span class="badge badge-secondary">
+                                                    <i class="fas fa-times-circle"></i> Inactive
+                                                </span>
+                                            {% endif %}
+                                        </td>
+                                        <td class="text-center action-buttons">
+                                            <button class="btn btn-sm btn-danger remove-student-btn" 
+                                                    data-id="{{ student.id }}"
+                                                    data-name="{{ student.full_name }}"
+                                                    title="Remove from stream">
+                                                <i class="fas fa-user-minus"></i> Remove
+                                            </button>
+                                            <a href="{% url 'admin_student_detail' student.id %}" class="btn btn-sm btn-info" 
+                                               title="View Profile">
+                                                <i class="fas fa-eye"></i> View
+                                            </a>
+                                        </td>
+                                    </tr>                                    
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Add Student Modal (for BULK ADD) -->
+<div class="modal fade" id="addStudentModal" tabindex="-1" role="dialog" aria-labelledby="addStudentModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title" id="addStudentModalLabel">
+                    <i class="fas fa-user-plus"></i> Add Students to {{ stream.class_level.name }}{{ stream.stream_letter }}
+                </h5>
+                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <div class="input-group">
+                            <div class="input-group-prepend">
+                                <span class="input-group-text"><i class="fas fa-search"></i></span>
+                            </div>
+                            <input type="text" class="form-control" id="search-available-students" placeholder="Search by name or registration number...">
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="input-group">
+                            <div class="input-group-prepend">
+                                <span class="input-group-text"><i class="fas fa-filter"></i></span>
+                            </div>
+                            <select class="form-control" id="filter-gender">
+                                <option value="">All Genders</option>
+                                <option value="M">Male</option>
+                                <option value="F">Female</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="table-responsive">
+                    <table class="table table-hover text-nowrap table-bordered table-striped display" id="available-students-table">
+                        <thead class="bg-light">
+                            <tr>
+                                <th width="5%">Select</th>
+                                <th>Name</th>
+                                <th>Reg. Number</th>
+                                <th>Gender</th>
+                                <th>Age</th>
+                                <th>Class Level</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for student in available_students %}
+                            <tr>
+                                <td>
+                                    <div class="text-center">
+                                        <!-- UNIQUE CLASS for modal table checkboxes -->
+                                        <input type="checkbox" class="student-checkbox-add" value="{{ student.id }}">
+                                    </div>
+                                </td>
+                                <td>{{ student.full_name }}</td>
+                                <td>{{ student.registration_number }}</td>
+                                <td>{{ student.get_gender_display }}</td>
+                                <td>{{ student.age|default:"N/A" }}</td>
+                                <td>{{ student.class_level.name }}</td>
+                                <td>
+                                    {% if student.is_active %}
+                                        <span class="badge badge-success">Active</span>
+                                    {% else %}
+                                        <span class="badge badge-secondary">Inactive</span>
+                                    {% endif %}
+                                </td>
+                            </tr>                           
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-success" id="add-selected-students" disabled>
+                    <i class="fas fa-user-plus"></i> Add Selected Students
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Confirm Bulk Remove Modal -->
+<div class="modal fade" id="confirmBulkRemoveModal" tabindex="-1" role="dialog" aria-labelledby="confirmBulkRemoveModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="confirmBulkRemoveModalLabel">
+                    <i class="fas fa-exclamation-triangle"></i> Confirm Bulk Removal
+                </h5>
+                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to remove <strong id="bulk-remove-count">0</strong> selected student(s) from this stream?</p>
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-circle me-2"></i>
+                    <strong>Warning:</strong> This action cannot be undone. The students will become available for assignment to other streams.
+                </div>
+                <div id="selectedStudentsList" class="mt-3" style="max-height: 150px; overflow-y: auto;">
+                    <!-- Selected students will be listed here -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirm-bulk-remove-btn">
+                    <i class="fas fa-user-minus"></i> Remove Selected
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Confirm Single Remove Modal -->
+<div class="modal fade" id="confirmRemoveModal" tabindex="-1" role="dialog" aria-labelledby="confirmRemoveModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="confirmRemoveModalLabel">
+                    <i class="fas fa-exclamation-triangle"></i> Confirm Removal
+                </h5>
+                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to remove <strong id="student-name"></strong> from this stream?</p>
+                <p class="text-muted"><small>The student will become available for assignment to other streams.</small></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirm-remove-btn">
+                    <i class="fas fa-user-minus"></i> Remove from Stream
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+<script>
+    // Function to get CSRF token
+    function getCSRFToken() {
+        return $('input[name="csrfmiddlewaretoken"]').val();
+    }
+
+    // Function to show/hide toast
+    function showToast(message, type = 'success') {
+        const toastId = type === 'success' ? 'success-toast' : 'error-toast';
+        const messageId = type === 'success' ? 'success-message' : 'error-message';
+        
+        $('#' + messageId).text(message);
+        $('#' + toastId).fadeIn();
+        
+        setTimeout(() => {
+            hideToast(type);
+        }, type === 'success' ? 3000 : 5000);
+    }
+
+    function hideToast(type) {
+        const toastId = type === 'success' ? 'success-toast' : 'error-toast';
+        $('#' + toastId).fadeOut();
+    }
+
+    // Function to update selected count for REMOVE action
+    function updateSelectedCount() {
+        const count = $('.student-checkbox-remove:checked').length;
+        $('#selectedCount').text(`${count} selected`);
+        $('#bulkRemoveBtn').prop('disabled', count === 0);
+        $('#bulkActionsContainer').toggle(count > 0);
+        
+        // Update bulk remove modal count
+        $('#bulk-remove-count').text(count);
+        
+        // Update students list in modal
+        const selectedStudents = [];
+        $('.student-checkbox-remove:checked').each(function() {
+            const studentId = $(this).data('id');
+            const studentName = $(this).data('name');
+            selectedStudents.push({ id: studentId, name: studentName });
+        });
+        
+        const studentsList = $('#selectedStudentsList');
+        studentsList.empty();
+        
+        if (selectedStudents.length > 0) {
+            const list = $('<div></div>');
+            selectedStudents.slice(0, 10).forEach(student => {
+                list.append(`<div class="mb-1"><i class="fas fa-user mr-2"></i>${student.name}</div>`);
+            });
+            
+            if (selectedStudents.length > 10) {
+                list.append(`<div class="text-muted">...and ${selectedStudents.length - 10} more</div>`);
+            }
+            
+            studentsList.append(list);
+        }
+    }
+
+    $(document).ready(function() {
+        // Initialize DataTables
+        var studentsTable = $('#students-table').DataTable({
+            "dom": "<'row'<'col-sm-12 col-md-6'l><'col-sm-12 col-md-6'f>>" +
+                   "<'row'<'col-sm-12'tr>>" +
+                   "<'row'<'col-sm-12 col-md-5'i><'col-sm-12 col-md-7'p>>",
+            "lengthMenu": [[10, 25, 50, -1], [10, 25, 50, "All"]],
+            "pageLength": 10,
+            "responsive": true,
+            "autoWidth": false,
+            "order": [[2, 'asc']], // Sort by name column
+            "language": {
+                "emptyTable": "<div class='text-center py-4'><i class='fas fa-user-graduate fa-2x mb-2'></i><br>No students in this stream.</div>",
+                "searchPlaceholder": "Search students..."
+            },
+            "columnDefs": [
+                {
+                    "targets": [0, 7], // Checkbox and Actions columns
+                    "orderable": false
+                }
+            ]
+        });
+        
+        var availableTable = $('#available-students-table').DataTable({
+            "dom": "<'row'<'col-sm-12 col-md-6'l><'col-sm-12 col-md-6'f>>" +
+                   "<'row'<'col-sm-12'tr>>" +
+                   "<'row'<'col-sm-12 col-md-5'i><'col-sm-12 col-md-7'p>>",
+            "lengthMenu": [[10, 25, 50, -1], [10, 25, 50, "All"]],
+            "pageLength": 10,
+            "responsive": true,
+            "autoWidth": false,
+            "order": [[1, 'asc']],
+            "columnDefs": [
+                {
+                    "targets": 0,
+                    "orderable": false,
+                    "searchable": false
+                }
+            ],
+            "language": {
+                "emptyTable": "<div class='text-center py-4'><i class='fas fa-user-check fa-2x mb-2'></i><br>No available students.</div>"
+            }
+        });
+        
+        // Table search functionality for main table
+        $('#tableSearch').on('keyup', function() {
+            studentsTable.search(this.value).draw();
+        });
+        
+        $('#tableSearchBtn').on('click', function() {
+            studentsTable.search($('#tableSearch').val()).draw();
+        });
+        
+        // Simple gender filter for available students
+        // Simple gender filter for available students - EXACT MATCH VERSION
+        $('#filter-gender').on('change', function() {
+            var gender = $(this).val();
+            
+            // Store the current search value from the search box
+            var searchText = $('#search-available-students').val();
+            
+            // Clear table
+            availableTable.search('');
+            availableTable.columns().search('');
+            
+            // Re-apply the search text if exists
+            if (searchText) {
+                availableTable.search(searchText);
+            }
+            
+            // Apply gender filter
+            if (gender === 'M') {
+                availableTable.column(3).search('^Male$', true, false).draw();
+            } else if (gender === 'F') {
+                availableTable.column(3).search('^Female$', true, false).draw();
+            } else {
+                availableTable.column(3).search('').draw();
+            }
+        });
+        
+        // Search filter for available students table
+        $('#search-available-students').on('keyup', function() {
+            availableTable.search(this.value).draw();
+        });
+        
+        // Checkbox selection for ADDING students (modal table)
+        $(document).on('change', '.student-checkbox-add', function() {
+            var anyChecked = $('.student-checkbox-add:checked').length > 0;
+            $('#add-selected-students').prop('disabled', !anyChecked);
+        });
+        
+        // Bulk selection functionality for REMOVING students
+        var isBulkMode = false;
+        
+        $('#bulkSelectToggleBtn').on('click', function() {
+            isBulkMode = !isBulkMode;
+            
+            if (isBulkMode) {
+                $(this).html('<i class="fas fa-check-square"></i> Exit Bulk Mode');
+                $(this).removeClass('btn-outline-primary').addClass('btn-primary');
+                $('.checkbox-column').show();
+                $('#selectAllHeader').prop('checked', false);
+                $('#selectAllStudents').prop('checked', false);
+                updateSelectedCount();
+            } else {
+                $(this).html('<i class="fas fa-check-square"></i> Bulk Select');
+                $(this).removeClass('btn-primary').addClass('btn-outline-primary');
+                $('.checkbox-column').hide();
+                $('.student-checkbox-remove').prop('checked', false);
+                $('#bulkActionsContainer').hide();
+            }
+            
+            // Trigger DataTable redraw
+            studentsTable.columns.adjust().draw();
+        });
+        
+        // Initially hide checkbox column
+        $('.checkbox-column').hide();
+        
+        // Select all header checkbox (for REMOVE)
+        $('#selectAllHeader').on('change', function() {
+            const isChecked = $(this).prop('checked');
+            $('#selectAllStudents').prop('checked', isChecked);
+            $('.student-checkbox-remove').prop('checked', isChecked);
+            updateSelectedCount();
+        });
+        
+        // Select all students checkbox (outside table - for REMOVE)
+        $('#selectAllStudents').on('change', function() {
+            const isChecked = $(this).prop('checked');
+            $('#selectAllHeader').prop('checked', isChecked);
+            $('.student-checkbox-remove').prop('checked', isChecked);
+            updateSelectedCount();
+        });
+        
+        // Individual checkbox change (for REMOVE)
+        $(document).on('change', '.student-checkbox-remove', function() {
+            updateSelectedCount();
+            
+            // Update select all header
+            const totalCheckboxes = $('.student-checkbox-remove').length;
+            const checkedCheckboxes = $('.student-checkbox-remove:checked').length;
+            $('#selectAllHeader').prop('checked', totalCheckboxes === checkedCheckboxes);
+            $('#selectAllStudents').prop('checked', totalCheckboxes === checkedCheckboxes);
+        });
+        
+        // Clear selection button (for REMOVE)
+        $('#clearSelectionBtn').on('click', function() {
+            $('.student-checkbox-remove, #selectAllHeader, #selectAllStudents').prop('checked', false);
+            updateSelectedCount();
+        });
+        
+        // Close bulk actions button
+        $('#closeBulkActionsBtn').on('click', function() {
+            $('#bulkActionsContainer').hide();
+            $('.student-checkbox-remove, #selectAllHeader, #selectAllStudents').prop('checked', false);
+        });
+        
+        // Bulk remove button
+        $('#bulkRemoveBtn').on('click', function() {
+            const selectedCount = $('.student-checkbox-remove:checked').length;
+            if (selectedCount === 0) {
+                showToast('No students selected', 'error');
+                return;
+            }
+            
+            $('#confirmBulkRemoveModal').modal('show');
+        });
+        
+        // Confirm bulk remove
+        $('#confirm-bulk-remove-btn').click(function(e) {
+            e.preventDefault();
+            
+            const selectedStudents = [];
+            $('.student-checkbox-remove:checked').each(function() {
+                selectedStudents.push({
+                    id: $(this).data('id'),
+                    name: $(this).data('name')
+                });
+            });
+            
+            if (selectedStudents.length === 0) return;
+            
+            const $btn = $(this);
+            const originalText = $btn.html();
+            $btn.html('<i class="fas fa-spinner fa-spin"></i> Removing...');
+            $btn.prop('disabled', true);
+            
+            // Create form data
+            const formData = new FormData();
+            selectedStudents.forEach(function(student) {
+                formData.append('student_ids[]', student.id);
+            });
+            formData.append('csrfmiddlewaretoken', getCSRFToken());
+            
+            // Send AJAX request
+            $.ajax({
+                url: '{% url "admin_bulk_remove_students_from_stream" stream.id %}',
+                type: 'POST',
+                data: formData,
+                processData: false,
+                contentType: false,
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                success: function(response) {
+                    if (response.success) {
+                        // Remove rows from table
+                        selectedStudents.forEach(function(student) {
+                            studentsTable.row('#student-row-' + student.id).remove().draw();
+                        });
+                        
+                        // Update counts
+                        $('#current-students').text(response.total_students);
+                        $('#student-count').text(response.total_students);
+                        $('#capacity-percentage').text(response.capacity_percentage.toFixed(1) + '%');
+                        $('#capacity-progress-bar').css('width', response.capacity_percentage.toFixed(0) + '%');
+                        
+                        // Update progress bar color
+                        const progressBar = $('#capacity-progress-bar');
+                        progressBar.removeClass('bg-success bg-warning bg-danger');
+                        if (response.capacity_percentage < 70) {
+                            progressBar.addClass('bg-success');
+                        } else if (response.capacity_percentage < 90) {
+                            progressBar.addClass('bg-warning');
+                        } else {
+                            progressBar.addClass('bg-danger');
+                        }
+                        
+                        // Hide modals and reset selection
+                        $('#confirmBulkRemoveModal').modal('hide');
+                        $('#bulkActionsContainer').hide();
+                        $('.student-checkbox-remove, #selectAllHeader, #selectAllStudents').prop('checked', false);
+                        isBulkMode = false;
+                        $('#bulkSelectToggleBtn').html('<i class="fas fa-check-square"></i> Bulk Select')
+                            .removeClass('btn-primary').addClass('btn-outline-primary');
+                        $('.checkbox-column').hide();
+                        studentsTable.columns.adjust().draw();
+                        
+                        showToast(response.message, 'success');
+                        
+                    } else {
+                        showToast(response.message, 'error');
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error:', error);
+                    showToast('An error occurred. Please try again.', 'error');
+                },
+                complete: function() {
+                    $btn.html(originalText).prop('disabled', false);
+                }
+            });
+        });
+        
+        // SINGLE STUDENT REMOVAL (Keep existing functionality)
+        var studentToRemove = null;
+        
+        // Handle single remove button click
+        $(document).on('click', '.remove-student-btn', function(e) {
+            e.preventDefault();
+            
+            studentToRemove = {
+                id: $(this).data('id'),
+                name: $(this).data('name')
+            };
+            
+            $('#student-name').text(studentToRemove.name);
+            $('#confirmRemoveModal').modal('show');
+        });
+        
+        // Handle confirm single remove button click
+        $('#confirm-remove-btn').click(function(e) {
+            e.preventDefault();
+            if (!studentToRemove) return;
+            
+            const $btn = $(this);
+            const originalText = $btn.html();
+            $btn.html('<i class="fas fa-spinner fa-spin"></i> Removing...');
+            $btn.prop('disabled', true);
+            
+            // Create form data with CSRF token
+            const formData = new FormData();
+            formData.append('student_id', studentToRemove.id);
+            formData.append('csrfmiddlewaretoken', getCSRFToken());
+            
+            // Send AJAX request
+            $.ajax({
+                url: '{% url "admin_remove_student_from_stream" stream.id %}',
+                type: 'POST',
+                data: formData,
+                processData: false,
+                contentType: false,
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                success: function(response) {
+                    if (response.success) {
+                        // Remove row from table
+                        studentsTable.row('#student-row-' + studentToRemove.id).remove().draw();
+                        
+                        // Update counts
+                        $('#current-students').text(response.total_students);
+                        $('#student-count').text(response.total_students);
+                        $('#capacity-percentage').text(response.capacity_percentage.toFixed(1) + '%');
+                        $('#capacity-progress-bar').css('width', response.capacity_percentage.toFixed(0) + '%');
+                        
+                        // Update progress bar color
+                        const progressBar = $('#capacity-progress-bar');
+                        progressBar.removeClass('bg-success bg-warning bg-danger');
+                        if (response.capacity_percentage < 70) {
+                            progressBar.addClass('bg-success');
+                        } else if (response.capacity_percentage < 90) {
+                            progressBar.addClass('bg-warning');
+                        } else {
+                            progressBar.addClass('bg-danger');
+                        }
+                        
+                        // Hide modal and show success message
+                        $('#confirmRemoveModal').modal('hide');
+                        showToast(response.message, 'success');
+                        
+                    } else {
+                        showToast(response.message, 'error');
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error:', error);
+                    showToast('An error occurred. Please try again.', 'error');
+                },
+                complete: function() {
+                    $btn.html(originalText).prop('disabled', false);
+                    studentToRemove = null;
+                }
+            });
+        });
+        
+        // Add selected students (for ADD modal)
+        $('#add-selected-students').click(function(e) {
+            e.preventDefault();
+            
+            const selectedStudents = [];
+            $('.student-checkbox-add:checked').each(function() {
+                selectedStudents.push($(this).val());
+            });
+            
+            if (selectedStudents.length === 0) return;
+            
+            const $btn = $(this);
+            const originalText = $btn.html();
+            $btn.html('<i class="fas fa-spinner fa-spin"></i> Adding...');
+            $btn.prop('disabled', true);
+            
+            // Create form data with CSRF token
+            const formData = new FormData();
+            selectedStudents.forEach(function(studentId) {
+                formData.append('student_ids[]', studentId);
+            });
+            formData.append('csrfmiddlewaretoken', getCSRFToken());
+            
+            // Send AJAX request
+            $.ajax({
+                url: '{% url "admin_add_student_to_stream" stream.id %}',
+                type: 'POST',
+                data: formData,
+                processData: false,
+                contentType: false,
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                success: function(response) {
+                    if (response.success) {
+                        $('#addStudentModal').modal('hide');
+                        showToast(response.message, 'success');
+                        
+                        // Reload the page to show updated student list
+                        setTimeout(function() {
+                            window.location.reload();
+                        }, 1500);
+                    } else {
+                        showToast(response.message, 'error');
+                        $btn.html(originalText).prop('disabled', false);
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error:', error);
+                    showToast('An error occurred. Please try again.', 'error');
+                    $btn.html(originalText).prop('disabled', false);
+                }
+            });
+        });
+        
+        // Handle modal close/cancel buttons
+        $(document).on('click', '[data-dismiss="modal"]', function(e) {
+            e.preventDefault();
+            $(this).closest('.modal').modal('hide');
+        });
+        
+        // Clear modals when hidden
+        $('#addStudentModal').on('hidden.bs.modal', function() {
+            $('.student-checkbox-add').prop('checked', false);
+            $('#add-selected-students').prop('disabled', true);
+            $('#search-available-students').val('');
+            $('#filter-gender').val('');
+            availableTable.search('').columns().search('').draw();
+        });
+        
+        $('#confirmRemoveModal').on('hidden.bs.modal', function() {
+            studentToRemove = null;
+            $('#confirm-remove-btn').html('<i class="fas fa-user-minus"></i> Remove from Stream').prop('disabled', false);
+        });
+        
+        $('#confirmBulkRemoveModal').on('hidden.bs.modal', function() {
+            $('#confirm-bulk-remove-btn').html('<i class="fas fa-user-minus"></i> Remove Selected').prop('disabled', false);
+        });
+    });
+</script>
+{% endblock extra_js %}

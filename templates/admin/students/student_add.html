@@ -333,6 +333,43 @@
         position: absolute;
         left: 8px;
     }
+    
+    /* Academic year badge */
+    .academic-year-badge {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 0.85rem;
+        font-weight: 600;
+        display: inline-block;
+        margin-left: 10px;
+    }
+    
+    /* Year info tooltip */
+    .year-info {
+        display: inline-block;
+        margin-left: 8px;
+        color: #718096;
+        cursor: help;
+        position: relative;
+    }
+    
+    .year-info:hover::after {
+        content: 'This determines the admission year and registration number';
+        position: absolute;
+        bottom: 100%;
+        left: 50%;
+        transform: translateX(-50%);
+        background: #2d3748;
+        color: white;
+        padding: 8px 12px;
+        border-radius: 6px;
+        font-size: 0.85rem;
+        width: 200px;
+        z-index: 1000;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
 </style>
 {% endblock extra_css %}
 
@@ -378,11 +415,55 @@
                 </div>
             {% endif %}
             
-            <!-- Personal Information Section -->
+            <!-- Academic Year & Personal Information Section -->
             <div class="form-section">
                 <div class="form-section-title">
-                    <i class="fas fa-user-circle"></i> Personal Information
+                    <i class="fas fa-calendar-alt"></i> Academic Year & Personal Information
                 </div>
+                
+                <!-- Academic Year Selection -->
+                <div class="row">
+                    <div class="col-12">
+                        <div class="form-group">
+                            <label for="id_academic_year" class="form-label required-field">
+                                <i class="fas fa-calendar-check"></i> Academic Year
+                                <span class="year-info" title="This determines the admission year and registration number">
+                                    <i class="fas fa-info-circle"></i>
+                                </span>
+                            </label>
+                            <select class="form-control select2 {% if form.academic_year.errors %}is-invalid{% endif %}" 
+                                    id="id_academic_year" name="academic_year" style="width: 100%;" required>
+                                <option value="">Select Academic Year</option>
+                                {% for year in academic_years %}
+                                    <option value="{{ year.id }}" 
+                                        {% if form.academic_year.value|stringformat:"s" == year.id|stringformat:"s" %}selected{% endif %}
+                                        {% if year.is_active %}data-active="true"{% endif %}>
+                                        {{ year.name }}
+                                        {% if year.is_active %}
+                                            <span class="badge badge-success ml-2">Active</span>
+                                        {% endif %}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                            {% if form.academic_year.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {{ form.academic_year.errors.0 }}
+                                </div>
+                            {% endif %}
+                            <small class="form-text text-muted">
+                                This determines the student's admission year and will affect their registration number generation.
+                                <span class="text-primary fw-semibold" id="yearInfoDisplay">
+                                    {% with active_year=academic_years|first %}
+                                        {% if active_year and active_year.is_active %}
+                                            Currently selected: {{ active_year.name }} (Active)
+                                        {% endif %}
+                                    {% endwith %}
+                                </span>
+                            </small>
+                        </div>
+                    </div>
+                </div>
+                
                 <div class="row">
                     <div class="col-lg-8">
                         <div class="row">
@@ -609,13 +690,15 @@
                             <input type="text" class="form-control {% if form.registration_number.errors %}is-invalid{% endif %}" 
                                    id="id_registration_number" name="registration_number" 
                                    value="{{ form.registration_number.value|default:'' }}"
-                                   placeholder="Auto-generated" readonly>
+                                   placeholder="Auto-generated based on academic year" readonly>
                             {% if form.registration_number.errors %}
                                 <div class="invalid-feedback d-block">
                                     {{ form.registration_number.errors.0 }}
                                 </div>
                             {% endif %}
-                            <small class="form-text text-muted">Registration number will be auto-generated after saving</small>
+                            <small class="form-text text-muted">
+                                Format: S2348/0001/<span id="admissionYearPreview">{{ current_year }}</span>
+                            </small>
                         </div>
                     </div>
                     <div class="col-md-6">
@@ -639,21 +722,19 @@
                 <div class="row">
                     <div class="col-12">
                         <div class="form-group">
-                            <label for="id_subjects" class="form-label required-field">
-                                <i class="fas fa-book"></i> Subjects
+                            <label for="id_optional_subjects" class="form-label">
+                                <i class="fas fa-book"></i> Optional Subjects
                             </label>
-                            <select class="form-control select2" id="id_subjects" name="subjects" 
-                                    multiple="multiple" style="width: 100%;" required disabled>
+                            <select class="form-control select2" id="id_optional_subjects" name="optional_subjects" 
+                                    multiple="multiple" style="width: 100%;" disabled>
                                 <option value="">Please select a class level first</option>
                             </select>
-                            {% if form.subjects.errors %}
+                            {% if form.optional_subjects.errors %}
                                 <div class="invalid-feedback d-block">
-                                    {{ form.subjects.errors.0 }}
+                                    {{ form.optional_subjects.errors.0 }}
                                 </div>
                             {% endif %}
-                            <div class="subjects-required-info">
-                                At least one subject must be selected
-                            </div>
+                            <small class="form-text text-muted">Select optional subjects (optional)</small>
                         </div>
                     </div>
                 </div>
@@ -762,11 +843,11 @@
                 <div class="row">
                     <div class="col-md-6">
                         <div class="form-group">
-                            <label for="id_status" class="form-label">
+                            <label for="id_status" class="form-label required-field">
                                 <i class="fas fa-tag"></i> Student Status
                             </label>
                             <select class="form-control select2 {% if form.status.errors %}is-invalid{% endif %}" 
-                                    id="id_status" name="status" style="width: 100%;">
+                                    id="id_status" name="status" style="width: 100%;" required>
                                 {% for status, label in status_choices %}
                                     <option value="{{ status }}" 
                                         {% if form.status.value == status %}selected{% endif %}>
@@ -801,6 +882,8 @@
             
             <!-- Hidden field for save type -->
             <input type="hidden" name="save_type" id="saveType" value="save_list">
+            <!-- Hidden field for admission year -->
+            <input type="hidden" name="admission_year" id="id_admission_year_hidden" value="{{ current_year }}">
             
             <!-- Action Buttons -->
             <div class="action-buttons">
@@ -927,6 +1010,33 @@ $(document).ready(function() {
         });
     });
 
+    // Update admission year preview when academic year changes
+    $('#id_academic_year').on('change', function() {
+        const selectedOption = $(this).find(':selected');
+        if (selectedOption.val()) {
+            // Extract year from academic year name (assuming format like "2023-2024")
+            const yearText = selectedOption.text();
+            const yearMatch = yearText.match(/\d{4}/);
+            if (yearMatch) {
+                const admissionYear = yearMatch[0];
+                $('#admissionYearPreview').text(admissionYear);
+                $('#id_admission_year_hidden').val(admissionYear);
+            }
+            
+            // Update year info display
+            const isActive = selectedOption.data('active');
+            let infoText = 'Selected: ' + yearText;
+            if (isActive) {
+                infoText += ' (Active Year)';
+            }
+            $('#yearInfoDisplay').text(infoText);
+        } else {
+            $('#admissionYearPreview').text('{{ current_year }}');
+            $('#id_admission_year_hidden').val('{{ current_year }}');
+            $('#yearInfoDisplay').text('');
+        }
+    });
+
     // Main form submission function (AJAX)
     function submitForm() {
         // Validate required fields
@@ -1028,10 +1138,12 @@ $(document).ready(function() {
         
         // Check required fields
         const requiredFields = [
+            { id: 'id_academic_year', message: 'Academic year is required', type: 'select' },
             { id: 'id_first_name', message: 'First name is required' },
             { id: 'id_last_name', message: 'Last name is required' },
             { id: 'id_class_level', message: 'Class level is required', type: 'select' },
-            { id: 'id_stream_class', message: 'Stream/Class is required', type: 'select' }
+            { id: 'id_stream_class', message: 'Stream/Class is required', type: 'select' },
+            { id: 'id_status', message: 'Student status is required', type: 'select' }
         ];
         
         requiredFields.forEach(field => {
@@ -1055,28 +1167,12 @@ $(document).ready(function() {
             }
             
             // Scroll to first error
-            if (!isValid) {
+            if (!isValid && $('.is-invalid').length === 1) {
                 $('html, body').animate({
                     scrollTop: element.offset().top - 100
                 }, 500);
             }
         });
-        
-        // Validate subjects (at least one required)
-        const selectedSubjects = $('#id_subjects').val();
-        if (!selectedSubjects || selectedSubjects.length === 0) {
-            const subjectsElement = $('.select2-selection[aria-labelledby="select2-id_subjects-container"]').parent();
-            subjectsElement.addClass('is-invalid');
-            subjectsElement.parent().find('.select2-container').addClass('required');
-            subjectsElement.after('<div class="invalid-feedback d-block">At least one subject must be selected</div>');
-            isValid = false;
-            
-            if (isValid) {
-                $('html, body').animate({
-                    scrollTop: subjectsElement.offset().top - 100
-                }, 500);
-            }
-        }
         
         // Validate date of birth
         const dob = $('#id_date_of_birth').val();
@@ -1154,9 +1250,9 @@ $(document).ready(function() {
         // Reset Select2 fields
         $('.select2').val(null).trigger('change');
         
-        // Disable stream and subjects
+        // Disable stream and optional subjects
         $('#id_stream_class').prop('disabled', true).trigger('change');
-        $('#id_subjects').prop('disabled', true).trigger('change');
+        $('#id_optional_subjects').prop('disabled', true).trigger('change');
         
         // Clear registration number
         $('#id_registration_number').val('');
@@ -1164,6 +1260,11 @@ $(document).ready(function() {
         // Reset profile preview
         $('#profilePreview').html('<i class="fas fa-user-plus"></i>');
         $('.custom-file-label').text('Choose file');
+        
+        // Reset academic year preview
+        $('#admissionYearPreview').text('{{ current_year }}');
+        $('#id_admission_year_hidden').val('{{ current_year }}');
+        $('#yearInfoDisplay').text('');
         
         // Clear validation errors
         $('.is-invalid').removeClass('is-invalid');
@@ -1197,11 +1298,11 @@ $(document).ready(function() {
         $('#loadingOverlay').fadeOut(300);
     }
 
-    // Load Streams & Subjects when Class Level changes
+    // Load Streams when Class Level changes
     $('#id_class_level').on('change', function () {
         const classId = $(this).val();
         const streamSelect = $('#id_stream_class');
-        const subjectsSelect = $('#id_subjects');
+        const subjectsSelect = $('#id_optional_subjects');
 
         // Reset stream & subjects selects
         streamSelect
@@ -1261,7 +1362,7 @@ $(document).ready(function() {
             }
         });
 
-        // Load subjects by class
+        // Load optional subjects by class
         $.ajax({
             url: "{% url 'admin_get_subjects_by_class' %}",
             type: 'GET',
@@ -1275,7 +1376,8 @@ $(document).ready(function() {
                         subjectsSelect.append(
                             $('<option>', {
                                 value: subject.id,
-                                text: subject.name
+                                text: subject.name,
+                                selected: subject.selected
                             })
                         );
                     });
@@ -1287,7 +1389,7 @@ $(document).ready(function() {
                         subjectsSelect.removeData('previous-values');
                     }
                 } else {
-                    subjectsSelect.append('<option value="">No subjects available for this class</option>');
+                    subjectsSelect.append('<option value="">No optional subjects available for this class</option>');
                 }
                 
                 subjectsSelect.trigger('change');
@@ -1345,7 +1447,7 @@ $(document).ready(function() {
         // Store existing values for stream and subjects if class level is pre-selected
         const classLevelValue = $('#id_class_level').val();
         const streamValue = $('#id_stream_class').val();
-        const subjectsValue = $('#id_subjects').val();
+        const subjectsValue = $('#id_optional_subjects').val();
         
         if (classLevelValue) {
             // Store current values before triggering change
@@ -1353,13 +1455,19 @@ $(document).ready(function() {
                 $('#id_stream_class').data('previous-value', streamValue);
             }
             if (subjectsValue) {
-                $('#id_subjects').data('previous-values', subjectsValue.split(','));
+                $('#id_optional_subjects').data('previous-values', subjectsValue.split(','));
             }
             
-            // Set a timeout to ensure DOM is fully loaded
+            // Trigger change to load streams and subjects
             setTimeout(() => {
                 $('#id_class_level').trigger('change');
             }, 500);
+        }
+        
+        // Initialize academic year preview
+        const academicYearValue = $('#id_academic_year').val();
+        if (academicYearValue) {
+            $('#id_academic_year').trigger('change');
         }
         
         // Initialize profile picture if exists
@@ -1368,6 +1476,12 @@ $(document).ready(function() {
             previewImage(profilePicInput);
         }
         
+        // Make registration number readonly
+        $('#id_registration_number').prop('readonly', true);
+        
+        // Set initial admission year preview
+        $('#id_admission_year_hidden').val('{{ current_year }}');
+        
         // Initialize any existing form errors
         if ($('.is-invalid').length > 0) {
             const firstError = $('.is-invalid').first();
@@ -1375,9 +1489,6 @@ $(document).ready(function() {
                 scrollTop: firstError.offset().top - 100
             }, 500);
         }
-        
-        // Make registration number readonly
-        $('#id_registration_number').prop('readonly', true);
     }
 
     // Call initialization

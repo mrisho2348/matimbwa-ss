@@ -9,9 +9,7 @@
 {% endblock breadcrumb %}
 
 {% block extra_css %}
-<!-- Select2 CSS -->
-<link rel="stylesheet" href="{% static 'admin/plugins/select2/css/select2.min.css' %}">
-<link rel="stylesheet" href="{% static 'admin/plugins/select2-bootstrap4-theme/select2-bootstrap4.min.css' %}">
+
 <style>
     .table th {
         font-weight: 600;
@@ -270,7 +268,7 @@
                                                 </button>
                                                 
                                                 <!-- View Students Button -->
-                                                <a href="#" class="btn btn-sm btn-info quick-action-btn" 
+                                                <a href="{% url 'admin_stream_students' stream.id %}" class="btn btn-sm btn-info quick-action-btn" 
                                                    title="View Students">
                                                     <i class="fas fa-users"></i>
                                                 </a>

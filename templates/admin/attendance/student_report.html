@@ -1,0 +1,523 @@
+{% extends 'admin/base.html' %}
+{% load static %}
+
+{% block title %}Attendance Report - {{ student.full_name }}{% endblock %}
+
+{% block breadcrumb %}
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'admin_dashboard' %}">Dashboard</a></li>      
+        <li class="breadcrumb-item"><a href="{% url 'student_attendance_list' %}">Students</a></li>
+        <li class="breadcrumb-item active" aria-current="page">{{ student.full_name }}</li>
+    </ol>
+</nav>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* Student Info Card */
+    .student-info-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 10px;
+        padding: 20px;
+        margin-bottom: 20px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    
+    .student-avatar-lg {
+        width: 80px;
+        height: 80px;
+        border-radius: 50%;
+        background: rgba(255,255,255,0.2);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 32px;
+        font-weight: bold;
+        margin-right: 20px;
+    }
+    
+    /* Statistics Cards */
+    .stats-card {
+        background: white;
+        border-radius: 8px;
+        padding: 15px;
+        margin-bottom: 15px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        text-align: center;
+        transition: transform 0.3s ease;
+    }
+    
+    .stats-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+    }
+    
+    .stats-card .stats-number {
+        font-size: 2rem;
+        font-weight: 700;
+        display: block;
+        line-height: 1;
+    }
+    
+    .stats-card .stats-label {
+        font-size: 0.875rem;
+        color: #6c757d;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-top: 5px;
+    }
+    
+    /* Attendance Badges */
+    .attendance-badge {
+        padding: 4px 10px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: 600;
+    }
+    
+    .badge-present {
+        background: #d4edda;
+        color: #155724;
+    }
+    
+    .badge-absent {
+        background: #f8d7da;
+        color: #721c24;
+    }
+    
+    .badge-late {
+        background: #fff3cd;
+        color: #856404;
+    }
+    
+    .badge-excused {
+        background: #d1ecf1;
+        color: #0c5460;
+    }
+    
+    /* Filter Card */
+    .filter-card {
+        background: #f8f9fa;
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 20px;
+        border: 1px solid #dee2e6;
+    }
+    
+    /* Table Styles */
+    .attendance-table {
+        font-size: 0.9rem;
+    }
+    
+    .attendance-table th {
+        background: #f8f9fa;
+        font-weight: 600;
+        border-bottom: 2px solid #dee2e6;
+    }
+    
+    /* Progress Bar */
+    .attendance-progress {
+        height: 10px;
+        border-radius: 5px;
+        overflow: hidden;
+        margin-top: 5px;
+    }
+    
+    .progress-present {
+        background: #28a745;
+    }
+    
+    .progress-absent {
+        background: #dc3545;
+    }
+    
+    .progress-late {
+        background: #ffc107;
+    }
+    
+    .progress-excused {
+        background: #17a2b8;
+    }
+    
+    /* Monthly Trends */
+    .monthly-trend-card {
+        background: white;
+        border-radius: 8px;
+        padding: 15px;
+        margin-bottom: 15px;
+        border-left: 4px solid #007bff;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+    
+    /* Print Styles */
+    @media print {
+        .no-print {
+            display: none !important;
+        }
+        
+        .student-info-card {
+            background: white !important;
+            color: black !important;
+            border: 2px solid #000;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="content">
+    <div class="container-fluid">
+        <!-- Page Header -->
+        <div class="row mb-4">
+            <div class="col-md-12">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h3><i class="fas fa-chart-bar me-2"></i>Attendance Report</h3>
+                        <p class="text-muted mb-0">Detailed attendance analysis for student</p>
+                    </div>
+                    <div class="d-flex gap-2 no-print">
+                        <button type="button" class="btn btn-outline-secondary" onclick="window.history.back()">
+                            <i class="fas fa-arrow-left me-2"></i>Back
+                        </button>
+                        <a href="{% url 'download_attendance_pdf' student.id %}?start_date={{ start_date }}&end_date={{ end_date }}&attendance_type={{ attendance_type_filter }}&status={{ status_filter }}" 
+                           class="btn btn-danger" target="_blank">
+                            <i class="fas fa-file-pdf me-2"></i>Download PDF
+                        </a>
+                        <a href="{% url 'student_attendance_list' %}" class="btn btn-primary">
+                            <i class="fas fa-users me-2"></i>All Students
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Student Information Card -->
+        <div class="student-info-card">
+            <div class="d-flex align-items-center">
+                <div class="student-avatar-lg">
+                    {{ student.first_name|first }}{{ student.last_name|first }}
+                </div>
+                <div class="flex-grow-1">
+                    <h4 class="mb-1">{{ student.full_name }}</h4>
+                    <div class="row">
+                        <div class="col-md-3">
+                            <small><i class="fas fa-id-card me-2"></i> {{ student.registration_number|default:"N/A" }}</small>
+                        </div>
+                        <div class="col-md-3">
+                            <small><i class="fas fa-graduation-cap me-2"></i> {{ student.class_level.name|default:"Not assigned" }}</small>
+                        </div>
+                        <div class="col-md-3">
+                            <small><i class="fas fa-stream me-2"></i> {{ student.stream_class.stream_letter|default:"N/A" }}</small>
+                        </div>
+                        <div class="col-md-3">
+                            <small><i class="fas fa-{% if student.gender == 'male' %}male{% else %}female{% endif %} me-2"></i> {{ student.get_gender_display|default:"N/A" }}</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Filter Card -->
+        <div class="filter-card no-print">
+            <form method="GET" class="row g-3">
+                <div class="col-md-3">
+                    <label for="start_date" class="form-label">Start Date</label>
+                    <input type="date" class="form-control" id="start_date" 
+                           name="start_date" value="{{ start_date }}">
+                </div>
+                <div class="col-md-3">
+                    <label for="end_date" class="form-label">End Date</label>
+                    <input type="date" class="form-control" id="end_date" 
+                           name="end_date" value="{{ end_date }}">
+                </div>
+                <div class="col-md-3">
+                    <label for="attendance_type" class="form-label">Attendance Type</label>
+                    <select name="attendance_type" id="attendance_type" class="form-select">
+                        {% for type_code, type_name in attendance_types %}
+                        <option value="{{ type_code }}" {% if attendance_type_filter == type_code %}selected{% endif %}>
+                            {{ type_name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label for="status" class="form-label">Status Filter</label>
+                    <select name="status" id="status" class="form-select">
+                        {% for status_code, status_name in status_options %}
+                        <option value="{{ status_code }}" {% if status_filter == status_code %}selected{% endif %}>
+                            {{ status_name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-12">
+                    <div class="d-flex justify-content-end gap-2">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-filter me-2"></i>Apply Filters
+                        </button>
+                        <a href="{% url 'student_attendance_report' student.id %}" class="btn btn-outline-secondary">
+                            <i class="fas fa-redo me-2"></i>Reset
+                        </a>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <!-- Statistics Cards -->
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="stats-card">
+                    <span class="stats-number text-success">{{ stats.present|default:0 }}</span>
+                    <span class="stats-label">Present</span>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stats-card">
+                    <span class="stats-number text-danger">{{ stats.absent|default:0 }}</span>
+                    <span class="stats-label">Absent</span>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stats-card">
+                    <span class="stats-number text-warning">{{ stats.late|default:0 }}</span>
+                    <span class="stats-label">Late</span>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stats-card">
+                    <span class="stats-number text-info">{{ stats.excused|default:0 }}</span>
+                    <span class="stats-label">Excused</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Overall Statistics -->
+        <div class="row mb-4">
+            <div class="col-md-4">
+                <div class="stats-card">
+                    <span class="stats-number text-primary">{{ attendance_rate }}%</span>
+                    <span class="stats-label">Attendance Rate</span>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="stats-card">
+                    <span class="stats-number text-secondary">{{ total_sessions }}</span>
+                    <span class="stats-label">Total Sessions</span>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="stats-card">
+                    <span class="stats-number text-dark">{{ total_days }}</span>
+                    <span class="stats-label">Days with Attendance</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Daily Summary -->
+        <div class="row mb-4">
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-calendar-day me-2"></i>
+                            Daily Attendance Summary ({{ start_date }} to {{ end_date }})
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        {% if daily_summary %}
+                        <div class="table-responsive">
+                            <table class="table table-hover attendance-table" id="dailySummaryTable">
+                                <thead>
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>Day</th>
+                                        <th>Present</th>
+                                        <th>Absent</th>
+                                        <th>Late</th>
+                                        <th>Excused</th>
+                                        <th>Total</th>
+                                        <th>Daily Rate</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for day in daily_summary %}
+                                    <tr>
+                                        <td>{{ day.date|date:"M d, Y" }}</td>
+                                        <td>{{ day.date|date:"l" }}</td>
+                                        <td>
+                                            <span class="badge-present">{{ day.present }}</span>
+                                        </td>
+                                        <td>
+                                            <span class="badge-absent">{{ day.absent }}</span>
+                                        </td>
+                                        <td>
+                                            <span class="badge-late">{{ day.late }}</span>
+                                        </td>
+                                        <td>
+                                            <span class="badge-excused">{{ day.excused }}</span>
+                                        </td>
+                                        <td>{{ day.total }}</td>
+                                        <td>
+                                            {% if day.total > 0 %}
+                                                {% widthratio day.present day.total 100 %}%
+                                            {% else %}
+                                                0%
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        {% else %}
+                        <div class="text-center py-5">
+                            <i class="fas fa-calendar-times fa-3x text-muted mb-3"></i>
+                            <h5>No attendance records found</h5>
+                            <p class="text-muted">No attendance records found for the selected date range.</p>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Monthly Trends -->
+        <div class="row mb-4">
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-chart-line me-2"></i>
+                            Monthly Attendance Trends
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        {% if monthly_trends %}
+                        <div class="row">
+                            {% for month in monthly_trends %}
+                            <div class="col-md-4 mb-3">
+                                <div class="monthly-trend-card">
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <h6 class="mb-0">{{ month.month }}</h6>
+                                        <span class="badge {% if month.attendance_rate >= 80 %}bg-success{% elif month.attendance_rate >= 60 %}bg-warning{% else %}bg-danger{% endif %}">
+                                            {{ month.attendance_rate }}%
+                                        </span>
+                                    </div>
+                                    <div class="d-flex justify-content-between small mb-2">
+                                        <span>Present: {{ month.stats.present|default:0 }}</span>
+                                        <span>Total: {{ month.stats.total|default:0 }}</span>
+                                    </div>
+                                    <div class="attendance-progress">
+                                        {% if month.stats.total > 0 %}
+                                        {% with present_width=month.stats.present|default:0|floatformat:0 absent_width=month.stats.absent|default:0|floatformat:0 late_width=month.stats.late|default:0|floatformat:0 excused_width=month.stats.excused|default:0|floatformat:0 %}
+                                        <div class="progress-present" style="width: {% widthratio present_width month.stats.total 100 %}%"></div>
+                                        <div class="progress-absent" style="width: {% widthratio absent_width month.stats.total 100 %}%"></div>
+                                        <div class="progress-late" style="width: {% widthratio late_width month.stats.total 100 %}%"></div>
+                                        <div class="progress-excused" style="width: {% widthratio excused_width month.stats.total 100 %}%"></div>
+                                        {% endwith %}
+                                        {% endif %}
+                                    </div>
+                                    <div class="text-center small text-muted mt-2">
+                                        {{ month.total_days }} days with attendance
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% else %}
+                        <div class="text-center py-3">
+                            <p class="text-muted">No monthly trends available for the selected date range.</p>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Detailed Records -->
+        <div class="row">
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-list me-2"></i>
+                            Detailed Attendance Records
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        {% if attendance_records %}
+                        <div class="table-responsive">
+                            <table class="table table-hover attendance-table" id="detailedRecordsTable">
+                                <thead>
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>Type</th>
+                                        <th>Class</th>
+                                        <th>Subject</th>
+                                        <th>Period</th>                                        
+                                        <th>Status</th>
+                                        <th>Remark</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for record in attendance_records %}
+                                    <tr>
+                                        <td>{{ record.attendance_session.date|date:"M d, Y" }}</td>
+                                        <td>
+                                            <span class="badge {% if record.attendance_session.attendance_type == 'CLASS' %}bg-info{% else %}bg-primary{% endif %}">
+                                                {{ record.attendance_session.get_attendance_type_display }}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            {{ record.attendance_session.class_level.name }}
+                                            {% if record.attendance_session.stream %}
+                                                - {{ record.attendance_session.stream.stream_letter }}
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if record.attendance_session.subject %}
+                                                {{ record.attendance_session.subject.name }}
+                                            {% else %}
+                                                <span class="text-muted">Class Attendance</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ record.attendance_session.period|default:"-" }}</td>                                        
+                                        <td>
+                                            <span class="attendance-badge badge-{{ record.status|lower }}">
+                                                {{ record.get_status_display }}
+                                            </span>
+                                        </td>
+                                        <td>{{ record.remark|default:"-" }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        {% else %}
+                        <div class="text-center py-5">
+                            <i class="fas fa-clipboard-list fa-3x text-muted mb-3"></i>
+                            <h5>No detailed records found</h5>
+                            <p class="text-muted">No detailed attendance records found for the selected filters.</p>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    $(document).ready(function() {
+        // Initialize tooltips
+        $('[title]').tooltip({
+            trigger: 'hover',
+            placement: 'top'
+        });
+    });
+</script>
+{% endblock %}

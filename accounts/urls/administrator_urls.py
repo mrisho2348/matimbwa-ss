@@ -40,6 +40,23 @@ urlpatterns = [
     path('admin/bulk-toggle-student-status/', bulk_toggle_student_status,   name='admin_bulk_toggle_student_status'),
     path('get-subjects-by-education-level/', get_subjects_by_class, name='admin_get_subjects_by_class'),   
     path('ajax/class-levels-by-education-level/', get_class_levels_by_education_level, name='admin_get_class_levels_by_education_level'),
+
+    path('streams/<int:stream_id>/students/', stream_students, name='admin_stream_students'),
+    path('streams/<int:stream_id>/students/remove/', remove_student_from_stream, name='admin_remove_student_from_stream'),
+    path('stream/<int:stream_id>/students/bulk-remove/', bulk_remove_students_from_stream, name='admin_bulk_remove_students_from_stream'),
+    path('streams/<int:stream_id>/students/add/', add_student_to_stream, name='admin_add_student_to_stream'),
+
+    path('departments/', department_management, name='admin_department_management'),
+    path('departments/crud/', departments_crud, name='admin_departments_crud'),
+    path('departments/<int:department_id>/', view_department, name='admin_view_department'),
+    path('departments/<int:department_id>/assign-staff/', assign_staff_to_department,   name='admin_assign_staff_to_department'),
+
+        
+    path('department/<int:department_id>/staff/', department_staff_assignment,  name='admin_department_staff'),
+    path('department/<int:department_id>/staff/add/', add_staff_to_department,   name='admin_add_staff_to_department'),
+    path('department/<int:department_id>/staff/remove/', remove_staff_from_department,   name='admin_remove_staff_from_department'),
+    path('department/<int:department_id>/staff/bulk-remove/', bulk_remove_staff_from_department,   name='admin_bulk_remove_staff_from_department'),
+
     # Student Management URLs
     path('students/', students_list, name='admin_students_list'),
     path('students/add/', students_add, name='admin_students_add'),
@@ -84,52 +101,16 @@ urlpatterns = [
     path('teaching-assignments/', teaching_assignments_list, name='admin_teaching_assignments_list'),
     path('teaching-assignments/crud/', teaching_assignments_crud, name='admin_teaching_assignments_crud'),
     path('teaching-assignments/details/', get_assignment_details, name='admin_get_assignment_details'),
-    path('teaching-assignments/streams/', get_streams_for_class, name='admin_get_streams_for_class'),
-    
-    # User Management URLs
-    path('users/', users_list, name='admin_users_list'),
-    path('users/add/', users_add, name='admin_users_add'),
-    path('users/roles/', users_roles, name='admin_users_roles'),
-    path('users/permissions/', permissions, name='admin_permissions'),
-    path('users/activity/', user_activity, name='admin_user_activity'),
-    
-    # System Settings URLs
-    path('settings/system/', system_config, name='admin_system_config'),
-    path('settings/email/', email_settings, name='admin_email_settings'),
-    path('settings/sms/', sms_settings, name='admin_sms_settings'),
-    path('settings/notifications/', notifications, name='admin_notifications'),
-    path('settings/backup/', backup, name='admin_backup'),
-    
-    # Security & Logs URLs
-    path('security/audit-logs/', audit_logs, name='admin_audit_logs'),
-    path('security/login-history/', login_history, name='admin_login_history'),
-    path('security/settings/', security_settings, name='admin_security_settings'),
-    path('security/api/', api_settings, name='admin_api_settings'),
-    
-    # Reports & Analytics URLs
-    path('reports/financial/', financial_reports, name='admin_financial_reports'),
-    path('reports/academic/', academic_reports, name='admin_academic_reports'),
-    path('reports/attendance/', attendance_reports, name='admin_attendance_reports'),
-    path('reports/custom/', custom_reports, name='admin_custom_reports'),
-    path('reports/export/', export_data, name='admin_export_data'),
-    
-    # Help & Support URLs
-    path('help/documentation/', documentation, name='admin_documentation'),
-    path('help/faq/', faq, name='admin_faq'),
-    path('help/support/', support_tickets, name='admin_support_tickets'),
-    path('help/system-status/', system_status, name='admin_system_status'),
+    path('teaching-assignments/streams/', get_streams_for_class, name='admin_get_streams_for_class'),   
+
     
     # Profile & Account Management URLs
     path('account/profile/', profile_view, name='admin_profile'),
     path('account/profile/update/', profile_update, name='admin_profile_update'),
     path('account/profile/picture/', profile_picture_update, name='admin_profile_picture_update'),
-    path('account/security/', profile_security, name='admin_security'),
+    
     path('account/change-password/', change_password, name='admin_change_password'),
-    path('account/two-factor/', two_factor_settings, name='admin_two_factor_settings'),
-    path('account/preferences/', account_preferences, name='admin_preferences'),
-    path('account/sessions/', session_management, name='admin_session_management'),
-    path('account/delete-request/', delete_account_request, name='admin_delete_request'),
-    path('account/activity-logs/', activity_logs, name='admin_activity_logs'),
+   
     
     # AJAX/API Endpoints
     path('ajax/get-streams/', ajax_get_streams, name='admin_ajax_get_streams'),
