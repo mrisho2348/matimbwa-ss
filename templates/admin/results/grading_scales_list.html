@@ -1,0 +1,815 @@
+{% extends 'admin/base.html' %}
+{% load static %}
+{% block title %} Grading Scales Management {% endblock title %}
+
+{% block breadcrumb %}
+    <button type="button" class="btn btn-primary" data-toggle="modal" data-target="#addGradingScaleModal">
+        <i class="fas fa-plus"></i> Add Grading Scale
+    </button>
+{% endblock breadcrumb %}
+
+{% block extra_css %}
+<style>
+    .table th {
+        font-weight: 600;
+        border-bottom-width: 2px;
+    }
+    .table td {
+        vertical-align: middle;
+    }
+    .badge {
+        font-size: 0.85em;
+        padding: 0.4em 0.8em;
+    }
+    .grade-badge {
+        font-weight: bold;
+        font-size: 1.1em;
+    }
+    .mark-range {
+        font-family: monospace;
+        background-color: #f8f9fa;
+        padding: 3px 8px;
+        border-radius: 4px;
+        border: 1px solid #dee2e6;
+    }
+    .points-badge {
+        background-color: #6f42c1;
+        color: white;
+    }
+    /* Action buttons container */
+    .quick-actions {
+        display: flex;
+        gap: 4px;
+        justify-content: center;
+        align-items: center;
+    }
+    /* Base button styling */
+    .quick-action-btn {
+        width: 28px;
+        height: 28px;
+        padding: 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        border: none;
+        transition: all 0.2s ease;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+    }
+    .quick-action-btn i {
+        font-size: 0.75rem;
+        color: #ffffff !important;
+    }
+    .quick-action-btn:hover {
+        transform: scale(1.1);
+        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        filter: brightness(1.05);
+    }
+    .btn-warning.quick-action-btn i {
+        color: #212529 !important;
+    }
+    .btn-primary.quick-action-btn { background-color: #007bff; }
+    .btn-danger.quick-action-btn  { background-color: #dc3545; }
+    
+    /* Grade colors */
+    .grade-A { background-color: #28a745; color: white; }
+    .grade-B { background-color: #17a2b8; color: white; }
+    .grade-C { background-color: #ffc107; color: #212529; }
+    .grade-D { background-color: #fd7e14; color: white; }
+    .grade-E { background-color: #e83e8c; color: white; }
+    .grade-F { background-color: #dc3545; color: white; }
+    .grade-S { background-color: #6f42c1; color: white; }
+    
+    /* Toast messages */
+    .success-toast, .error-toast {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 1056;
+        min-width: 300px;
+    }
+    
+    /* Select2 fix */
+    .select2-container {
+        z-index: 1056 !important;
+    }
+    .select2-dropdown {
+        z-index: 1057 !important;
+    }
+    
+    /* Modal header colors */
+    .modal-header.bg-primary {
+        background-color: #007bff !important;
+    }
+    .modal-header.bg-warning {
+        background-color: #ffc107 !important;
+    }
+    .modal-header.bg-danger {
+        background-color: #dc3545 !important;
+    }
+</style>
+{% endblock extra_css %}
+
+{% block content %}
+<section class="content">
+    <div class="container-fluid">
+        <!-- Toast Messages -->
+        <div id="success-toast" class="alert alert-success alert-dismissible fade success-toast" style="display: none;" role="alert">
+            <strong><i class="fas fa-check-circle"></i> Success!</strong> 
+            <span id="success-message"></span>
+            <button type="button" class="close" onclick="$('#success-toast').fadeOut()" data-dismiss="alert" aria-label="Close">
+                <span aria-hidden="true">&times;</span>
+            </button>
+        </div>
+
+        <div id="error-toast" class="alert alert-danger alert-dismissible fade error-toast" style="display: none;" role="alert">
+            <strong><i class="fas fa-exclamation-circle"></i> Error!</strong> 
+            <span id="error-message"></span>
+            <button type="button" class="close" onclick="$('#error-toast').fadeOut()" data-dismiss="alert" aria-label="Close">
+                <span aria-hidden="true">&times;</span>
+            </button>
+        </div>
+
+        <!-- Main Content -->
+        <div class="row">
+            <div class="col-lg-12">
+                <div class="card shadow-lg">
+                    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                        <h6 class="header-title mb-0 text-uppercase">
+                            <i class="fas fa-chart-line"></i> Grading Scales Management
+                        </h6>
+                        <div class="d-flex align-items-center">
+                            <span class="badge badge-light">
+                                Total: <span id="total-count">{{ grading_scales|length }}</span>
+                            </span>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover text-nowrap table-responsive-sm table-bordered table-striped table-sm display" id="grading-scales-table">
+                                <thead class="bg-light">
+                                    <tr>
+                                        <th>Grade</th>
+                                        <th>Education Level</th>
+                                        <th>Mark Range</th>
+                                        <th>Points</th>
+                                        <th>Description</th>
+                                        <th class="text-center">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for scale in grading_scales %}
+                                    <tr id="row-{{ scale.id }}">
+                                        <td>
+                                            <span class="badge grade-badge grade-{{ scale.grade }}">
+                                                {{ scale.grade }} - {{ scale.get_grade_display|slice:"3:" }}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <strong>{{ scale.education_level.name }}</strong>
+                                            <br>
+                                            <small class="text-muted">{{ scale.education_level.code }}</small>
+                                        </td>
+                                        <td>
+                                            <span class="mark-range">
+                                                {{ scale.min_mark }} - {{ scale.max_mark }}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <span class="badge points-badge">
+                                                {{ scale.points }} pts
+                                            </span>
+                                        </td>
+                                        <td>
+                                            {% if scale.description %}
+                                                {{ scale.description }}
+                                            {% else %}
+                                                <span class="text-muted">No description</span>
+                                            {% endif %}
+                                        </td>
+                                        <td class="text-center">
+                                            <div class="quick-actions">
+                                                <!-- Edit Button -->
+                                                <button class="btn btn-sm btn-primary quick-action-btn edit-btn" 
+                                                        data-id="{{ scale.id }}"
+                                                        data-education-level="{{ scale.education_level.id }}"
+                                                        data-grade="{{ scale.grade }}"
+                                                        data-min-mark="{{ scale.min_mark }}"
+                                                        data-max-mark="{{ scale.max_mark }}"
+                                                        data-points="{{ scale.points }}"
+                                                        data-description="{{ scale.description }}"
+                                                        title="Edit Grading Scale">
+                                                    <i class="fas fa-edit"></i>
+                                                </button>
+                                                
+                                                <!-- Delete Button -->
+                                                <button class="btn btn-sm btn-danger quick-action-btn delete-btn" 
+                                                        data-id="{{ scale.id }}"
+                                                        data-grade="{{ scale.grade }}"
+                                                        data-education-level="{{ scale.education_level.name }}"
+                                                        title="Delete Grading Scale">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Add Grading Scale Modal -->
+<div class="modal fade" id="addGradingScaleModal" tabindex="-1" role="dialog" aria-labelledby="addModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="addModalLabel">
+                    <i class="fas fa-plus-circle"></i> Add New Grading Scale
+                </h5>
+                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <form id="add-form">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="education_level">Education Level <span class="text-danger">*</span></label>
+                                <select class="form-control select2bs4" id="education_level" name="education_level" required style="width: 100%;">
+                                    <option value="">Select Education Level</option>
+                                    {% for level in education_levels %}
+                                        <option value="{{ level.id }}">{{ level.name }} ({{ level.code }})</option>
+                                    {% endfor %}
+                                </select>
+                                <small class="form-text text-muted">Select the education level for this grading scale</small>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="grade">Grade <span class="text-danger">*</span></label>
+                                <select class="form-control select2bs4" id="grade" name="grade" required style="width: 100%;">
+                                    <option value="">Select Grade</option>
+                                    {% for grade_code, grade_name in grade_choices %}
+                                        <option value="{{ grade_code }}" data-color="grade-{{ grade_code }}">{{ grade_name }}</option>
+                                    {% endfor %}
+                                </select>
+                                <small class="form-text text-muted">Select the grade letter</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label for="min_mark">Min Mark <span class="text-danger">*</span></label>
+                                <input type="number" class="form-control" id="min_mark" name="min_mark" required 
+                                       step="0.01" min="0" max="100" placeholder="0.00">
+                                <small class="form-text text-muted">Minimum mark for this grade (0-100)</small>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label for="max_mark">Max Mark <span class="text-danger">*</span></label>
+                                <input type="number" class="form-control" id="max_mark" name="max_mark" required 
+                                       step="0.01" min="0" max="100" placeholder="100.00">
+                                <small class="form-text text-muted">Maximum mark for this grade (0-100)</small>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label for="points">Points</label>
+                                <input type="number" class="form-control" id="points" name="points" 
+                                       step="0.1" min="0" max="10" placeholder="0.0">
+                                <small class="form-text text-muted">Grade points (0 for primary levels)</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-12">
+                            <div class="form-group">
+                                <label for="description">Description</label>
+                                <textarea class="form-control" id="description" name="description" rows="2" 
+                                          placeholder="Optional description for this grade"></textarea>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-12">
+                            <div class="alert alert-info">
+                                <i class="fas fa-info-circle"></i> 
+                                <strong>Note:</strong> Ensure mark ranges don't overlap for the same education level.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal" id="cancel-add-btn">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="save-btn">
+                        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="display: none;"></span>
+                        Save Grading Scale
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Grading Scale Modal -->
+<div class="modal fade" id="editGradingScaleModal" tabindex="-1" role="dialog" aria-labelledby="editModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-warning text-dark">
+                <h5 class="modal-title" id="editModalLabel">
+                    <i class="fas fa-edit"></i> Edit Grading Scale
+                </h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <form id="edit-form">
+                {% csrf_token %}
+                <input type="hidden" id="edit-id" name="id">
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="edit-education_level">Education Level <span class="text-danger">*</span></label>
+                                <select class="form-control select2bs4" id="edit-education_level" name="education_level" required style="width: 100%;">
+                                    <option value="">Select Education Level</option>
+                                    {% for level in education_levels %}
+                                        <option value="{{ level.id }}">{{ level.name }} ({{ level.code }})</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="edit-grade">Grade <span class="text-danger">*</span></label>
+                                <select class="form-control select2bs4" id="edit-grade" name="grade" required style="width: 100%;">
+                                    <option value="">Select Grade</option>
+                                    {% for grade_code, grade_name in grade_choices %}
+                                        <option value="{{ grade_code }}" data-color="grade-{{ grade_code }}">{{ grade_name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label for="edit-min_mark">Min Mark <span class="text-danger">*</span></label>
+                                <input type="number" class="form-control" id="edit-min_mark" name="min_mark" required 
+                                       step="0.01" min="0" max="100" placeholder="0.00">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label for="edit-max_mark">Max Mark <span class="text-danger">*</span></label>
+                                <input type="number" class="form-control" id="edit-max_mark" name="max_mark" required 
+                                       step="0.01" min="0" max="100" placeholder="100.00">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label for="edit-points">Points</label>
+                                <input type="number" class="form-control" id="edit-points" name="points" 
+                                       step="0.1" min="0" max="10" placeholder="0.0">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-12">
+                            <div class="form-group">
+                                <label for="edit-description">Description</label>
+                                <textarea class="form-control" id="edit-description" name="description" rows="2"></textarea>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal" id="cancel-edit-btn">Cancel</button>
+                    <button type="submit" class="btn btn-warning" id="update-btn">
+                        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="display: none;"></span>
+                        Update Grading Scale
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Grading Scale Modal -->
+<div class="modal fade" id="deleteGradingScaleModal" tabindex="-1" role="dialog" aria-labelledby="deleteModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="deleteModalLabel">
+                    <i class="fas fa-exclamation-triangle"></i> Confirm Deletion
+                </h5>
+                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete the grading scale for <strong id="delete-grade-name"></strong> (<strong id="delete-level-name"></strong>)?</p>
+                <p class="text-danger"><small>This action cannot be undone. This grading scale might be referenced in exam results.</small></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal" id="cancel-delete-btn">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirm-delete-btn">
+                    <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="display: none;"></span>
+                    Delete
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+<!-- Select2 JS -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/css/select2.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/js/select2.min.js"></script>
+
+<script>
+    $(document).ready(function() {
+        // Initialize Select2
+        function initializeSelect2() {
+            $('.select2bs4').select2({
+                theme: 'bootstrap4',
+                dropdownParent: $('.modal:visible'),
+                width: '100%',
+                placeholder: 'Select an option',
+                allowClear: false
+            });
+        }
+        
+        // Initialize on page load
+        initializeSelect2();
+
+        // Reinitialize when modals are shown
+        $('#addGradingScaleModal').on('shown.bs.modal', function() {
+            $('#education_level').select2({
+                theme: 'bootstrap4',
+                dropdownParent: $('#addGradingScaleModal'),
+                width: '100%',
+                placeholder: 'Select Education Level',
+                allowClear: false
+            });
+            $('#grade').select2({
+                theme: 'bootstrap4',
+                dropdownParent: $('#addGradingScaleModal'),
+                width: '100%',
+                placeholder: 'Select Grade',
+                allowClear: false
+            });
+        });
+
+        $('#editGradingScaleModal').on('shown.bs.modal', function() {
+            $('#edit-education_level').select2({
+                theme: 'bootstrap4',
+                dropdownParent: $('#editGradingScaleModal'),
+                width: '100%',
+                placeholder: 'Select Education Level',
+                allowClear: false
+            });
+            $('#edit-grade').select2({
+                theme: 'bootstrap4',
+                dropdownParent: $('#editGradingScaleModal'),
+                width: '100%',
+                placeholder: 'Select Grade',
+                allowClear: false
+            });
+        });
+
+        // Destroy Select2 when modals are hidden
+        $('#addGradingScaleModal').on('hidden.bs.modal', function() {
+            $('#education_level').select2('destroy');
+            $('#grade').select2('destroy');
+            $('#add-form')[0].reset();
+        });
+
+        $('#editGradingScaleModal').on('hidden.bs.modal', function() {
+            $('#edit-education_level').select2('destroy');
+            $('#edit-grade').select2('destroy');
+        });
+
+        // Initialize DataTable
+        var table = $('#grading-scales-table').DataTable({
+            "dom": "<'row'<'col-sm-12 col-md-6'l><'col-sm-12 col-md-6'f>>" +
+                   "<'row'<'col-sm-12'tr>>" +
+                   "<'row'<'col-sm-12 col-md-5'i><'col-sm-12 col-md-7'p>>",
+            "lengthMenu": [[10, 25, 50, -1], [10, 25, 50, "All"]],
+            "pageLength": 10,
+            "responsive": true,
+            "autoWidth": false,
+            "ordering": true,
+            "order": [[1, 'asc'], [0, 'asc']], // Sort by education level, then grade
+            
+            "columnDefs": [
+                { 
+                    "targets": 5, // Actions column
+                    "orderable": false,
+                    "searchable": false
+                }
+            ],
+            
+            "language": {
+                "emptyTable": "<div class='text-center py-4'><i class='fas fa-chart-line fa-2x mb-2'></i><br>No grading scales found. Click \"Add Grading Scale\" to create one.</div>",
+                "search": "_INPUT_",
+                "searchPlaceholder": "Search grading scales...",
+                "lengthMenu": "_MENU_ scales per page",
+                "info": "Showing _START_ to _END_ of _TOTAL_ scales",
+                "infoEmpty": "Showing 0 to 0 of 0 scales",
+                "infoFiltered": "(filtered from _MAX_ total scales)",
+                "paginate": {
+                    "first": "First",
+                    "last": "Last",
+                    "next": "Next",
+                    "previous": "Previous"
+                }
+            }
+        });
+
+        // CSRF token for AJAX requests
+        function getCSRFToken() {
+            return $('input[name="csrfmiddlewaretoken"]').val();
+        }
+
+        // Show toast message
+        function showToast(message, type = 'success') {
+            const toastId = type === 'success' ? '#success-toast' : '#error-toast';
+            const messageId = type === 'success' ? '#success-message' : '#error-message';
+            
+            $(messageId).text(message);
+            $(toastId).addClass('show').fadeIn();
+            
+            setTimeout(function() {
+                $(toastId).fadeOut(function() {
+                    $(this).removeClass('show');
+                });
+            }, type === 'success' ? 3000 : 5000);
+        }
+
+        // Function to reload page after delay
+        function reloadPageAfterDelay(message, type = 'success') {
+            showToast(message, type);
+            var delay = type === 'success' ? 2000 : 3000;
+            setTimeout(function() {
+                location.reload();
+            }, delay);
+        }
+
+        // Handle modal close/cancel buttons
+        $(document).on('click', '[data-dismiss="modal"]', function(e) {
+            e.preventDefault();
+            $(this).closest('.modal').modal('hide');
+        });
+
+        // Handle cancel buttons
+        $('#cancel-add-btn, #cancel-edit-btn, #cancel-delete-btn').on('click', function(e) {
+            e.preventDefault();
+            $(this).closest('.modal').modal('hide');
+        });
+
+        // Helper function to handle button loading state
+        function setButtonLoading(btn, isLoading) {
+            const spinner = btn.find('.spinner-border');
+            if (isLoading) {
+                btn.data('original-text', btn.html());
+                btn.prop('disabled', true);
+                spinner.show();
+                btn.html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>');
+            } else {
+                btn.prop('disabled', false);
+                spinner.hide();
+                btn.html(btn.data('original-text'));
+            }
+        }
+        
+        // Add Grading Scale
+        $('#add-form').on('submit', function(e) {
+            e.preventDefault();
+            
+            const saveBtn = $('#save-btn');
+            setButtonLoading(saveBtn, true);
+            
+            const formData = new FormData(this);
+            formData.append('action', 'create');
+            
+            $.ajax({
+                url: '{% url "admin_grading_scales_crud" %}',
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCSRFToken(),
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function(data) {
+                    if (data.success) {
+                        $('#addGradingScaleModal').modal('hide');
+                        reloadPageAfterDelay(data.message, 'success');
+                    } else {
+                        showToast(data.message, 'danger');
+                        setButtonLoading(saveBtn, false);
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error:', error);
+                    showToast('An error occurred while saving. Please try again.', 'danger');
+                    setButtonLoading(saveBtn, false);
+                }
+            });
+        });
+
+        // Edit Grading Scale - Setup modal
+        $(document).on('click', '.edit-btn', function() {
+            const btn = $(this);
+            
+            $('#edit-id').val(btn.data('id'));
+            
+            // Store values
+            const educationLevelId = btn.data('education-level');
+            const grade = btn.data('grade');
+            const minMark = btn.data('min-mark');
+            const maxMark = btn.data('max-mark');
+            const points = btn.data('points');
+            const description = btn.data('description');
+            
+            // Show modal first
+            $('#editGradingScaleModal').modal('show');
+            
+            // Set values after modal is shown
+            setTimeout(function() {
+                $('#edit-education_level').val(educationLevelId).trigger('change');
+                $('#edit-grade').val(grade).trigger('change');
+                $('#edit-min_mark').val(minMark);
+                $('#edit-max_mark').val(maxMark);
+                $('#edit-points').val(points);
+                $('#edit-description').val(description);
+            }, 500);
+        });
+
+        // Edit Grading Scale - Submit form
+        $('#edit-form').on('submit', function(e) {
+            e.preventDefault();
+            
+            const updateBtn = $('#update-btn');
+            setButtonLoading(updateBtn, true);
+            
+            const formData = new FormData(this);
+            formData.append('action', 'update');
+            
+            $.ajax({
+                url: '{% url "admin_grading_scales_crud" %}',
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCSRFToken(),
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function(data) {
+                    if (data.success) {
+                        $('#editGradingScaleModal').modal('hide');
+                        reloadPageAfterDelay(data.message, 'success');
+                    } else {
+                        showToast(data.message, 'danger');
+                        setButtonLoading(updateBtn, false);
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error:', error);
+                    showToast('An error occurred while updating. Please try again.', 'danger');
+                    setButtonLoading(updateBtn, false);
+                }
+            });
+        });
+
+        // Delete Grading Scale - Setup modal
+        let gradingScaleToDelete = null;
+        
+        $(document).on('click', '.delete-btn', function() {
+            const btn = $(this);
+            
+            gradingScaleToDelete = {
+                id: btn.data('id'),
+                grade: btn.data('grade'),
+                educationLevel: btn.data('education-level')
+            };
+            
+            $('#delete-grade-name').text(btn.data('grade'));
+            $('#delete-level-name').text(btn.data('education-level'));
+            $('#deleteGradingScaleModal').modal('show');
+        });
+
+        // Delete Grading Scale - Confirm
+        $('#confirm-delete-btn').on('click', function() {
+            if (!gradingScaleToDelete) return;
+            
+            const deleteBtn = $(this);
+            setButtonLoading(deleteBtn, true);
+            
+            $.ajax({
+                url: '{% url "admin_grading_scales_crud" %}',
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCSRFToken(),
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                data: {
+                    'action': 'delete',
+                    'id': gradingScaleToDelete.id,
+                    'csrfmiddlewaretoken': getCSRFToken()
+                },
+                success: function(data) {
+                    if (data.success) {
+                        $('#deleteGradingScaleModal').modal('hide');
+                        reloadPageAfterDelay(data.message, 'success');
+                    } else {
+                        showToast(data.message, 'danger');
+                        setButtonLoading(deleteBtn, false);
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error:', error);
+                    showToast('An error occurred while deleting. Please try again.', 'danger');
+                    setButtonLoading(deleteBtn, false);
+                }
+            });
+        });
+
+        // Clear form and reset button state on modal close
+        $('#addGradingScaleModal').on('hidden.bs.modal', function() {
+            $('#add-form')[0].reset();
+            setButtonLoading($('#save-btn'), false);
+        });
+        
+        $('#editGradingScaleModal').on('hidden.bs.modal', function() {
+            setButtonLoading($('#update-btn'), false);
+        });
+        
+        $('#deleteGradingScaleModal').on('hidden.bs.modal', function() {
+            gradingScaleToDelete = null;
+            setButtonLoading($('#confirm-delete-btn'), false);
+        });
+
+        // Form validation
+        $('#add-form, #edit-form').on('submit', function(e) {
+            const isAddForm = $(this).attr('id') === 'add-form';
+            const minMarkInput = isAddForm ? '#min_mark' : '#edit-min_mark';
+            const maxMarkInput = isAddForm ? '#max_mark' : '#edit-max_mark';
+            
+            const minMark = parseFloat($(minMarkInput).val());
+            const maxMark = parseFloat($(maxMarkInput).val());
+            
+            // Validate mark ranges
+            if (isNaN(minMark) || minMark < 0 || minMark > 100) {
+                e.preventDefault();
+                showToast('Min mark must be a number between 0 and 100.', 'danger');
+                $(minMarkInput).addClass('is-invalid');
+                return false;
+            }
+            
+            if (isNaN(maxMark) || maxMark < 0 || maxMark > 100) {
+                e.preventDefault();
+                showToast('Max mark must be a number between 0 and 100.', 'danger');
+                $(maxMarkInput).addClass('is-invalid');
+                return false;
+            }
+            
+            if (minMark > maxMark) {
+                e.preventDefault();
+                showToast('Min mark cannot exceed max mark.', 'danger');
+                $(minMarkInput).addClass('is-invalid');
+                $(maxMarkInput).addClass('is-invalid');
+                return false;
+            }
+            
+            return true;
+        });
+
+        // Remove validation classes on input
+        $('#min_mark, #max_mark, #edit-min_mark, #edit-max_mark').on('input', function() {
+            $(this).removeClass('is-invalid');
+        });
+
+        // Manual refresh button
+        $('.btn-outline-secondary').on('click', function() {
+            if ($(this).find('.fa-sync-alt').length) {
+                location.reload();
+            }
+        });
+    });
+</script>
+{% endblock extra_js %}

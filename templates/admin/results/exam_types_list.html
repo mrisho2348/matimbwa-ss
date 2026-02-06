@@ -1,0 +1,795 @@
+{% extends 'admin/base.html' %}
+{% load static %}
+{% block title %} Exam Types Management {% endblock title %}
+
+{% block breadcrumb %}
+    <button type="button" class="btn btn-primary" data-toggle="modal" data-target="#addExamTypeModal">
+        <i class="fas fa-plus"></i> Add Exam Type
+    </button>
+{% endblock breadcrumb %}
+
+{% block extra_css %}
+<style>
+    .table th {
+        font-weight: 600;
+        border-bottom-width: 2px;
+    }
+    .table td {
+        vertical-align: middle;
+    }
+    .badge {
+        font-size: 0.85em;
+        padding: 0.4em 0.8em;
+    }
+    .modal-header {
+        border-radius: 0;
+    }
+    /* DataTable Styles */
+    .dataTables_wrapper .dataTables_filter {
+        float: right;
+        text-align: right;
+    }
+    .dataTables_wrapper .dataTables_length {
+        float: left;
+    }
+    .dataTables_wrapper .dataTables_paginate {
+        float: right;
+        margin-top: 10px;
+    }
+    .success-toast, .error-toast {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 1056;
+        min-width: 300px;
+    }
+    /* Select2 in modal fix */
+    .select2-container {
+        z-index: 1056 !important;
+    }
+    .select2-dropdown {
+        z-index: 1057 !important;
+    }
+    /* Weight badges */
+    .weight-badge {
+        background-color: #17a2b8;
+        color: white;
+    }
+    .max-score-badge {
+        background-color: #28a745;
+        color: white;
+    }
+    /* Action buttons */
+    .action-btn-sm {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.75rem;
+        border-radius: 0.2rem;
+    }
+    /* Quick actions container */
+    .quick-actions {
+        display: flex;
+        gap: 4px;
+        justify-content: center;
+        align-items: center;
+    }
+    /* Base button styling: Circular & Professional */
+    .quick-action-btn {
+        width: 28px;
+        height: 28px;
+        padding: 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        border: none;
+        transition: all 0.2s ease;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+    }
+    /* Icon color */
+    .quick-action-btn i {
+        font-size: 0.75rem;
+        color: #ffffff !important;
+    }
+    /* Hover effects */
+    .quick-action-btn:hover {
+        transform: scale(1.1);
+        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        filter: brightness(1.05);
+    }
+    /* Button colors */
+    .btn-primary.quick-action-btn { background-color: #007bff; }
+    .btn-danger.quick-action-btn  { background-color: #dc3545; }
+    /* Warning button icon for contrast */
+    .btn-warning.quick-action-btn i {
+        color: #212529 !important;
+    }
+    /* Description text */
+    .description-text {
+        font-size: 0.85em;
+        color: #6c757d;
+        max-width: 200px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+</style>
+{% endblock extra_css %}
+
+{% block content %}
+<section class="content">
+    <div class="container-fluid">
+        <div id="success-toast" class="alert alert-success alert-dismissible fade success-toast" style="display: none;" role="alert">
+            <strong><i class="fas fa-check-circle"></i> Success!</strong> 
+            <span id="success-message"></span>
+            <button type="button" class="close" onclick="$('#success-toast').fadeOut()" data-dismiss="alert" aria-label="Close">
+                <span aria-hidden="true">&times;</span>
+            </button>
+        </div>
+
+        <div id="error-toast" class="alert alert-danger alert-dismissible fade error-toast" style="display: none;" role="alert">
+            <strong><i class="fas fa-exclamation-circle"></i> Error!</strong> 
+            <span id="error-message"></span>
+            <button type="button" class="close" onclick="$('#error-toast').fadeOut()" data-dismiss="alert" aria-label="Close">
+                <span aria-hidden="true">&times;</span>
+            </button>
+        </div>
+
+        <div class="row">
+            <div class="col-lg-12">
+                <div class="card shadow-lg">
+                    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                        <h6 class="header-title mb-0 text-uppercase">
+                            <i class="fas fa-clipboard-check"></i> Exam Types Management
+                        </h6>
+                        <div class="d-flex align-items-center">
+                            <span class="badge badge-light">
+                                Total: <span id="total-count">{{ total_exam_types }}</span>
+                            </span>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover text-nowrap table-responsive-sm table-bordered table-striped table-sm display" id="exam-types-table">
+                                <thead class="bg-light">
+                                    <tr>
+                                        <th>Exam Type Name</th>
+                                        <th>Code</th>
+                                        <th>Weight (%)</th>
+                                        <th>Max Score</th>
+                                        <th>Description</th>
+                                        <th class="text-center">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for exam_type in exam_types %}
+                                    <tr id="row-{{ exam_type.id }}">
+                                        <td>
+                                            <strong>{{ exam_type.name }}</strong>
+                                        </td>
+                                        <td>
+                                            <code>{{ exam_type.code }}</code>
+                                        </td>
+                                        <td>
+                                            <span class="badge weight-badge">
+                                                <i class="fas fa-weight"></i> {{ exam_type.weight }}%
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <span class="badge max-score-badge">
+                                                <i class="fas fa-chart-line"></i> {{ exam_type.max_score }}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            {% if exam_type.description %}
+                                                <span class="description-text" title="{{ exam_type.description }}">
+                                                    {{ exam_type.description|truncatechars:50 }}
+                                                </span>
+                                            {% else %}
+                                                <span class="text-muted">-</span>
+                                            {% endif %}
+                                        </td>
+                                        <td class="text-center">
+                                            <div class="quick-actions">
+                                                <!-- Edit Button -->
+                                                <button class="btn btn-sm btn-primary quick-action-btn edit-btn" 
+                                                        data-id="{{ exam_type.id }}"
+                                                        data-name="{{ exam_type.name }}"
+                                                        data-code="{{ exam_type.code }}"
+                                                        data-weight="{{ exam_type.weight }}"
+                                                        data-max-score="{{ exam_type.max_score }}"
+                                                        data-description="{{ exam_type.description }}"
+                                                        title="Edit Exam Type">
+                                                    <i class="fas fa-edit"></i>
+                                                </button>
+                                                
+                                                <!-- Delete Button -->
+                                                <button class="btn btn-sm btn-danger quick-action-btn delete-btn" 
+                                                        data-id="{{ exam_type.id }}"
+                                                        data-name="{{ exam_type.name }}"
+                                                        data-used="{% if exam_type.examsession_set.exists %}true{% else %}false{% endif %}"
+                                                        title="Delete Exam Type">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Add Exam Type Modal -->
+<div class="modal fade" id="addExamTypeModal" tabindex="-1" role="dialog" aria-labelledby="addModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="addModalLabel">
+                    <i class="fas fa-plus-circle"></i> Add New Exam Type
+                </h5>
+                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <form id="add-form">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="name">Exam Type Name <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="name" name="name" required 
+                                       placeholder="e.g., Midterm, Final, CAT" maxlength="100">
+                                <small class="form-text text-muted">Name of the exam type (max 100 characters)</small>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="code">Exam Type Code <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="code" name="code" required 
+                                       placeholder="e.g., MID, FINAL, CAT" maxlength="20">
+                                <small class="form-text text-muted">Unique code for this exam type (max 20 characters)</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="weight">Weight (%) <span class="text-danger">*</span></label>
+                                <div class="input-group">
+                                    <input type="number" class="form-control" id="weight" name="weight" required 
+                                           step="0.01" min="0" max="100" placeholder="0.00" value="0">
+                                    <div class="input-group-append">
+                                        <span class="input-group-text">%</span>
+                                    </div>
+                                </div>
+                                <small class="form-text text-muted">Contribution to final score (0-100%)</small>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="max_score">Maximum Score <span class="text-danger">*</span></label>
+                                <div class="input-group">
+                                    <input type="number" class="form-control" id="max_score" name="max_score" required 
+                                           step="0.01" min="1" placeholder="0.00" value="100">
+                                    <div class="input-group-append">
+                                        <span class="input-group-text">marks</span>
+                                    </div>
+                                </div>
+                                <small class="form-text text-muted">Maximum obtainable marks for this exam</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-12">
+                            <div class="form-group">
+                                <label for="description">Description</label>
+                                <textarea class="form-control" id="description" name="description" rows="3" 
+                                          placeholder="Optional description of the exam type (max 500 characters)" maxlength="500"></textarea>
+                                <small class="form-text text-muted">Brief description of this exam type</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal" id="cancel-add-btn">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="save-btn">
+                        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="display: none;"></span>
+                        Save Exam Type
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Exam Type Modal -->
+<div class="modal fade" id="editExamTypeModal" tabindex="-1" role="dialog" aria-labelledby="editModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-warning text-dark">
+                <h5 class="modal-title" id="editModalLabel">
+                    <i class="fas fa-edit"></i> Edit Exam Type
+                </h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <form id="edit-form">
+                {% csrf_token %}
+                <input type="hidden" id="edit-id" name="id">
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="edit-name">Exam Type Name <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="edit-name" name="name" required 
+                                       placeholder="e.g., Midterm, Final, CAT" maxlength="100">
+                                <small class="form-text text-muted">Name of the exam type</small>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="edit-code">Exam Type Code <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="edit-code" name="code" required 
+                                       placeholder="e.g., MID, FINAL, CAT" maxlength="20">
+                                <small class="form-text text-muted">Unique code for this exam type</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="edit-weight">Weight (%) <span class="text-danger">*</span></label>
+                                <div class="input-group">
+                                    <input type="number" class="form-control" id="edit-weight" name="weight" required 
+                                           step="0.01" min="0" max="100" placeholder="0.00">
+                                    <div class="input-group-append">
+                                        <span class="input-group-text">%</span>
+                                    </div>
+                                </div>
+                                <small class="form-text text-muted">Contribution to final score (0-100%)</small>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="edit-max_score">Maximum Score <span class="text-danger">*</span></label>
+                                <div class="input-group">
+                                    <input type="number" class="form-control" id="edit-max_score" name="max_score" required 
+                                           step="0.01" min="1" placeholder="0.00">
+                                    <div class="input-group-append">
+                                        <span class="input-group-text">marks</span>
+                                    </div>
+                                </div>
+                                <small class="form-text text-muted">Maximum obtainable marks for this exam</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-12">
+                            <div class="form-group">
+                                <label for="edit-description">Description</label>
+                                <textarea class="form-control" id="edit-description" name="description" rows="3" 
+                                          placeholder="Optional description of the exam type" maxlength="500"></textarea>
+                                <small class="form-text text-muted">Brief description of this exam type</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal" id="cancel-edit-btn">Cancel</button>
+                    <button type="submit" class="btn btn-warning" id="update-btn">
+                        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="display: none;"></span>
+                        Update Exam Type
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Exam Type Modal -->
+<div class="modal fade" id="deleteExamTypeModal" tabindex="-1" role="dialog" aria-labelledby="deleteModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="deleteModalLabel">
+                    <i class="fas fa-exclamation-triangle"></i> Confirm Deletion
+                </h5>
+                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete the exam type <strong id="delete-exam-type-name"></strong>?</p>
+                <div id="delete-warning" class="alert alert-warning d-none">
+                    <i class="fas fa-exclamation-circle"></i> 
+                    <strong>Warning:</strong> This exam type is used in exam sessions. Deleting it may affect existing records.
+                </div>
+                <p class="text-danger"><small>This action cannot be undone.</small></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal" id="cancel-delete-btn">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirm-delete-btn">
+                    <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="display: none;"></span>
+                    Delete
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+<script>
+    $(document).ready(function() {
+        // Initialize DataTable
+        var table = $('#exam-types-table').DataTable({
+            "dom": "<'row'<'col-sm-12 col-md-6'l><'col-sm-12 col-md-6'f>>" +
+                   "<'row'<'col-sm-12'tr>>" +
+                   "<'row'<'col-sm-12 col-md-5'i><'col-sm-12 col-md-7'p>>",
+            "lengthMenu": [[10, 25, 50, -1], [10, 25, 50, "All"]],
+            "pageLength": 10,
+            "responsive": true,
+            "autoWidth": false,
+            "ordering": true,
+            "order": [[0, 'asc']], // Sort by name
+            
+            "destroy": true,
+            "retrieve": true,
+            "deferRender": true,
+            
+            "columnDefs": [
+                { 
+                    "targets": 5, // Actions column
+                    "orderable": false,
+                    "searchable": false
+                }
+            ],
+            
+            "language": {
+                "emptyTable": "<div class='text-center py-4'><i class='fas fa-inbox fa-2x mb-2'></i><br>No exam types found. Click \"Add Exam Type\" to create one.</div>",
+                "search": "_INPUT_",
+                "searchPlaceholder": "Search exam types...",
+                "lengthMenu": "_MENU_ exam types per page",
+                "info": "Showing _START_ to _END_ of _TOTAL_ exam types",
+                "infoEmpty": "Showing 0 to 0 of 0 exam types",
+                "infoFiltered": "(filtered from _MAX_ total exam types)",
+                "paginate": {
+                    "first": "First",
+                    "last": "Last",
+                    "next": "Next",
+                    "previous": "Previous"
+                }
+            },
+            "drawCallback": function(settings) {
+                var api = this.api();
+                var total = api.rows().count();
+                $('#total-count').text(total);
+            }
+        });
+
+        // CSRF token for AJAX requests
+        function getCSRFToken() {
+            return $('input[name="csrfmiddlewaretoken"]').val();
+        }
+
+        // Show toast message
+        function showToast(message, type = 'success') {
+            const toastId = type === 'success' ? '#success-toast' : '#error-toast';
+            const messageId = type === 'success' ? '#success-message' : '#error-message';
+            
+            $(messageId).text(message);
+            $(toastId).addClass('show').fadeIn();
+            
+            setTimeout(function() {
+                $(toastId).fadeOut(function() {
+                    $(this).removeClass('show');
+                });
+            }, type === 'success' ? 3000 : 5000);
+        }
+
+        // Function to reload page after delay
+        function reloadPageAfterDelay(message, type = 'success') {
+            showToast(message, type);
+            var delay = type === 'success' ? 2000 : 3000;
+            setTimeout(function() {
+                location.reload();
+            }, delay);
+        }
+
+        // Handle modal close/cancel buttons
+        $(document).on('click', '[data-dismiss="modal"]', function(e) {
+            e.preventDefault();
+            $(this).closest('.modal').modal('hide');
+        });
+
+        // Handle cancel buttons
+        $('#cancel-add-btn, #cancel-edit-btn, #cancel-delete-btn').on('click', function(e) {
+            e.preventDefault();
+            $(this).closest('.modal').modal('hide');
+        });
+
+        // Helper function to handle button loading state
+        function setButtonLoading(btn, isLoading) {
+            const spinner = btn.find('.spinner-border');
+            if (isLoading) {
+                btn.data('original-text', btn.html());
+                btn.prop('disabled', true);
+                spinner.show();
+                btn.html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>');
+            } else {
+                btn.prop('disabled', false);
+                spinner.hide();
+                btn.html(btn.data('original-text'));
+            }
+        }
+        
+        // Add Exam Type
+        $('#add-form').on('submit', function(e) {
+            e.preventDefault();
+            
+            const saveBtn = $('#save-btn');
+            setButtonLoading(saveBtn, true);
+            
+            const formData = new FormData(this);
+            formData.append('action', 'create');
+            
+            $.ajax({
+                url: '{% url "admin_exam_types_crud" %}',
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCSRFToken(),
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function(data) {
+                    if (data.success) {
+                        $('#addExamTypeModal').modal('hide');
+                        reloadPageAfterDelay(data.message, 'success');
+                    } else {
+                        showToast(data.message, 'danger');
+                        setButtonLoading(saveBtn, false);
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error:', error);
+                    showToast('An error occurred while saving. Please try again.', 'danger');
+                    setButtonLoading(saveBtn, false);
+                }
+            });
+        });
+
+        // Edit Exam Type - Setup modal
+        $(document).on('click', '.edit-btn', function() {
+            const btn = $(this);
+            
+            $('#edit-id').val(btn.data('id'));
+            
+            // Store values
+            const name = btn.data('name');
+            const code = btn.data('code');
+            const weight = btn.data('weight');
+            const maxScore = btn.data('max-score');
+            const description = btn.data('description');
+            
+            // Show modal first
+            $('#editExamTypeModal').modal('show');
+            
+            // Set values after modal is shown
+            setTimeout(function() {
+                $('#edit-name').val(name);
+                $('#edit-code').val(code);
+                $('#edit-weight').val(weight);
+                $('#edit-max_score').val(maxScore);
+                $('#edit-description').val(description);
+            }, 100);
+        });
+
+        // Edit Exam Type - Submit form
+        $('#edit-form').on('submit', function(e) {
+            e.preventDefault();
+            
+            const updateBtn = $('#update-btn');
+            setButtonLoading(updateBtn, true);
+            
+            const formData = new FormData(this);
+            formData.append('action', 'update');
+            
+            $.ajax({
+                url: '{% url "admin_exam_types_crud" %}',
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCSRFToken(),
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function(data) {
+                    if (data.success) {
+                        $('#editExamTypeModal').modal('hide');
+                        reloadPageAfterDelay(data.message, 'success');
+                    } else {
+                        showToast(data.message, 'danger');
+                        setButtonLoading(updateBtn, false);
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error:', error);
+                    showToast('An error occurred while updating. Please try again.', 'danger');
+                    setButtonLoading(updateBtn, false);
+                }
+            });
+        });
+
+        // Delete Exam Type - Setup modal
+        let examTypeToDelete = null;
+        
+        $(document).on('click', '.delete-btn', function() {
+            const btn = $(this);
+            
+            examTypeToDelete = {
+                id: btn.data('id'),
+                name: btn.data('name'),
+                isUsed: btn.data('used') === 'true'
+            };
+            
+            $('#delete-exam-type-name').text(btn.data('name'));
+            
+            // Show/hide warning based on usage
+            const warningDiv = $('#delete-warning');
+            if (examTypeToDelete.isUsed) {
+                warningDiv.removeClass('d-none');
+            } else {
+                warningDiv.addClass('d-none');
+            }
+            
+            $('#deleteExamTypeModal').modal('show');
+        });
+
+        // Delete Exam Type - Confirm
+        $('#confirm-delete-btn').on('click', function() {
+            if (!examTypeToDelete) return;
+            
+            const deleteBtn = $(this);
+            setButtonLoading(deleteBtn, true);
+            
+            $.ajax({
+                url: '{% url "admin_exam_types_crud" %}',
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCSRFToken(),
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                data: {
+                    'action': 'delete',
+                    'id': examTypeToDelete.id,
+                    'csrfmiddlewaretoken': getCSRFToken()
+                },
+                success: function(data) {
+                    if (data.success) {
+                        $('#deleteExamTypeModal').modal('hide');
+                        reloadPageAfterDelay(data.message, 'success');
+                    } else {
+                        showToast(data.message, 'danger');
+                        setButtonLoading(deleteBtn, false);
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error:', error);
+                    showToast('An error occurred while deleting. Please try again.', 'danger');
+                    setButtonLoading(deleteBtn, false);
+                }
+            });
+        });
+
+        // Clear form and reset button state on modal close
+        $('#addExamTypeModal').on('hidden.bs.modal', function() {
+            $('#add-form')[0].reset();
+            setButtonLoading($('#save-btn'), false);
+        });
+        
+        $('#editExamTypeModal').on('hidden.bs.modal', function() {
+            setButtonLoading($('#update-btn'), false);
+        });
+        
+        $('#deleteExamTypeModal').on('hidden.bs.modal', function() {
+            examTypeToDelete = null;
+            setButtonLoading($('#confirm-delete-btn'), false);
+        });
+
+        // Manual refresh button
+        $('.btn-outline-secondary').on('click', function() {
+            if ($(this).find('.fa-sync-alt').length) {
+                location.reload();
+            }
+        });
+
+        // Form validation
+        $('#add-form, #edit-form').on('submit', function(e) {
+            const isAddForm = $(this).attr('id') === 'add-form';
+            const codeInput = isAddForm ? '#code' : '#edit-code';
+            const nameInput = isAddForm ? '#name' : '#edit-name';
+            const weightInput = isAddForm ? '#weight' : '#edit-weight';
+            const maxScoreInput = isAddForm ? '#max_score' : '#edit-max_score';
+            
+            const code = $(codeInput).val().trim();
+            const name = $(nameInput).val().trim();
+            const weight = parseFloat($(weightInput).val());
+            const maxScore = parseFloat($(maxScoreInput).val());
+            
+            // Reset validation classes
+            $(codeInput).removeClass('is-invalid');
+            $(nameInput).removeClass('is-invalid');
+            $(weightInput).removeClass('is-invalid');
+            $(maxScoreInput).removeClass('is-invalid');
+            
+            let isValid = true;
+            
+            // Validate code format
+            if (!/^[A-Za-z0-9_-]+$/.test(code)) {
+                $(codeInput).addClass('is-invalid');
+                showToast('Exam type code can only contain letters, numbers, hyphens, and underscores.', 'danger');
+                isValid = false;
+            }
+            
+            // Validate name length
+            if (name.length < 2) {
+                $(nameInput).addClass('is-invalid');
+                showToast('Exam type name must be at least 2 characters long.', 'danger');
+                isValid = false;
+            }
+            
+            // Validate weight
+            if (isNaN(weight) || weight < 0 || weight > 100) {
+                $(weightInput).addClass('is-invalid');
+                showToast('Weight must be a number between 0 and 100.', 'danger');
+                isValid = false;
+            }
+            
+            // Validate max score
+            if (isNaN(maxScore) || maxScore <= 0) {
+                $(maxScoreInput).addClass('is-invalid');
+                showToast('Maximum score must be a number greater than 0.', 'danger');
+                isValid = false;
+            }
+            
+            return isValid;
+        });
+
+        // Remove validation classes on input
+        $('#code, #edit-code, #name, #edit-name, #weight, #edit-weight, #max_score, #edit-max_score').on('input', function() {
+            $(this).removeClass('is-invalid');
+        });
+
+        // Auto-format code to uppercase
+        $('#code, #edit-code').on('blur', function() {
+            $(this).val($(this).val().toUpperCase());
+        });
+
+        // Auto-calculate percentage helper
+        $('#weight, #edit-weight').on('change', function() {
+            let value = parseFloat($(this).val());
+            if (!isNaN(value)) {
+                $(this).val(value.toFixed(2));
+            }
+        });
+
+        // Auto-calculate max score helper
+        $('#max_score, #edit-max_score').on('change', function() {
+            let value = parseFloat($(this).val());
+            if (!isNaN(value)) {
+                $(this).val(value.toFixed(2));
+            }
+        });
+    });
+</script>
+{% endblock extra_js %}

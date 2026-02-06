@@ -50,6 +50,10 @@ class GradingScale(models.Model):
 
     description = models.CharField(max_length=100, blank=True)
 
+        # Audit
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
     class Meta:
         ordering = ['education_level', '-min_mark']
         unique_together = ('education_level', 'grade')
@@ -85,6 +89,7 @@ class DivisionScale(models.Model):
     education_level = models.ForeignKey(
         EducationalLevel,
         on_delete=models.CASCADE,
+        limit_choices_to={'level_type__in': ['O_LEVEL', 'A_LEVEL']},
         related_name='division_scales'
     )
 
@@ -255,7 +260,8 @@ class StudentExamMetrics(models.Model):
     total_marks = models.DecimalField(max_digits=8, decimal_places=2, default=0)
     average_marks = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
     average_percentage = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
-
+    average_grade = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+    average_remark = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
     total_grade_points = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
     division = models.ForeignKey(DivisionScale, null=True, blank=True, on_delete=models.SET_NULL)
 
@@ -269,51 +275,7 @@ class StudentExamMetrics(models.Model):
     def __str__(self):
         return f"{self.student.full_name} - {self.exam_session}"
 
-    def calculate_metrics(self):
-        """
-        Calculates metrics for the student for this exam session:
-        - total_marks
-        - average_marks
-        - average_percentage
-        - total_grade_points based on best 7 subjects (if O-Level)
-        - division based on total points
-        """
-        from django.db.models import Sum, F, Q
-
-        results = StudentResult.objects.filter(exam_paper__exam_session=self.exam_session, student=self.student)
-        present_results = results.filter(marks_obtained__isnull=False)
-
-        # Total Marks
-        self.total_marks = present_results.aggregate(total=Sum('marks_obtained'))['total'] or 0
-
-        # Average Marks & Percentage
-        if present_results.exists():
-            self.average_marks = self.total_marks / present_results.count()
-            total_max_marks = present_results.aggregate(
-                total=Sum(F('exam_paper__total_marks'))
-            )['total'] or 0
-            if total_max_marks > 0:
-                self.average_percentage = (self.total_marks / total_max_marks) * 100
-
-        # Total grade points (best 7 subjects for secondary/advanced)
-        education_level = self.exam_session.class_level.education_level
-        if education_level.name.lower() in ['secondary', 'advanced']:
-            # Best 7 subjects by grade points
-            results_with_points = present_results.filter(grade_point__isnull=False).order_by('-grade_point')
-            top_subjects = list(results_with_points[:7])
-            self.total_grade_points = sum([r.grade_point or 0 for r in top_subjects])
-
-            # Assign division based on division scale
-            if self.total_grade_points is not None:
-                division = DivisionScale.objects.filter(
-                    education_level=education_level,
-                    min_points__lte=self.total_grade_points,
-                    max_points__gte=self.total_grade_points
-                ).first()
-                self.division = division
-
-        self.save()
-
+    
 
 # ============== STUDENT EXAM POSITION ==============
 class StudentExamPosition(models.Model):
@@ -340,39 +302,4 @@ class StudentExamPosition(models.Model):
     def __str__(self):
         return f"{self.student.full_name} - {self.exam_session}"
 
-    def calculate_positions(self):
-        """
-        Calculates class-wise and stream-wise positions based on
-        StudentExamMetrics.average_percentage
-        """
-        from django.db.models import F, Window
-        from django.db.models.functions import DenseRank
-
-        # Get all metrics for the same exam session
-        metrics_qs = StudentExamMetrics.objects.filter(exam_session=self.exam_session, average_percentage__isnull=False)
-
-        # Class-wise ranking
-        class_ranked = metrics_qs.annotate(
-            rank=Window(
-                expression=DenseRank(),
-                order_by=F('average_percentage').desc()
-            )
-        )
-        for metric in class_ranked:
-            pos, _ = StudentExamPosition.objects.get_or_create(student=metric.student, exam_session=self.exam_session)
-            pos.class_position = metric.rank
-            pos.save()
-
-        # Stream-wise ranking (if applicable)
-        if self.exam_session.stream_class:
-            stream_qs = metrics_qs.filter(student__stream_class=self.exam_session.stream_class)
-            stream_ranked = stream_qs.annotate(
-                rank=Window(
-                    expression=DenseRank(),
-                    order_by=F('average_percentage').desc()
-                )
-            )
-            for metric in stream_ranked:
-                pos = StudentExamPosition.objects.get(student=metric.student, exam_session=self.exam_session)
-                pos.stream_position = metric.rank
-                pos.save()
+    
