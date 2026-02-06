@@ -1,0 +1,611 @@
+{% extends 'admin/base.html' %}
+{% load static %}
+{% load humanize %} 
+{% block title %} Fine Payment {% endblock title %}
+
+{% block breadcrumb %}
+    <a href="{% url 'admin_book_borrows_list' %}" class="btn btn-outline-secondary">
+        <i class="fas fa-arrow-left"></i> Back to Borrow List
+    </a>
+{% endblock breadcrumb %}
+
+{% block extra_css %}
+<style>
+    .required-field::after {
+        content: " *";
+        color: #dc3545;
+    }
+    .payment-summary-card {
+        transition: transform 0.2s;
+    }
+    .payment-summary-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }
+    .quick-payment-btn {
+        margin: 2px;
+    }
+    .amount-input-group {
+        position: relative;
+    }
+    .amount-preset {
+        position: absolute;
+        right: 10px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #6c757d;
+        font-size: 0.9rem;
+    }
+    .method-icon {
+        width: 30px;
+        text-align: center;
+        margin-right: 8px;
+    }
+    .receipt-preview {
+        font-family: 'Courier New', monospace;
+        background-color: #f8f9fa;
+        border: 1px dashed #dee2e6;
+        padding: 15px;
+        border-radius: 5px;
+    }
+</style>
+{% endblock extra_css %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-lg-10 offset-lg-1">
+            <div class="card">
+                <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-money-bill-wave"></i> Fine Payment
+                    </h5>
+                    <span class="badge bg-light text-dark">
+                        Borrow ID: #{{ borrow.id|stringformat:"06d" }}
+                    </span>
+                </div>
+                <div class="card-body">
+                    <!-- Borrower Information -->
+                    <div class="card mb-4">
+                        <div class="card-body">
+                            <h6 class="card-title"><i class="fas fa-user"></i> Borrower Details</h6>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <p class="mb-1"><strong>Name:</strong> {{ borrow.get_borrower_name }}</p>
+                                    <p class="mb-1"><strong>Type:</strong> {{ borrow.get_borrower_type_display }}</p>
+                                </div>
+                                <div class="col-md-6">
+                                    {% if borrow.borrower_type == 'student' and borrow.student_borrower.registration_number %}
+                                    <p class="mb-1"><strong>Registration:</strong> {{ borrow.student_borrower.registration_number }}</p>
+                                    {% endif %}
+                                    {% if borrow.borrower_type == 'staff' and borrow.staff_borrower.admin.email %}
+                                    <p class="mb-1"><strong>Email:</strong> {{ borrow.staff_borrower.admin.email }}</p>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Book Information -->
+                    <div class="card mb-4">
+                        <div class="card-body">
+                            <h6 class="card-title"><i class="fas fa-book"></i> Book Details</h6>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <p class="mb-1"><strong>Title:</strong> {{ borrow.book.title }}</p>
+                                    <p class="mb-1"><strong>Author:</strong> {{ borrow.book.author }}</p>
+                                    <p class="mb-1"><strong>Accession:</strong> {{ borrow.book.accession_number }}</p>
+                                </div>
+                                <div class="col-md-6">
+                                    <p class="mb-1"><strong>Borrow Date:</strong> {{ borrow.borrow_date|date:"M d, Y" }}</p>
+                                    <p class="mb-1"><strong>Due Date:</strong> {{ borrow.due_date|date:"M d, Y" }}</p>
+                                    {% if borrow.actual_return_date %}
+                                    <p class="mb-1"><strong>Returned:</strong> {{ borrow.actual_return_date|date:"M d, Y" }}</p>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Fine Summary -->
+                    <div class="card mb-4">
+                        <div class="card-header bg-light">
+                            <h6 class="card-title mb-0"><i class="fas fa-calculator"></i> Fine Summary</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-3 mb-3">
+                                    <div class="card border-primary payment-summary-card h-100">
+                                        <div class="card-body text-center">
+                                            <h6 class="card-title text-muted mb-2">Total Fine</h6>
+                                            <h3 class="text-primary mb-2">TZS {{ borrow.fine_amount|floatformat:0|intcomma }}</h3>
+                                            <small class="text-muted">
+                                                {% with overdue_days=borrow.calculate_overdue_days %}
+                                                {% if overdue_days > 0 %}
+                                                {{ overdue_days }} day(s) overdue
+                                                {% else %}
+                                                No overdue days
+                                                {% endif %}
+                                                {% endwith %}
+                                            </small>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3 mb-3">
+                                    <div class="card border-success payment-summary-card h-100">
+                                        <div class="card-body text-center">
+                                            <h6 class="card-title text-muted mb-2">Amount Paid</h6>
+                                            <h3 class="text-success mb-2">TZS {{ borrow.fine_paid|floatformat:0|intcomma }}</h3>
+                                            <small class="text-muted">
+                                                {% if borrow.fine_payments.exists %}
+                                                {{ borrow.fine_payments.count }} payment(s)
+                                                {% else %}
+                                                No payments yet
+                                                {% endif %}
+                                            </small>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3 mb-3">
+                                    <div class="card border-danger payment-summary-card h-100">
+                                        <div class="card-body text-center">
+                                            <h6 class="card-title text-muted mb-2">Balance Due</h6>
+                                            <h3 class="text-danger mb-2">TZS {{ borrow.fine_balance|floatformat:0|intcomma }}</h3>
+                                            <small class="text-muted">
+                                                {% if borrow.fine_balance > 0 %}
+                                                Outstanding
+                                                {% else %}
+                                                Fully paid
+                                                {% endif %}
+                                            </small>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3 mb-3">
+                                    <div class="card border-warning payment-summary-card h-100">
+                                        <div class="card-body text-center">
+                                            <h6 class="card-title text-muted mb-2">Book Status</h6>
+                                            <h4 class="mb-2">
+                                                <span class="badge bg-{% if borrow.status == 'returned' %}success{% elif borrow.status == 'overdue' %}danger{% else %}warning{% endif %}">
+                                                    {{ borrow.get_status_display }}
+                                                </span>
+                                            </h4>
+                                            <small class="text-muted">
+                                                {% if borrow.actual_return_date %}
+                                                Book returned
+                                                {% else %}
+                                                Book not yet returned
+                                                {% endif %}
+                                            </small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            {% if borrow.fine_balance == 0 %}
+                            <div class="alert alert-success mt-3">
+                                <i class="fas fa-check-circle"></i>
+                                <strong>No outstanding balance!</strong> All fines have been paid for this borrow.
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <!-- Payment Form -->
+                    <div class="card">
+                        <div class="card-header bg-light">
+                            <h6 class="card-title mb-0"><i class="fas fa-credit-card"></i> Payment Details</h6>
+                        </div>
+                        <div class="card-body">
+                            <form id="payment-form">
+                                {% csrf_token %}
+                                <input type="hidden" name="borrow_id" value="{{ borrow.id }}">
+                                
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="form-group">
+                                            <label for="amount" class="required-field">Payment Amount (TZS)</label>
+                                            <div class="input-group amount-input-group">
+                                                <div class="input-group-prepend">
+                                                    <span class="input-group-text">
+                                                        <i class="fas fa-money-bill-wave"></i>
+                                                    </span>
+                                                </div>
+                                                <input type="number" class="form-control" id="amount" name="amount" 
+                                                       min="100" max="{{ borrow.fine_balance }}" step="100" 
+                                                       value="{% if borrow.fine_balance > 0 %}{{ borrow.fine_balance }}{% else %}0{% endif %}" 
+                                                       required {% if borrow.fine_balance == 0 %}disabled{% endif %}>
+                                                <div class="amount-preset">
+                                                    Max: TZS {{ borrow.fine_balance|floatformat:0|intcomma }}
+                                                </div>
+                                            </div>
+                                            <small class="form-text text-muted">
+                                                Enter amount between 100 and {{ borrow.fine_balance|floatformat:0 }} TZS
+                                            </small>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="form-group">
+                                            <label for="payment_method" class="required-field">Payment Method</label>
+                                            <select class="form-control" id="payment_method" name="payment_method" 
+                                                    required {% if borrow.fine_balance == 0 %}disabled{% endif %}>
+                                                <option value="">Select Payment Method</option>
+                                                {% for code, name in payment_method_choices %}
+                                                    <option value="{{ code }}">
+                                                        <span class="method-icon">
+                                                            {% if code == 'cash' %}
+                                                            <i class="fas fa-money-bill"></i>
+                                                            {% elif code == 'bank' %}
+                                                            <i class="fas fa-university"></i>
+                                                            {% elif code == 'mobile' %}
+                                                            <i class="fas fa-mobile-alt"></i>
+                                                            {% else %}
+                                                            <i class="fas fa-ellipsis-h"></i>
+                                                            {% endif %}
+                                                        </span>
+                                                        {{ name }}
+                                                    </option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="form-group">
+                                            <label for="transaction_id">
+                                                <i class="fas fa-receipt"></i> Transaction ID (Optional)
+                                            </label>
+                                            <input type="text" class="form-control" id="transaction_id" name="transaction_id" 
+                                                   placeholder="e.g., MPESA123456, BANK789012"
+                                                   {% if borrow.fine_balance == 0 %}disabled{% endif %}>
+                                            <small class="form-text text-muted">
+                                                For mobile money or bank transfers
+                                            </small>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="form-group">
+                                            <label for="paid_by">
+                                                <i class="fas fa-user-check"></i> Payment Made By
+                                            </label>
+                                            <input type="text" class="form-control" id="paid_by_display" 
+                                                   value="{{ borrow.get_borrower_name }}" readonly>
+                                            <input type="hidden" name="paid_by" value="{{ borrow.get_borrower.id }}">
+                                            <small class="form-text text-muted">
+                                                Borrower responsible for payment
+                                            </small>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="notes">
+                                        <i class="fas fa-sticky-note"></i> Payment Notes (Optional)
+                                    </label>
+                                    <textarea class="form-control" id="notes" name="notes" rows="3" 
+                                              placeholder="Any notes about this payment, special circumstances, or references"
+                                              {% if borrow.fine_balance == 0 %}disabled{% endif %}></textarea>
+                                </div>
+                                
+                                <!-- Quick Payment Options -->
+                                {% if borrow.fine_balance > 0 %}
+                                <div class="alert alert-light mb-4">
+                                    <h6><i class="fas fa-bolt"></i> Quick Payment Amounts</h6>
+                                    <div class="d-flex flex-wrap">
+                                        <button type="button" class="btn btn-outline-primary quick-payment-btn" 
+                                                data-amount="{{ borrow.fine_balance }}">
+                                            <i class="fas fa-check-circle"></i> Full Amount
+                                        </button>
+                                        <button type="button" class="btn btn-outline-primary quick-payment-btn" 
+                                                data-amount="{% widthratio borrow.fine_balance 2 1 %}">
+                                            <i class="fas fa-divide"></i> Half Amount
+                                        </button>
+                                        <button type="button" class="btn btn-outline-primary quick-payment-btn" 
+                                                data-amount="1000">
+                                            TZS 1,000
+                                        </button>
+                                        <button type="button" class="btn btn-outline-primary quick-payment-btn" 
+                                                data-amount="5000">
+                                            TZS 5,000
+                                        </button>
+                                        <button type="button" class="btn btn-outline-primary quick-payment-btn" 
+                                                data-amount="10000">
+                                            TZS 10,000
+                                        </button>
+                                        <button type="button" class="btn btn-outline-primary quick-payment-btn" 
+                                                data-amount="20000">
+                                            TZS 20,000
+                                        </button>
+                                    </div>
+                                </div>
+                                {% endif %}
+                                
+                                <!-- Receipt Preview -->
+                                <div class="receipt-preview mb-4" id="receipt-preview" style="display: none;">
+                                    <h6 class="text-center mb-3">PAYMENT RECEIPT PREVIEW</h6>
+                                    <div class="row">
+                                        <div class="col-6">
+                                            <strong>Receipt No:</strong> <span id="preview-receipt-number">PENDING</span>
+                                        </div>
+                                        <div class="col-6 text-end">
+                                            <strong>Date:</strong> {% now "Y-m-d" %}
+                                        </div>
+                                    </div>
+                                    <hr>
+                                    <p><strong>Book:</strong> {{ borrow.book.title }}</p>
+                                    <p><strong>Borrower:</strong> {{ borrow.get_borrower_name }}</p>
+                                    <p><strong>Amount:</strong> TZS <span id="preview-amount">0</span></p>
+                                    <p><strong>Method:</strong> <span id="preview-method">-</span></p>
+                                    <hr>
+                                    <p class="text-center mb-0">Thank you for your payment!</p>
+                                </div>
+                                
+                                <div class="form-group mt-4">
+                                    <button type="submit" class="btn btn-success btn-lg" id="submit-btn"
+                                            {% if borrow.fine_balance == 0 %}disabled{% endif %}>
+                                        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="display: none;"></span>
+                                        <i class="fas fa-check"></i> Process Payment
+                                    </button>
+                                    <button type="button" class="btn btn-outline-info btn-lg" id="preview-btn"
+                                            {% if borrow.fine_balance == 0 %}disabled{% endif %}>
+                                        <i class="fas fa-eye"></i> Preview Receipt
+                                    </button>
+                                    <a href="{% url 'admin_book_borrows_list' %}" class="btn btn-secondary btn-lg">
+                                        <i class="fas fa-times"></i> Cancel
+                                    </a>
+                                    
+                                    {% if borrow.fine_balance == 0 %}
+                                    <div class="mt-3">
+                                        <small class="text-success">
+                                            <i class="fas fa-check-circle"></i>
+                                            No payment required. All fines have been settled.
+                                        </small>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // Initialize variables
+    const maxAmount = parseFloat('{{ borrow.fine_balance }}');
+    
+    // Quick payment buttons
+    $('.quick-payment-btn').on('click', function() {
+        const amount = parseFloat($(this).data('amount'));
+        if (amount <= maxAmount) {
+            $('#amount').val(amount).trigger('input');
+        } else {
+            $('#amount').val(maxAmount).trigger('input');
+            Swal.fire({
+                icon: 'warning',
+                title: 'Amount Adjusted',
+                text: `Amount adjusted to maximum balance of TZS ${maxAmount.toLocaleString()}`,
+                timer: 2000
+            });
+        }
+    });
+    
+    // Update preview when amount or method changes
+    $('#amount, #payment_method').on('input change', function() {
+        updateReceiptPreview();
+    });
+    
+    // Preview receipt button
+    $('#preview-btn').on('click', function() {
+        updateReceiptPreview();
+        $('#receipt-preview').slideToggle();
+    });
+    
+    // Update receipt preview
+    function updateReceiptPreview() {
+        const amount = $('#amount').val();
+        const method = $('#payment_method option:selected').text();
+        
+        $('#preview-amount').text(amount ? parseFloat(amount).toLocaleString() : '0');
+        $('#preview-method').text(method || '-');
+    }
+    
+    // Generate a temporary receipt number
+    function generateTempReceiptNumber() {
+        const timestamp = Date.now().toString().slice(-6);
+        const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+        return `TEMP-${timestamp}-${random}`;
+    }
+    
+    // Form submission
+    $('#payment-form').on('submit', function(e) {
+        e.preventDefault();
+        
+        const submitBtn = $('#submit-btn');
+        const spinner = submitBtn.find('.spinner-border');
+        const amount = parseFloat($('#amount').val());
+        const paymentMethod = $('#payment_method').val();
+        
+        // Validation
+        if (!amount || amount <= 0) {
+            Swal.fire({
+                icon: 'error',
+                title: 'Invalid Amount',
+                text: 'Payment amount must be greater than zero.'
+            });
+            return;
+        }
+        
+        if (amount > maxAmount) {
+            Swal.fire({
+                icon: 'error',
+                title: 'Amount Exceeds Balance',
+                text: `Payment amount cannot exceed TZS ${maxAmount.toLocaleString()}.`
+            });
+            return;
+        }
+        
+        if (!paymentMethod) {
+            Swal.fire({
+                icon: 'error',
+                title: 'Payment Method Required',
+                text: 'Please select a payment method.'
+            });
+            return;
+        }
+        
+        // Confirm payment
+        const paymentDetails = `
+            <div class="text-start">
+                <p>Please confirm the payment details:</p>
+                <div class="alert alert-info mt-3">
+                    <p class="mb-1"><strong>Book:</strong> {{ borrow.book.title }}</p>
+                    <p class="mb-1"><strong>Borrower:</strong> {{ borrow.get_borrower_name }}</p>
+                    <p class="mb-1"><strong>Amount:</strong> TZS ${amount.toLocaleString()}</p>
+                    <p class="mb-1"><strong>Method:</strong> ${$('#payment_method option:selected').text()}</p>
+                    <p class="mb-0"><strong>New Balance:</strong> TZS ${(maxAmount - amount).toLocaleString()}</p>
+                </div>
+            </div>
+        `;
+        
+        Swal.fire({
+            title: 'Confirm Payment',
+            html: paymentDetails,
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonText: 'Yes, Process Payment',
+            cancelButtonText: 'Review Details',
+            confirmButtonColor: '#198754',
+            cancelButtonColor: '#6c757d',
+            showLoaderOnConfirm: true,
+            preConfirm: () => {
+                return true;
+            }
+        }).then((result) => {
+            if (result.isConfirmed) {
+                processPayment();
+            }
+        });
+    });
+    
+    // Process the payment
+    function processPayment() {
+        const submitBtn = $('#submit-btn');
+        const spinner = submitBtn.find('.spinner-border');
+        
+        // Show loading spinner
+        submitBtn.prop('disabled', true);
+        spinner.show();
+        
+        // Get form data
+        const formData = new FormData($('#payment-form')[0]);
+        
+        // Send AJAX request
+        $.ajax({
+            url: window.location.href,
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': $('input[name="csrfmiddlewaretoken"]').val(),
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            data: formData,
+            processData: false,
+            contentType: false,
+            success: function(data) {
+                if (data.success) {
+                    // Show success message
+                    const newBalance = parseFloat(data.fine_balance);
+                    const receiptNumber = data.receipt_number;
+                    
+                    let successHtml = `
+                        <div class="text-start">
+                            <p>${data.message}</p>
+                            <div class="alert alert-success mt-3">
+                                <p class="mb-1"><strong>Receipt Number:</strong> ${receiptNumber}</p>
+                                <p class="mb-1"><strong>Amount Paid:</strong> TZS ${parseFloat(data.amount_paid).toLocaleString()}</p>
+                                <p class="mb-1"><strong>New Balance:</strong> TZS ${newBalance.toLocaleString()}</p>
+                                <p class="mb-0"><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
+                            </div>
+                        </div>
+                    `;
+                    
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Payment Processed Successfully!',
+                        html: successHtml,
+                        showCancelButton: true,
+                        confirmButtonText: 'Back to List',
+                        cancelButtonText: 'View Receipt',
+                        confirmButtonColor: '#198754',
+                        cancelButtonColor: '#0d6efd',
+                        allowOutsideClick: false
+                    }).then((result) => {
+                        if (result.isConfirmed) {
+                            window.location.href = '{% url "admin_book_borrows_list" %}';
+                        } else if (result.dismiss === Swal.DismissReason.cancel) {
+                            // Open receipt in new tab or print
+                            window.open(`/admin/library/receipt/${data.payment_id}/`, '_blank');
+                            // After a delay, redirect back
+                            setTimeout(() => {
+                                window.location.href = '{% url "admin_book_borrows_list" %}';
+                            }, 2000);
+                        }
+                    });
+                } else {
+                    // Show error message
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Payment Failed!',
+                        text: data.message || 'An error occurred while processing the payment.',
+                        confirmButtonText: 'Try Again'
+                    });
+                    submitBtn.prop('disabled', false);
+                    spinner.hide();
+                }
+            },
+            error: function(xhr, status, error) {
+                console.error('Error:', error);
+                let errorMessage = 'An error occurred while processing your request.';
+                
+                if (xhr.responseJSON && xhr.responseJSON.message) {
+                    errorMessage = xhr.responseJSON.message;
+                }
+                
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Server Error!',
+                    text: errorMessage,
+                    confirmButtonText: 'OK'
+                });
+                submitBtn.prop('disabled', false);
+                spinner.hide();
+            }
+        });
+    }
+    
+    // Initialize amount input
+    $('#amount').on('input', function() {
+        const value = parseFloat($(this).val());
+        if (value > maxAmount) {
+            $(this).val(maxAmount);
+            Swal.fire({
+                icon: 'warning',
+                title: 'Maximum Amount',
+                text: `Amount cannot exceed TZS ${maxAmount.toLocaleString()}`,
+                timer: 2000
+            });
+        }
+    });
+    
+    // Initialize tooltips
+    $('[data-toggle="tooltip"]').tooltip();
+});
+</script>
+{% endblock %}

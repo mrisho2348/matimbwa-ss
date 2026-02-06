@@ -1,0 +1,501 @@
+{% extends 'admin/base.html' %}
+{% load static %}
+{% load custom_filters %}
+{% block title %} Overdue Books Report {% endblock title %}
+
+{% block breadcrumb %}
+    <a href="{% url 'admin_book_borrows_list' %}" class="btn btn-outline-secondary">
+        <i class="fas fa-arrow-left"></i> Back to Borrows
+    </a>
+    <button class="btn btn-success ml-2" onclick="downloadPDF()">
+        <i class="fas fa-file-pdf"></i> Download PDF
+    </button>
+    <button class="btn btn-primary ml-2" onclick="window.print()">
+        <i class="fas fa-print"></i> Print Report
+    </button>
+{% endblock breadcrumb %}
+
+{% block extra_css %}
+<style>
+    .report-header {
+        background: linear-gradient(135deg, #f56565 0%, #c53030 100%);
+        color: white;
+        padding: 30px;
+        border-radius: 10px;
+        margin-bottom: 30px;
+    }
+    
+    .report-header h1 {
+        font-size: 2.5rem;
+        font-weight: 700;
+        margin-bottom: 10px;
+    }
+    
+    .report-header .subtitle {
+        font-size: 1.2rem;
+        opacity: 0.9;
+    }
+    
+    .filter-card {
+        background: white;
+        border-radius: 10px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        padding: 20px;
+        margin-bottom: 30px;
+    }
+    
+    .filter-card h4 {
+        color: #4a5568;
+        margin-bottom: 20px;
+        padding-bottom: 10px;
+        border-bottom: 2px solid #e2e8f0;
+    }
+    
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 20px;
+        margin-bottom: 30px;
+    }
+    
+    .stat-card {
+        background: white;
+        border-radius: 10px;
+        padding: 20px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        text-align: center;
+        transition: transform 0.3s ease;
+    }
+    
+    .stat-card:hover {
+        transform: translateY(-5px);
+    }
+    
+    .stat-number {
+        font-size: 2.5rem;
+        font-weight: 700;
+        margin-bottom: 10px;
+    }
+    
+    .stat-label {
+        font-size: 1rem;
+        color: #718096;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+    
+    .table-responsive {
+        background: white;
+        border-radius: 10px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        overflow: hidden;
+        margin-bottom: 30px;
+    }
+    
+    .table th {
+        background-color: #c53030;
+        color: white;
+        border: none;
+        padding: 15px;
+        font-weight: 600;
+    }
+    
+    .table td {
+        padding: 12px 15px;
+        vertical-align: middle;
+        border-color: #e2e8f0;
+    }
+    
+    .table tbody tr:hover {
+        background-color: #f7fafc;
+    }
+    
+    .badge {
+        font-size: 0.85em;
+        padding: 5px 10px;
+        border-radius: 20px;
+        font-weight: 600;
+    }
+    
+    .badge-staff { background-color: #4299e1; color: white; }
+    .badge-student { background-color: #38b2ac; color: white; }
+    .badge-critical { background-color: #c53030; color: white; }
+    .badge-high { background-color: #ed8936; color: white; }
+    .badge-medium { background-color: #ecc94b; color: #2d3748; }
+    .badge-low { background-color: #48bb78; color: white; }
+    
+    .overdue-severity {
+        font-weight: 600;
+    }
+    
+    .severity-critical { color: #c53030; }
+    .severity-high { color: #ed8936; }
+    .severity-medium { color: #d69e2e; }
+    .severity-low { color: #38a169; }
+    
+    .fine-details {
+        font-size: 0.9em;
+    }
+    
+    .fine-amount {
+        font-weight: 600;
+    }
+    
+    .fine-positive { color: #f56565; }
+    .fine-zero { color: #48bb78; }
+    
+    .text-overdue {
+        color: #f56565;
+        font-weight: 600;
+    }
+    
+    /* Print styles */
+    @media print {
+        .no-print, .btn, .filter-card, .breadcrumb {
+            display: none !important;
+        }
+        
+        .report-header {
+            background: none !important;
+            color: black !important;
+            padding: 0 !important;
+            margin-bottom: 20px !important;
+        }
+        
+        .table-responsive {
+            box-shadow: none !important;
+        }
+        
+        .table th {
+            background-color: #f7fafc !important;
+            color: black !important;
+            border: 1px solid #e2e8f0 !important;
+        }
+    }
+</style>
+{% endblock extra_css %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Report Header -->
+    <div class="report-header">
+        <h1><i class="fas fa-exclamation-triangle"></i> Overdue Books Report</h1>
+        <div class="subtitle">
+            <i class="fas fa-calendar-alt"></i> Generated on: {% now "F d, Y h:i A" %}
+        </div>
+    </div>
+    
+    <!-- Filter Form -->
+    <div class="filter-card">
+        <h4><i class="fas fa-filter"></i> Filter Options</h4>
+        <form method="GET" action="" id="report-form">
+            <div class="row">
+                <div class="col-md-3">
+                    <div class="form-group">
+                        <label for="borrower_type">Borrower Type</label>
+                        <select class="form-control" id="borrower_type" name="borrower_type">
+                            <option value="">All Types</option>
+                            <option value="staff" {% if borrower_type_filter == 'staff' %}selected{% endif %}>Staff</option>
+                            <option value="student" {% if borrower_type_filter == 'student' %}selected{% endif %}>Student</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="form-group">
+                        <label for="overdue_days">Overdue Days</label>
+                        <select class="form-control" id="overdue_days" name="overdue_days">
+                            <option value="">All</option>
+                            <option value="1-7" {% if overdue_days_filter == '1-7' %}selected{% endif %}>1-7 days</option>
+                            <option value="8-14" {% if overdue_days_filter == '8-14' %}selected{% endif %}>8-14 days</option>
+                            <option value="15-30" {% if overdue_days_filter == '15-30' %}selected{% endif %}>15-30 days</option>
+                            <option value="31-90" {% if overdue_days_filter == '31-90' %}selected{% endif %}>31-90 days</option>
+                            <option value="90+" {% if overdue_days_filter == '90+' %}selected{% endif %}>90+ days</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="form-group">
+                        <label for="fine_status">Fine Status</label>
+                        <select class="form-control" id="fine_status" name="fine_status">
+                            <option value="">All</option>
+                            <option value="unpaid" {% if fine_status_filter == 'unpaid' %}selected{% endif %}>Unpaid</option>
+                            <option value="partial" {% if fine_status_filter == 'partial' %}selected{% endif %}>Partially Paid</option>
+                            <option value="paid" {% if fine_status_filter == 'paid' %}selected{% endif %}>Fully Paid</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="form-group">
+                        <label for="date_range">Due Date Range</label>
+                        <select class="form-control" id="date_range" name="date_range" onchange="toggleCustomDate()">
+                            <option value="">All Time</option>
+                            {% for value, label in date_range_options %}
+                                <option value="{{ value }}" {% if date_range_filter == value %}selected{% endif %}>
+                                    {{ label }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Custom Date Range -->
+            <div id="custom_date_range" class="row mt-3" style="display: {% if date_range_filter == 'custom' %}block{% else %}none{% endif %};">
+                <div class="col-md-3">
+                    <div class="form-group">
+                        <label for="date_from">From Date</label>
+                        <input type="date" class="form-control" id="date_from" name="date_from" value="{{ date_from }}">
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="form-group">
+                        <label for="date_to">To Date</label>
+                        <input type="date" class="form-control" id="date_to" name="date_to" value="{{ date_to }}">
+                    </div>
+                </div>
+            </div>
+            
+            <div class="row mt-3">
+                <div class="col-md-12">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-search"></i> Apply Filters
+                    </button>
+                    <button type="button" class="btn btn-secondary" onclick="resetFilters()">
+                        <i class="fas fa-times"></i> Clear Filters
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+    
+    <!-- Statistics Cards -->
+    <div class="stats-grid">
+        <div class="stat-card" style="border-left: 4px solid #f56565;">
+            <div class="stat-number">{{ overdue_books|length }}</div>
+            <div class="stat-label">Total Overdue</div>
+        </div>
+        <div class="stat-card" style="border-left: 4px solid #c53030;">
+            <div class="stat-number">{{ critical_count }}</div>
+            <div class="stat-label">Critical (>90 days)</div>
+        </div>
+        <div class="stat-card" style="border-left: 4px solid #4299e1;">
+            <div class="stat-number">{{ staff_overdue }}</div>
+            <div class="stat-label">Staff Overdue</div>
+        </div>
+        <div class="stat-card" style="border-left: 4px solid #38b2ac;">
+            <div class="stat-number">{{ student_overdue }}</div>
+            <div class="stat-label">Student Overdue</div>
+        </div>
+        <div class="stat-card" style="border-left: 4px solid #ed8936;">
+            <div class="stat-number">TZS {{ total_fine|floatformat:0 }}</div>
+            <div class="stat-label">Total Fine</div>
+        </div>
+        <div class="stat-card" style="border-left: 4px solid #9f7aea;">
+            <div class="stat-number">TZS {{ total_unpaid_fine|floatformat:0 }}</div>
+            <div class="stat-label">Unpaid Fine</div>
+        </div>
+    </div>
+    
+    <!-- Report Table -->
+    <div class="table-responsive">
+        <table class="table table-hover">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Borrower</th>
+                    <th>Book Details</th>
+                    <th>Dates</th>
+                    <th>Overdue Status</th>
+                    <th>Fine Details (TZS)</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for borrow in overdue_books %}
+                <tr>
+                    <td>{{ forloop.counter }}</td>
+                    <td>
+                        <strong>{{ borrow.get_borrower_name }}</strong><br>
+                        <span class="badge badge-{{ borrow.borrower_type }}">
+                            {{ borrow.borrower_type|title }}
+                        </span>
+                        {% if borrow.borrower_type == 'student' and borrow.student_borrower.registration_number %}
+                        <br>
+                        <small class="text-muted">{{ borrow.student_borrower.registration_number }}</small>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <div class="font-weight-bold">{{ borrow.book.title }}</div>
+                        <div class="text-muted">{{ borrow.book.author }}</div>
+                        {% if borrow.book_copy %}
+                        <small class="text-muted">Copy #{{ borrow.book_copy.copy_number }}</small>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <div><strong>Borrowed:</strong> {{ borrow.borrow_date|date:"M d, Y" }}</div>
+                        <div class="text-overdue"><strong>Due:</strong> {{ borrow.due_date|date:"M d, Y" }}</div>
+                        <div><strong>Days Overdue:</strong> {{ borrow.overdue_days }} days</div>
+                        <span class="badge badge-{{ borrow.overdue_severity }}">
+                            {{ borrow.get_overdue_severity_display }}
+                        </span>
+                    </td>
+                    <td>
+                        <div class="overdue-severity severity-{{ borrow.overdue_severity }}">
+                            {{ borrow.overdue_days }} days overdue
+                        </div>
+                        <small class="text-muted">Since {{ borrow.due_date|date:"M d, Y" }}</small>
+                    </td>
+                    <td>
+                        <div class="fine-details">
+                            <div class="fine-amount {% if borrow.fine_amount > 0 %}fine-positive{% else %}fine-zero{% endif %}">
+                                <div>Total: {{ borrow.fine_amount|floatformat:0 }}</div>
+                                <div>Paid: {{ borrow.fine_paid|floatformat:0 }}</div>
+                                <div><strong>Balance: {{ borrow.fine_balance|floatformat:0 }}</strong></div>
+                            </div>
+                            {% if borrow.fine_amount > 0 %}
+                            <small class="text-muted">
+                                {{ borrow.fine_per_day|floatformat:0 }}/day
+                            </small>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="6" class="text-center py-5">
+                        <i class="fas fa-check-circle fa-3x mb-3 text-muted"></i>
+                        <h4>No overdue books found</h4>
+                        <p class="text-muted">All books are returned on time!</p>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    
+    <!-- Report Summary -->
+    <div class="card">
+        <div class="card-header bg-light">
+            <h5 class="card-title mb-0"><i class="fas fa-chart-bar"></i> Report Summary</h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-4">
+                    <h6>Overdue Severity Distribution</h6>
+                    <ul class="list-group list-group-flush">
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            Critical (>90 days)
+                            <span class="badge badge-danger badge-pill">{{ critical_count }}</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            High (31-90 days)
+                            <span class="badge badge-warning badge-pill">{{ high_count }}</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            Medium (15-30 days)
+                            <span class="badge badge-secondary badge-pill">{{ medium_count }}</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            Low (1-14 days)
+                            <span class="badge badge-success badge-pill">{{ low_count }}</span>
+                        </li>
+                    </ul>
+                </div>
+                <div class="col-md-4">
+                    <h6>Borrower Distribution</h6>
+                    <ul class="list-group list-group-flush">
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            Staff
+                            <span class="badge badge-primary badge-pill">{{ staff_overdue }}</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            Students
+                            <span class="badge badge-info badge-pill">{{ student_overdue }}</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            Total
+                            <span class="badge badge-dark badge-pill">{{ overdue_books|length }}</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            Avg. Overdue Days
+                            <span class="badge badge-warning badge-pill">{{ avg_overdue_days|floatformat:1 }}</span>
+                        </li>
+                    </ul>
+                </div>
+                <div class="col-md-4">
+                    <h6>Financial Summary</h6>
+                    <ul class="list-group list-group-flush">
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            Total Fine
+                            <span class="badge badge-danger badge-pill">TZS {{ total_fine|floatformat:0 }}</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            Amount Paid
+                            <span class="badge badge-success badge-pill">TZS {{ total_fine_paid|floatformat:0 }}</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            Unpaid Balance
+                            <span class="badge badge-warning badge-pill">TZS {{ total_unpaid_fine|floatformat:0 }}</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            Collection Rate
+                            <span class="badge badge-info badge-pill">{{ collection_rate|floatformat:1 }}%</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function toggleCustomDate() {
+        const dateRange = document.getElementById('date_range');
+        const customDateRange = document.getElementById('custom_date_range');
+        
+        if (dateRange.value === 'custom') {
+            customDateRange.style.display = 'block';
+        } else {
+            customDateRange.style.display = 'none';
+            document.getElementById('date_from').value = '';
+            document.getElementById('date_to').value = '';
+        }
+    }
+    
+    function resetFilters() {
+        // Reset all form fields
+        document.getElementById('report-form').reset();
+        toggleCustomDate();
+        
+        // Submit the form to reload with no filters
+        document.getElementById('report-form').submit();
+    }
+    
+    function downloadPDF() {
+        // Get current filters
+        const form = document.getElementById('report-form');
+        const params = new URLSearchParams(new FormData(form));
+        
+        // Build PDF download URL
+        let pdfUrl = '{% url "admin_export_overdue_books_pdf" %}';
+        if (params.toString()) {
+            pdfUrl += '?' + params.toString();
+        }
+        
+        // Open in new tab
+        window.open(pdfUrl, '_blank');
+    }
+    
+    // Initialize date pickers
+    $(document).ready(function() {
+        // Set max date to today for date inputs
+        const today = new Date().toISOString().split('T')[0];
+        $('#date_from').attr('max', today);
+        $('#date_to').attr('max', today);
+        
+        // Initialize tooltips
+        $('[data-toggle="tooltip"]').tooltip();
+    });
+</script>
+{% endblock %}

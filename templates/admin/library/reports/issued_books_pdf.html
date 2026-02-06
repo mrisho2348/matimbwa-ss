@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Issued Books Report</title>
+
+    <style>
+        /* ===============================
+           PAGE SETUP (PDF SAFE)
+        =============================== */
+        @page {
+            size: A4;
+            margin: 20mm;
+            @bottom-center {
+                content: "Page " counter(page) " of " counter(pages);
+                font-size: 9pt;
+                color: #666;
+            }
+        }
+
+        body {
+            font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+            font-size: 11pt;
+            color: #333;
+            line-height: 1.5;
+            margin: 0;
+            padding: 0;
+        }
+
+        h1, h2, h3, h4 {
+            margin: 0;
+            padding: 0;
+        }
+
+        /* ===============================
+           HEADER
+        =============================== */
+        .header {
+            text-align: center;
+            padding-bottom: 15px;
+            margin-bottom: 20px;
+            border-bottom: 3px solid #2c3e50;
+        }
+
+        .header h1 {
+            font-size: 24pt;
+            color: #2c3e50;
+            text-transform: uppercase;
+            margin-bottom: 5px;
+        }
+
+        .header h2 {
+            font-size: 16pt;
+            color: #3498db;
+            font-weight: normal;
+            margin-bottom: 8px;
+        }
+
+        .header .date {
+            font-size: 10pt;
+            color: #7f8c8d;
+            margin-top: 5px;
+        }
+
+        /* ===============================
+           REPORT INFO SECTION
+        =============================== */
+        .report-info {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            font-size: 10pt;
+        }
+
+        .info-item {
+            padding: 3px 0;
+        }
+
+        .info-label {
+            font-weight: 600;
+            color: #2c3e50;
+            display: inline-block;
+            min-width: 120px;
+        }
+
+        /* ===============================
+           STATISTICS SECTION
+        =============================== */
+        .stats-section {
+            margin-bottom: 25px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 12px;
+            margin-bottom: 15px;
+        }
+
+        .stat-card {
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 12px 8px;
+            text-align: center;
+            background: #ffffff;
+        }
+
+        .stat-number {
+            font-size: 18pt;
+            font-weight: 700;
+            color: #2c3e50;
+            line-height: 1.2;
+        }
+
+        .stat-label {
+            margin-top: 4px;
+            font-size: 8pt;
+            color: #7f8c8d;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        /* Balance Due Summary */
+        .balance-summary {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 15px;
+        }
+
+        .balance-header {
+            font-size: 12pt;
+            font-weight: 600;
+            color: #856404;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+
+        .balance-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            text-align: center;
+        }
+
+        .balance-item {
+            padding: 10px;
+            border-radius: 6px;
+            background: white;
+            border: 1px solid #dee2e6;
+        }
+
+        .balance-label {
+            font-size: 9pt;
+            color: #7f8c8d;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .balance-amount {
+            font-size: 14pt;
+            font-weight: 700;
+        }
+
+        .total-fine { color: #c0392b; }
+        .total-paid { color: #27ae60; }
+        .total-balance { color: #e74c3c; }
+
+        /* ===============================
+           TABLE STYLES
+        =============================== */
+        .table-title {
+            font-size: 14pt;
+            color: #2c3e50;
+            margin: 25px 0 10px 0;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #3498db;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 9pt;
+            margin-bottom: 25px;
+        }
+
+        thead {
+            background: #2c3e50;
+            color: #fff;
+            position: sticky;
+            top: 0;
+        }
+
+        th {
+            padding: 10px 8px;
+            text-align: left;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border: 1px solid #34495e;
+        }
+
+        td {
+            padding: 8px;
+            border: 1px solid #dee2e6;
+            vertical-align: top;
+        }
+
+        tbody tr:nth-child(even) {
+            background: #f8f9fa;
+        }
+
+        tbody tr:hover {
+            background: #e8f4fd;
+        }
+
+        /* ===============================
+           BADGES & STATUS INDICATORS
+        =============================== */
+        .badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 8pt;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+
+        /* Status badges */
+        .status-active { background: #d4edda; color: #155724; }
+        .status-overdue { background: #f8d7da; color: #721c24; }
+        .status-returned { background: #e2e3e5; color: #383d41; }
+        .status-lost { background: #f5c6cb; color: #721c24; }
+        .status-cancelled { background: #d6d8d9; color: #1b1e21; }
+
+        /* Borrower type badges */
+        .borrower-staff { background: #cce5ff; color: #004085; }
+        .borrower-student { background: #d1ecf1; color: #0c5460; }
+
+        /* Fine status indicators */
+        .fine-cell {
+            text-align: right;
+            font-family: 'Courier New', monospace;
+            font-weight: 600;
+        }
+
+        .fine-positive { color: #e74c3c; }
+        .fine-zero { color: #27ae60; }
+        .fine-partial { color: #e67e22; }
+
+        /* Balance indicators */
+        .balance-high { background: #f8d7da; }
+        .balance-medium { background: #fff3cd; }
+        .balance-low { background: #d1ecf1; }
+
+        /* ===============================
+           COLUMN SPECIFIC STYLES
+        =============================== */
+        .col-serial { width: 30px; text-align: center; }
+        .col-borrower { width: 150px; }
+        .col-book { width: 180px; }
+        .col-dates { width: 120px; }
+        .col-status { width: 80px; }
+        .col-fines { width: 100px; }
+        .col-balance { width: 100px; }
+
+        /* ===============================
+           FOOTER
+        =============================== */
+        .footer {
+            margin-top: 30px;
+            padding-top: 15px;
+            border-top: 1px solid #dee2e6;
+            text-align: center;
+            font-size: 9pt;
+            color: #7f8c8d;
+        }
+
+        .footer p {
+            margin: 3px 0;
+        }
+
+        /* ===============================
+           UTILITY CLASSES
+        =============================== */
+        .text-right { text-align: right; }
+        .text-center { text-align: center; }
+        .text-bold { font-weight: 600; }
+        .text-muted { color: #7f8c8d; }
+        .text-danger { color: #e74c3c; }
+        .text-success { color: #27ae60; }
+        .text-warning { color: #f39c12; }
+
+        .mb-10 { margin-bottom: 10px; }
+        .mb-15 { margin-bottom: 15px; }
+        .mb-20 { margin-bottom: 20px; }
+
+        /* ===============================
+           PAGE BREAK AVOIDANCE
+        =============================== */
+        .avoid-break {
+            page-break-inside: avoid;
+        }
+
+        /* ===============================
+           NO DATA MESSAGE
+        =============================== */
+        .no-data {
+            text-align: center;
+            padding: 40px 20px;
+            color: #7f8c8d;
+            font-style: italic;
+        }
+
+        .no-data-icon {
+            font-size: 36pt;
+            margin-bottom: 10px;
+            color: #bdc3c7;
+        }
+    </style>
+</head>
+
+<body>
+
+<!-- HEADER SECTION -->
+<div class="header">
+    <h1>Library Management System</h1>
+    <h2>Issued Books Report</h2>
+    <div class="date">
+        Generated on {{ export_date|date:"F d, Y h:i A" }}
+    </div>
+</div>
+
+<!-- REPORT INFO SECTION -->
+<div class="report-info">
+    <div class="info-grid">
+        <div class="info-item"><span class="info-label">Report Period:</span> {{ filters.date_from|default:"Start" }} to {{ filters.date_to|default:"End" }}</div>
+        <div class="info-item"><span class="info-label">Status Filter:</span> {{ filters.status|default:"All Statuses" }}</div>
+        <div class="info-item"><span class="info-label">Borrower Type:</span> {{ filters.borrower_type|default:"All Types"|title }}</div>
+        <div class="info-item"><span class="info-label">Total Records:</span> {{ borrows|length }}</div>
+        <div class="info-item"><span class="info-label">Generated By:</span> {{ request.user.get_full_name }}</div>
+        <div class="info-item"><span class="info-label">User Role:</span> 
+            {% if request.user.groups.first %}
+                {{ request.user.groups.first.name }}
+            {% else %}
+                Administrator
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- STATISTICS SECTION -->
+<div class="stats-section">
+    <!-- Main Statistics -->
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-number">{{ total_active }}</div>
+            <div class="stat-label">Active</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number">{{ total_overdue }}</div>
+            <div class="stat-label">Overdue</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number">{{ total_returned }}</div>
+            <div class="stat-label">Returned</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number">{{ total_staff }}</div>
+            <div class="stat-label">Staff</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number">{{ total_student }}</div>
+            <div class="stat-label">Students</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number">{{ borrows|length }}</div>
+            <div class="stat-label">Total</div>
+        </div>
+    </div>
+
+    <!-- Balance Due Summary -->
+    <div class="balance-summary avoid-break">
+        <div class="balance-header">Balance Due Summary</div>
+        <div class="balance-grid">
+            <div class="balance-item">
+                <div class="balance-label">Total Fines</div>
+                <div class="balance-amount total-fine">TZS {{ total_fine|floatformat:0 }}</div>
+            </div>
+            <div class="balance-item">
+                <div class="balance-label">Amount Paid</div>
+                <div class="balance-amount total-paid">TZS {{ total_fine_paid|floatformat:0 }}</div>
+            </div>
+            <div class="balance-item">
+                <div class="balance-label">Balance Due</div>
+                <div class="balance-amount total-balance">TZS {{ total_fine_balance|floatformat:0 }}</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- TABLE SECTION -->
+<div class="table-title">Issued Books Details</div>
+
+<table>
+    <thead>
+        <tr>
+            <th class="col-serial">#</th>
+            <th class="col-borrower">Borrower Details</th>
+            <th class="col-book">Book Information</th>
+            <th class="col-dates">Dates</th>
+            <th class="col-status">Status</th>
+            <th class="col-fines">Fines (TZS)</th>
+            <th class="col-balance">Balance Due</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% if borrows %}
+            {% for borrow in borrows %}
+            {% with balance_percentage=borrow.fine_balance|floatformat:2 %}
+            <tr class="avoid-break">
+                <td class="col-serial text-center">{{ forloop.counter }}</td>
+                
+                <!-- Borrower Column -->
+                <td class="col-borrower">
+                    <div class="text-bold">{{ borrow.get_borrower_name }}</div>
+                    <div class="badge borrower-{{ borrow.borrower_type }}">
+                        {{ borrow.borrower_type|title }}
+                    </div>
+                    {% if borrow.issued_by %}
+                        <div class="text-muted" style="font-size: 8pt; margin-top: 3px;">
+                            Issued by: {{ borrow.issued_by.username }}
+                        </div>
+                    {% endif %}
+                </td>
+                
+                <!-- Book Column -->
+                <td class="col-book">
+                    <div class="text-bold">{{ borrow.book.title|truncatechars:40 }}</div>
+                    <div style="font-size: 8pt; color: #666; margin: 3px 0;">
+                        <strong>Author:</strong> {{ borrow.book.author|truncatechars:30 }}
+                    </div>
+                    {% if borrow.book_copy %}
+                        <div style="font-size: 8pt; color: #666;">
+                            <strong>Copy:</strong> #{{ borrow.book_copy.copy_number }}
+                            ({{ borrow.book_copy.accession_number }})
+                        </div>
+                    {% endif %}
+                </td>
+                
+                <!-- Dates Column -->
+                <td class="col-dates">
+                    <div style="font-size: 8pt;">
+                        <strong>Borrowed:</strong><br>
+                        {{ borrow.borrow_date|date:"M d, Y" }}
+                    </div>
+                    <div style="font-size: 8pt; margin-top: 5px;">
+                        <strong>Due:</strong><br>
+                        {{ borrow.due_date|date:"M d, Y" }}
+                    </div>
+                    {% if borrow.actual_return_date %}
+                        <div style="font-size: 8pt; margin-top: 5px;">
+                            <strong>Returned:</strong><br>
+                            {{ borrow.actual_return_date|date:"M d, Y" }}
+                        </div>
+                    {% endif %}
+                </td>
+                
+                <!-- Status Column -->
+                <td class="col-status">
+                    <span class="badge status-{{ borrow.status }}">
+                        {{ borrow.get_status_display }}
+                    </span>
+                    {% if borrow.renewed_count > 0 %}
+                        <div style="font-size: 7pt; margin-top: 3px; color: #666;">
+                            Renewed: {{ borrow.renewed_count }}x
+                        </div>
+                    {% endif %}
+                </td>
+                
+                <!-- Fines Column -->
+                <td class="col-fines fine-cell">
+                    <div style="margin-bottom: 3px;">
+                        <strong>Total:</strong><br>
+                        <span class="{% if borrow.fine_amount > 0 %}fine-positive{% else %}fine-zero{% endif %}">
+                            {{ borrow.fine_amount|floatformat:0 }}
+                        </span>
+                    </div>
+                    <div style="font-size: 8pt; color: #666;">
+                        <strong>Paid:</strong><br>
+                        <span class="text-success">{{ borrow.fine_paid|floatformat:0 }}</span>
+                    </div>
+                </td>
+                
+                <!-- Balance Due Column -->
+                <td class="col-balance fine-cell 
+                    {% if borrow.fine_balance > 0 %}
+                        {% if borrow.fine_balance == borrow.fine_amount %}balance-high
+                        {% elif borrow.fine_amount > 0 and borrow.fine_balance > borrow.fine_amount|add:0 %}balance-high
+                        {% else %}balance-medium
+                        {% endif %}
+                    {% endif %}">
+                    <div class="text-bold" style="font-size: 10pt;">
+                        {% if borrow.fine_balance > 0 %}
+                            <span class="fine-positive">{{ borrow.fine_balance|floatformat:0 }}</span>
+                        {% else %}
+                            <span class="fine-zero">{{ borrow.fine_balance|floatformat:0 }}</span>
+                        {% endif %}
+                    </div>
+                    <div style="font-size: 7pt; margin-top: 2px; color: #666;">
+                        {% if borrow.fine_balance > 0 %}
+                            {% if borrow.fine_balance == borrow.fine_amount %}
+                                <span class="text-danger">Unpaid</span>
+                            {% elif borrow.fine_paid > 0 %}
+                                <span class="text-warning">Partial</span>
+                            {% else %}
+                                <span class="text-danger">Unpaid</span>
+                            {% endif %}
+                        {% else %}
+                            <span class="text-success">Cleared</span>
+                        {% endif %}
+                    </div>
+                    {% if borrow.fine_amount > 0 and borrow.fine_balance > 0 %}
+                    <div style="font-size: 7pt; margin-top: 2px; color: #999;">
+                        {{ borrow.fine_paid|floatformat:0 }} / {{ borrow.fine_amount|floatformat:0 }}
+                    </div>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endwith %}
+            {% endfor %}
+        {% else %}
+            <tr>
+                <td colspan="7" class="no-data">
+                    <div class="no-data-icon">📚</div>
+                    <div>No issued books found for the selected criteria.</div>
+                </td>
+            </tr>
+        {% endif %}
+    </tbody>
+</table>
+
+<!-- SUMMARY FOOTNOTE -->
+{% if borrows %}
+<div style="margin-top: 20px; padding: 10px; background: #f8f9fa; border-radius: 6px; font-size: 9pt;">
+    <div class="text-bold" style="margin-bottom: 5px;">Summary:</div>
+    <div>
+        • Total records: <strong>{{ borrows|length }}</strong> | 
+        • Total fines: <strong class="text-danger">TZS {{ total_fine|floatformat:0 }}</strong> | 
+        • Amount paid: <strong class="text-success">TZS {{ total_fine_paid|floatformat:0 }}</strong> | 
+        • Balance due: <strong class="text-danger">TZS {{ total_fine_balance|floatformat:0 }}</strong>
+    </div>
+    {% if total_fine_balance > 0 %}
+    <div style="margin-top: 5px; color: #e74c3c; font-weight: 600;">
+        ⚠️ Outstanding balance of TZS {{ total_fine_balance|floatformat:0 }} requires collection.
+    </div>
+    {% endif %}
+</div>
+{% endif %}
+
+<!-- FOOTER -->
+<div class="footer">
+    <p><strong>Library Management System</strong> — Official Report</p>
+    <p>Generated by {{ request.user.username }} on {{ export_date|date:"F d, Y" }}</p>
+    <p class="text-muted">This is a system-generated report. For inquiries, contact the library administration.</p>
+</div>
+
+</body>
+</html>

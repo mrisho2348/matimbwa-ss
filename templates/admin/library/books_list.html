@@ -861,55 +861,10 @@
 {% endblock content %}
 
 {% block extra_js %}
-
 <script>
     $(document).ready(function() {
-        // Initialize Select2 for all select fields
-        function initializeSelect2() {
-            $('.select2bs4').select2({
-                theme: 'bootstrap4',
-                dropdownParent: $('.modal:visible'),
-                width: '100%',
-                placeholder: 'Select an option',
-                allowClear: false,
-                minimumResultsForSearch: 10
-            });
-        }
+        // ====================== INITIALIZATION ======================
         
-        // Initialize on page load
-        initializeSelect2();
-
-        // Reinitialize when modals are shown
-        $('#addBookModal').on('shown.bs.modal', function() {
-            $('#category, #book_type, #condition, #status').select2({
-                theme: 'bootstrap4',
-                dropdownParent: $('#addBookModal'),
-                width: '100%',
-                placeholder: 'Select an option',
-                allowClear: false
-            });
-        });
-
-        $('#editBookModal').on('shown.bs.modal', function() {
-            $('#edit-category, #edit-book_type, #edit-condition, #edit-status').select2({
-                theme: 'bootstrap4',
-                dropdownParent: $('#editBookModal'),
-                width: '100%',
-                placeholder: 'Select an option',
-                allowClear: false
-            });
-        });
-
-        // Destroy Select2 when modals are hidden
-        $('#addBookModal').on('hidden.bs.modal', function() {
-            $('#category, #book_type, #condition, #status').select2('destroy');
-            $('#add-form')[0].reset();
-        });
-
-        $('#editBookModal').on('hidden.bs.modal', function() {
-            $('#edit-category, #edit-book_type, #edit-condition, #edit-status').select2('destroy');
-        });
-
         // Initialize DataTable
         var table = $('#books-table').DataTable({
             "dom": "<'row'<'col-sm-12 col-md-6'l><'col-sm-12 col-md-6'f>>" +
@@ -920,20 +875,17 @@
             "responsive": true,
             "autoWidth": false,
             "ordering": true,
-            "order": [[0, 'asc']], // Sort by book title
-            
+            "order": [[0, 'asc']],
             "destroy": true,
             "retrieve": true,
             "deferRender": true,
-            
             "columnDefs": [
                 { 
-                    "targets": 6, // Actions column
+                    "targets": 6,
                     "orderable": false,
                     "searchable": false
                 }
             ],
-            
             "language": {
                 "emptyTable": "<div class='text-center py-4'><i class='fas fa-book fa-2x mb-2'></i><br>No books found. Click \"Add Book\" to create one.</div>",
                 "search": "_INPUT_",
@@ -950,30 +902,12 @@
                 }
             },
             "drawCallback": function(settings) {
-                var api = this.api();
-                var total = api.rows().count();
-                $('#total-count').text(total);
-                
-                // Count available and borrowed books
-                var availableCount = 0;
-                var borrowedCount = 0;
-                
-                api.rows().every(function() {
-                    var data = this.data();
-                    var statusText = $(data[3]).find('.badge').first().text().toLowerCase();
-                    if (statusText.includes('available')) {
-                        availableCount++;
-                    }
-                    if (statusText.includes('borrowed')) {
-                        borrowedCount++;
-                    }
-                });
-                
-                $('#available-count').text(availableCount);
-                $('#borrowed-count').text(borrowedCount);
+                updateBookCounts();
             }
         });
 
+        // ====================== UTILITY FUNCTIONS ======================
+        
         // CSRF token for AJAX requests
         function getCSRFToken() {
             return $('input[name="csrfmiddlewaretoken"]').val();
@@ -994,22 +928,64 @@
             }, type === 'success' ? 3000 : 5000);
         }
 
+        // Update book counts in the header
+        function updateBookCounts() {
+            let availableCount = 0;
+            let borrowedCount = 0;
+            let totalCount = 0;
+            
+            $('#books-table tbody tr').each(function() {
+                totalCount++;
+                const availableBadge = $(this).find('.copy-badge.badge-success');
+                const borrowedBadge = $(this).find('.copy-badge.badge-info');
+                
+                if (availableBadge.length) {
+                    const availableText = availableBadge.text().trim();
+                    const availableNum = parseInt(availableText.replace(/\D/g, '')) || 0;
+                    availableCount += availableNum;
+                }
+                
+                if (borrowedBadge.length) {
+                    const borrowedText = borrowedBadge.text().trim();
+                    const borrowedNum = parseInt(borrowedText.replace(/\D/g, '')) || 0;
+                    borrowedCount += borrowedNum;
+                }
+            });
+            
+            $('#available-count').text(availableCount);
+            $('#borrowed-count').text(borrowedCount);
+            $('#total-count').text(totalCount);
+        }
+
+        // Helper function to handle button loading state
+        function setButtonLoading(btn, isLoading) {
+            const spinner = btn.find('.spinner-border');
+            if (isLoading) {
+                btn.data('original-text', btn.html());
+                btn.prop('disabled', true);
+                spinner.show();
+            } else {
+                btn.prop('disabled', false);
+                spinner.hide();
+                btn.html(btn.data('original-text'));
+            }
+        }
+
         // Function to reload page after delay
         function reloadPageAfterDelay(message, type = 'success') {
             showToast(message, type);
-            var delay = type === 'success' ? 2000 : 3000;
             setTimeout(function() {
                 location.reload();
-            }, delay);
+            }, type === 'success' ? 2000 : 3000);
         }
 
-        // Function to update UI without reload
+        // Function to update UI without reload (for quick toggles)
         function updateBookUI(bookId, data) {
-            // Update status badge
             const statusBadge = $('#status-badge-' + bookId);
             const conditionBadge = $('#condition-badge-' + bookId);
             const statusBtn = $('.toggle-status-btn[data-id="' + bookId + '"]');
             
+            // Update status if provided
             if (data.hasOwnProperty('status')) {
                 const statusClass = 'status-' + data.status;
                 statusBadge.removeClass().addClass('badge ' + statusClass).text(data.status_display);
@@ -1027,12 +1003,29 @@
                 }
             }
             
+            // Update condition if provided
             if (data.hasOwnProperty('condition')) {
                 const conditionClass = 'condition-' + data.condition;
                 conditionBadge.removeClass().addClass('badge ' + conditionClass).text(data.condition_display);
             }
             
-            // Update counts
+            // Update reference button if provided
+            if (data.hasOwnProperty('is_reference')) {
+                const refBtn = $('.toggle-reference-btn[data-id="' + bookId + '"]');
+                if (data.is_reference) {
+                    refBtn.removeClass('btn-secondary').addClass('btn-info')
+                        .attr('title', 'Mark as Non-Reference')
+                        .html('<i class="fas fa-bookmark"></i>')
+                        .attr('data-current-reference', 'true');
+                } else {
+                    refBtn.removeClass('btn-info').addClass('btn-secondary')
+                        .attr('title', 'Mark as Reference')
+                        .html('<i class="far fa-bookmark"></i>')
+                        .attr('data-current-reference', 'false');
+                }
+            }
+            
+            // Update copy counts if provided
             if (data.hasOwnProperty('available_copies')) {
                 const row = $('#row-' + bookId);
                 const copyBadge = row.find('.copy-badge.badge-success');
@@ -1050,36 +1043,20 @@
                 const copyBadge = row.find('.copy-badge.badge-secondary');
                 copyBadge.html('<i class="fas fa-copy"></i> ' + data.total_copies);
             }
+            
+            // Update counts
+            updateBookCounts();
         }
 
+        // ====================== EVENT HANDLERS ======================
+        
         // Handle modal close/cancel buttons
         $(document).on('click', '[data-dismiss="modal"]', function(e) {
             e.preventDefault();
             $(this).closest('.modal').modal('hide');
         });
 
-        // Handle cancel buttons
-        $('#cancel-add-btn, #cancel-edit-btn, #cancel-delete-btn').on('click', function(e) {
-            e.preventDefault();
-            $(this).closest('.modal').modal('hide');
-        });
-
-        // Helper function to handle button loading state
-        function setButtonLoading(btn, isLoading) {
-            const spinner = btn.find('.spinner-border');
-            if (isLoading) {
-                btn.data('original-text', btn.html());
-                btn.prop('disabled', true);
-                spinner.show();
-                btn.html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>');
-            } else {
-                btn.prop('disabled', false);
-                spinner.hide();
-                btn.html(btn.data('original-text'));
-            }
-        }
-        
-        // Add Book
+        // ====================== ADD BOOK ======================
         $('#add-form').on('submit', function(e) {
             e.preventDefault();
             
@@ -1116,66 +1093,73 @@
             });
         });
 
-        // Edit Book - Setup modal
+        // ====================== EDIT BOOK ======================
+        let currentEditBookId = null;
+        
         $(document).on('click', '.edit-btn', function() {
             const btn = $(this);
+            currentEditBookId = btn.data('id');
             
-            $('#edit-id').val(btn.data('id'));
+            // Show loading state on modal
+            $('#editModalLabel').html('<i class="fas fa-spinner fa-spin"></i> Loading Book Data...');
             
-            // Store values
-            const title = btn.data('title');
-            const author = btn.data('author');
-            const isbn = btn.data('isbn');
-            const publisher = btn.data('publisher');
-            const publicationYear = btn.data('publication_year');
-            const edition = btn.data('edition');
-            const categoryId = btn.data('category');
-            const bookType = btn.data('book_type');
-            const accessionNumber = btn.data('accession_number');
-            const barcode = btn.data('barcode');
-            const locationCode = btn.data('location_code');
-            const pages = btn.data('pages');
-            const language = btn.data('language');
-            const description = btn.data('description');
-            const keywords = btn.data('keywords');
-            const condition = btn.data('condition');
-            const status = btn.data('status');
-            const isReference = btn.data('is_reference') === 'true';
-            const fineAmount = btn.data('fine_amount');
-            const totalCopies = btn.data('total_copies');
-            const borrowedCopies = btn.data('borrowed_copies');
-            
-            // Calculate available copies
-            const availableCopies = totalCopies - borrowedCopies;
-            
-            // Show modal first
-            $('#editBookModal').modal('show');
-            
-            // Set values after modal is shown
-            setTimeout(function() {
-                $('#edit-title').val(title);
-                $('#edit-author').val(author);
-                $('#edit-isbn').val(isbn);
-                $('#edit-publisher').val(publisher);
-                $('#edit-publication_year').val(publicationYear);
-                $('#edit-edition').val(edition);
-                $('#edit-category').val(categoryId).trigger('change');
-                $('#edit-book_type').val(bookType).trigger('change');
-                $('#edit-accession_number').val(accessionNumber);
-                $('#edit-barcode').val(barcode);
-                $('#edit-location_code').val(locationCode);
-                $('#edit-pages').val(pages);
-                $('#edit-language').val(language);
-                $('#edit-description').val(description);
-                $('#edit-keywords').val(keywords);
-                $('#edit-condition').val(condition).trigger('change');
-                $('#edit-status').val(status).trigger('change');
-                $('#edit-is_reference').prop('checked', isReference);
-                $('#edit-fine_amount').val(fineAmount);
-                $('#edit-total_copies').val(totalCopies);
-                $('#edit-borrowed_copies').val(borrowedCopies);
-                $('#edit-available-calculated').text(availableCopies);
-            }, 500);
+            // Fetch book data from server
+            $.ajax({
+                url: '/library/books/get/' + currentEditBookId + '/', // Update with your actual URL
+                method: 'GET',
+                headers: {
+                    'X-CSRFToken': getCSRFToken(),
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                success: function(data) {
+                    if (data.success) {
+                        const book = data.book;
+                        
+                        // Set form values
+                        $('#edit-id').val(book.id);
+                        $('#edit-title').val(book.title);
+                        $('#edit-author').val(book.author);
+                        $('#edit-isbn').val(book.isbn || '');
+                        $('#edit-publisher').val(book.publisher || '');
+                        $('#edit-publication_year').val(book.publication_year || '');
+                        $('#edit-edition').val(book.edition || '');
+                        $('#edit-accession_number').val(book.accession_number);
+                        $('#edit-barcode').val(book.barcode);
+                        $('#edit-location_code').val(book.location_code || '');
+                        $('#edit-pages').val(book.pages || '');
+                        $('#edit-language').val(book.language);
+                        $('#edit-description').val(book.description || '');
+                        $('#edit-keywords').val(book.keywords || '');
+                        $('#edit-fine_amount').val(book.fine_amount);
+                        $('#edit-total_copies').val(book.total_copies);
+                        $('#edit-borrowed_copies').val(book.borrowed_copies);
+                        $('#edit-is_reference').prop('checked', book.is_reference);
+                        $('#edit-available-calculated').text(book.available_copies);
+                        
+                        // Update modal title
+                        $('#editModalLabel').html('<i class="fas fa-edit"></i> Edit Book: ' + book.title);
+                        
+                        // Show modal
+                        $('#editBookModal').modal('show');
+                        
+                        // Set select2 values after a short delay to ensure modal is ready
+                        setTimeout(function() {
+                            if (book.category) {
+                                $('#edit-category').val(book.category).trigger('change');
+                            }
+                            $('#edit-book_type').val(book.book_type).trigger('change');
+                            $('#edit-condition').val(book.condition).trigger('change');
+                            $('#edit-status').val(book.status).trigger('change');
+                        }, 300);
+                    } else {
+                        showToast(data.message, 'danger');
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error:', error);
+                    showToast('An error occurred while fetching book data.', 'danger');
+                }
+            });
         });
 
         // Calculate available copies on input change
@@ -1186,7 +1170,7 @@
             $('#edit-available-calculated').text(available);
         });
 
-        // Edit Book - Submit form
+        // Edit form submission
         $('#edit-form').on('submit', function(e) {
             e.preventDefault();
             
@@ -1223,7 +1207,7 @@
             });
         });
 
-        // Toggle Book Status (Available/Unavailable)
+        // ====================== TOGGLE STATUS ======================
         $(document).on('click', '.toggle-status-btn', function() {
             const btn = $(this);
             const bookId = btn.data('id');
@@ -1268,7 +1252,7 @@
             }
         });
 
-        // Toggle Book Reference Status
+        // ====================== TOGGLE REFERENCE ======================
         $(document).on('click', '.toggle-reference-btn', function() {
             const btn = $(this);
             const bookId = btn.data('id');
@@ -1294,18 +1278,9 @@
                     },
                     success: function(data) {
                         if (data.success) {
-                            // Update button
-                            if (data.is_reference) {
-                                btn.removeClass('btn-secondary').addClass('btn-info')
-                                    .attr('title', 'Mark as Non-Reference')
-                                    .html('<i class="fas fa-bookmark"></i>')
-                                    .attr('data-current-reference', 'true');
-                            } else {
-                                btn.removeClass('btn-info').addClass('btn-secondary')
-                                    .attr('title', 'Mark as Reference')
-                                    .html('<i class="far fa-bookmark"></i>')
-                                    .attr('data-current-reference', 'false');
-                            }
+                            updateBookUI(bookId, { 
+                                is_reference: data.is_reference
+                            });
                             showToast(data.message, 'success');
                         } else {
                             showToast(data.message, 'danger');
@@ -1321,7 +1296,7 @@
             }
         });
 
-        // Delete Book - Setup modal
+        // ====================== DELETE BOOK ======================
         let bookToDelete = null;
         
         $(document).on('click', '.delete-btn', function() {
@@ -1336,7 +1311,7 @@
             $('#deleteBookModal').modal('show');
         });
 
-        // Delete Book - Confirm
+        // Delete confirmation
         $('#confirm-delete-btn').on('click', function() {
             if (!bookToDelete) return;
             
@@ -1372,22 +1347,34 @@
             });
         });
 
-        // Clear form and reset button state on modal close
+        // ====================== MODAL CLEANUP ======================
+        
+        // Clear add modal on close
         $('#addBookModal').on('hidden.bs.modal', function() {
             $('#add-form')[0].reset();
             setButtonLoading($('#save-btn'), false);
+            // Reset Select2
+            $('#category, #book_type, #condition, #status').val(null).trigger('change');
         });
         
+        // Clear edit modal on close
         $('#editBookModal').on('hidden.bs.modal', function() {
             setButtonLoading($('#update-btn'), false);
+            // Reset Select2
+            $('#edit-category, #edit-book_type, #edit-condition, #edit-status').val(null).trigger('change');
+            // Reset modal title
+            $('#editModalLabel').html('<i class="fas fa-edit"></i> Edit Book');
+            currentEditBookId = null;
         });
         
+        // Clear delete modal on close
         $('#deleteBookModal').on('hidden.bs.modal', function() {
             bookToDelete = null;
             setButtonLoading($('#confirm-delete-btn'), false);
         });
 
-        // Form validation
+        // ====================== FORM VALIDATION ======================
+        
         $('#add-form, #edit-form').on('submit', function(e) {
             const isAddForm = $(this).attr('id') === 'add-form';
             const titleInput = isAddForm ? '#title' : '#edit-title';
@@ -1411,100 +1398,82 @@
             const language = $(languageInput).val().trim();
             const borrowedCopies = isAddForm ? $('#borrowed_copies').val() : $('#edit-borrowed_copies').val();
             
+            // Clear previous validation
+            $(titleInput).removeClass('is-invalid');
+            $(authorInput).removeClass('is-invalid');
+            $(categoryInput).removeClass('is-invalid');
+            $(bookTypeInput).removeClass('is-invalid');
+            $(conditionInput).removeClass('is-invalid');
+            $(statusInput).removeClass('is-invalid');
+            $(languageInput).removeClass('is-invalid');
+            $(fineAmountInput).removeClass('is-invalid');
+            $(totalCopiesInput).removeClass('is-invalid');
+            if (isAddForm) {
+                $('#borrowed_copies').removeClass('is-invalid');
+            } else {
+                $('#edit-borrowed_copies').removeClass('is-invalid');
+            }
+            
+            let isValid = true;
+            let errorMessage = '';
+            
             // Validate required fields
             if (!title) {
-                e.preventDefault();
-                showToast('Book title is required.', 'danger');
+                errorMessage = 'Book title is required.';
                 $(titleInput).addClass('is-invalid');
-                return false;
-            }
-            
-            if (!author) {
-                e.preventDefault();
-                showToast('Author is required.', 'danger');
+                isValid = false;
+            } else if (title.length < 2) {
+                errorMessage = 'Book title must be at least 2 characters long.';
+                $(titleInput).addClass('is-invalid');
+                isValid = false;
+            } else if (title.length > 200) {
+                errorMessage = 'Book title cannot exceed 200 characters.';
+                $(titleInput).addClass('is-invalid');
+                isValid = false;
+            } else if (!author) {
+                errorMessage = 'Author is required.';
                 $(authorInput).addClass('is-invalid');
-                return false;
-            }
-            
-            if (!category) {
-                e.preventDefault();
-                showToast('Category is required.', 'danger');
+                isValid = false;
+            } else if (author.length < 2) {
+                errorMessage = 'Author name must be at least 2 characters long.';
+                $(authorInput).addClass('is-invalid');
+                isValid = false;
+            } else if (!category) {
+                errorMessage = 'Category is required.';
                 $(categoryInput).addClass('is-invalid');
-                return false;
-            }
-            
-            if (!bookType) {
-                e.preventDefault();
-                showToast('Book type is required.', 'danger');
+                isValid = false;
+            } else if (!bookType) {
+                errorMessage = 'Book type is required.';
                 $(bookTypeInput).addClass('is-invalid');
-                return false;
-            }
-            
-            if (!condition) {
-                e.preventDefault();
-                showToast('Condition is required.', 'danger');
+                isValid = false;
+            } else if (!condition) {
+                errorMessage = 'Condition is required.';
                 $(conditionInput).addClass('is-invalid');
-                return false;
-            }
-            
-            if (!status) {
-                e.preventDefault();
-                showToast('Status is required.', 'danger');
+                isValid = false;
+            } else if (!status) {
+                errorMessage = 'Status is required.';
                 $(statusInput).addClass('is-invalid');
-                return false;
-            }
-            
-            if (!language) {
-                e.preventDefault();
-                showToast('Language is required.', 'danger');
+                isValid = false;
+            } else if (!language) {
+                errorMessage = 'Language is required.';
                 $(languageInput).addClass('is-invalid');
-                return false;
-            }
-            
-            // Validate title length
-            if (title.length < 2) {
-                e.preventDefault();
-                showToast('Book title must be at least 2 characters long.', 'danger');
-                $(titleInput).addClass('is-invalid');
-                return false;
-            }
-            
-            if (title.length > 200) {
-                e.preventDefault();
-                showToast('Book title cannot exceed 200 characters.', 'danger');
-                $(titleInput).addClass('is-invalid');
-                return false;
-            }
-            
-            // Validate author length
-            if (author.length < 2) {
-                e.preventDefault();
-                showToast('Author name must be at least 2 characters long.', 'danger');
-                $(authorInput).addClass('is-invalid');
-                return false;
-            }
-            
-            // Validate fine amount
-            if (parseFloat(fineAmount) < 0) {
-                e.preventDefault();
-                showToast('Fine amount cannot be negative.', 'danger');
+                isValid = false;
+            } else if (parseFloat(fineAmount) < 0) {
+                errorMessage = 'Fine amount cannot be negative.';
                 $(fineAmountInput).addClass('is-invalid');
-                return false;
-            }
-            
-            // Validate copies
-            if (parseInt(totalCopies) < 1) {
-                e.preventDefault();
-                showToast('Total copies must be at least 1.', 'danger');
+                isValid = false;
+            } else if (parseInt(totalCopies) < 1) {
+                errorMessage = 'Total copies must be at least 1.';
                 $(totalCopiesInput).addClass('is-invalid');
-                return false;
-            }
-            
-            if (parseInt(borrowedCopies) > parseInt(totalCopies)) {
-                e.preventDefault();
-                showToast('Borrowed copies cannot exceed total copies.', 'danger');
-                $(isAddForm ? '#borrowed_copies' : '#edit-borrowed_copies').addClass('is-invalid');
-                return false;
+                isValid = false;
+            } else if (parseInt(borrowedCopies) > parseInt(totalCopies)) {
+                errorMessage = 'Borrowed copies cannot exceed total copies.';
+                if (isAddForm) {
+                    $('#borrowed_copies').addClass('is-invalid');
+                } else {
+                    $('#edit-borrowed_copies').addClass('is-invalid');
+                }
+                isValid = false;
             }
             
             // Validate publication year if provided
@@ -1513,11 +1482,16 @@
             if (publicationYear) {
                 const currentYear = new Date().getFullYear();
                 if (parseInt(publicationYear) > currentYear) {
-                    e.preventDefault();
-                    showToast('Publication year cannot be in the future.', 'danger');
+                    errorMessage = 'Publication year cannot be in the future.';
                     $(publicationYearInput).addClass('is-invalid');
-                    return false;
+                    isValid = false;
                 }
+            }
+            
+            if (!isValid) {
+                e.preventDefault();
+                showToast(errorMessage, 'danger');
+                return false;
             }
             
             return true;
@@ -1542,6 +1516,9 @@
                 }
             }
         });
+
+        // ====================== INITIAL UPDATE OF COUNTS ======================
+        updateBookCounts();
     });
 </script>
 {% endblock extra_js %}

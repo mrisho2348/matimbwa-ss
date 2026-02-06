@@ -1,0 +1,512 @@
+{% extends 'admin/base.html' %}
+{% load static %}
+{% load custom_filters %}
+{% block title %} Renew Book {% endblock title %}
+
+{% block breadcrumb %}
+    <a href="{% url 'admin_book_borrows_list' %}" class="btn btn-outline-secondary">
+        <i class="fas fa-arrow-left"></i> Back to Borrow List
+    </a>
+{% endblock breadcrumb %}
+
+{% block extra_css %}
+<style>
+    .borrower-info-card {
+        border-left: 4px solid #198754;
+    }
+    .book-info-card {
+        border-left: 4px solid #0d6efd;
+    }
+    .timeline-card {
+        border-left: 4px solid #ffc107;
+    }
+    .rules-card {
+        border-left: 4px solid #6f42c1;
+    }
+    .renewal-stats {
+        font-size: 0.9rem;
+    }
+    .eligibility-badge {
+        font-size: 0.8rem;
+    }
+    .timeline-item {
+        padding: 10px 15px;
+        border-radius: 5px;
+        margin-bottom: 10px;
+    }
+    .timeline-current {
+        background-color: #e7f1ff;
+        border-left: 3px solid #0d6efd;
+    }
+    .timeline-future {
+        background-color: #f8f9fa;
+        border-left: 3px solid #6c757d;
+    }
+</style>
+{% endblock extra_css %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-lg-10 offset-lg-1">
+            <div class="card">
+                <div class="card-header bg-warning text-dark d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-redo"></i> Renew Book
+                    </h5>
+                    <span class="badge bg-light text-dark">
+                        Borrow ID: #{{ borrow.id|stringformat:"06d" }}
+                    </span>
+                </div>
+                <div class="card-body">
+                    <!-- Borrower Information -->
+                    <div class="card borrower-info-card mb-4">
+                        <div class="card-body">
+                            <h6 class="card-title"><i class="fas fa-user"></i> Borrower Details</h6>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <p class="mb-1"><strong>Name:</strong> {{ borrow.get_borrower_name }}</p>
+                                    <p class="mb-1"><strong>Type:</strong> {{ borrow.get_borrower_type_display }}</p>
+                                </div>
+                                <div class="col-md-6">
+                                    {% if borrow.borrower_type == 'student' and borrow.student_borrower.registration_number %}
+                                    <p class="mb-1"><strong>Registration:</strong> {{ borrow.student_borrower.registration_number }}</p>
+                                    {% endif %}
+                                    {% if borrow.borrower_type == 'staff' and borrow.staff_borrower.admin.email %}
+                                    <p class="mb-1"><strong>Email:</strong> {{ borrow.staff_borrower.admin.email }}</p>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Book Information -->
+                    <div class="card book-info-card mb-4">
+                        <div class="card-body">
+                            <h6 class="card-title"><i class="fas fa-book"></i> Book Details</h6>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <p class="mb-1"><strong>Title:</strong> {{ borrow.book.title }}</p>
+                                    <p class="mb-1"><strong>Author:</strong> {{ borrow.book.author }}</p>
+                                    <p class="mb-1"><strong>ISBN:</strong> {{ borrow.book.isbn|default:"Not specified" }}</p>
+                                </div>
+                                <div class="col-md-6">
+                                    <p class="mb-1"><strong>Accession No:</strong> {{ borrow.book.accession_number }}</p>
+                                    {% if borrow.book_copy %}
+                                    <p class="mb-1"><strong>Copy:</strong> #{{ borrow.book_copy.copy_number }}</p>
+                                    {% endif %}
+                                    <p class="mb-0">
+                                        <span class="badge {% if borrow.book.is_reference %}bg-info{% else %}bg-success{% endif %}">
+                                            {% if borrow.book.is_reference %}Reference Book{% else %}Regular Book{% endif %}
+                                        </span>
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Borrowing Timeline -->
+                    <div class="card timeline-card mb-4">
+                        <div class="card-body">
+                            <h6 class="card-title"><i class="fas fa-history"></i> Borrowing History</h6>
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <div class="timeline-item bg-light">
+                                        <small class="text-muted d-block">Borrow Date</small>
+                                        <strong>{{ borrow.borrow_date|date:"M d, Y" }}</strong>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="timeline-item {% if borrow.is_overdue %}bg-danger text-white{% else %}timeline-current{% endif %}">
+                                        <small class="{% if borrow.is_overdue %}text-white{% else %}text-muted{% endif %} d-block">Current Due Date</small>
+                                        <strong>{{ borrow.due_date|date:"M d, Y" }}</strong>
+                                        {% if borrow.is_overdue %}
+                                        <small class="d-block mt-1">Overdue by {{ borrow.overdue_days }} day(s)</small>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="timeline-item timeline-future">
+                                        <small class="text-muted d-block">Today</small>
+                                        <strong>{% now "M d, Y" %}</strong>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Fine Information -->
+                    {% with overdue_days=borrow.calculate_overdue_days fine_amount=borrow.calculate_fine %}
+                    {% if overdue_days > 0 %}
+                    <div class="card mb-4 border-danger">
+                        <div class="card-header bg-danger text-white">
+                            <h6 class="card-title mb-0">
+                                <i class="fas fa-exclamation-triangle"></i> Overdue & Fine Information
+                            </h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <div class="text-center p-3 bg-light rounded">
+                                        <small class="text-muted d-block">Overdue Days</small>
+                                        <h3 class="mb-0 text-danger">{{ overdue_days }}</h3>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="text-center p-3 bg-warning rounded">
+                                        <small class="text-dark d-block">Fine Amount</small>
+                                        <h3 class="mb-0">TZS {{ fine_amount|floatformat:0 }}</h3>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="text-center p-3 bg-danger text-white rounded">
+                                        <small class="text-white d-block">Fine Balance</small>
+                                        <h3 class="mb-0">TZS {{ borrow.fine_balance|floatformat:0 }}</h3>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="alert alert-warning mt-3">
+                                <i class="fas fa-info-circle"></i>
+                                <strong>Important:</strong> You must clear the outstanding fine before renewing this book.
+                                <div class="mt-2">
+                                    <a href="{% url 'admin_fine_payment' borrow.id %}" class="btn btn-sm btn-danger">
+                                        <i class="fas fa-money-bill-wave"></i> Pay Fine Now
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                    {% endwith %}
+                    
+                    <!-- Renewal Eligibility & Rules -->
+                    {% with can_renew=borrow.status == 'active' and borrow.renewed_count < 2 %}
+                    <div class="card rules-card mb-4">
+                        <div class="card-body">
+                            <h6 class="card-title"><i class="fas fa-clipboard-check"></i> Renewal Eligibility & Rules</h6>
+                            
+                            <!-- Eligibility Status -->
+                            <div class="alert {% if can_renew and borrow.fine_balance == 0 %}alert-success{% else %}alert-danger{% endif %} mb-3">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <strong>Renewal Status:</strong>
+                                        {% if can_renew and borrow.fine_balance == 0 %}
+                                            <span class="badge bg-success">Eligible for Renewal</span>
+                                        {% else %}
+                                            <span class="badge bg-danger">Not Eligible for Renewal</span>
+                                        {% endif %}
+                                    </div>
+                                    <div class="renewal-stats">
+                                        <span class="badge bg-info">
+                                            {{ borrow.renewed_count }} of {{ borrow.max_renewals }} renewals used
+                                        </span>
+                                    </div>
+                                </div>
+                                
+                                {% if not can_renew %}
+                                <ul class="mb-0 mt-2">
+                                    {% if borrow.status != 'active' %}
+                                    <li>Book must be in 'active' status (current: {{ borrow.get_status_display }})</li>
+                                    {% endif %}
+                                    {% if borrow.renewed_count >= borrow.max_renewals %}
+                                    <li>Maximum renewals ({{ borrow.max_renewals }}) already used</li>
+                                    {% endif %}
+                                    {% if borrow.fine_balance > 0 %}
+                                    <li>Outstanding fine balance must be paid</li>
+                                    {% endif %}
+                                    {% if borrow.book.is_reserved %}
+                                    <li>Book is currently reserved by another user</li>
+                                    {% endif %}
+                                </ul>
+                                {% endif %}
+                            </div>
+                            
+                            <!-- Renewal Rules -->
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <h6 class="mb-2"><i class="fas fa-ruler"></i> Renewal Rules</h6>
+                                    <table class="table table-sm table-borderless">
+                                        <tr>
+                                            <td><i class="fas fa-calendar-plus"></i></td>
+                                            <td><strong>Renewal Duration:</strong></td>
+                                            <td>{{ borrow.renewal_duration_days }} days</td>
+                                        </tr>
+                                        <tr>
+                                            <td><i class="fas fa-redo"></i></td>
+                                            <td><strong>Max Renewals:</strong></td>
+                                            <td>{{ borrow.max_renewals }} times</td>
+                                        </tr>
+                                        <tr>
+                                            <td><i class="fas fa-clock"></i></td>
+                                            <td><strong>Current Renewals:</strong></td>
+                                            <td>{{ borrow.renewed_count }} used</td>
+                                        </tr>
+                                        {% if borrow.last_renewal_date %}
+                                        <tr>
+                                            <td><i class="fas fa-calendar-check"></i></td>
+                                            <td><strong>Last Renewed:</strong></td>
+                                            <td>{{ borrow.last_renewal_date|date:"M d, Y" }}</td>
+                                        </tr>
+                                        {% endif %}
+                                    </table>
+                                </div>
+                                <div class="col-md-6">
+                                    <h6 class="mb-2"><i class="fas fa-calculator"></i> New Due Date Calculation</h6>
+                                    <div class="alert alert-light">
+                                        <p class="mb-1"><strong>Current Due Date:</strong> {{ borrow.due_date|date:"M d, Y" }}</p>
+                                        <p class="mb-1"><strong>Add Renewal Days:</strong> + {{ borrow.renewal_duration_days }} days</p>
+                                        <p class="mb-0"><strong>New Due Date:</strong> 
+                                            <span class="text-primary">
+                                                {{ borrow.due_date|add_days:borrow.renewal_duration_days|date:"M d, Y" }}
+                                            </span>
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endwith %}
+                    
+                    <!-- Renewal Form -->
+                    <div class="card">
+                        <div class="card-header bg-light">
+                            <h6 class="card-title mb-0"><i class="fas fa-edit"></i> Renewal Request</h6>
+                        </div>
+                        <div class="card-body">
+                            <form id="renew-form">
+                                {% csrf_token %}
+                                <input type="hidden" name="borrow_id" value="{{ borrow.id }}">
+                                
+                                <div class="form-group">
+                                    <label for="reason" class="form-label">
+                                        <i class="fas fa-comment-dots"></i> Renewal Reason (Optional)
+                                    </label>
+                                    <textarea class="form-control" id="reason" name="reason" rows="3" 
+                                              placeholder="Please provide a reason for renewal (e.g., need more time for research, book not yet finished)"></textarea>
+                                    <small class="form-text text-muted">
+                                        This helps us understand renewal patterns and improve our services.
+                                    </small>
+                                </div>
+                                
+                                <!-- Renewal Acknowledgment -->
+                                <div class="form-group mt-4">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="acknowledge_terms" 
+                                               {% if not can_renew or borrow.fine_balance > 0 %}disabled{% endif %}>
+                                        <label class="form-check-label" for="acknowledge_terms">
+                                            I acknowledge that:
+                                            <ul class="mb-0 mt-2" style="padding-left: 20px;">
+                                                <li>Renewal extends the due date by {{ borrow.renewal_duration_days }} days</li>
+                                                <li>This is renewal {{ borrow.renewed_count|add:1 }} of {{ borrow.max_renewals }} allowed</li>
+                                                <li>Any fines will be recalculated based on the new due date</li>
+                                                <li>I must return the book by the new due date or face additional fines</li>
+                                            </ul>
+                                        </label>
+                                    </div>
+                                </div>
+                                
+                                <div class="form-group mt-4">
+                                    <button type="submit" class="btn btn-warning btn-lg" id="submit-btn" 
+                                            {% if not can_renew or borrow.fine_balance > 0 %}disabled{% endif %}>
+                                        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="display: none;"></span>
+                                        <i class="fas fa-redo"></i> Renew Book
+                                    </button>
+                                    <a href="{% url 'admin_book_borrows_list' %}" class="btn btn-secondary btn-lg">
+                                        <i class="fas fa-times"></i> Cancel
+                                    </a>
+                                    
+                                    {% if not can_renew or borrow.fine_balance > 0 %}
+                                    <div class="mt-3">
+                                        <small class="text-danger">
+                                            <i class="fas fa-exclamation-circle"></i>
+                                            Renewal is not available. Please check the eligibility requirements above.
+                                        </small>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // Enable/disable submit button based on acknowledgment
+    $('#acknowledge_terms').on('change', function() {
+        const submitBtn = $('#submit-btn');
+        if ($(this).is(':checked') && !submitBtn.prop('disabled')) {
+            submitBtn.prop('disabled', false);
+        } else if (!$(this).is(':checked')) {
+            submitBtn.prop('disabled', true);
+        }
+    });
+    
+    // Calculate new due date
+    function calculateNewDueDate() {
+        const currentDueDate = '{{ borrow.due_date|date:"Y-m-d" }}';
+        const renewalDays = {{ borrow.renewal_duration_days }};
+        
+        if (currentDueDate) {
+            const date = new Date(currentDueDate);
+            date.setDate(date.getDate() + renewalDays);
+            return date.toLocaleDateString('en-US', { 
+                year: 'numeric', 
+                month: 'short', 
+                day: 'numeric' 
+            });
+        }
+        return 'Unable to calculate';
+    }
+    
+    // Show confirmation dialog with calculated dates
+    function showRenewalConfirmation() {
+        const reason = $('#reason').val();
+        const newDueDate = calculateNewDueDate();
+        
+        let confirmationMessage = `
+            <div class="text-start">
+                <p>You are about to renew this book. Please confirm the details:</p>
+                <div class="alert alert-info mt-3">
+                    <p class="mb-1"><strong>Book:</strong> {{ borrow.book.title }}</p>
+                    <p class="mb-1"><strong>Current Due Date:</strong> {{ borrow.due_date|date:"M d, Y" }}</p>
+                    <p class="mb-1"><strong>New Due Date:</strong> ${newDueDate}</p>
+                    <p class="mb-0"><strong>Renewal Count:</strong> {{ borrow.renewed_count|add:1 }} of {{ borrow.max_renewals }}</p>
+                </div>
+        `;
+        
+        if (reason) {
+            confirmationMessage += `
+                <div class="alert alert-light mt-3">
+                    <p class="mb-0"><strong>Renewal Reason:</strong><br>${reason}</p>
+                </div>
+            `;
+        }
+        
+        confirmationMessage += `</div>`;
+        
+        Swal.fire({
+            title: 'Confirm Renewal',
+            html: confirmationMessage,
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonText: 'Yes, Renew Book',
+            cancelButtonText: 'Cancel',
+            confirmButtonColor: '#ffc107',
+            cancelButtonColor: '#6c757d',
+            showLoaderOnConfirm: true,
+            preConfirm: () => {
+                return true;
+            }
+        }).then((result) => {
+            if (result.isConfirmed) {
+                submitRenewalForm();
+            }
+        });
+    }
+    
+    // Submit the renewal form
+    function submitRenewalForm() {
+        const submitBtn = $('#submit-btn');
+        const spinner = submitBtn.find('.spinner-border');
+        
+        // Show loading spinner
+        submitBtn.prop('disabled', true);
+        spinner.show();
+        
+        // Get form data
+        const formData = new FormData($('#renew-form')[0]);
+        
+        // Send AJAX request
+        $.ajax({
+            url: window.location.href,
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': $('input[name="csrfmiddlewaretoken"]').val(),
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            data: formData,
+            processData: false,
+            contentType: false,
+            success: function(data) {
+                if (data.success) {
+                    // Show success message
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Book Renewed Successfully!',
+                        html: `
+                            <div class="text-start">
+                                <p>${data.message}</p>
+                                <div class="alert alert-success mt-3">
+                                    <p class="mb-0"><strong>New Due Date:</strong> ${data.new_due_date}</p>
+                                </div>
+                            </div>
+                        `,
+                        showConfirmButton: true,
+                        confirmButtonText: 'Back to List',
+                        confirmButtonColor: '#198754',
+                        allowOutsideClick: false
+                    }).then(() => {
+                        window.location.href = '{% url "admin_book_borrows_list" %}';
+                    });
+                } else {
+                    // Show error message
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Renewal Failed!',
+                        text: data.message || 'An error occurred while renewing the book.',
+                        confirmButtonText: 'Try Again'
+                    });
+                    submitBtn.prop('disabled', false);
+                    spinner.hide();
+                }
+            },
+            error: function(xhr, status, error) {
+                console.error('Error:', error);
+                let errorMessage = 'An error occurred while processing your request.';
+                
+                if (xhr.responseJSON && xhr.responseJSON.message) {
+                    errorMessage = xhr.responseJSON.message;
+                }
+                
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Server Error!',
+                    text: errorMessage,
+                    confirmButtonText: 'OK'
+                });
+                submitBtn.prop('disabled', false);
+                spinner.hide();
+            }
+        });
+    }
+    
+    // Form submission handler
+    $('#renew-form').on('submit', function(e) {
+        e.preventDefault();
+        showRenewalConfirmation();
+    });
+    
+    // Initialize tooltips
+    $('[data-toggle="tooltip"]').tooltip();
+});
+</script>
+
+<!-- Custom template filter for date calculation -->
+{% if not request.template.engine.debug %}
+<script>
+// Add days to date function
+Date.prototype.addDays = function(days) {
+    const date = new Date(this.valueOf());
+    date.setDate(date.getDate() + days);
+    return date;
+};
+</script>
+{% endif %}
+{% endblock %}

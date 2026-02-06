@@ -1,0 +1,865 @@
+<!-- templates/admin/library/view_book_borrow.html -->
+{% extends 'admin/base.html' %}
+{% load static %}
+{% block title %} Borrow Record Details - {{ borrow.book.title }} {% endblock title %}
+
+{% block breadcrumb %}
+    <a href="{% url 'admin_book_borrows_list' %}" class="btn btn-outline-secondary">
+        <i class="fas fa-arrow-left"></i> Back to Borrow List
+    </a>
+    {% if borrow.status == 'active' or borrow.status == 'overdue' %}
+        <a href="{% url 'admin_return_book_borrow' borrow.id %}" class="btn btn-success ml-2">
+            <i class="fas fa-undo"></i> Return Book
+        </a>
+    {% endif %}
+    {% if can_renew %}
+        <a href="{% url 'admin_renew_book_borrow' borrow.id %}" class="btn btn-warning ml-2">
+            <i class="fas fa-redo"></i> Renew Book
+        </a>
+    {% endif %}
+    {% if borrow.fine_balance > 0 %}
+        <a href="{% url 'admin_fine_payment' borrow.id %}" class="btn btn-info ml-2">
+            <i class="fas fa-money-bill-wave"></i> Pay Fine
+        </a>
+    {% endif %}
+    <!-- EDIT BUTTON IN BREADCRUMB - ONLY FOR ACTIVE STATUS -->
+    {% if borrow.status == 'active' %}
+        <a href="{% url 'admin_edit_book_borrow' borrow.id %}" class="btn btn-primary ml-2">
+            <i class="fas fa-edit"></i> Edit Record
+        </a>
+    {% endif %}
+    <!-- PDF DOWNLOAD BUTTON -->
+    <a href="{% url 'admin_export_borrow_details_pdf' borrow.id %}" class="btn btn-danger ml-2">
+        <i class="fas fa-file-pdf"></i> Download PDF Report
+    </a>
+{% endblock breadcrumb %}
+
+{% block extra_css %}
+<style>
+    .detail-card {
+        border-radius: 10px;
+        box-shadow: 0 0 15px rgba(0,0,0,0.1);
+        margin-bottom: 20px;
+    }
+    .detail-card .card-header {
+        border-radius: 10px 10px 0 0 !important;
+        font-weight: 600;
+    }
+    .info-label {
+        font-weight: 600;
+        color: #495057;
+        min-width: 150px;
+    }
+    .info-value {
+        color: #212529;
+        word-break: break-word;
+    }
+    .status-badge {
+        font-size: 0.9em;
+        padding: 0.5em 1em;
+    }
+    .timeline {
+        position: relative;
+        padding-left: 20px;
+        margin-left: 10px;
+    }
+    .timeline::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: 2px;
+        background-color: #dee2e6;
+    }
+    .timeline-item {
+        position: relative;
+        margin-bottom: 20px;
+        padding-bottom: 10px;
+        border-bottom: 1px solid #f1f1f1;
+    }
+    .timeline-item::before {
+        content: '';
+        position: absolute;
+        left: -24px;
+        top: 5px;
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background-color: #007bff;
+        border: 2px solid white;
+        box-shadow: 0 0 0 2px #007bff;
+    }
+    .timeline-item.success::before {
+        background-color: #28a745;
+        box-shadow: 0 0 0 2px #28a745;
+    }
+    .timeline-item.warning::before {
+        background-color: #ffc107;
+        box-shadow: 0 0 0 2px #ffc107;
+    }
+    .timeline-item.danger::before {
+        background-color: #dc3545;
+        box-shadow: 0 0 0 2px #dc3545;
+    }
+    .timeline-item.info::before {
+        background-color: #17a2b8;
+        box-shadow: 0 0 0 2px #17a2b8;
+    }
+    .action-buttons {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+    .fine-amount {
+        font-size: 1.2em;
+        font-weight: 700;
+    }
+    .fine-paid {
+        color: #28a745;
+        font-weight: 600;
+    }
+    .fine-balance {
+        color: #dc3545;
+        font-weight: 700;
+    }
+    .book-cover-placeholder {
+        width: 100%;
+        height: 200px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        border-radius: 8px;
+        margin-bottom: 15px;
+    }
+    .book-cover-placeholder i {
+        font-size: 4rem;
+    }
+    .copy-details {
+        background-color: #f8f9fa;
+        border-radius: 5px;
+        padding: 15px;
+        margin-top: 10px;
+    }
+    .qr-code {
+        width: 150px;
+        height: 150px;
+        background-color: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 5px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto;
+    }
+    .action-status {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-size: 0.8em;
+        margin-left: 5px;
+    }
+    .action-available {
+        background-color: #d4edda;
+        color: #155724;
+    }
+    .action-unavailable {
+        background-color: #f8d7da;
+        color: #721c24;
+    }
+    .pdf-download-btn {
+        background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+        border: none;
+        transition: all 0.3s ease;
+    }
+    .pdf-download-btn:hover {
+        background: linear-gradient(135deg, #c82333 0%, #bd2130 100%);
+        transform: translateY(-2px);
+        box-shadow: 0 4px 15px rgba(220, 53, 69, 0.3);
+    }
+</style>
+{% endblock extra_css %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <!-- Left Column: Main Details -->
+        <div class="col-lg-8">
+            <!-- Borrower & Book Information -->
+            <div class="row">
+                <!-- Borrower Information -->
+                <div class="col-md-6">
+                    <div class="card detail-card">
+                        <div class="card-header bg-primary text-white">
+                            <h5 class="mb-0"><i class="fas fa-user"></i> Borrower Information</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row mb-3">
+                                <div class="col-12">
+                                    <div class="d-flex align-items-center mb-3">
+                                        <div class="mr-3">
+                                            {% if borrow.borrower_type == 'staff' %}
+                                                <i class="fas fa-user-tie fa-3x text-primary"></i>
+                                            {% else %}
+                                                <i class="fas fa-user-graduate fa-3x text-info"></i>
+                                            {% endif %}
+                                        </div>
+                                        <div>
+                                            <h4 class="mb-0">{{ borrow.get_borrower_name }}</h4>
+                                            <span class="badge {% if borrow.borrower_type == 'staff' %}badge-primary{% else %}badge-info{% endif %} status-badge">
+                                                {{ borrow.borrower_type|title }}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    
+                                    <table class="table table-sm table-borderless">
+                                        <tbody>
+                                            {% if borrow.borrower_type == 'staff' and borrower %}
+                                                {% if borrower.admin.email %}
+                                                <tr>
+                                                    <td class="info-label">Email:</td>
+                                                    <td class="info-value">{{ borrower.admin.email }}</td>
+                                                </tr>
+                                                {% endif %}
+                                                {% if borrower.position_title %}
+                                                <tr>
+                                                    <td class="info-label">Position:</td>
+                                                    <td class="info-value">{{ borrower.position_title }}</td>
+                                                </tr>
+                                                {% endif %}
+                                                {% if borrower.department %}
+                                                <tr>
+                                                    <td class="info-label">Department:</td>
+                                                    <td class="info-value">{{ borrower.department }}</td>
+                                                </tr>
+                                                {% endif %}
+                                            {% elif borrow.borrower_type == 'student' and borrower %}
+                                                {% if borrower.registration_number %}
+                                                <tr>
+                                                    <td class="info-label">Reg Number:</td>
+                                                    <td class="info-value">{{ borrower.registration_number }}</td>
+                                                </tr>
+                                                {% endif %}
+                                                {% if borrower.class_level %}
+                                                <tr>
+                                                    <td class="info-label">Class:</td>
+                                                    <td class="info-value">{{ borrower.class_level.name }}</td>
+                                                </tr>
+                                                {% endif %}
+                                                {% if borrower.stream_class %}
+                                                <tr>
+                                                    <td class="info-label">Stream:</td>
+                                                    <td class="info-value">{{ borrower.stream_class.name }}</td>
+                                                </tr>
+                                                {% endif %}
+                                            {% endif %}
+                                           <tr>
+                                                <td class="info-label">Active Borrows:</td>
+                                                <td class="info-value">
+                                                    {{ active_borrows_count }}
+                                                    {% if borrowing_rules %}
+                                                        of {{ borrowing_rules.max_books_allowed }}
+                                                    {% endif %}
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Book Information -->
+                <div class="col-md-6">
+                    <div class="card detail-card">
+                        <div class="card-header bg-info text-white">
+                            <h5 class="mb-0"><i class="fas fa-book"></i> Book Information</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="book-cover-placeholder">
+                                <i class="fas fa-book-open"></i>
+                            </div>
+                            <h4 class="mb-2">{{ borrow.book.title }}</h4>
+                            <p class="text-muted mb-3">by {{ borrow.book.author }}</p>
+                            
+                            <table class="table table-sm table-borderless">
+                                <tbody>
+                                    <tr>
+                                        <td class="info-label">ISBN:</td>
+                                        <td class="info-value">{{ borrow.book.isbn|default:"N/A" }}</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="info-label">Category:</td>
+                                        <td class="info-value">
+                                            {% if borrow.book.category %}
+                                                {{ borrow.book.category.name }}
+                                            {% else %}
+                                                N/A
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td class="info-label">Type:</td>
+                                        <td class="info-value">
+                                            {{ borrow.book.get_book_type_display }}
+                                            {% if borrow.book.is_reference %}
+                                                <span class="badge badge-warning ml-2">Reference</span>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td class="info-label">Accession #:</td>
+                                        <td class="info-value">
+                                            <code>{{ borrow.book.accession_number }}</code>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td class="info-label">Available Copies:</td>
+                                        <td class="info-value">
+                                            {{ borrow.book.available_copies }} of {{ borrow.book.total_copies }}
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td class="info-label">Fine Rate:</td>
+                                        <td class="info-value">
+                                            TZS {{ borrow.book.fine_amount|floatformat:0 }}/day
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                            
+                            <!-- Copy Details -->
+                            {% if borrow.book_copy %}
+                            <div class="copy-details">
+                                <h6><i class="fas fa-copy"></i> Copy Details</h6>
+                                <table class="table table-sm table-borderless mb-0">
+                                    <tbody>
+                                        <tr>
+                                            <td class="info-label">Copy #:</td>
+                                            <td class="info-value">{{ borrow.book_copy.copy_number }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="info-label">Accession:</td>
+                                            <td class="info-value">{{ borrow.book_copy.accession_number }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="info-label">Barcode:</td>
+                                            <td class="info-value">{{ borrow.book_copy.barcode }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="info-label">Condition:</td>
+                                            <td class="info-value">{{ borrow.book_copy.get_condition_display }}</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Borrowing Timeline -->
+            <div class="card detail-card">
+                <div class="card-header bg-secondary text-white">
+                    <h5 class="mb-0"><i class="fas fa-history"></i> Borrowing Timeline</h5>
+                </div>
+                <div class="card-body">
+                    <div class="timeline">
+                        <!-- Borrow Date -->
+                        <div class="timeline-item info">
+                            <h6 class="mb-1">
+                                <i class="fas fa-calendar-plus text-info"></i> 
+                                Book Borrowed
+                            </h6>
+                            <p class="mb-1 text-muted">{{ borrow.borrow_date|date:"F d, Y" }}</p>
+                            <small class="text-muted">
+                                Issued by: {{ borrow.issued_by.username|default:"System" }}
+                            </small>
+                        </div>
+                        
+                        <!-- Due Date -->
+                        <div class="timeline-item {% if borrow.status == 'overdue' %}danger{% else %}warning{% endif %}">
+                            <h6 class="mb-1">
+                                <i class="fas fa-calendar-check {% if borrow.status == 'overdue' %}text-danger{% else %}text-warning{% endif %}"></i> 
+                                Due Date
+                            </h6>
+                            <p class="mb-1 text-muted">{{ borrow.due_date|date:"F d, Y" }}</p>
+                            {% if borrow.status == 'overdue' %}
+                                <small class="text-danger">
+                                    <i class="fas fa-exclamation-triangle"></i>
+                                    {{ overdue_days }} day{{ overdue_days|pluralize }} overdue
+                                </small>
+                            {% elif borrow.status == 'active' and borrow.due_date <= now.date %}
+                                <small class="text-warning">
+                                    <i class="fas fa-clock"></i> Due soon
+                                </small>
+                            {% endif %}
+                        </div>
+                        
+                        <!-- Renewals -->
+                        {% if renewal_history %}
+                            {% for renewal in renewal_history %}
+                            <div class="timeline-item success">
+                                <h6 class="mb-1">
+                                    <i class="fas fa-redo text-success"></i> 
+                                    Book Renewed
+                                </h6>
+                                <p class="mb-1 text-muted">{{ renewal.renewal_date|date:"F d, Y" }}</p>
+                                <small class="text-muted">
+                                    Renewed by: {{ renewal.renewed_by.username|default:"System" }}
+                                    {% if renewal.reason %}
+                                        <br>Reason: {{ renewal.reason }}
+                                    {% endif %}
+                                </small>
+                            </div>
+                            {% endfor %}
+                        {% endif %}
+                        
+                        <!-- Return Date (if returned) -->
+                        {% if borrow.actual_return_date %}
+                        <div class="timeline-item success">
+                            <h6 class="mb-1">
+                                <i class="fas fa-calendar-minus text-success"></i> 
+                                Book Returned
+                            </h6>
+                            <p class="mb-1 text-muted">{{ borrow.actual_return_date|date:"F d, Y" }}</p>
+                            {% if return_history %}
+                                {% with return=return_history.first %}
+                                <small class="text-muted">
+                                    Condition: {{ return.condition|title }}
+                                    {% if return.notes %}
+                                        <br>Notes: {{ return.notes }}
+                                    {% endif %}
+                                </small>
+                                {% endwith %}
+                            {% endif %}
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Right Column: Status & Actions -->
+        <div class="col-lg-4">
+            <!-- Current Status -->
+            <div class="card detail-card">
+                <div class="card-header {% if borrow.status == 'overdue' %}bg-danger{% elif borrow.status == 'active' %}bg-success{% elif borrow.status == 'returned' %}bg-secondary{% else %}bg-warning{% endif %} text-white">
+                    <h5 class="mb-0"><i class="fas fa-info-circle"></i> Current Status</h5>
+                </div>
+                <div class="card-body text-center">
+                    <div class="mb-4">
+                        <span class="badge {% if borrow.status == 'active' %}badge-success{% elif borrow.status == 'overdue' %}badge-danger{% elif borrow.status == 'returned' %}badge-secondary{% else %}badge-warning{% endif %} status-badge" style="font-size: 1.2em;">
+                            {{ borrow.get_status_display }}
+                        </span>
+                        
+                        {% if borrow.status == 'overdue' %}
+                        <div class="alert alert-danger mt-3">
+                            <i class="fas fa-exclamation-triangle"></i>
+                            <strong>Book is overdue!</strong>
+                            <p class="mb-0 mt-1">Please return the book immediately to avoid additional fines.</p>
+                        </div>
+                        {% elif borrow.status == 'active' and borrow.due_date <= now.date %}
+                        <div class="alert alert-warning mt-3">
+                            <i class="fas fa-clock"></i>
+                            <strong>Book due soon!</strong>
+                            <p class="mb-0 mt-1">Due date is approaching. Consider renewing if needed.</p>
+                        </div>
+                        {% endif %}
+                    </div>
+                    
+                    <!-- Quick Actions -->
+                    <div class="action-buttons mb-4">
+                        {% if borrow.status == 'active' or borrow.status == 'overdue' %}
+                        <a href="{% url 'admin_return_book_borrow' borrow.id %}" class="btn btn-success btn-block">
+                            <i class="fas fa-undo"></i> Return Book
+                            <span class="action-status action-available">Available</span>
+                        </a>
+                        {% endif %}
+                        
+                        {% if can_renew %}
+                        <a href="{% url 'admin_renew_book_borrow' borrow.id %}" class="btn btn-warning btn-block">
+                            <i class="fas fa-redo"></i> Renew Book
+                            <span class="action-status action-available">Available</span>
+                        </a>
+                        {% else %}
+                        <button class="btn btn-warning btn-block" disabled title="Cannot renew this book">
+                            <i class="fas fa-redo"></i> Renew Book
+                            <span class="action-status action-unavailable">Unavailable</span>
+                        </button>
+                        {% endif %}
+                        
+                        {% if borrow.fine_balance > 0 %}
+                        <a href="{% url 'admin_fine_payment' borrow.id %}" class="btn btn-info btn-block">
+                            <i class="fas fa-money-bill-wave"></i> Pay Fine (TZS {{ borrow.fine_balance|floatformat:0 }})
+                            <span class="action-status action-available">Available</span>
+                        </a>
+                        {% else %}
+                        <button class="btn btn-info btn-block" disabled title="No outstanding fines">
+                            <i class="fas fa-money-bill-wave"></i> Pay Fine
+                            <span class="action-status action-unavailable">No Balance</span>
+                        </button>
+                        {% endif %}
+                        
+                        <!-- EDIT BUTTON - ONLY FOR ACTIVE STATUS -->
+                        {% if borrow.status == 'active' %}
+                        <a href="{% url 'admin_edit_book_borrow' borrow.id %}" class="btn btn-primary btn-block">
+                            <i class="fas fa-edit"></i> Edit Record
+                            <span class="action-status action-available">Available</span>
+                        </a>
+                        {% else %}
+                        <button class="btn btn-secondary btn-block" disabled title="Cannot edit - Book is {{ borrow.get_status_display }}">
+                            <i class="fas fa-edit"></i> Edit Record
+                            <span class="action-status action-unavailable">Unavailable</span>
+                        </button>
+                        {% endif %}
+                        
+                        <!-- PDF DOWNLOAD BUTTON IN ACTION AREA -->
+                        <a href="{% url 'admin_export_borrow_details_pdf' borrow.id %}" class="btn btn-danger btn-block pdf-download-btn">
+                            <i class="fas fa-file-pdf"></i> Download PDF Report
+                        </a>
+                    </div>
+                    
+                    <!-- Fine Information -->
+                    <div class="card bg-light">
+                        <div class="card-body">
+                            <h6 class="card-title mb-3"><i class="fas fa-file-invoice-dollar"></i> Fine Summary</h6>
+                            <div class="row text-center">
+                                <div class="col-6">
+                                    <p class="mb-1 text-muted">Total Fine</p>
+                                    <p class="fine-amount">TZS {{ borrow.fine_amount|floatformat:0 }}</p>
+                                </div>
+                                <div class="col-6">
+                                    <p class="mb-1 text-muted">Amount Paid</p>
+                                    <p class="fine-paid">TZS {{ borrow.fine_paid|floatformat:0 }}</p>
+                                </div>
+                            </div>
+                            <hr>
+                            <div class="text-center">
+                                <p class="mb-1 text-muted">Balance Due</p>
+                                <p class="fine-balance">TZS {{ borrow.fine_balance|floatformat:0 }}</p>
+                            </div>
+                            
+                            {% if fine_payments %}
+                            <div class="mt-3">
+                                <small class="text-muted">Last payment: {{ fine_payments.first.payment_date|date:"M d, Y" }}</small>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Additional Information -->
+            <div class="card detail-card">
+                <div class="card-header bg-dark text-white">
+                    <h5 class="mb-0"><i class="fas fa-clipboard-list"></i> Additional Information</h5>
+                </div>
+                <div class="card-body">
+                    <table class="table table-sm table-borderless">
+                        <tbody>
+                            <tr>
+                                <td class="info-label">Status:</td>
+                                <td class="info-value">
+                                    <span class="badge {% if borrow.status == 'active' %}badge-success{% elif borrow.status == 'overdue' %}badge-danger{% elif borrow.status == 'returned' %}badge-secondary{% else %}badge-warning{% endif %}">
+                                        {{ borrow.get_status_display }}
+                                    </span>
+                                    {% if borrow.status == 'active' %}
+                                        <small class="text-success ml-2">
+                                            <i class="fas fa-check-circle"></i> Editable
+                                        </small>
+                                    {% else %}
+                                        <small class="text-muted ml-2">
+                                            <i class="fas fa-lock"></i> Not Editable
+                                        </small>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="info-label">Renewals:</td>
+                                <td class="info-value">
+                                    {{ borrow.renewed_count }} time{{ borrow.renewed_count|pluralize }}
+                                    {% if borrow.last_renewal_date %}
+                                        (Last: {{ borrow.last_renewal_date|date:"M d, Y" }})
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="info-label">Days Borrowed:</td>
+                                <td class="info-value">
+                                    {% if borrow.actual_return_date %}
+                                        {{ borrow.actual_return_date|timeuntil:borrow.borrow_date }}
+                                    {% else %}
+                                        {{ now.date|timeuntil:borrow.borrow_date }} so far
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="info-label">Days Remaining:</td>
+                                <td class="info-value">
+                                    {% if borrow.actual_return_date %}
+                                        Returned
+                                    {% elif borrow.status == 'overdue' %}
+                                        <span class="text-danger">Overdue by {{ overdue_days }} days</span>
+                                    {% else %}
+                                        {{ borrow.due_date|timeuntil:now.date }}
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="info-label">Created:</td>
+                                <td class="info-value">{{ borrow.created_at|date:"M d, Y H:i" }}</td>
+                            </tr>
+                            <tr>
+                                <td class="info-label">Last Updated:</td>
+                                <td class="info-value">{{ borrow.updated_at|date:"M d, Y H:i" }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    
+                    {% if borrow.fine_notes %}
+                    <div class="alert alert-info mt-3">
+                        <h6><i class="fas fa-sticky-note"></i> Fine Notes</h6>
+                        <p class="mb-0">{{ borrow.fine_notes }}</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <!-- Borrowing Rules -->
+            {% if borrowing_rules %}
+            <div class="card detail-card">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="mb-0"><i class="fas fa-clipboard-check"></i> Borrowing Rules</h5>
+                </div>
+                <div class="card-body">
+                    <table class="table table-sm table-borderless">
+                        <tbody>
+                            <tr>
+                                <td class="info-label">Max Books:</td>
+                                <td class="info-value">{{ borrowing_rules.max_books_allowed }}</td>
+                            </tr>
+                            <tr>
+                                <td class="info-label">Duration:</td>
+                                <td class="info-value">{{ borrowing_rules.borrowing_duration_days }} days</td>
+                            </tr>
+                            <tr>
+                                <td class="info-label">Renewals Allowed:</td>
+                                <td class="info-value">
+                                    {% if borrowing_rules.renewal_allowed %}
+                                        Yes ({{ borrowing_rules.max_renewals }} max)
+                                    {% else %}
+                                        No
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="info-label">Renewal Days:</td>
+                                <td class="info-value">{{ borrowing_rules.renewal_duration_days }} days</td>
+                            </tr>
+                            <tr>
+                                <td class="info-label">Fine Rate:</td>
+                                <td class="info-value">TZS {{ borrowing_rules.fine_per_day|floatformat:0 }}/day</td>
+                            </tr>
+                            <tr>
+                                <td class="info-label">Max Fine:</td>
+                                <td class="info-value">TZS {{ borrowing_rules.max_fine_amount|floatformat:0 }}</td>
+                            </tr>
+                            <tr>
+                                <td class="info-label">Reference Books:</td>
+                                <td class="info-value">
+                                    {% if borrowing_rules.can_borrow_reference %}
+                                        <span class="badge badge-success">Allowed</span>
+                                    {% else %}
+                                        <span class="badge badge-danger">Not Allowed</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    
+    <!-- Fine Payments History -->
+    {% if fine_payments %}
+    <div class="card detail-card mt-4">
+        <div class="card-header bg-success text-white">
+            <h5 class="mb-0"><i class="fas fa-receipt"></i> Payment History</h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead class="bg-light">
+                        <tr>
+                            <th>Receipt #</th>
+                            <th>Date</th>
+                            <th>Amount</th>
+                            <th>Method</th>
+                            <th>Paid By</th>
+                            <th>Received By</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for payment in fine_payments %}
+                        <tr>
+                            <td><code>{{ payment.receipt_number }}</code></td>
+                            <td>{{ payment.payment_date|date:"M d, Y" }}</td>
+                            <td class="text-success font-weight-bold">TZS {{ payment.amount|floatformat:0 }}</td>
+                            <td>
+                                <span class="badge badge-info">{{ payment.get_payment_method_display }}</span>
+                            </td>
+                            <td>
+                                {% if payment.paid_by %}
+                                    {{ payment.paid_by.username }}
+                                {% else %}
+                                    {{ borrow.get_borrower_name }}
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if payment.received_by %}
+                                    {{ payment.received_by.username }}
+                                {% else %}
+                                    N/A
+                                {% endif %}
+                            </td>
+                            <td>
+                                <span class="badge {% if payment.status == 'completed' %}badge-success{% else %}badge-warning{% endif %}">
+                                    {{ payment.get_status_display }}
+                                </span>
+                            </td>
+                            <td>
+                                <a href="#" class="btn btn-sm btn-outline-primary">
+                                    <i class="fas fa-print"></i> Print
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot>
+                        <tr class="bg-light">
+                            <td colspan="2" class="text-right"><strong>Totals:</strong></td>
+                            <td class="text-success font-weight-bold">TZS {{ borrow.fine_paid|floatformat:0 }}</td>
+                            <td colspan="5"></td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- QR Code for Quick Reference -->
+    <div class="card detail-card mt-4">
+        <div class="card-header bg-dark text-white">
+            <h5 class="mb-0"><i class="fas fa-qrcode"></i> Quick Reference</h5>
+        </div>
+        <div class="card-body text-center">
+            <div class="qr-code mb-3">
+                <div class="text-center">
+                    <i class="fas fa-qrcode fa-4x text-muted"></i>
+                    <p class="mt-2 text-muted">Scan for details</p>
+                </div>
+            </div>
+            <p class="text-muted mb-0">
+                Borrow ID: <code>BOR-{{ borrow.id|stringformat:"06d" }}</code><br>
+                Status: <span class="badge {% if borrow.status == 'active' %}badge-success{% elif borrow.status == 'overdue' %}badge-danger{% elif borrow.status == 'returned' %}badge-secondary{% else %}badge-warning{% endif %}">
+                    {{ borrow.get_status_display }}
+                </span>
+            </p>
+            <!-- Additional PDF Download Button -->
+            <div class="mt-3">
+                <a href="{% url 'admin_export_borrow_details_pdf' borrow.id %}" class="btn btn-outline-danger">
+                    <i class="fas fa-file-pdf mr-1"></i> Download Full PDF Report
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // Print button functionality
+    $('.btn-print').on('click', function(e) {
+        e.preventDefault();
+        window.print();
+    });
+    
+    // Copy Borrow ID to clipboard
+    $('.copy-borrow-id').on('click', function(e) {
+        e.preventDefault();
+        const borrowId = 'BOR-' + $(this).data('borrow-id').toString().padStart(6, '0');
+        
+        navigator.clipboard.writeText(borrowId).then(function() {
+            // Show success message
+            const originalText = $(this).html();
+            $(this).html('<i class="fas fa-check"></i> Copied!');
+            
+            setTimeout(() => {
+                $(this).html(originalText);
+            }, 2000);
+        }.bind(this)).catch(function(err) {
+            console.error('Failed to copy: ', err);
+            alert('Failed to copy to clipboard');
+        });
+    });
+    
+    // Auto-refresh status every 30 seconds
+    setInterval(function() {
+        $.ajax({
+            url: '{% url "admin_get_borrow_data" %}?borrow_id={{ borrow.id }}',
+            method: 'GET',
+            success: function(data) {
+                if (data.success) {
+                    // Update status badge if changed
+                    const currentStatus = '{{ borrow.status }}';
+                    if (data.borrow.status !== currentStatus) {
+                        location.reload();
+                    }
+                }
+            }
+        });
+    }, 30000);
+    
+    // Show edit availability status
+    function checkEditAvailability() {
+        const status = '{{ borrow.status }}';
+        if (status === 'active') {
+            $('.edit-availability').html('<span class="text-success"><i class="fas fa-check-circle"></i> Editable</span>');
+        } else {
+            $('.edit-availability').html('<span class="text-danger"><i class="fas fa-times-circle"></i> Not Editable</span>');
+        }
+    }
+    
+    // Initial check
+    checkEditAvailability();
+    
+    // PDF download with loading indicator
+    $('.pdf-download-btn').on('click', function(e) {
+        const $btn = $(this);
+        const originalHtml = $btn.html();
+        
+        // Show loading indicator
+        $btn.html('<i class="fas fa-spinner fa-spin"></i> Generating PDF...');
+        $btn.prop('disabled', true);
+        
+        // The actual download will start automatically from the link
+        // Reset button after 3 seconds in case download doesn't start
+        setTimeout(function() {
+            $btn.html(originalHtml);
+            $btn.prop('disabled', false);
+        }, 3000);
+    });
+});
+</script>
+{% endblock extra_js %}

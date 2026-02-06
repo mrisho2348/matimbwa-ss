@@ -1,0 +1,1273 @@
+{% extends 'admin/base.html' %}
+{% load static %}
+{% block title %} Book Copies Management {% endblock title %}
+
+{% block breadcrumb %}
+    {% if book %}
+    <a href="{% url 'admin_book_copies_list' %}" class="btn btn-outline-secondary">
+        <i class="fas fa-arrow-left"></i> All Copies
+    </a>
+    {% endif %}
+    <button type="button" class="btn btn-primary ml-2" data-toggle="modal" data-target="#addCopyModal">
+        <i class="fas fa-plus"></i> Add Copy
+    </button>
+    {% if book %}
+    <button type="button" class="btn btn-info ml-2" data-toggle="modal" data-target="#bulkCopyModal">
+        <i class="fas fa-copy"></i> Add Multiple Copies
+    </button>
+    {% endif %}
+    <button class="btn btn-outline-secondary ml-2" onclick="location.reload()">
+        <i class="fas fa-sync-alt"></i> Refresh
+    </button>
+{% endblock breadcrumb %}
+
+{% block extra_css %}
+<style>
+    .table th {
+        font-weight: 600;
+        border-bottom-width: 2px;
+    }
+    .table td {
+        vertical-align: middle;
+    }
+    .badge {
+        font-size: 0.85em;
+        padding: 0.4em 0.8em;
+    }
+    .modal-header {
+        border-radius: 0;
+    }
+    
+    /* DataTable Styles */
+    .dataTables_wrapper .dataTables_filter {
+        float: right;
+        text-align: right;
+    }
+    .dataTables_wrapper .dataTables_length {
+        float: left;
+    }
+    .dataTables_wrapper .dataTables_paginate {
+        float: right;
+        margin-top: 10px;
+    }
+    .success-toast, .error-toast {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 1056;
+        min-width: 300px;
+    }
+    
+    /* Status badges */
+    .status-available { background-color: #28a745; color: white; }
+    .status-borrowed { background-color: #007bff; color: white; }
+    .status-reserved { background-color: #ffc107; color: #212529; }
+    .status-damaged { background-color: #dc3545; color: white; }
+    .status-lost { background-color: #6c757d; color: white; }
+    .status-under_maintenance { background-color: #17a2b8; color: white; }
+    .status-unavailable { background-color: #6c757d; color: white; }
+    
+    /* Condition badges */
+    .condition-excellent { background-color: #28a745; color: white; }
+    .condition-good { background-color: #20c997; color: white; }
+    .condition-fair { background-color: #ffc107; color: #212529; }
+    .condition-poor { background-color: #fd7e14; color: white; }
+    .condition-damaged { background-color: #dc3545; color: white; }
+    
+    /* Select2 in modal fix */
+    .select2-container {
+        z-index: 1056 !important;
+    }
+    .select2-dropdown {
+        z-index: 1057 !important;
+    }
+    
+    /* Quick action buttons */
+    .quick-actions {
+        display: flex;
+        gap: 4px;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .quick-action-btn {
+        width: 28px;
+        height: 28px;
+        padding: 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        border: none;
+        transition: all 0.2s ease;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+    }
+
+    .quick-action-btn i {
+        font-size: 0.75rem;
+        color: #ffffff !important;
+    }
+
+    .btn-warning.quick-action-btn i {
+        color: #212529 !important;
+    }
+
+    .quick-action-btn:hover {
+        transform: scale(1.1);
+        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        filter: brightness(1.05);
+    }
+
+    .btn-success.quick-action-btn { background-color: #28a745; }
+    .btn-primary.quick-action-btn { background-color: #007bff; }
+    .btn-danger.quick-action-btn  { background-color: #dc3545; }
+    .btn-secondary.quick-action-btn { background-color: #6c757d; }
+    .btn-warning.quick-action-btn { background-color: #ffc107; }
+    .btn-info.quick-action-btn { background-color: #17a2b8; }
+    
+    /* Copy details */
+    .copy-code {
+        background-color: #e9ecef;
+        color: #495057;
+        padding: 2px 6px;
+        border-radius: 3px;
+        font-family: 'Courier New', monospace;
+        font-size: 0.85em;
+    }
+    
+    .book-title {
+        font-weight: 600;
+        font-size: 0.95rem;
+        margin-bottom: 2px;
+    }
+    .book-author {
+        font-size: 0.85rem;
+        color: #6c757d;
+    }
+    
+    /* Modal sizes */
+    .modal-lg {
+        max-width: 800px;
+    }
+    
+    /* Required field indicator */
+    .required-field::after {
+        content: " *";
+        color: #dc3545;
+    }
+    
+    /* Card header */
+    .card-header.bg-info .badge {
+        font-size: 0.9em;
+        padding: 0.3em 0.7em;
+    }
+</style>
+{% endblock extra_css %}
+
+{% block content %}
+<section class="content">
+    <div class="container-fluid"> 
+        <div id="success-toast" class="alert alert-success alert-dismissible fade success-toast" style="display: none;" role="alert">
+            <strong><i class="fas fa-check-circle"></i> Success!</strong> 
+            <span id="success-message"></span>
+            <button type="button" class="close" onclick="$('#success-toast').fadeOut()" data-dismiss="alert" aria-label="Close">
+                <span aria-hidden="true">&times;</span>
+            </button>
+        </div>
+
+        <div id="error-toast" class="alert alert-danger alert-dismissible fade error-toast" style="display: none;" role="alert">
+            <strong><i class="fas fa-exclamation-circle"></i> Error!</strong> 
+            <span id="error-message"></span>
+            <button type="button" class="close" onclick="$('#error-toast').fadeOut()" data-dismiss="alert" aria-label="Close">
+                <span aria-hidden="true">&times;</span>
+            </button>
+        </div>
+
+        <div class="row">
+            <div class="col-lg-12">
+                <div class="card shadow-lg">
+                    <div class="card-header {% if book %}bg-info text-white{% else %}bg-primary text-white{% endif %} d-flex justify-content-between align-items-center">
+                        <h6 class="header-title mb-0 text-uppercase">
+                            <i class="fas fa-copy"></i> 
+                            {% if book %}
+                                Book Copies: {{ book.title }}
+                            {% else %}
+                                All Book Copies
+                            {% endif %}
+                        </h6>
+                        <div class="d-flex align-items-center">
+                            <span class="badge badge-success mr-2">
+                                <i class="fas fa-check-circle"></i> Available: <span id="available-count">{{ available_copies_count }}</span>
+                            </span>
+                            <span class="badge badge-info mr-2">
+                                <i class="fas fa-book-reader"></i> Borrowed: <span id="borrowed-count">{{ borrowed_copies_count }}</span>
+                            </span>
+                            <span class="badge badge-danger mr-2">
+                                <i class="fas fa-times-circle"></i> Damaged: <span id="damaged-count">{{ damaged_copies_count }}</span>
+                            </span>
+                            <span class="badge badge-light">
+                                Total: <span id="total-count">{{ copies|length }}</span>
+                            </span>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        {% if not book %}
+                        <div class="row mb-3" style="position: relative; z-index: 1;">
+                            <div class="col-md-4">
+                                <div class="form-group">
+                                    <label for="book-filter">Filter by Book</label>
+                                    <select class="form-control select2bs4" id="book-filter" style="width: 100%;">
+                                        <option value="">All Books</option>
+                                        {% for book_item in books %}
+                                            <option value="{{ book_item.id }}" {% if book and book.id == book_item.id %}selected{% endif %}>
+                                                {{ book_item.title }} ({{ book_item.author }})
+                                            </option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+                        
+                        <div class="table-responsive">
+                            <table class="table table-hover text-nowrap table-responsive-sm table-bordered table-striped table-sm display" id="copies-table">
+                                <thead class="bg-light">
+                                    <tr>
+                                        <th>Book Details</th>
+                                        <th>Copy Information</th>
+                                        <th>Status</th>
+                                        <th>Condition</th>
+                                        <th>Purchase Info</th>
+                                        <th class="text-center">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for copy in copies %}
+                                    <tr id="row-{{ copy.id }}">
+                                        <td>
+                                            <div class="book-title">{{ copy.book.title|truncatechars:40 }}</div>
+                                            <div class="book-author">by {{ copy.book.author|truncatechars:30 }}</div>
+                                            <small class="text-muted">ISBN: {{ copy.book.isbn|default:"-" }}</small>
+                                        </td>
+                                        <td>
+                                            <div class="copy-code mb-1">Copy #{{ copy.copy_number }}</div>
+                                            <div class="copy-code mb-1">{{ copy.accession_number }}</div>
+                                            {% if copy.barcode %}
+                                            <small class="text-muted">Barcode: {{ copy.barcode }}</small>
+                                            {% endif %}
+                                            {% if copy.notes %}
+                                            <small class="text-muted d-block mt-1">{{ copy.notes|truncatechars:50 }}</small>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <span class="badge status-{{ copy.status }}" id="status-badge-{{ copy.id }}">
+                                                {{ copy.get_status_display }}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <span class="badge condition-{{ copy.condition }}" id="condition-badge-{{ copy.id }}">
+                                                {{ copy.get_condition_display }}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            {% if copy.purchase_date %}
+                                            <small class="d-block">Date: {{ copy.purchase_date|date:"M d, Y" }}</small>
+                                            {% endif %}
+                                            {% if copy.purchase_price %}
+                                            <small class="d-block">Price: TZS {{ copy.purchase_price|floatformat:0 }}</small>
+                                            {% endif %}
+                                            {% if not copy.purchase_date and not copy.purchase_price %}
+                                            <span class="text-muted">-</span>
+                                            {% endif %}
+                                        </td>
+                                        <td class="text-center">
+                                            <div class="quick-actions">
+                                                <!-- Quick Status Toggle -->
+                                                {% if copy.status == 'available' %}
+                                                <button class="btn btn-sm btn-warning quick-action-btn toggle-status-btn" 
+                                                        data-id="{{ copy.id }}"
+                                                        data-book-title="{{ copy.book.title }}"
+                                                        data-copy-number="{{ copy.copy_number }}"
+                                                        data-current-status="available"
+                                                        title="Mark as Unavailable">
+                                                    <i class="fas fa-toggle-off"></i>
+                                                </button>
+                                                {% else %}
+                                                <button class="btn btn-sm btn-success quick-action-btn toggle-status-btn" 
+                                                        data-id="{{ copy.id }}"
+                                                        data-book-title="{{ copy.book.title }}"
+                                                        data-copy-number="{{ copy.copy_number }}"
+                                                        data-current-status="unavailable"
+                                                        title="Mark as Available">
+                                                    <i class="fas fa-toggle-on"></i>
+                                                </button>
+                                                {% endif %}
+                                                
+                                                <!-- Edit Button -->
+                                                <button class="btn btn-sm btn-primary quick-action-btn edit-btn" 
+                                                        data-id="{{ copy.id }}"
+                                                        data-book="{{ copy.book.id }}"
+                                                        data-copy-number="{{ copy.copy_number }}"
+                                                        data-barcode="{{ copy.barcode }}"
+                                                        data-accession-number="{{ copy.accession_number }}"
+                                                        data-status="{{ copy.status }}"
+                                                        data-condition="{{ copy.condition }}"
+                                                        data-notes="{{ copy.notes }}"
+                                                        data-purchase-date="{{ copy.purchase_date|date:'Y-m-d' }}"
+                                                        data-purchase-price="{{ copy.purchase_price }}"
+                                                        title="Edit Copy">
+                                                    <i class="fas fa-edit"></i>
+                                                </button>
+                                                
+                                                <!-- Delete Button -->
+                                                <button class="btn btn-sm btn-danger quick-action-btn delete-btn" 
+                                                        data-id="{{ copy.id }}"
+                                                        data-book-title="{{ copy.book.title }}"
+                                                        data-copy-number="{{ copy.copy_number }}"
+                                                        title="Delete Copy">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>                                    
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Add Copy Modal -->
+<div class="modal fade" id="addCopyModal" tabindex="-1" role="dialog" aria-labelledby="addModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="addModalLabel">
+                    <i class="fas fa-plus-circle"></i> Add New Book Copy
+                </h5>
+                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <form id="add-form">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="book" class="required-field">Book</label>
+                                <select class="form-control select2bs4" id="book" name="book" required style="width: 100%;">
+                                    <option value="">Select Book</option>
+                                    {% for book_item in books %}
+                                        <option value="{{ book_item.id }}" {% if book and book.id == book_item.id %}selected{% endif %}>
+                                            {{ book_item.title }} ({{ book_item.author }})
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                                <small class="form-text text-muted">Select the book for this copy</small>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="copy_number" class="required-field">Copy Number</label>
+                                <input type="number" class="form-control" id="copy_number" name="copy_number" required 
+                                       min="1" placeholder="e.g., 1, 2, 3">
+                                <small class="form-text text-muted">Unique copy number for this book</small>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="barcode">Barcode</label>
+                                <input type="text" class="form-control" id="barcode" name="barcode" 
+                                       placeholder="Will be auto-generated" maxlength="50">
+                                <small class="form-text text-muted">Leave blank to auto-generate</small>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="accession_number">Accession Number</label>
+                                <input type="text" class="form-control" id="accession_number" name="accession_number" 
+                                       placeholder="Will be auto-generated" maxlength="50">
+                                <small class="form-text text-muted">Leave blank to auto-generate</small>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="status" class="required-field">Status</label>
+                                <select class="form-control select2bs4" id="status" name="status" required style="width: 100%;">
+                                    <option value="">Select Status</option>
+                                    {% for status_code, status_name in copy_status_choices %}
+                                        <option value="{{ status_code }}" {% if status_code == 'available' %}selected{% endif %}>{{ status_name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="condition" class="required-field">Condition</label>
+                                <select class="form-control select2bs4" id="condition" name="condition" required style="width: 100%;">
+                                    <option value="">Select Condition</option>
+                                    {% for condition_code, condition_name in condition_choices %}
+                                        <option value="{{ condition_code }}" {% if condition_code == 'good' %}selected{% endif %}>{{ condition_name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="purchase_date">Purchase Date</label>
+                                <input type="date" class="form-control" id="purchase_date" name="purchase_date">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="purchase_price">Purchase Price (TZS)</label>
+                                <input type="number" class="form-control" id="purchase_price" name="purchase_price" 
+                                       min="0" step="100" placeholder="e.g., 5000">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="notes">Notes</label>
+                        <textarea class="form-control" id="notes" name="notes" rows="3" 
+                                  placeholder="Additional notes about this copy"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal" id="cancel-add-btn">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="save-btn">
+                        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="display: none;"></span>
+                        Save Copy
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Copy Modal -->
+<div class="modal fade" id="editCopyModal" tabindex="-1" role="dialog" aria-labelledby="editModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-warning text-dark">
+                <h5 class="modal-title" id="editModalLabel">
+                    <i class="fas fa-edit"></i> Edit Book Copy
+                </h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <form id="edit-form">
+                {% csrf_token %}
+                <input type="hidden" id="edit-id" name="id">
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="edit-book" class="required-field">Book</label>
+                                <select class="form-control select2bs4" id="edit-book" name="book" required style="width: 100%;">
+                                    <option value="">Select Book</option>
+                                    {% for book_item in books %}
+                                        <option value="{{ book_item.id }}">{{ book_item.title }} ({{ book_item.author }})</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="edit-copy_number" class="required-field">Copy Number</label>
+                                <input type="number" class="form-control" id="edit-copy_number" name="copy_number" required 
+                                       min="1" placeholder="e.g., 1, 2, 3">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="edit-barcode">Barcode</label>
+                                <input type="text" class="form-control" id="edit-barcode" name="barcode" 
+                                       placeholder="Leave blank to auto-generate" maxlength="50">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="edit-accession_number">Accession Number</label>
+                                <input type="text" class="form-control" id="edit-accession_number" name="accession_number" 
+                                       placeholder="Leave blank to auto-generate" maxlength="50">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="edit-status" class="required-field">Status</label>
+                                <select class="form-control select2bs4" id="edit-status" name="status" required style="width: 100%;">
+                                    <option value="">Select Status</option>
+                                    {% for status_code, status_name in copy_status_choices %}
+                                        <option value="{{ status_code }}">{{ status_name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="edit-condition" class="required-field">Condition</label>
+                                <select class="form-control select2bs4" id="edit-condition" name="condition" required style="width: 100%;">
+                                    <option value="">Select Condition</option>
+                                    {% for condition_code, condition_name in condition_choices %}
+                                        <option value="{{ condition_code }}">{{ condition_name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="edit-purchase_date">Purchase Date</label>
+                                <input type="date" class="form-control" id="edit-purchase_date" name="purchase_date">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="edit-purchase_price">Purchase Price (TZS)</label>
+                                <input type="number" class="form-control" id="edit-purchase_price" name="purchase_price" 
+                                       min="0" step="100" placeholder="e.g., 5000">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="edit-notes">Notes</label>
+                        <textarea class="form-control" id="edit-notes" name="notes" rows="3" 
+                                  placeholder="Additional notes about this copy"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal" id="cancel-edit-btn">Cancel</button>
+                    <button type="submit" class="btn btn-warning" id="update-btn">
+                        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="display: none;"></span>
+                        Update Copy
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Bulk Create Copies Modal -->
+{% if book %}
+<div class="modal fade" id="bulkCopyModal" tabindex="-1" role="dialog" aria-labelledby="bulkModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-info text-white">
+                <h5 class="modal-title" id="bulkModalLabel">
+                    <i class="fas fa-copy"></i> Add Multiple Copies
+                </h5>
+                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <form id="bulk-form">
+                {% csrf_token %}
+                <input type="hidden" id="bulk-book" name="book" value="{{ book.id }}">
+                <div class="modal-body">
+                    <div class="alert alert-info">
+                        <small>
+                            <i class="fas fa-info-circle"></i> 
+                            <strong>Note:</strong> This will create multiple copies for "{{ book.title }}"
+                        </small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="start_number" class="required-field">Start Copy Number</label>
+                        <input type="number" class="form-control" id="start_number" name="start_number" 
+                               value="1" min="1" required>
+                        <small class="form-text text-muted">Starting copy number (e.g., 1, 5, 10)</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="count" class="required-field">Number of Copies</label>
+                        <input type="number" class="form-control" id="count" name="count" 
+                               value="1" min="1" max="50" required>
+                        <small class="form-text text-muted">How many copies to create (max 50)</small>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="bulk-status">Status</label>
+                                <select class="form-control select2bs4" id="bulk-status" name="status" style="width: 100%;">
+                                    {% for status_code, status_name in copy_status_choices %}
+                                        <option value="{{ status_code }}" {% if status_code == 'available' %}selected{% endif %}>{{ status_name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="bulk-condition">Condition</label>
+                                <select class="form-control select2bs4" id="bulk-condition" name="condition" style="width: 100%;">
+                                    {% for condition_code, condition_name in condition_choices %}
+                                        <option value="{{ condition_code }}" {% if condition_code == 'good' %}selected{% endif %}>{{ condition_name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="bulk-notes">Notes (for all copies)</label>
+                        <textarea class="form-control" id="bulk-notes" name="notes" rows="2" 
+                                  placeholder="Optional notes that will apply to all copies"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal" id="cancel-bulk-btn">Cancel</button>
+                    <button type="submit" class="btn btn-info" id="bulk-save-btn">
+                        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="display: none;"></span>
+                        Create Copies
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Delete Copy Modal -->
+<div class="modal fade" id="deleteCopyModal" tabindex="-1" role="dialog" aria-labelledby="deleteModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="deleteModalLabel">
+                    <i class="fas fa-exclamation-triangle"></i> Confirm Deletion
+                </h5>
+                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete copy <strong id="delete-copy-number"></strong> of <strong id="delete-book-title"></strong>?</p>
+                <p class="text-danger"><small>This action cannot be undone. Any associated borrow records will be affected.</small></p>
+                <div class="alert alert-warning mt-3">
+                    <small>
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <strong>Warning:</strong> If this copy has active borrows, deletion may cause data inconsistency.
+                    </small>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal" id="cancel-delete-btn">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirm-delete-btn">
+                    <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="display: none;"></span>
+                    Delete
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+<script>
+    $(document).ready(function() {
+        // ====================== INITIALIZATION ======================
+        
+        // Initialize DataTable
+        var table = $('#copies-table').DataTable({
+            "dom": "<'row'<'col-sm-12 col-md-6'l><'col-sm-12 col-md-6'f>>" +
+                   "<'row'<'col-sm-12'tr>>" +
+                   "<'row'<'col-sm-12 col-md-5'i><'col-sm-12 col-md-7'p>>",
+            "lengthMenu": [[10, 25, 50, -1], [10, 25, 50, "All"]],
+            "pageLength": 10,
+            "responsive": true,
+            "autoWidth": false,
+            "ordering": true,
+            "order": [[0, 'asc']],
+            "destroy": true,
+            "retrieve": true,
+            "deferRender": true,
+            "columnDefs": [
+                { 
+                    "targets": 5,
+                    "orderable": false,
+                    "searchable": false
+                }
+            ],
+            "language": {
+                "emptyTable": "<div class='text-center py-4'><i class='fas fa-copy fa-2x mb-2'></i><br>No copies found. Click \"Add Copy\" to create one.</div>",
+                "search": "_INPUT_",
+                "searchPlaceholder": "Search copies...",
+                "lengthMenu": "_MENU_ copies per page",
+                "info": "Showing _START_ to _END_ of _TOTAL_ copies",
+                "infoEmpty": "Showing 0 to 0 of 0 copies",
+                "infoFiltered": "(filtered from _MAX_ total copies)",
+                "paginate": {
+                    "first": "First",
+                    "last": "Last",
+                    "next": "Next",
+                    "previous": "Previous"
+                }
+            },
+            "drawCallback": function(settings) {
+                updateCopyCounts();
+            }
+        });
+
+        // Initialize Select2
+        function initializeSelect2() {
+            // Add modal
+            $('#book, #status, #condition').select2({
+                theme: 'bootstrap4',
+                width: '100%',
+                dropdownParent: $('#addCopyModal')
+            });
+            
+            // Edit modal
+            $('#edit-book, #edit-status, #edit-condition').select2({
+                theme: 'bootstrap4',
+                width: '100%',
+                dropdownParent: $('#editCopyModal')
+            });
+            
+            // Bulk modal
+            $('#bulk-status, #bulk-condition').select2({
+                theme: 'bootstrap4',
+                width: '100%',
+                dropdownParent: $('#bulkCopyModal')
+            });
+            
+            // Book filter
+            $('#book-filter').select2({
+                theme: 'bootstrap4',
+                width: '100%'
+            });
+        }
+        
+        // Call initialization
+        initializeSelect2();
+
+        // ====================== UTILITY FUNCTIONS ======================
+        
+        // CSRF token for AJAX requests
+        function getCSRFToken() {
+            return $('input[name="csrfmiddlewaretoken"]').val();
+        }
+
+        // Show toast message
+        function showToast(message, type = 'success') {
+            const toastId = type === 'success' ? '#success-toast' : '#error-toast';
+            const messageId = type === 'success' ? '#success-message' : '#error-message';
+            
+            $(messageId).text(message);
+            $(toastId).addClass('show').fadeIn();
+            
+            setTimeout(function() {
+                $(toastId).fadeOut(function() {
+                    $(this).removeClass('show');
+                });
+            }, type === 'success' ? 3000 : 5000);
+        }
+
+        // Update copy counts in the header
+        function updateCopyCounts() {
+            let availableCount = 0;
+            let borrowedCount = 0;
+            let damagedCount = 0;
+            let totalCount = 0;
+            
+            $('#copies-table tbody tr').each(function() {
+                totalCount++;
+                const statusBadge = $(this).find('.badge');
+                const statusText = statusBadge.text().toLowerCase();
+                
+                if (statusText.includes('available')) {
+                    availableCount++;
+                } else if (statusText.includes('borrowed')) {
+                    borrowedCount++;
+                } else if (statusText.includes('damaged')) {
+                    damagedCount++;
+                }
+            });
+            
+            $('#available-count').text(availableCount);
+            $('#borrowed-count').text(borrowedCount);
+            $('#damaged-count').text(damagedCount);
+            $('#total-count').text(totalCount);
+        }
+
+        // Helper function to handle button loading state
+        function setButtonLoading(btn, isLoading) {
+            const spinner = btn.find('.spinner-border');
+            if (isLoading) {
+                btn.data('original-text', btn.html());
+                btn.prop('disabled', true);
+                spinner.show();
+            } else {
+                btn.prop('disabled', false);
+                spinner.hide();
+                btn.html(btn.data('original-text'));
+            }
+        }
+
+        // Function to reload page after delay
+        function reloadPageAfterDelay(message, type = 'success') {
+            showToast(message, type);
+            setTimeout(function() {
+                location.reload();
+            }, type === 'success' ? 2000 : 3000);
+        }
+
+        // Function to update UI without reload (for quick toggles)
+        function updateCopyUI(copyId, data) {
+            const statusBadge = $('#status-badge-' + copyId);
+            const conditionBadge = $('#condition-badge-' + copyId);
+            const statusBtn = $('.toggle-status-btn[data-id="' + copyId + '"]');
+            
+            // Update status if provided
+            if (data.hasOwnProperty('status')) {
+                const statusClass = 'status-' + data.status;
+                statusBadge.removeClass().addClass('badge ' + statusClass).text(data.status_display);
+                
+                if (data.status === 'available') {
+                    statusBtn.removeClass('btn-success').addClass('btn-warning')
+                        .attr('title', 'Mark as Unavailable')
+                        .html('<i class="fas fa-toggle-off"></i>')
+                        .attr('data-current-status', 'available');
+                } else {
+                    statusBtn.removeClass('btn-warning').addClass('btn-success')
+                        .attr('title', 'Mark as Available')
+                        .html('<i class="fas fa-toggle-on"></i>')
+                        .attr('data-current-status', 'unavailable');
+                }
+            }
+            
+            // Update condition if provided
+            if (data.hasOwnProperty('condition')) {
+                const conditionClass = 'condition-' + data.condition;
+                conditionBadge.removeClass().addClass('badge ' + conditionClass).text(data.condition_display);
+            }
+            
+            // Update counts
+            updateCopyCounts();
+        }
+
+        // ====================== EVENT HANDLERS ======================
+        
+        // Handle book filter change
+        $('#book-filter').on('change', function() {
+            const bookId = $(this).val();
+            if (bookId) {
+                window.location.href = '{% url "admin_book_copies_by_book" 0 %}'.replace('0', bookId);
+            } else {
+                window.location.href = '{% url "admin_book_copies_list" %}';
+            }
+        });
+
+        // Handle modal close/cancel buttons
+        $(document).on('click', '[data-dismiss="modal"]', function(e) {
+            e.preventDefault();
+            $(this).closest('.modal').modal('hide');
+        });
+
+        // ====================== ADD COPY ======================
+        $('#add-form').on('submit', function(e) {
+            e.preventDefault();
+            
+            const saveBtn = $('#save-btn');
+            setButtonLoading(saveBtn, true);
+            
+            const formData = new FormData(this);
+            formData.append('action', 'create');
+            
+            $.ajax({
+                url: '{% url "admin_book_copies_crud" %}',
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCSRFToken(),
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function(data) {
+                    if (data.success) {
+                        $('#addCopyModal').modal('hide');
+                        reloadPageAfterDelay(data.message, 'success');
+                    } else {
+                        showToast(data.message, 'danger');
+                        setButtonLoading(saveBtn, false);
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error:', error);
+                    showToast('An error occurred while saving. Please try again.', 'danger');
+                    setButtonLoading(saveBtn, false);
+                }
+            });
+        });
+
+        // ====================== EDIT COPY ======================
+        let currentEditCopyId = null;
+        
+        $(document).on('click', '.edit-btn', function() {
+            const btn = $(this);
+            currentEditCopyId = btn.data('id');
+            
+            // Set form values
+            $('#edit-id').val(currentEditCopyId);
+            $('#edit-copy_number').val(btn.data('copy-number'));
+            $('#edit-barcode').val(btn.data('barcode'));
+            $('#edit-accession-number').val(btn.data('accession-number'));
+            $('#edit-notes').val(btn.data('notes'));
+            $('#edit-purchase-date').val(btn.data('purchase-date'));
+            $('#edit-purchase_price').val(btn.data('purchase-price'));
+            
+            // Show modal
+            $('#editCopyModal').modal('show');
+            
+            // Set select values after a short delay
+            setTimeout(function() {
+                $('#edit-book').val(btn.data('book')).trigger('change');
+                $('#edit-status').val(btn.data('status')).trigger('change');
+                $('#edit-condition').val(btn.data('condition')).trigger('change');
+            }, 300);
+        });
+
+        // Edit form submission
+        $('#edit-form').on('submit', function(e) {
+            e.preventDefault();
+            
+            const updateBtn = $('#update-btn');
+            setButtonLoading(updateBtn, true);
+            
+            const formData = new FormData(this);
+            formData.append('action', 'update');
+            
+            $.ajax({
+                url: '{% url "admin_book_copies_crud" %}',
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCSRFToken(),
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function(data) {
+                    if (data.success) {
+                        $('#editCopyModal').modal('hide');
+                        reloadPageAfterDelay(data.message, 'success');
+                    } else {
+                        showToast(data.message, 'danger');
+                        setButtonLoading(updateBtn, false);
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error:', error);
+                    showToast('An error occurred while updating. Please try again.', 'danger');
+                    setButtonLoading(updateBtn, false);
+                }
+            });
+        });
+
+        // ====================== TOGGLE STATUS ======================
+        $(document).on('click', '.toggle-status-btn', function() {
+            const btn = $(this);
+            const copyId = btn.data('id');
+            const bookTitle = btn.data('book-title');
+            const copyNumber = btn.data('copy-number');
+            const currentStatus = btn.data('current-status');
+            const newStatus = currentStatus === 'available' ? 'unavailable' : 'available';
+            const actionText = currentStatus === 'available' ? 'mark as unavailable' : 'mark as available';
+            
+            if (confirm(`Are you sure you want to ${actionText} copy ${copyNumber} of "${bookTitle}"?`)) {
+                setButtonLoading(btn, true);
+                
+                $.ajax({
+                    url: '{% url "admin_book_copies_crud" %}',
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': getCSRFToken(),
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    data: {
+                        'action': 'toggle_status',
+                        'id': copyId,
+                        'csrfmiddlewaretoken': getCSRFToken()
+                    },
+                    success: function(data) {
+                        if (data.success) {
+                            updateCopyUI(copyId, { 
+                                status: data.status,
+                                status_display: data.status_display
+                            });
+                            showToast(data.message, 'success');
+                        } else {
+                            showToast(data.message, 'danger');
+                        }
+                        setButtonLoading(btn, false);
+                    },
+                    error: function(xhr, status, error) {
+                        console.error('Error:', error);
+                        showToast('An error occurred while updating status. Please try again.', 'danger');
+                        setButtonLoading(btn, false);
+                    }
+                });
+            }
+        });
+
+        // ====================== BULK CREATE ======================
+        {% if book %}
+        $('#bulk-form').on('submit', function(e) {
+            e.preventDefault();
+            
+            const bulkSaveBtn = $('#bulk-save-btn');
+            setButtonLoading(bulkSaveBtn, true);
+            
+            const formData = new FormData(this);
+            formData.append('action', 'bulk_create');
+            
+            $.ajax({
+                url: '{% url "admin_book_copies_crud" %}',
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCSRFToken(),
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function(data) {
+                    if (data.success) {
+                        $('#bulkCopyModal').modal('hide');
+                        reloadPageAfterDelay(data.message, 'success');
+                    } else {
+                        showToast(data.message, 'danger');
+                        setButtonLoading(bulkSaveBtn, false);
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error:', error);
+                    showToast('An error occurred while creating copies. Please try again.', 'danger');
+                    setButtonLoading(bulkSaveBtn, false);
+                }
+            });
+        });
+        {% endif %}
+
+        // ====================== DELETE COPY ======================
+        let copyToDelete = null;
+        
+        $(document).on('click', '.delete-btn', function() {
+            const btn = $(this);
+            
+            copyToDelete = {
+                id: btn.data('id'),
+                bookTitle: btn.data('book-title'),
+                copyNumber: btn.data('copy-number')
+            };
+            
+            $('#delete-book-title').text(btn.data('book-title'));
+            $('#delete-copy-number').text(btn.data('copy-number'));
+            $('#deleteCopyModal').modal('show');
+        });
+
+        // Delete confirmation
+        $('#confirm-delete-btn').on('click', function() {
+            if (!copyToDelete) return;
+            
+            const deleteBtn = $(this);
+            setButtonLoading(deleteBtn, true);
+            
+            $.ajax({
+                url: '{% url "admin_book_copies_crud" %}',
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCSRFToken(),
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                data: {
+                    'action': 'delete',
+                    'id': copyToDelete.id,
+                    'csrfmiddlewaretoken': getCSRFToken()
+                },
+                success: function(data) {
+                    if (data.success) {
+                        $('#deleteCopyModal').modal('hide');
+                        reloadPageAfterDelay(data.message, 'success');
+                    } else {
+                        showToast(data.message, 'danger');
+                        setButtonLoading(deleteBtn, false);
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error:', error);
+                    showToast('An error occurred while deleting. Please try again.', 'danger');
+                    setButtonLoading(deleteBtn, false);
+                }
+            });
+        });
+
+        // ====================== MODAL CLEANUP ======================
+        
+        // Clear add modal on close
+        $('#addCopyModal').on('hidden.bs.modal', function() {
+            $('#add-form')[0].reset();
+            setButtonLoading($('#save-btn'), false);
+            // Reset Select2
+            $('#book, #status, #condition').val(null).trigger('change');
+        });
+        
+        // Clear edit modal on close
+        $('#editCopyModal').on('hidden.bs.modal', function() {
+            setButtonLoading($('#update-btn'), false);
+            // Reset Select2
+            $('#edit-book, #edit-status, #edit-condition').val(null).trigger('change');
+            currentEditCopyId = null;
+        });
+        
+        // Clear bulk modal on close
+        $('#bulkCopyModal').on('hidden.bs.modal', function() {
+            $('#bulk-form')[0].reset();
+            setButtonLoading($('#bulk-save-btn'), false);
+            // Reset Select2
+            $('#bulk-status, #bulk-condition').val(null).trigger('change');
+        });
+        
+        // Clear delete modal on close
+        $('#deleteCopyModal').on('hidden.bs.modal', function() {
+            copyToDelete = null;
+            setButtonLoading($('#confirm-delete-btn'), false);
+        });
+
+        // ====================== FORM VALIDATION ======================
+        
+        $('#add-form, #edit-form, #bulk-form').on('submit', function(e) {
+            const isAddForm = $(this).attr('id') === 'add-form';
+            const isEditForm = $(this).attr('id') === 'edit-form';
+            
+            let bookInput, copyNumberInput, statusInput, conditionInput;
+            
+            if (isAddForm) {
+                bookInput = '#book';
+                copyNumberInput = '#copy_number';
+                statusInput = '#status';
+                conditionInput = '#condition';
+            } else if (isEditForm) {
+                bookInput = '#edit-book';
+                copyNumberInput = '#edit-copy_number';
+                statusInput = '#edit-status';
+                conditionInput = '#edit-condition';
+            } else {
+                // Bulk form
+                const startNumberInput = '#start_number';
+                const countInput = '#count';
+                
+                const startNumber = $(startNumberInput).val();
+                const count = $(countInput).val();
+                
+                // Clear previous validation
+                $(startNumberInput).removeClass('is-invalid');
+                $(countInput).removeClass('is-invalid');
+                
+                let isValid = true;
+                let errorMessage = '';
+                
+                if (!startNumber || parseInt(startNumber) < 1) {
+                    errorMessage = 'Start number must be at least 1.';
+                    $(startNumberInput).addClass('is-invalid');
+                    isValid = false;
+                } else if (!count || parseInt(count) < 1) {
+                    errorMessage = 'Count must be at least 1.';
+                    $(countInput).addClass('is-invalid');
+                    isValid = false;
+                } else if (parseInt(count) > 50) {
+                    errorMessage = 'Cannot create more than 50 copies at once.';
+                    $(countInput).addClass('is-invalid');
+                    isValid = false;
+                }
+                
+                if (!isValid) {
+                    e.preventDefault();
+                    showToast(errorMessage, 'danger');
+                    return false;
+                }
+                
+                return true;
+            }
+            
+            const book = $(bookInput).val();
+            const copyNumber = $(copyNumberInput).val();
+            const status = $(statusInput).val();
+            const condition = $(conditionInput).val();
+            
+            // Clear previous validation
+            $(bookInput).removeClass('is-invalid');
+            $(copyNumberInput).removeClass('is-invalid');
+            $(statusInput).removeClass('is-invalid');
+            $(conditionInput).removeClass('is-invalid');
+            
+            let isValid = true;
+            let errorMessage = '';
+            
+            // Validate required fields
+            if (!book) {
+                errorMessage = 'Book selection is required.';
+                $(bookInput).addClass('is-invalid');
+                isValid = false;
+            } else if (!copyNumber) {
+                errorMessage = 'Copy number is required.';
+                $(copyNumberInput).addClass('is-invalid');
+                isValid = false;
+            } else if (parseInt(copyNumber) < 1) {
+                errorMessage = 'Copy number must be at least 1.';
+                $(copyNumberInput).addClass('is-invalid');
+                isValid = false;
+            } else if (!status) {
+                errorMessage = 'Status is required.';
+                $(statusInput).addClass('is-invalid');
+                isValid = false;
+            } else if (!condition) {
+                errorMessage = 'Condition is required.';
+                $(conditionInput).addClass('is-invalid');
+                isValid = false;
+            }
+            
+            if (!isValid) {
+                e.preventDefault();
+                showToast(errorMessage, 'danger');
+                return false;
+            }
+            
+            return true;
+        });
+
+        // Remove validation classes on input
+        $('input, select, textarea').on('input change', function() {
+            $(this).removeClass('is-invalid');
+        });
+
+        // ====================== INITIAL UPDATE OF COUNTS ======================
+        updateCopyCounts();
+    });
+</script>
+{% endblock extra_js %}

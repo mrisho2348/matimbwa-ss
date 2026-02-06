@@ -1,0 +1,674 @@
+{% extends 'admin/base.html' %}
+{% load static %}
+{% load custom_filters %}
+{% block title %} Book Borrow Management {% endblock title %}
+
+{% block breadcrumb %}
+    <a href="{% url 'admin_create_book_borrow' %}" class="btn btn-primary">
+        <i class="fas fa-plus"></i> New Borrow
+    </a>   
+    <button class="btn btn-outline-secondary ml-2" onclick="location.reload()">
+        <i class="fas fa-sync-alt"></i> Refresh
+    </button>
+{% endblock breadcrumb %}
+
+{% block extra_css %}
+<style>
+    .table th {
+        font-weight: 600;
+        border-bottom-width: 2px;
+    }
+    .table td {
+        vertical-align: middle;
+    }
+    .badge {
+        font-size: 0.85em;
+        padding: 0.4em 0.8em;
+    }
+    
+    /* Status badges */
+    .badge-active { background-color: #28a745; color: white; }
+    .badge-overdue { background-color: #dc3545; color: white; }
+    .badge-returned { background-color: #6c757d; color: white; }
+    .badge-lost { background-color: #343a40; color: white; }
+    .badge-cancelled { background-color: #ffc107; color: #212529; }
+    
+    /* Borrower type badges */
+    .badge-staff { background-color: #007bff; color: white; }
+    .badge-student { background-color: #17a2b8; color: white; }
+    
+    /* Action buttons */
+    .action-buttons {
+        display: flex;
+        gap: 5px;
+        flex-wrap: wrap;
+    }
+    
+    .action-buttons .btn {
+        min-width: 80px;
+        font-size: 0.85rem;
+    }
+    
+    /* Fine indicators */
+    .fine-amount {
+        font-weight: 600;
+        color: #dc3545;
+    }
+    .fine-paid {
+        color: #28a745;
+    }
+    .fine-balance {
+        color: #fd7e14;
+        font-weight: 600;
+    }
+    
+    /* Overdue rows */
+    .overdue-row {
+        background-color: #f8d7da !important;
+    }
+    .due-soon {
+        background-color: #fff3cd !important;
+    }
+    
+    /* Statistics cards */
+    .stats-card {
+        border-radius: 8px;
+        padding: 15px;
+        margin-bottom: 15px;
+        text-align: center;
+        border: 1px solid #dee2e6;
+        background: white;
+    }
+    .stats-card .stats-number {
+        font-size: 1.8rem;
+        font-weight: 700;
+        margin-bottom: 5px;
+    }
+    .stats-card .stats-label {
+        font-size: 0.9rem;
+        color: #6c757d;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+    
+    /* Book title styling */
+    .book-title {
+        font-weight: 600;
+        font-size: 0.95rem;
+        margin-bottom: 2px;
+    }
+    .book-author {
+        font-size: 0.85rem;
+        color: #6c757d;
+    }
+    
+    /* DataTables customization */
+    .dataTables_wrapper .dataTables_length select,
+    .dataTables_wrapper .dataTables_filter input {
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+        padding: 5px 10px;
+    }
+    
+    .dataTables_wrapper .dataTables_paginate .paginate_button {
+        padding: 5px 10px;
+        margin: 0 2px;
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+    }
+    
+    .dataTables_wrapper .dataTables_paginate .paginate_button.current {
+        background: #007bff;
+        color: white !important;
+        border-color: #007bff;
+    }
+    
+    /* Print styles */
+    @media print {
+        .no-print, .btn, .dataTables_length, .dataTables_filter, 
+        .dataTables_paginate, .breadcrumb {
+            display: none !important;
+        }
+    }
+</style>
+{% endblock extra_css %}
+
+{% block content %}
+<section class="content">
+    <div class="container-fluid">
+        <!-- Statistics Cards -->
+        <div class="row mb-4">
+            <div class="col-xl-2 col-md-4">
+                <div class="stats-card">
+                    <div class="stats-number text-primary">{{ active_borrows_count }}</div>
+                    <div class="stats-label">Active Borrows</div>
+                </div>
+            </div>
+            <div class="col-xl-2 col-md-4">
+                <div class="stats-card">
+                    <div class="stats-number text-danger">{{ overdue_borrows_count }}</div>
+                    <div class="stats-label">Overdue</div>
+                </div>
+            </div>
+            <div class="col-xl-2 col-md-4">
+                <div class="stats-card">
+                    <div class="stats-number text-success">{{ returned_borrows_count }}</div>
+                    <div class="stats-label">Returned</div>
+                </div>
+            </div>
+            <div class="col-xl-2 col-md-4">
+                <div class="stats-card">
+                    <div class="stats-number text-info">{{ staff_borrows_count }}</div>
+                    <div class="stats-label">Staff Borrows</div>
+                </div>
+            </div>
+            <div class="col-xl-2 col-md-4">
+                <div class="stats-card">
+                    <div class="stats-number text-warning">{{ student_borrows_count }}</div>
+                    <div class="stats-label">Student Borrows</div>
+                </div>
+            </div>
+            <div class="col-xl-2 col-md-4">
+                <div class="stats-card">
+                    <div class="stats-number text-warning">TZS {{ total_fine_balance|floatformat:0 }}</div>
+                    <div class="stats-label">Total Fine Due</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Table -->
+        <div class="row">
+            <div class="col-lg-12">
+                <div class="card shadow-lg">
+                    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                        <h6 class="header-title mb-0 text-uppercase">
+                            <i class="fas fa-book-reader"></i> Book Borrow Records
+                        </h6>
+                        <div class="d-flex align-items-center">
+                            <span class="badge badge-light mr-2">{{ borrows|length }} records</span>
+                            <div class="btn-group">
+                                <button type="button" class="btn btn-sm btn-light" onclick="location.reload()" title="Refresh">
+                                    <i class="fas fa-sync-alt"></i>
+                                </button>
+                                <button type="button" class="btn btn-sm btn-light" onclick="window.print()" title="Print">
+                                    <i class="fas fa-print"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <!-- Simple Filter Row -->
+                        <div class="row mb-3">
+                            <div class="col-md-4">
+                                <div class="input-group">
+                                    <div class="input-group-prepend">
+                                        <span class="input-group-text"><i class="fas fa-search"></i></span>
+                                    </div>
+                                    <input type="text" class="form-control" id="search-input" placeholder="Search borrow records...">
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <select class="form-control" id="status-filter">
+                                    <option value="">All Status</option>
+                                    {% for code, name in status_choices %}
+                                        <option value="{{ code }}">{{ name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <select class="form-control" id="borrower-type-filter">
+                                    <option value="">All Borrower Types</option>
+                                    <option value="staff">Staff</option>
+                                    <option value="student">Student</option>
+                                </select>
+                            </div>
+                            <div class="col-md-2">
+                                <button type="button" class="btn btn-secondary btn-block" id="clear-filters">
+                                    <i class="fas fa-times"></i> Clear
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="table-responsive">
+                            <table class="table table-hover table-bordered table-striped" id="borrows-table">
+                                <thead class="bg-light">
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Borrower</th>
+                                        <th>Book Details</th>
+                                        <th>Dates</th>
+                                        <th>Status</th>
+                                        <th>Fine</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for borrow in borrows %}
+                                    <tr id="row-{{ borrow.id }}" 
+                                        data-status="{{ borrow.status }}"
+                                        data-borrower-type="{{ borrow.borrower_type }}"
+                                        data-due-date="{{ borrow.due_date|date:'Y-m-d' }}"
+                                        class="{% if borrow.status == 'overdue' %}overdue-row{% elif borrow.status == 'active' and borrow.due_date <= tomorrow %}due-soon{% endif %}">
+                                        <td>{{ forloop.counter }}</td>
+                                        <td>
+                                            <div class="d-flex align-items-start">
+                                                <div class="mr-2">
+                                                    {% if borrow.borrower_type == 'staff' %}
+                                                        <i class="fas fa-user-tie text-primary"></i>
+                                                    {% else %}
+                                                        <i class="fas fa-user-graduate text-info"></i>
+                                                    {% endif %}
+                                                </div>
+                                                <div>
+                                                    <strong>{{ borrow.get_borrower_name }}</strong>
+                                                    <br>
+                                                    <span class="badge badge-{{ borrow.borrower_type }}">
+                                                        {{ borrow.borrower_type|title }}
+                                                    </span>
+                                                    {% if borrow.borrower_type == 'student' and borrow.student_borrower.registration_number %}
+                                                        <br>
+                                                        <small class="text-muted">{{ borrow.student_borrower.registration_number }}</small>
+                                                    {% endif %}
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <div class="book-title">{{ borrow.book.title }}</div>
+                                            <div class="book-author">{{ borrow.book.author }}</div>
+                                            {% if borrow.book_copy %}
+                                            <small class="text-muted">Copy #{{ borrow.book_copy.copy_number }}</small>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <div class="d-flex flex-column">
+                                                <small class="mb-1">
+                                                    <strong>Borrowed:</strong> {{ borrow.borrow_date|date:"M d, Y" }}
+                                                </small>
+                                                <small class="mb-1">
+                                                    <strong>Due:</strong> {{ borrow.due_date|date:"M d, Y" }}
+                                                    {% if borrow.status == 'overdue' %}
+                                                        <span class="text-danger">
+                                                            ({{ borrow.calculate_overdue_days }} day{{ borrow.calculate_overdue_days|pluralize }} overdue)
+                                                        </span>
+                                                    {% endif %}
+                                                </small>
+                                                {% if borrow.actual_return_date %}
+                                                <small class="mb-1">
+                                                    <strong>Returned:</strong> {{ borrow.actual_return_date|date:"M d, Y" }}
+                                                </small>
+                                                {% endif %}
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <span class="badge badge-{{ borrow.status }}">
+                                                {{ borrow.get_status_display }}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <div class="d-flex flex-column">
+                                                <small class="fine-amount mb-1">
+                                                    Total: TZS {{ borrow.fine_amount|floatformat:0 }}
+                                                </small>
+                                                <small class="fine-balance">
+                                                    Balance: TZS {{ borrow.fine_balance|floatformat:0 }}
+                                                </small>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <div class="action-buttons">
+                                                <!-- View Button - Always visible -->
+                                                <a href="{% url 'admin_view_book_borrow' borrow.id %}" 
+                                                   class="btn btn-sm btn-primary" title="View Details">
+                                                    <i class="fas fa-eye"></i> View
+                                                </a>
+                                                
+                                                <!-- Edit Button - ONLY VISIBLE FOR ACTIVE STATUS -->
+                                                {% if borrow.status == 'active' %}
+                                                <a href="{% url 'admin_edit_book_borrow' borrow.id %}" 
+                                                   class="btn btn-sm btn-warning" title="Edit">
+                                                    <i class="fas fa-edit"></i> Edit
+                                                </a>
+                                                {% endif %}
+                                                
+                                                <!-- Delete Button - ONLY VISIBLE FOR NON-ACTIVE STATUS -->
+                                                {% if borrow.status != 'active' and borrow.status != 'overdue' %}
+                                                <button class="btn btn-sm btn-danger delete-btn" 
+                                                        data-id="{{ borrow.id }}"
+                                                        data-borrower="{{ borrow.get_borrower_name }}"
+                                                        data-book="{{ borrow.book.title }}">
+                                                    <i class="fas fa-trash"></i> Delete
+                                                </button>
+                                                {% endif %}
+                                                
+                                                <!-- Return Button - ONLY VISIBLE FOR ACTIVE AND OVERDUE STATUS -->
+                                                {% if borrow.status == 'active' or borrow.status == 'overdue' %}
+                                                <a href="{% url 'admin_return_book_borrow' borrow.id %}" 
+                                                   class="btn btn-sm btn-success" title="Return Book">
+                                                    <i class="fas fa-book-return"></i> Return
+                                                </a>
+                                                {% endif %}
+                                                
+                                                <!-- Renew Button - ONLY VISIBLE FOR ACTIVE STATUS -->
+                                                {% if borrow.status == 'active' %}
+                                                <a href="{% url 'admin_renew_book_borrow' borrow.id %}" 
+                                                   class="btn btn-sm btn-info" title="Renew Book">
+                                                    <i class="fas fa-redo"></i> Renew
+                                                </a>
+                                                {% endif %}
+                                                
+                                                <!-- Fine Payment Button - ONLY VISIBLE WHEN THERE IS FINE BALANCE -->
+                                                {% if borrow.fine_balance > 0 %}
+                                                <a href="{% url 'admin_fine_payment' borrow.id %}" 
+                                                   class="btn btn-sm btn-danger" title="Pay Fine">
+                                                    <i class="fas fa-money-bill-wave"></i> Pay Fine
+                                                </a>
+                                                {% endif %}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% empty %}
+                                    <tr>
+                                        <td colspan="7" class="text-center py-4">
+                                            <i class="fas fa-book-reader fa-3x mb-3 text-muted"></i>
+                                            <h5>No Borrow Records Found</h5>
+                                            <p class="text-muted">Click "New Borrow" to create your first borrow record.</p>
+                                            <a href="{% url 'admin_create_book_borrow' %}" class="btn btn-primary">
+                                                <i class="fas fa-plus"></i> Create First Borrow
+                                            </a>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="deleteConfirmModal" tabindex="-1" role="dialog" aria-labelledby="deleteConfirmModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="deleteConfirmModalLabel">
+                    <i class="fas fa-exclamation-triangle"></i> Confirm Deletion
+                </h5>
+                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete the borrow record for <strong id="delete-book-title"></strong> borrowed by <strong id="delete-borrower-name"></strong>?</p>
+                <p class="text-danger"><small>This action cannot be undone.</small></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirm-delete-btn">
+                    Delete Record
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+<script>
+    $(document).ready(function() {
+        // Initialize DataTable
+        const dataTable = $('#borrows-table').DataTable({
+            "pageLength": 25,
+            "lengthMenu": [[10, 25, 50, 100, -1], [10, 25, 50, 100, "All"]],
+            "responsive": true,
+            "autoWidth": false,
+            "order": [[0, 'asc']],
+            "language": {
+                "emptyTable": "No borrow records found",
+                "search": "_INPUT_",
+                "searchPlaceholder": "Search...",
+                "lengthMenu": "_MENU_ records per page",
+                "info": "Showing _START_ to _END_ of _TOTAL_ borrows",
+                "infoEmpty": "Showing 0 to 0 of 0 borrows",
+                "infoFiltered": "(filtered from _MAX_ total borrows)",
+                "paginate": {
+                    "first": "First",
+                    "last": "Last",
+                    "next": "Next",
+                    "previous": "Previous"
+                }
+            },
+            "initComplete": function() {
+                // Add custom search functionality
+                this.api().columns().every(function() {
+                    var column = this;
+                    
+                    // Only apply to specific columns
+                    if ($(column.header()).text() === 'Status') {
+                        $('#status-filter').on('change', function() {
+                            var val = $.fn.dataTable.util.escapeRegex($(this).val());
+                            column.search(val ? val : '', true, false).draw();
+                        });
+                    }
+                    
+                    if ($(column.header()).text() === 'Borrower') {
+                        $('#borrower-type-filter').on('change', function() {
+                            var val = $.fn.dataTable.util.escapeRegex($(this).val());
+                            column.search(val ? val : '', true, false).draw();
+                        });
+                    }
+                });
+                
+                // Add search functionality to the main search input
+                $('#search-input').on('keyup', function() {
+                    dataTable.search(this.value).draw();
+                });
+            }
+        });
+        
+        // Store which borrow record to delete
+        let borrowToDelete = null;
+        
+        // Handle delete button click
+        $(document).on('click', '.delete-btn', function(e) {
+            e.preventDefault();
+            
+            borrowToDelete = {
+                id: $(this).data('id'),
+                borrower: $(this).data('borrower'),
+                book: $(this).data('book')
+            };
+            
+            $('#delete-borrower-name').text(borrowToDelete.borrower);
+            $('#delete-book-title').text(borrowToDelete.book);
+            $('#deleteConfirmModal').modal('show');
+        });
+         // Handle modal close/cancel buttons
+        $(document).on('click', '[data-dismiss="modal"]', function(e) {
+            e.preventDefault();
+            $(this).closest('.modal').modal('hide');
+        });
+
+        // Handle cancel buttons
+        $('#cancel-add-btn, #cancel-edit-btn, #cancel-delete-btn').on('click', function(e) {
+            e.preventDefault();
+            $(this).closest('.modal').modal('hide');
+        });
+        // Handle confirm delete
+        $('#confirm-delete-btn').on('click', function() {
+            if (!borrowToDelete) return;
+            
+            const deleteBtn = $(this);
+            deleteBtn.prop('disabled', true).text('Deleting...');
+            
+            // Send AJAX request
+            $.ajax({
+                url: '{% url "admin_book_borrows_crud" %}',
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCSRFToken(),
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                data: {
+                    'action': 'delete',
+                    'id': borrowToDelete.id
+                },
+                success: function(response) {
+                    if (response.success) {
+                        // Remove row from DataTable
+                        const row = $('#row-' + borrowToDelete.id);
+                        dataTable.row(row).remove().draw();
+                        
+                        // Show success message
+                        showToast('Borrow record deleted successfully!', 'success');
+                        
+                        // Update statistics (you might want to reload the page for accurate stats)
+                        setTimeout(function() {
+                            location.reload();
+                        }, 1500);
+                    } else {
+                        showToast(response.message || 'Failed to delete record', 'danger');
+                    }
+                    $('#deleteConfirmModal').modal('hide');
+                    deleteBtn.prop('disabled', false).text('Delete Record');
+                    borrowToDelete = null;
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error:', error);
+                    showToast('An error occurred. Please try again.', 'danger');
+                    $('#deleteConfirmModal').modal('hide');
+                    deleteBtn.prop('disabled', false).text('Delete Record');
+                }
+            });
+        });
+        
+        // Clear filters
+        $('#clear-filters').on('click', function() {
+            $('#status-filter').val('');
+            $('#borrower-type-filter').val('');
+            $('#search-input').val('');
+            
+            // Clear all DataTable searches
+            dataTable.search('').columns().search('').draw();
+        });
+        
+        // Auto-refresh for overdue books
+        setInterval(function() {
+            const today = new Date();
+            $('tr[data-status="active"]').each(function() {
+                const dueDateStr = $(this).data('due-date');
+                if (dueDateStr) {
+                    const dueDate = new Date(dueDateStr);
+                    if (dueDate < today) {
+                        $(this).addClass('overdue-row').removeClass('due-soon');
+                    } else if (dueDate <= new Date(today.getTime() + 3 * 24 * 60 * 60 * 1000)) {
+                        $(this).addClass('due-soon');
+                    }
+                }
+            });
+        }, 60000); // Check every minute
+        
+        // Helper function to get CSRF token
+        function getCSRFToken() {
+            return $('input[name="csrfmiddlewaretoken"]').val();
+        }
+        
+        // Helper function to show toast messages
+        function showToast(message, type = 'success') {
+            // Create toast element
+            const toastId = 'toast-' + Date.now();
+            const toastHtml = `
+                <div id="${toastId}" class="toast fade show" role="alert" style="position: fixed; top: 20px; right: 20px; z-index: 9999; min-width: 300px;">
+                    <div class="toast-header bg-${type} text-white">
+                        <strong class="mr-auto">
+                            ${type === 'success' ? '<i class="fas fa-check-circle"></i> Success' : '<i class="fas fa-exclamation-circle"></i> Error'}
+                        </strong>
+                        <button type="button" class="ml-2 mb-1 close text-white" data-dismiss="toast" aria-label="Close">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                    <div class="toast-body">
+                        ${message}
+                    </div>
+                </div>
+            `;
+            
+            // Add toast to page
+            $('body').append(toastHtml);
+            
+            // Auto-remove after 5 seconds
+            setTimeout(function() {
+                $('#' + toastId).remove();
+            }, 5000);
+            
+            // Add click handler to close button
+            $('#' + toastId + ' .close').on('click', function() {
+                $('#' + toastId).remove();
+            });
+        }
+        
+        // Export PDF functionality
+        $('#export-pdf-btn').on('click', function(e) {
+            e.preventDefault();
+            
+            // Get current filters
+            const status = $('#status-filter').val();
+            const borrowerType = $('#borrower-type-filter').val();
+            const search = $('#search-input').val();
+            
+            // Build export URL
+            let exportUrl = '{% url "admin_export_book_borrows" %}';
+            const params = new URLSearchParams();
+            
+            if (status) params.append('status', status);
+            if (borrowerType) params.append('borrower_type', borrowerType);
+            if (search) params.append('search', search);
+            
+            if (params.toString()) {
+                exportUrl += '?' + params.toString();
+            }
+            
+            // Open in new tab
+            window.open(exportUrl, '_blank');
+        });
+        
+        // Function to check edit eligibility
+        function canEditBorrow(status) {
+            // Only allow editing for 'active' status
+            const editableStatuses = ['active'];
+            return editableStatuses.includes(status);
+        }
+        
+        // Apply edit button visibility on page load
+        $('tr').each(function() {
+            const status = $(this).data('status');
+            const editButton = $(this).find('.btn-warning');
+            
+            if (editButton.length && !canEditBorrow(status)) {
+                editButton.remove();
+            }
+        });
+        
+        // Filter rows based on edit eligibility
+        $('#edit-eligible-filter').on('change', function() {
+            const showOnlyEditable = $(this).is(':checked');
+            
+            dataTable.rows().every(function() {
+                const row = this.node();
+                const status = $(row).data('status');
+                const isEditable = canEditBorrow(status);
+                
+                if (showOnlyEditable && !isEditable) {
+                    $(row).hide();
+                } else {
+                    $(row).show();
+                }
+            });
+            
+            dataTable.draw();
+        });
+    });
+</script>
+{% endblock extra_js %}

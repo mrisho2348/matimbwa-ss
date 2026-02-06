@@ -1,4 +1,5 @@
 # templatetags/custom_filters.py
+from datetime import timedelta
 import json
 import re
 from django import template
@@ -137,3 +138,12 @@ def json_serialize(value):
         return json.dumps(value.__dict__)
     else:
         return json.dumps(list(value))
+
+
+@register.filter
+def add_days(value, days):
+    """Add days to a date"""
+    try:
+        return value + timedelta(days=int(days))
+    except (ValueError, TypeError):
+        return value        

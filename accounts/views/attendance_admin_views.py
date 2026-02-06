@@ -38,6 +38,7 @@ from django.conf import settings
 from django.urls import reverse
 
 
+
 class AdminRequiredMixin(LoginRequiredMixin, UserPassesTestMixin):
     def test_func(self):
         return self.request.user.is_staff or self.request.user.is_superuser

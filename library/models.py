@@ -1,14 +1,13 @@
+# library/models.py - Updated to support both staff and students
 from django.db import models
 from django.core.exceptions import ValidationError
 from django.utils import timezone
-from django.utils.translation import gettext_lazy as _
 from datetime import timedelta
 from decimal import Decimal
 import uuid
-from accounts.models import  Staffs
+from accounts.models import Staffs
+from students.models import Student
 from django.dispatch import receiver
-
-# Library Management Models
 
 class BookCategory(models.Model):
     """Categories for books (e.g., Science, Literature, Reference)"""
@@ -114,33 +113,24 @@ class Book(models.Model):
     
     def clean(self):
         """Validate book data"""
-        # Ensure available copies don't exceed total copies
         if self.available_copies > self.total_copies:
             raise ValidationError("Available copies cannot exceed total copies")
-        
-        # Ensure borrowed copies don't exceed total copies
         if self.borrowed_copies > self.total_copies:
             raise ValidationError("Borrowed copies cannot exceed total copies")
-        
-        # Update available copies based on total and borrowed
         if self.pk:
             self.available_copies = self.total_copies - self.borrowed_copies
     
     def save(self, *args, **kwargs):
-        # Auto-generate accession number if not provided
         if not self.accession_number:
             last_book = Book.objects.order_by('-id').first()
             last_number = int(last_book.accession_number.split('-')[-1]) if last_book and '-' in last_book.accession_number else 0
             self.accession_number = f"LIB-{self.category.code if self.category else 'GEN'}-{last_number + 1:06d}"
         
-        # Auto-generate barcode if not provided
         if not self.barcode:
             self.barcode = str(uuid.uuid4().int)[:12]
         
-        # Calculate available copies
         self.available_copies = self.total_copies - self.borrowed_copies
         
-        # Update status based on available copies
         if self.available_copies == 0:
             self.status = 'borrowed'
         elif self.status == 'borrowed' and self.available_copies > 0:
@@ -152,17 +142,9 @@ class Book(models.Model):
         """Check if book is available for borrowing"""
         return self.status == 'available' and self.available_copies > 0 and not self.is_reference
     
-    def get_borrow_duration(self, borrower_type):
-        """Get allowed borrowing duration based on borrower type"""
-        if borrower_type == 'student':
-            return 7  # 7 days for students
-        elif borrower_type == 'teacher':
-            return 14  # 14 days for teachers
-        return 7  # Default
-    
-    def calculate_fine(self, overdue_days):
-        """Calculate fine for overdue days"""
-        return Decimal(overdue_days) * self.fine_amount
+    def get_available_copies(self):
+        """Get all available copies of this book"""
+        return self.copies.filter(status='available')
     
     def update_copies_on_borrow(self):
         """Update copy counts when book is borrowed"""
@@ -229,18 +211,36 @@ class BookCopy(models.Model):
         return self.status == 'available'
     
     def save(self, *args, **kwargs):
-        # Auto-generate barcode if not provided
         if not self.barcode:
             self.barcode = str(uuid.uuid4().int)[:12]
         
-        # Auto-generate accession number if not provided
         if not self.accession_number:
-            last_copy = BookCopy.objects.filter(book=self.book).order_by('-id').first()
-            if last_copy and '-' in last_copy.accession_number:
-                last_num = int(last_copy.accession_number.split('-')[-1])
-            else:
-                last_num = 0
-            self.accession_number = f"{self.book.accession_number}-C{last_num + 1:03d}"
+            temp_accession = f"{self.book.accession_number}-C{self.copy_number}"
+            self.accession_number = temp_accession
+        
+        super().save(*args, **kwargs)
+        
+        # Generate unique accession number
+        if self.accession_number.startswith(self.book.accession_number + "-C"):
+            import re
+            base = self.book.accession_number
+            pattern = re.compile(rf'^{re.escape(base)}-C(\d+)$')
+            existing_numbers = []
+            
+            for copy in BookCopy.objects.filter(book=self.book).exclude(id=self.id):
+                match = pattern.match(copy.accession_number)
+                if match:
+                    try:
+                        existing_numbers.append(int(match.group(1)))
+                    except ValueError:
+                        pass
+            
+            if existing_same_accession := BookCopy.objects.filter(
+                accession_number=self.accession_number
+            ).exclude(id=self.id).exists():
+                next_num = max(existing_numbers) + 1 if existing_numbers else 1
+                self.accession_number = f"{base}-C{next_num:03d}"
+                super().save(update_fields=['accession_number'])
         
         super().save(*args, **kwargs)
 
@@ -274,17 +274,17 @@ class BorrowingRules(models.Model):
     def __str__(self):
         return f"{self.get_borrower_type_display()} Rules"
     
-    def get_rules_for_user(self, user):
-        """Get borrowing rules based on user type"""
-        if hasattr(user, 'student'):
-            return self.objects.get(borrower_type='student')
-        elif hasattr(user, 'staff'):
-            return self.objects.get(borrower_type='teacher')
-        return self.objects.get(borrower_type='guest')
+    def get_borrowing_duration(self):
+        """Get borrowing duration in days"""
+        return self.borrowing_duration_days
+    
+    def get_renewal_duration(self):
+        """Get renewal duration in days"""
+        return self.renewal_duration_days if self.renewal_allowed else 0
 
 
 class BookBorrow(models.Model):
-    """Record of book borrowing"""
+    """Record of book borrowing - supports both Staff and Student"""
     BORROW_STATUS_CHOICES = [
         ('active', 'Active'),
         ('returned', 'Returned'),
@@ -293,11 +293,38 @@ class BookBorrow(models.Model):
         ('cancelled', 'Cancelled'),
     ]
     
-    # Borrowing Information
-    borrower = models.ForeignKey(Staffs, on_delete=models.CASCADE, related_name='book_borrows')
+    # Borrower Information (can be either Staff or Student)
+    borrower_type = models.CharField(max_length=20, choices=[
+        ('staff', 'Staff'),
+        ('student', 'Student'),
+    ])
+    
+    # Generic borrower fields (one will be filled based on borrower_type)
+    staff_borrower = models.ForeignKey(
+        Staffs, 
+        on_delete=models.CASCADE, 
+        related_name='book_borrows_staff',
+        null=True, 
+        blank=True
+    )
+    student_borrower = models.ForeignKey(
+        Student, 
+        on_delete=models.CASCADE, 
+        related_name='book_borrows_student',
+        null=True, 
+        blank=True
+    )
+    
+    # Book Information
     book = models.ForeignKey(Book, on_delete=models.CASCADE, related_name='borrows')
-    book_copy = models.ForeignKey(BookCopy, on_delete=models.SET_NULL, null=True, blank=True, 
-                                 related_name='borrows', help_text="Specific copy borrowed")
+    book_copy = models.ForeignKey(
+        BookCopy, 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True, 
+        related_name='borrows', 
+        help_text="Specific copy borrowed"
+    )
     
     # Borrowing Details
     borrow_date = models.DateField(auto_now_add=True)
@@ -321,9 +348,14 @@ class BookBorrow(models.Model):
     fine_balance = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
     fine_notes = models.TextField(blank=True)
     
-    # Issued by
-    issued_by = models.ForeignKey(Staffs, on_delete=models.SET_NULL, null=True, 
-                                 related_name='issued_borrows', help_text="Librarian who issued the book")
+    # Issued by (always staff)
+    issued_by = models.ForeignKey(
+        Staffs, 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        related_name='issued_borrows', 
+        help_text="Librarian who issued the book"
+    )
     
     # Audit
     created_at = models.DateTimeField(auto_now_add=True)
@@ -334,27 +366,62 @@ class BookBorrow(models.Model):
         verbose_name_plural = 'Book Borrows'
         ordering = ['-borrow_date', '-created_at']
         indexes = [
-            models.Index(fields=['borrower', 'status']),
+            models.Index(fields=['borrow_date', 'status']),
             models.Index(fields=['due_date', 'status']),
             models.Index(fields=['book', 'status']),
         ]
     
     def __str__(self):
-        return f"{self.book.title} - {self.borrower.username} ({self.status})"
+        borrower_name = self.get_borrower_name()
+        return f"{self.book.title} - {borrower_name} ({self.status})"
+    
+    def get_borrower(self):
+        """Get the borrower object based on borrower_type"""
+        if self.borrower_type == 'staff' and self.staff_borrower:
+            return self.staff_borrower
+        elif self.borrower_type == 'student' and self.student_borrower:
+            return self.student_borrower
+        return None
+    
+    def get_borrower_name(self):
+        """Get borrower's name"""
+        borrower = self.get_borrower()
+        if not borrower:
+            return "Unknown Borrower"
+        
+        if hasattr(borrower, 'get_full_name'):
+            return borrower.get_full_name()
+        elif hasattr(borrower, 'full_name'):
+            return borrower.full_name
+        elif hasattr(borrower, 'username'):
+            return borrower.username
+        return str(borrower)
+    
+    def get_borrower_display(self):
+        """Get borrower display with type"""
+        borrower_name = self.get_borrower_name()
+        borrower_type_display = "Staff" if self.borrower_type == 'staff' else "Student"
+        return f"{borrower_name} ({borrower_type_display})"
     
     def clean(self):
         """Validate borrowing rules"""
-        # Get borrower type
-        borrower_type = 'student'  # Default
+        # Ensure only one borrower type is set
+        if self.borrower_type == 'staff' and not self.staff_borrower:
+            raise ValidationError("Staff borrower must be selected for staff borrow")
+        if self.borrower_type == 'student' and not self.student_borrower:
+            raise ValidationError("Student borrower must be selected for student borrow")
         
-        if hasattr(self.borrower, 'student'):
-            borrower_type = 'student'
-        elif hasattr(self.borrower, 'staff'):
-            borrower_type = 'teacher'
+        # Get borrower and rules
+        borrower = self.get_borrower()
+        if not borrower:
+            raise ValidationError("Borrower not found")
+        
+        # Determine borrower type for rules
+        rule_borrower_type = 'student' if self.borrower_type == 'student' else 'teacher'
         
         # Get borrowing rules
         try:
-            rules = BorrowingRules.objects.get(borrower_type=borrower_type)
+            rules = BorrowingRules.objects.get(borrower_type=rule_borrower_type)
         except BorrowingRules.DoesNotExist:
             rules = BorrowingRules.objects.filter(borrower_type='student').first()
         
@@ -366,10 +433,16 @@ class BookBorrow(models.Model):
             raise ValidationError("Reference books cannot be borrowed")
         
         # Check if user has reached max books limit
-        active_borrows = BookBorrow.objects.filter(
-            borrower=self.borrower,
-            status__in=['active', 'overdue']
-        ).count()
+        if self.borrower_type == 'staff':
+            active_borrows = BookBorrow.objects.filter(
+                staff_borrower=self.staff_borrower,
+                status__in=['active', 'overdue']
+            ).count()
+        else:
+            active_borrows = BookBorrow.objects.filter(
+                student_borrower=self.student_borrower,
+                status__in=['active', 'overdue']
+            ).count()
         
         if active_borrows >= rules.max_books_allowed and not self.pk:
             raise ValidationError(f"You can only borrow {rules.max_books_allowed} book(s) at a time")
@@ -377,14 +450,11 @@ class BookBorrow(models.Model):
     def save(self, *args, **kwargs):
         # Set due date based on borrower type if not set
         if not self.due_date:
-            borrower_type = 'student'
-            if hasattr(self.borrower, 'student'):
-                borrower_type = 'student'
-            elif hasattr(self.borrower, 'staff'):
-                borrower_type = 'teacher'
+            # Determine borrower type for rules
+            rule_borrower_type = 'student' if self.borrower_type == 'student' else 'teacher'
             
             try:
-                rules = BorrowingRules.objects.get(borrower_type=borrower_type)
+                rules = BorrowingRules.objects.get(borrower_type=rule_borrower_type)
                 self.due_date = timezone.now().date() + timedelta(days=rules.borrowing_duration_days)
             except BorrowingRules.DoesNotExist:
                 self.due_date = timezone.now().date() + timedelta(days=7)
@@ -422,20 +492,15 @@ class BookBorrow(models.Model):
         overdue_days = self.calculate_overdue_days()
         if overdue_days > 0:
             # Get fine per day from book or rules
-            fine_per_day = self.book.fine_amount if self.book else 500.00
+            fine_per_day = self.book.fine_amount if self.book else Decimal('500.00')
             
             # Calculate fine
             fine_amount = Decimal(overdue_days) * fine_per_day
             
             # Apply maximum fine limit
             try:
-                borrower_type = 'student'
-                if hasattr(self.borrower, 'student'):
-                    borrower_type = 'student'
-                elif hasattr(self.borrower, 'staff'):
-                    borrower_type = 'teacher'
-                
-                rules = BorrowingRules.objects.get(borrower_type=borrower_type)
+                rule_borrower_type = 'student' if self.borrower_type == 'student' else 'teacher'
+                rules = BorrowingRules.objects.get(borrower_type=rule_borrower_type)
                 if fine_amount > rules.max_fine_amount:
                     fine_amount = rules.max_fine_amount
             except BorrowingRules.DoesNotExist:
@@ -449,7 +514,7 @@ class BookBorrow(models.Model):
         self.fine_amount = self.calculate_fine()
         self.fine_balance = self.fine_amount - self.fine_paid
         
-        if self.fine_amount > 0:
+        if self.fine_amount > 0 and self.status == 'active':
             self.status = 'overdue'
         
         self.save(update_fields=['fine_amount', 'fine_balance', 'status'])
@@ -457,15 +522,11 @@ class BookBorrow(models.Model):
     
     def renew_book(self, renewed_by):
         """Renew the book borrowing"""
-        # Get borrowing rules
-        borrower_type = 'student'
-        if hasattr(self.borrower, 'student'):
-            borrower_type = 'student'
-        elif hasattr(self.borrower, 'staff'):
-            borrower_type = 'teacher'
+        # Determine borrower type for rules
+        rule_borrower_type = 'student' if self.borrower_type == 'student' else 'teacher'
         
         try:
-            rules = BorrowingRules.objects.get(borrower_type=borrower_type)
+            rules = BorrowingRules.objects.get(borrower_type=rule_borrower_type)
         except BorrowingRules.DoesNotExist:
             rules = None
         
@@ -542,9 +603,7 @@ class BookBorrow(models.Model):
         return True
 
 
-
-
-
+# The rest of the models remain similar...
 class BookRenewal(models.Model):
     """Record of book renewals"""
     borrow = models.ForeignKey(BookBorrow, on_delete=models.CASCADE, related_name='renewals')
@@ -613,10 +672,37 @@ class FinePayment(models.Model):
     payment_method = models.CharField(max_length=20, choices=PAYMENT_METHOD_CHOICES, default='cash')
     transaction_id = models.CharField(max_length=100, blank=True, help_text="Bank/Mobile transaction ID")
     receipt_number = models.CharField(max_length=50, unique=True)
-    paid_by = models.ForeignKey(Staffs, on_delete=models.SET_NULL, null=True, 
-                               related_name='fine_payments_made')
-    received_by = models.ForeignKey(Staffs, on_delete=models.SET_NULL, null=True, 
-                                   related_name='fine_payments_received', help_text="Staff who received payment")
+    
+    # Payer can be either Staff or Student
+    payer_type = models.CharField(max_length=20, choices=[
+        ('staff', 'Staff'),
+        ('student', 'Student'),
+    ], default='student')
+    
+    staff_payer = models.ForeignKey(
+        Staffs, 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True,
+        related_name='fine_payments_made_staff'
+    )
+    
+    student_payer = models.ForeignKey(
+        Student,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='fine_payments_made_student'
+    )
+    
+    received_by = models.ForeignKey(
+        Staffs, 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        related_name='fine_payments_received', 
+        help_text="Staff who received payment"
+    )
+    
     status = models.CharField(max_length=20, choices=PAYMENT_STATUS_CHOICES, default='completed')
     notes = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -630,7 +716,6 @@ class FinePayment(models.Model):
         return f"Payment of {self.amount} for {self.borrow.book.title}"
     
     def save(self, *args, **kwargs):
-        # Auto-generate receipt number if not provided
         if not self.receipt_number:
             last_payment = FinePayment.objects.order_by('-id').first()
             last_number = int(last_payment.receipt_number.split('-')[-1]) if last_payment and '-' in last_payment.receipt_number else 0
@@ -638,47 +723,47 @@ class FinePayment(models.Model):
         
         super().save(*args, **kwargs)
         
-        # Update borrow record
         if self.status == 'completed':
             self.borrow.fine_paid += self.amount
             self.borrow.fine_balance = self.borrow.fine_amount - self.borrow.fine_paid
             self.borrow.save()
-
-
-
-# Signals and helper functions
-@receiver(models.signals.pre_save, sender=BookBorrow)
-def update_book_status_on_borrow(sender, instance, **kwargs):
-    """Update book status when borrowed"""
-    if instance.status == 'active' and instance.book:
-        instance.book.update_copies_on_borrow()
-
-
-@receiver(models.signals.pre_save, sender=BookBorrow)
-def update_book_status_on_return(sender, instance, **kwargs):
-    """Update book status when returned"""
-    if instance.status == 'returned' and instance.book:
-        instance.book.update_copies_on_return()
-
-
-@receiver(models.signals.post_save, sender=FinePayment)
-def update_borrow_fine_balance(sender, instance, created, **kwargs):
-    """Update borrow fine balance when payment is made"""
-    if created and instance.status == 'completed':
-        instance.borrow.fine_paid += instance.amount
-        instance.borrow.fine_balance = instance.borrow.fine_amount - instance.borrow.fine_paid
-        instance.borrow.save(update_fields=['fine_paid', 'fine_balance'])
+    
+    def get_payer(self):
+        """Get the payer object based on payer_type"""
+        if self.payer_type == 'staff' and self.staff_payer:
+            return self.staff_payer
+        elif self.payer_type == 'student' and self.student_payer:
+            return self.student_payer
+        return None
+    
+    def get_payer_name(self):
+        """Get payer's name"""
+        payer = self.get_payer()
+        if not payer:
+            return "Unknown Payer"
+        
+        if hasattr(payer, 'get_full_name'):
+            return payer.get_full_name()
+        elif hasattr(payer, 'full_name'):
+            return payer.full_name
+        elif hasattr(payer, 'username'):
+            return payer.username
+        return str(payer)
 
 
 # Utility functions
 def check_borrower_eligibility(user, book):
     """Check if user is eligible to borrow a book"""
-    # Get borrower type
-    borrower_type = 'student'
-    if hasattr(user, 'student'):
+    # Determine user type
+    borrower_type = None
+    if hasattr(user, 'staff'):
+        borrower_type = 'teacher'  # Teacher type in rules
+        borrower = user.staff
+    elif hasattr(user, 'student'):
         borrower_type = 'student'
-    elif hasattr(user, 'staff'):
-        borrower_type = 'teacher'
+        borrower = user.student
+    else:
+        return False, "User type not supported for borrowing"
     
     # Get borrowing rules
     try:
@@ -687,10 +772,16 @@ def check_borrower_eligibility(user, book):
         return False, "No borrowing rules found for your user type"
     
     # Check active borrows
-    active_borrows = BookBorrow.objects.filter(
-        borrower=user,
-        status__in=['active', 'overdue']
-    ).count()
+    if borrower_type == 'student':
+        active_borrows = BookBorrow.objects.filter(
+            student_borrower=borrower,
+            status__in=['active', 'overdue']
+        ).count()
+    else:
+        active_borrows = BookBorrow.objects.filter(
+            staff_borrower=borrower,
+            status__in=['active', 'overdue']
+        ).count()
     
     if active_borrows >= rules.max_books_allowed:
         return False, f"You can only borrow {rules.max_books_allowed} book(s) at a time"
@@ -706,45 +797,22 @@ def check_borrower_eligibility(user, book):
     return True, "Eligible to borrow"
 
 
-def get_user_borrowing_summary(user):
-    """Get borrowing summary for a user"""
-    summary = {
-        'active_borrows': 0,
-        'overdue_borrows': 0,
-        'total_fine': Decimal('0.00'),
-        'books_allowed': 1,
-        'can_borrow_more': True,
-    }
-    
-    # Get borrower type and rules
-    borrower_type = 'student'
-    if hasattr(user, 'student'):
-        borrower_type = 'student'
-    elif hasattr(user, 'staff'):
-        borrower_type = 'teacher'
-    
-    try:
-        rules = BorrowingRules.objects.get(borrower_type=borrower_type)
-        summary['books_allowed'] = rules.max_books_allowed
-    except BorrowingRules.DoesNotExist:
-        pass
-    
-    # Get active borrows
-    active_borrows = BookBorrow.objects.filter(
-        borrower=user,
-        status__in=['active', 'overdue']
-    )
-    
-    summary['active_borrows'] = active_borrows.filter(status='active').count()
-    summary['overdue_borrows'] = active_borrows.filter(status='overdue').count()
-    
-    # Calculate total fine
-    for borrow in active_borrows:
-        borrow.update_fine()
-        summary['total_fine'] += borrow.fine_balance
-    
-    # Check if can borrow more
-    total_active = summary['active_borrows'] + summary['overdue_borrows']
-    summary['can_borrow_more'] = total_active < summary['books_allowed']
-    
-    return summary
+# Signals
+@receiver(models.signals.pre_save, sender=BookBorrow)
+def update_book_status_on_borrow(sender, instance, **kwargs):
+    """Update book status when borrowed"""
+    if instance.status == 'active' and instance.book:
+        instance.book.update_copies_on_borrow()
+        if instance.book_copy:
+            instance.book_copy.status = 'borrowed'
+            instance.book_copy.save()
+
+
+@receiver(models.signals.pre_save, sender=BookBorrow)
+def update_book_status_on_return(sender, instance, **kwargs):
+    """Update book status when returned"""
+    if instance.status == 'returned' and instance.book:
+        instance.book.update_copies_on_return()
+        if instance.book_copy:
+            instance.book_copy.status = 'available'
+            instance.book_copy.save()

@@ -1,0 +1,1081 @@
+{% extends 'admin/base.html' %}
+{% load static %}
+{% block title %} Borrowing Rules Management {% endblock title %}
+
+{% block breadcrumb %}
+    <button type="button" class="btn btn-primary" data-toggle="modal" data-target="#addRuleModal">
+        <i class="fas fa-plus"></i> Add Rule
+    </button>
+    <button class="btn btn-outline-secondary ml-2" onclick="location.reload()">
+        <i class="fas fa-sync-alt"></i> Refresh
+    </button>
+{% endblock breadcrumb %}
+
+{% block extra_css %}
+<style>
+    .table th {
+        font-weight: 600;
+        border-bottom-width: 2px;
+    }
+    .table td {
+        vertical-align: middle;
+    }
+    .badge {
+        font-size: 0.85em;
+        padding: 0.4em 0.8em;
+    }
+    .modal-header {
+        border-radius: 0;
+    }
+    
+    /* DataTable Styles */
+    .dataTables_wrapper .dataTables_filter {
+        float: right;
+        text-align: right;
+    }
+    .dataTables_wrapper .dataTables_length {
+        float: left;
+    }
+    .dataTables_wrapper .dataTables_paginate {
+        float: right;
+        margin-top: 10px;
+    }
+    .success-toast, .error-toast {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 1056;
+        min-width: 300px;
+    }
+    
+    /* Borrower type badges */
+    .borrower-student { background-color: #28a745; color: white; }
+    .borrower-teacher { background-color: #007bff; color: white; }
+    .borrower-staff { background-color: #6c757d; color: white; }
+    .borrower-guest { background-color: #fd7e14; color: white; }
+    
+    /* Status badges */
+    .status-yes { background-color: #28a745; color: white; }
+    .status-no { background-color: #dc3545; color: white; }
+    
+    /* Select2 in modal fix */
+    .select2-container {
+        z-index: 1056 !important;
+    }
+    .select2-dropdown {
+        z-index: 1057 !important;
+    }
+    
+    /* Quick action buttons */
+    .quick-actions {
+        display: flex;
+        gap: 4px;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .quick-action-btn {
+        width: 28px;
+        height: 28px;
+        padding: 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        border: none;
+        transition: all 0.2s ease;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+    }
+
+    .quick-action-btn i {
+        font-size: 0.75rem;
+        color: #ffffff !important;
+    }
+
+    .quick-action-btn:hover {
+        transform: scale(1.1);
+        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        filter: brightness(1.05);
+    }
+
+    .btn-success.quick-action-btn { background-color: #28a745; }
+    .btn-primary.quick-action-btn { background-color: #007bff; }
+    .btn-danger.quick-action-btn  { background-color: #dc3545; }
+    
+    /* Rule details */
+    .rule-parameter {
+        background-color: #e9ecef;
+        color: #495057;
+        padding: 2px 6px;
+        border-radius: 3px;
+        font-family: 'Courier New', monospace;
+        font-size: 0.85em;
+        margin-right: 5px;
+    }
+    
+    .rule-title {
+        font-weight: 600;
+        font-size: 0.95rem;
+        margin-bottom: 2px;
+    }
+    .rule-details {
+        font-size: 0.85rem;
+        color: #6c757d;
+    }
+    
+    /* Modal sizes */
+    .modal-lg {
+        max-width: 800px;
+    }
+    
+    /* Required field indicator */
+    .required-field::after {
+        content: " *";
+        color: #dc3545;
+    }
+    
+    /* Card header */
+    .card-header.bg-info .badge {
+        font-size: 0.9em;
+        padding: 0.3em 0.7em;
+    }
+    
+    /* Stats cards */
+    .stats-card {
+        border-radius: 8px;
+        margin-bottom: 15px;
+    }
+    .stats-card .card-body {
+        padding: 1rem;
+    }
+    .stats-icon {
+        font-size: 2rem;
+        opacity: 0.8;
+    }
+    .stats-value {
+        font-size: 1.5rem;
+        font-weight: bold;
+    }
+    .stats-label {
+        font-size: 0.85rem;
+        color: #6c757d;
+    }
+</style>
+{% endblock extra_css %}
+
+{% block content %}
+<section class="content">
+    <div class="container-fluid"> 
+        <div id="success-toast" class="alert alert-success alert-dismissible fade success-toast" style="display: none;" role="alert">
+            <strong><i class="fas fa-check-circle"></i> Success!</strong> 
+            <span id="success-message"></span>
+            <button type="button" class="close" onclick="$('#success-toast').fadeOut()" data-dismiss="alert" aria-label="Close">
+                <span aria-hidden="true">&times;</span>
+            </button>
+        </div>
+
+        <div id="error-toast" class="alert alert-danger alert-dismissible fade error-toast" style="display: none;" role="alert">
+            <strong><i class="fas fa-exclamation-circle"></i> Error!</strong> 
+            <span id="error-message"></span>
+            <button type="button" class="close" onclick="$('#error-toast').fadeOut()" data-dismiss="alert" aria-label="Close">
+                <span aria-hidden="true">&times;</span>
+            </button>
+        </div>
+
+        <!-- Statistics Cards -->
+        <div class="row mb-4">
+            <div class="col-lg-3 col-md-6">
+                <div class="card stats-card bg-primary text-white">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <div class="stats-value">{{ rules|length }}</div>
+                                <div class="stats-label">Total Rules</div>
+                            </div>
+                            <div class="stats-icon">
+                                <i class="fas fa-cogs"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-3 col-md-6">
+                <div class="card stats-card bg-success text-white">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <div class="stats-value">{{ max_books_allowed_sum }}</div>
+                                <div class="stats-label">Max Books (Avg)</div>
+                            </div>
+                            <div class="stats-icon">
+                                <i class="fas fa-book"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-3 col-md-6">
+                <div class="card stats-card bg-warning text-white">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <div class="stats-value">{{ renewal_allowed_count }}</div>
+                                <div class="stats-label">Allow Renewal</div>
+                            </div>
+                            <div class="stats-icon">
+                                <i class="fas fa-redo"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-3 col-md-6">
+                <div class="card stats-card bg-info text-white">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <div class="stats-value">{{ can_borrow_reference_count }}</div>
+                                <div class="stats-label">Can Borrow Reference</div>
+                            </div>
+                            <div class="stats-icon">
+                                <i class="fas fa-book-reader"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-lg-12">
+                <div class="card shadow-lg">
+                    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                        <h6 class="header-title mb-0 text-uppercase">
+                            <i class="fas fa-cogs"></i> Borrowing Rules Management
+                        </h6>
+                        <div class="d-flex align-items-center">
+                            <span class="badge badge-light">
+                                <i class="fas fa-list"></i> Showing {{ rules|length }} rule(s)
+                            </span>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle"></i>
+                            <strong>Note:</strong> Borrowing rules define the limits and permissions for different user types. 
+                            Each user type can have only one set of rules.
+                        </div>
+                        
+                        <div class="table-responsive">
+                            <table class="table table-hover text-nowrap table-responsive-sm table-bordered table-striped table-sm display" id="rules-table">
+                                <thead class="bg-light">
+                                    <tr>
+                                        <th>Borrower Type</th>
+                                        <th>Borrowing Limits</th>
+                                        <th>Renewal Rules</th>
+                                        <th>Fine Settings</th>
+                                        <th>Permissions</th>
+                                        <th class="text-center">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for rule in rules %}
+                                    <tr id="row-{{ rule.id }}">
+                                        <td>
+                                            <div class="rule-title">
+                                                <span class="badge borrower-{{ rule.borrower_type }}">
+                                                    {{ rule.get_borrower_type_display }}
+                                                </span>
+                                            </div>
+                                            <div class="rule-details mt-1">
+                                                <small>Created: {{ rule.created_at|date:"M d, Y" }}</small><br>
+                                                <small>Updated: {{ rule.updated_at|date:"M d, Y" }}</small>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <div class="mb-1">
+                                                <span class="rule-parameter">{{ rule.max_books_allowed }}</span> 
+                                                <small>max books</small>
+                                            </div>
+                                            <div>
+                                                <span class="rule-parameter">{{ rule.borrowing_duration_days }} days</span> 
+                                                <small>borrowing duration</small>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            {% if rule.renewal_allowed %}
+                                            <div class="mb-1">
+                                                <span class="badge status-yes">Allowed</span>
+                                            </div>
+                                            <div>
+                                                <span class="rule-parameter">{{ rule.max_renewals }}</span> 
+                                                <small>max renewals</small><br>
+                                                <span class="rule-parameter">{{ rule.renewal_duration_days }} days</span> 
+                                                <small>per renewal</small>
+                                            </div>
+                                            {% else %}
+                                            <span class="badge status-no">Not Allowed</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <div class="mb-1">
+                                                <span class="rule-parameter">TZS {{ rule.fine_per_day|floatformat:0 }}</span> 
+                                                <small>per day</small>
+                                            </div>
+                                            <div>
+                                                <span class="rule-parameter">TZS {{ rule.max_fine_amount|floatformat:0 }}</span> 
+                                                <small>max fine</small>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <div class="mb-1">
+                                                {% if rule.can_borrow_reference %}
+                                                <span class="badge status-yes">Can borrow reference books</span>
+                                                {% else %}
+                                                <span class="badge status-no">Cannot borrow reference books</span>
+                                                {% endif %}
+                                            </div>
+                                            <div>
+                                                <small>Rule ID: {{ rule.id }}</small>
+                                            </div>
+                                        </td>
+                                        <td class="text-center">
+                                            <div class="quick-actions">
+                                                <!-- Edit Button -->
+                                                <button class="btn btn-sm btn-primary quick-action-btn edit-btn" 
+                                                        data-id="{{ rule.id }}"
+                                                        data-borrower-type="{{ rule.borrower_type }}"
+                                                        data-max-books-allowed="{{ rule.max_books_allowed }}"
+                                                        data-borrowing-duration-days="{{ rule.borrowing_duration_days }}"
+                                                        data-renewal-allowed="{{ rule.renewal_allowed|yesno:'true,false' }}"
+                                                        data-max-renewals="{{ rule.max_renewals }}"
+                                                        data-renewal-duration-days="{{ rule.renewal_duration_days }}"
+                                                        data-fine-per-day="{{ rule.fine_per_day }}"
+                                                        data-max-fine-amount="{{ rule.max_fine_amount }}"
+                                                        data-can-borrow-reference="{{ rule.can_borrow_reference|yesno:'true,false' }}"
+                                                        title="Edit Rule">
+                                                    <i class="fas fa-edit"></i>
+                                                </button>
+                                                
+                                                <!-- Delete Button -->
+                                                <button class="btn btn-sm btn-danger quick-action-btn delete-btn" 
+                                                        data-id="{{ rule.id }}"
+                                                        data-borrower-type="{{ rule.get_borrower_type_display }}"
+                                                        title="Delete Rule">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>                                   
+                                    
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Add Rule Modal -->
+<div class="modal fade" id="addRuleModal" tabindex="-1" role="dialog" aria-labelledby="addModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="addModalLabel">
+                    <i class="fas fa-plus-circle"></i> Add New Borrowing Rule
+                </h5>
+                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <form id="add-form">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-12">
+                            <div class="form-group">
+                                <label for="borrower_type" class="required-field">Borrower Type</label>
+                                <select class="form-control select2bs4" id="borrower_type" name="borrower_type" required style="width: 100%;">
+                                    <option value="">Select Borrower Type</option>
+                                    {% for borrower_type_code, borrower_type_name in borrower_type_choices %}
+                                        <option value="{{ borrower_type_code }}">{{ borrower_type_name }}</option>
+                                    {% endfor %}
+                                </select>
+                                <small class="form-text text-muted">Select the user type for these rules</small>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="max_books_allowed" class="required-field">Maximum Books Allowed</label>
+                                <input type="number" class="form-control" id="max_books_allowed" name="max_books_allowed" 
+                                       value="1" min="1" max="10" required placeholder="e.g., 3">
+                                <small class="form-text text-muted">Maximum number of books that can be borrowed at once</small>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="borrowing_duration_days" class="required-field">Borrowing Duration (Days)</label>
+                                <input type="number" class="form-control" id="borrowing_duration_days" name="borrowing_duration_days" 
+                                       value="7" min="1" max="30" required placeholder="e.g., 14">
+                                <small class="form-text text-muted">Maximum borrowing period in days</small>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <div class="custom-control custom-switch">
+                                    <input type="checkbox" class="custom-control-input" id="renewal_allowed" name="renewal_allowed" checked>
+                                    <label class="custom-control-label" for="renewal_allowed">Allow Renewal</label>
+                                </div>
+                                <small class="form-text text-muted">Whether users can renew borrowed books</small>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <div class="custom-control custom-switch">
+                                    <input type="checkbox" class="custom-control-input" id="can_borrow_reference" name="can_borrow_reference">
+                                    <label class="custom-control-label" for="can_borrow_reference">Can Borrow Reference Books</label>
+                                </div>
+                                <small class="form-text text-muted">Whether users can borrow reference books</small>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div id="renewal-fields">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="max_renewals">Maximum Renewals</label>
+                                    <input type="number" class="form-control" id="max_renewals" name="max_renewals" 
+                                           value="1" min="0" max="5" placeholder="e.g., 2">
+                                    <small class="form-text text-muted">Maximum number of renewals allowed (0 = no limit)</small>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="renewal_duration_days">Renewal Duration (Days)</label>
+                                    <input type="number" class="form-control" id="renewal_duration_days" name="renewal_duration_days" 
+                                           value="7" min="1" max="30" placeholder="e.g., 7">
+                                    <small class="form-text text-muted">Duration for each renewal in days</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="fine_per_day" class="required-field">Fine Per Day (TZS)</label>
+                                <input type="number" class="form-control" id="fine_per_day" name="fine_per_day" 
+                                       value="500" min="0" step="100" required placeholder="e.g., 500">
+                                <small class="form-text text-muted">Fine per day for overdue books</small>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="max_fine_amount" class="required-field">Maximum Fine Amount (TZS)</label>
+                                <input type="number" class="form-control" id="max_fine_amount" name="max_fine_amount" 
+                                       value="10000" min="0" step="500" required placeholder="e.g., 10000">
+                                <small class="form-text text-muted">Maximum fine amount that can be charged</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal" id="cancel-add-btn">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="save-btn">
+                        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="display: none;"></span>
+                        Save Rule
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Rule Modal -->
+<div class="modal fade" id="editRuleModal" tabindex="-1" role="dialog" aria-labelledby="editModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-warning text-dark">
+                <h5 class="modal-title" id="editModalLabel">
+                    <i class="fas fa-edit"></i> Edit Borrowing Rule
+                </h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <form id="edit-form">
+                {% csrf_token %}
+                <input type="hidden" id="edit-id" name="id">
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-12">
+                            <div class="form-group">
+                                <label for="edit-borrower_type" class="required-field">Borrower Type</label>
+                                <select class="form-control select2bs4" id="edit-borrower_type" name="borrower_type" required style="width: 100%;" disabled>
+                                    <option value="">Select Borrower Type</option>
+                                    {% for borrower_type_code, borrower_type_name in borrower_type_choices %}
+                                        <option value="{{ borrower_type_code }}">{{ borrower_type_name }}</option>
+                                    {% endfor %}
+                                </select>
+                                <small class="form-text text-muted">Borrower type cannot be changed</small>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="edit-max_books_allowed" class="required-field">Maximum Books Allowed</label>
+                                <input type="number" class="form-control" id="edit-max_books_allowed" name="max_books_allowed" 
+                                       min="1" max="10" required placeholder="e.g., 3">
+                                <small class="form-text text-muted">Maximum number of books that can be borrowed at once</small>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="edit-borrowing_duration_days" class="required-field">Borrowing Duration (Days)</label>
+                                <input type="number" class="form-control" id="edit-borrowing_duration_days" name="borrowing_duration_days" 
+                                       min="1" max="30" required placeholder="e.g., 14">
+                                <small class="form-text text-muted">Maximum borrowing period in days</small>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <div class="custom-control custom-switch">
+                                    <input type="checkbox" class="custom-control-input" id="edit-renewal_allowed" name="renewal_allowed">
+                                    <label class="custom-control-label" for="edit-renewal_allowed">Allow Renewal</label>
+                                </div>
+                                <small class="form-text text-muted">Whether users can renew borrowed books</small>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <div class="custom-control custom-switch">
+                                    <input type="checkbox" class="custom-control-input" id="edit-can_borrow_reference" name="can_borrow_reference">
+                                    <label class="custom-control-label" for="edit-can_borrow_reference">Can Borrow Reference Books</label>
+                                </div>
+                                <small class="form-text text-muted">Whether users can borrow reference books</small>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div id="edit-renewal-fields">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="edit-max_renewals">Maximum Renewals</label>
+                                    <input type="number" class="form-control" id="edit-max_renewals" name="max_renewals" 
+                                           min="0" max="5" placeholder="e.g., 2">
+                                    <small class="form-text text-muted">Maximum number of renewals allowed (0 = no limit)</small>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="edit-renewal_duration_days">Renewal Duration (Days)</label>
+                                    <input type="number" class="form-control" id="edit-renewal_duration_days" name="renewal_duration_days" 
+                                           min="1" max="30" placeholder="e.g., 7">
+                                    <small class="form-text text-muted">Duration for each renewal in days</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="edit-fine_per_day" class="required-field">Fine Per Day (TZS)</label>
+                                <input type="number" class="form-control" id="edit-fine_per_day" name="fine_per_day" 
+                                       min="0" step="100" required placeholder="e.g., 500">
+                                <small class="form-text text-muted">Fine per day for overdue books</small>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="edit-max_fine_amount" class="required-field">Maximum Fine Amount (TZS)</label>
+                                <input type="number" class="form-control" id="edit-max_fine_amount" name="max_fine_amount" 
+                                       min="0" step="500" required placeholder="e.g., 10000">
+                                <small class="form-text text-muted">Maximum fine amount that can be charged</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal" id="cancel-edit-btn">Cancel</button>
+                    <button type="submit" class="btn btn-warning" id="update-btn">
+                        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="display: none;"></span>
+                        Update Rule
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Rule Modal -->
+<div class="modal fade" id="deleteRuleModal" tabindex="-1" role="dialog" aria-labelledby="deleteModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="deleteModalLabel">
+                    <i class="fas fa-exclamation-triangle"></i> Confirm Deletion
+                </h5>
+                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete borrowing rules for <strong id="delete-borrower-type"></strong>?</p>
+                <p class="text-danger"><small>This action cannot be undone. Users of this type will have no borrowing rules until new ones are created.</small></p>
+                <div class="alert alert-warning mt-3">
+                    <small>
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <strong>Warning:</strong> Deleting these rules may affect borrowing operations for users of this type.
+                    </small>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal" id="cancel-delete-btn">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirm-delete-btn">
+                    <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="display: none;"></span>
+                    Delete
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+<script>
+    $(document).ready(function() {
+        // ====================== INITIALIZATION ======================
+        
+        // Initialize DataTable
+        var table = $('#rules-table').DataTable({
+            "dom": "<'row'<'col-sm-12 col-md-6'l><'col-sm-12 col-md-6'f>>" +
+                   "<'row'<'col-sm-12'tr>>" +
+                   "<'row'<'col-sm-12 col-md-5'i><'col-sm-12 col-md-7'p>>",
+            "lengthMenu": [[10, 25, 50, -1], [10, 25, 50, "All"]],
+            "pageLength": 10,
+            "responsive": true,
+            "autoWidth": false,
+            "ordering": true,
+            "order": [[0, 'asc']],
+            "destroy": true,
+            "retrieve": true,
+            "deferRender": true,
+            "columnDefs": [
+                { 
+                    "targets": 5,
+                    "orderable": false,
+                    "searchable": false
+                }
+            ],
+            "language": {
+                "emptyTable": "<div class='text-center py-4'><i class='fas fa-cogs fa-2x mb-2'></i><br>No rules found. Click \"Add Rule\" to create one.</div>",
+                "search": "_INPUT_",
+                "searchPlaceholder": "Search rules...",
+                "lengthMenu": "_MENU_ rules per page",
+                "info": "Showing _START_ to _END_ of _TOTAL_ rules",
+                "infoEmpty": "Showing 0 to 0 of 0 rules",
+                "infoFiltered": "(filtered from _MAX_ total rules)",
+                "paginate": {
+                    "first": "First",
+                    "last": "Last",
+                    "next": "Next",
+                    "previous": "Previous"
+                }
+            }
+        });
+
+        // Initialize Select2
+        function initializeSelect2() {
+            // Add modal
+            $('#borrower_type').select2({
+                theme: 'bootstrap4',
+                width: '100%',
+                dropdownParent: $('#addRuleModal')
+            });
+            
+            // Edit modal
+            $('#edit-borrower_type').select2({
+                theme: 'bootstrap4',
+                width: '100%',
+                dropdownParent: $('#editRuleModal')
+            });
+        }
+        
+        // Call initialization
+        initializeSelect2();
+
+        // ====================== UTILITY FUNCTIONS ======================
+        
+        // CSRF token for AJAX requests
+        function getCSRFToken() {
+            return $('input[name="csrfmiddlewaretoken"]').val();
+        }
+
+        // Show toast message
+        function showToast(message, type = 'success') {
+            const toastId = type === 'success' ? '#success-toast' : '#error-toast';
+            const messageId = type === 'success' ? '#success-message' : '#error-message';
+            
+            $(messageId).text(message);
+            $(toastId).addClass('show').fadeIn();
+            
+            setTimeout(function() {
+                $(toastId).fadeOut(function() {
+                    $(this).removeClass('show');
+                });
+            }, type === 'success' ? 3000 : 5000);
+        }
+
+        // Helper function to handle button loading state
+        function setButtonLoading(btn, isLoading) {
+            const spinner = btn.find('.spinner-border');
+            if (isLoading) {
+                btn.data('original-text', btn.html());
+                btn.prop('disabled', true);
+                spinner.show();
+            } else {
+                btn.prop('disabled', false);
+                spinner.hide();
+                btn.html(btn.data('original-text'));
+            }
+        }
+
+        // Function to reload page after delay
+        function reloadPageAfterDelay(message, type = 'success') {
+            showToast(message, type);
+            setTimeout(function() {
+                location.reload();
+            }, type === 'success' ? 2000 : 3000);
+        }
+
+        // Toggle renewal fields based on checkbox
+        function toggleRenewalFields(isEnabled, isEdit = false) {
+            const prefix = isEdit ? 'edit-' : '';
+            const renewalFields = $('#' + prefix + 'renewal-fields');
+            
+            if (isEnabled) {
+                renewalFields.show();
+                $('#' + prefix + 'max_renewals, #' + prefix + 'renewal_duration_days').prop('disabled', false);
+            } else {
+                renewalFields.hide();
+                $('#' + prefix + 'max_renewals, #' + prefix + 'renewal_duration_days').prop('disabled', true);
+            }
+        }
+
+        // ====================== EVENT HANDLERS ======================
+        
+        // Handle modal close/cancel buttons
+        $(document).on('click', '[data-dismiss="modal"]', function(e) {
+            e.preventDefault();
+            $(this).closest('.modal').modal('hide');
+        });
+
+        // Handle renewal allowed checkbox change (add form)
+        $('#renewal_allowed').on('change', function() {
+            toggleRenewalFields($(this).is(':checked'), false);
+        });
+        
+        // Handle renewal allowed checkbox change (edit form)
+        $('#edit-renewal_allowed').on('change', function() {
+            toggleRenewalFields($(this).is(':checked'), true);
+        });
+
+        // Initialize renewal fields state
+        toggleRenewalFields($('#renewal_allowed').is(':checked'), false);
+
+        // ====================== ADD RULE ======================
+        $('#add-form').on('submit', function(e) {
+            e.preventDefault();
+            
+            const saveBtn = $('#save-btn');
+            setButtonLoading(saveBtn, true);
+            
+            const formData = new FormData(this);
+            formData.append('action', 'create');
+            
+            $.ajax({
+                url: '{% url "admin_borrowing_rules_crud" %}',
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCSRFToken(),
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function(data) {
+                    if (data.success) {
+                        $('#addRuleModal').modal('hide');
+                        reloadPageAfterDelay(data.message, 'success');
+                    } else {
+                        showToast(data.message, 'danger');
+                        setButtonLoading(saveBtn, false);
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error:', error);
+                    showToast('An error occurred while saving. Please try again.', 'danger');
+                    setButtonLoading(saveBtn, false);
+                }
+            });
+        });
+
+        // ====================== EDIT RULE ======================
+        let currentEditRuleId = null;
+        
+        $(document).on('click', '.edit-btn', function() {
+            const btn = $(this);
+            currentEditRuleId = btn.data('id');
+            
+            // Set form values
+            $('#edit-id').val(currentEditRuleId);
+            $('#edit-borrower_type').val(btn.data('borrower-type')).trigger('change');
+            $('#edit-max_books_allowed').val(btn.data('max-books-allowed'));
+            $('#edit-borrowing_duration_days').val(btn.data('borrowing-duration-days'));
+            $('#edit-fine_per_day').val(btn.data('fine-per-day'));
+            $('#edit-max_fine_amount').val(btn.data('max-fine-amount'));
+            $('#edit-max_renewals').val(btn.data('max-renewals'));
+            $('#edit-renewal_duration_days').val(btn.data('renewal-duration-days'));
+            
+            // Set checkbox values
+            $('#edit-renewal_allowed').prop('checked', btn.data('renewal-allowed') === 'true');
+            $('#edit-can_borrow_reference').prop('checked', btn.data('can-borrow-reference') === 'true');
+            
+            // Show modal
+            $('#editRuleModal').modal('show');
+            
+            // Toggle renewal fields based on checkbox
+            toggleRenewalFields(btn.data('renewal-allowed') === 'true', true);
+        });
+
+        // Edit form submission
+        $('#edit-form').on('submit', function(e) {
+            e.preventDefault();
+            
+            const updateBtn = $('#update-btn');
+            setButtonLoading(updateBtn, true);
+            
+            const formData = new FormData(this);
+            formData.append('action', 'update');
+            
+            $.ajax({
+                url: '{% url "admin_borrowing_rules_crud" %}',
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCSRFToken(),
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function(data) {
+                    if (data.success) {
+                        $('#editRuleModal').modal('hide');
+                        reloadPageAfterDelay(data.message, 'success');
+                    } else {
+                        showToast(data.message, 'danger');
+                        setButtonLoading(updateBtn, false);
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error:', error);
+                    showToast('An error occurred while updating. Please try again.', 'danger');
+                    setButtonLoading(updateBtn, false);
+                }
+            });
+        });
+
+        // ====================== DELETE RULE ======================
+        let ruleToDelete = null;
+        
+        $(document).on('click', '.delete-btn', function() {
+            const btn = $(this);
+            
+            ruleToDelete = {
+                id: btn.data('id'),
+                borrowerType: btn.data('borrower-type')
+            };
+            
+            $('#delete-borrower-type').text(btn.data('borrower-type'));
+            $('#deleteRuleModal').modal('show');
+        });
+
+        // Delete confirmation
+        $('#confirm-delete-btn').on('click', function() {
+            if (!ruleToDelete) return;
+            
+            const deleteBtn = $(this);
+            setButtonLoading(deleteBtn, true);
+            
+            $.ajax({
+                url: '{% url "admin_borrowing_rules_crud" %}',
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCSRFToken(),
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                data: {
+                    'action': 'delete',
+                    'id': ruleToDelete.id,
+                    'csrfmiddlewaretoken': getCSRFToken()
+                },
+                success: function(data) {
+                    if (data.success) {
+                        $('#deleteRuleModal').modal('hide');
+                        reloadPageAfterDelay(data.message, 'success');
+                    } else {
+                        showToast(data.message, 'danger');
+                        setButtonLoading(deleteBtn, false);
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error:', error);
+                    showToast('An error occurred while deleting. Please try again.', 'danger');
+                    setButtonLoading(deleteBtn, false);
+                }
+            });
+        });
+
+        // ====================== MODAL CLEANUP ======================
+        
+        // Clear add modal on close
+        $('#addRuleModal').on('hidden.bs.modal', function() {
+            $('#add-form')[0].reset();
+            setButtonLoading($('#save-btn'), false);
+            // Reset Select2
+            $('#borrower_type').val(null).trigger('change');
+            // Reset checkboxes
+            $('#renewal_allowed').prop('checked', true);
+            $('#can_borrow_reference').prop('checked', false);
+            // Reset renewal fields state
+            toggleRenewalFields(true, false);
+        });
+        
+        // Clear edit modal on close
+        $('#editRuleModal').on('hidden.bs.modal', function() {
+            setButtonLoading($('#update-btn'), false);
+            // Reset Select2
+            $('#edit-borrower_type').val(null).trigger('change');
+            currentEditRuleId = null;
+        });
+        
+        // Clear delete modal on close
+        $('#deleteRuleModal').on('hidden.bs.modal', function() {
+            ruleToDelete = null;
+            setButtonLoading($('#confirm-delete-btn'), false);
+        });
+
+        // ====================== FORM VALIDATION ======================
+        
+        $('#add-form, #edit-form').on('submit', function(e) {
+            const isAddForm = $(this).attr('id') === 'add-form';
+            
+            let borrowerTypeInput, maxBooksInput, durationInput, finePerDayInput, maxFineInput;
+            
+            if (isAddForm) {
+                borrowerTypeInput = '#borrower_type';
+                maxBooksInput = '#max_books_allowed';
+                durationInput = '#borrowing_duration_days';
+                finePerDayInput = '#fine_per_day';
+                maxFineInput = '#max_fine_amount';
+            } else {
+                borrowerTypeInput = '#edit-borrower_type';
+                maxBooksInput = '#edit-max_books_allowed';
+                durationInput = '#edit-borrowing_duration_days';
+                finePerDayInput = '#edit-fine_per_day';
+                maxFineInput = '#edit-max_fine_amount';
+            }
+            
+            const borrowerType = $(borrowerTypeInput).val();
+            const maxBooks = $(maxBooksInput).val();
+            const duration = $(durationInput).val();
+            const finePerDay = $(finePerDayInput).val();
+            const maxFine = $(maxFineInput).val();
+            
+            // Clear previous validation
+            $(borrowerTypeInput).removeClass('is-invalid');
+            $(maxBooksInput).removeClass('is-invalid');
+            $(durationInput).removeClass('is-invalid');
+            $(finePerDayInput).removeClass('is-invalid');
+            $(maxFineInput).removeClass('is-invalid');
+            
+            let isValid = true;
+            let errorMessage = '';
+            
+            // Validate required fields
+            if (!borrowerType) {
+                errorMessage = 'Borrower type is required.';
+                $(borrowerTypeInput).addClass('is-invalid');
+                isValid = false;
+            } else if (!maxBooks) {
+                errorMessage = 'Maximum books allowed is required.';
+                $(maxBooksInput).addClass('is-invalid');
+                isValid = false;
+            } else if (parseInt(maxBooks) < 1 || parseInt(maxBooks) > 10) {
+                errorMessage = 'Maximum books allowed must be between 1 and 10.';
+                $(maxBooksInput).addClass('is-invalid');
+                isValid = false;
+            } else if (!duration) {
+                errorMessage = 'Borrowing duration is required.';
+                $(durationInput).addClass('is-invalid');
+                isValid = false;
+            } else if (parseInt(duration) < 1 || parseInt(duration) > 30) {
+                errorMessage = 'Borrowing duration must be between 1 and 30 days.';
+                $(durationInput).addClass('is-invalid');
+                isValid = false;
+            } else if (!finePerDay) {
+                errorMessage = 'Fine per day is required.';
+                $(finePerDayInput).addClass('is-invalid');
+                isValid = false;
+            } else if (parseFloat(finePerDay) < 0) {
+                errorMessage = 'Fine per day cannot be negative.';
+                $(finePerDayInput).addClass('is-invalid');
+                isValid = false;
+            } else if (!maxFine) {
+                errorMessage = 'Maximum fine amount is required.';
+                $(maxFineInput).addClass('is-invalid');
+                isValid = false;
+            } else if (parseFloat(maxFine) < 0) {
+                errorMessage = 'Maximum fine amount cannot be negative.';
+                $(maxFineInput).addClass('is-invalid');
+                isValid = false;
+            } else if (parseFloat(finePerDay) > parseFloat(maxFine)) {
+                errorMessage = 'Fine per day cannot exceed maximum fine amount.';
+                $(finePerDayInput).addClass('is-invalid');
+                $(maxFineInput).addClass('is-invalid');
+                isValid = false;
+            }
+            
+            if (!isValid) {
+                e.preventDefault();
+                showToast(errorMessage, 'danger');
+                return false;
+            }
+            
+            return true;
+        });
+
+        // Remove validation classes on input
+        $('input, select, textarea').on('input change', function() {
+            $(this).removeClass('is-invalid');
+        });
+    });
+</script>
+{% endblock extra_js %}

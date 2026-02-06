@@ -1,0 +1,778 @@
+<!-- templates/admin/library/edit_book_borrow.html -->
+{% extends 'admin/base.html' %}
+{% load static %}
+{% block title %} Edit Borrow Record - {{ borrow.book.title }} {% endblock title %}
+
+{% block breadcrumb %}
+    <a href="{% url 'admin_book_borrows_list' %}" class="btn btn-outline-secondary">
+        <i class="fas fa-arrow-left"></i> Back to Borrow List
+    </a>
+    <a href="{% url 'admin_view_book_borrow' borrow.id %}" class="btn btn-primary ml-2">
+        <i class="fas fa-eye"></i> View Details
+    </a>
+{% endblock breadcrumb %}
+
+{% block extra_css %}
+<style>
+    .edit-form-section {
+        background-color: #f8f9fa;
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 20px;
+        border: 1px solid #dee2e6;
+    }
+    .edit-form-section h5 {
+        border-bottom: 2px solid #007bff;
+        padding-bottom: 10px;
+        margin-bottom: 20px;
+        color: #007bff;
+    }
+    .current-info {
+        background-color: #e8f4fd;
+        border-radius: 5px;
+        padding: 15px;
+        margin-bottom: 20px;
+        border-left: 4px solid #007bff;
+    }
+    .info-label {
+        font-weight: 600;
+        color: #495057;
+        min-width: 150px;
+    }
+    .info-value {
+        color: #212529;
+        word-break: break-word;
+    }
+    .status-badge {
+        font-size: 0.9em;
+        padding: 0.5em 1em;
+    }
+    .fine-amount {
+        font-size: 1.2em;
+        font-weight: 700;
+    }
+    .fine-paid {
+        color: #28a745;
+        font-weight: 600;
+    }
+    .fine-balance {
+        color: #dc3545;
+        font-weight: 700;
+    }
+    .payment-history {
+        max-height: 300px;
+        overflow-y: auto;
+    }
+    .history-item {
+        border-left: 3px solid #28a745;
+        padding-left: 10px;
+        margin-bottom: 10px;
+    }
+    .history-item.refunded {
+        border-left-color: #ffc107;
+    }
+    .history-item.failed {
+        border-left-color: #dc3545;
+    }
+    .form-section {
+        margin-bottom: 25px;
+    }
+    .form-section h6 {
+        color: #495057;
+        border-bottom: 1px solid #dee2e6;
+        padding-bottom: 5px;
+        margin-bottom: 15px;
+    }
+    .required-field::after {
+        content: " *";
+        color: #dc3545;
+    }
+    .help-text {
+        font-size: 0.85em;
+        color: #6c757d;
+        margin-top: 5px;
+    }
+    .btn-update {
+        min-width: 150px;
+    }
+</style>
+{% endblock extra_css %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-lg-10 offset-lg-1">
+            <div class="card">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-edit"></i> Edit Borrow Record - {{ borrow.book.title }}
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <!-- Current Information -->
+                    <div class="current-info">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h6><i class="fas fa-info-circle"></i> Current Information</h6>
+                                <table class="table table-sm table-borderless">
+                                    <tbody>
+                                        <tr>
+                                            <td class="info-label">Borrower:</td>
+                                            <td class="info-value">
+                                                {{ borrow.get_borrower_name }}
+                                                <span class="badge {% if borrow.borrower_type == 'staff' %}badge-primary{% else %}badge-info{% endif %} status-badge ml-2">
+                                                    {{ borrow.borrower_type|title }}
+                                                </span>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td class="info-label">Book:</td>
+                                            <td class="info-value">{{ borrow.book.title }} by {{ borrow.book.author }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="info-label">Borrow Date:</td>
+                                            <td class="info-value">{{ borrow.borrow_date|date:"F d, Y" }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="info-label">Due Date:</td>
+                                            <td class="info-value">{{ borrow.due_date|date:"F d, Y" }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="info-label">Status:</td>
+                                            <td class="info-value">
+                                                <span class="badge {% if borrow.status == 'active' %}badge-success{% elif borrow.status == 'overdue' %}badge-danger{% elif borrow.status == 'returned' %}badge-secondary{% else %}badge-warning{% endif %} status-badge">
+                                                    {{ borrow.get_status_display }}
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div class="col-md-6">
+                                <h6><i class="fas fa-file-invoice-dollar"></i> Fine Information</h6>
+                                <table class="table table-sm table-borderless">
+                                    <tbody>
+                                        <tr>
+                                            <td class="info-label">Total Fine:</td>
+                                            <td class="fine-amount">TZS {{ borrow.fine_amount|floatformat:0 }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="info-label">Amount Paid:</td>
+                                            <td class="fine-paid">TZS {{ borrow.fine_paid|floatformat:0 }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="info-label">Balance Due:</td>
+                                            <td class="fine-balance">TZS {{ borrow.fine_balance|floatformat:0 }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="info-label">Overdue Days:</td>
+                                            <td class="info-value">
+                                                {% if borrow.status == 'overdue' %}
+                                                    {{ borrow.calculate_overdue_days }} day{{ borrow.calculate_overdue_days|pluralize }}
+                                                {% else %}
+                                                    0
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Edit Form -->
+                    <form id="edit-borrow-form">
+                        {% csrf_token %}
+                        
+                        <!-- Borrower Information -->
+                        <div class="edit-form-section">
+                            <h5><i class="fas fa-user"></i> Borrower Information</h5>
+                            
+                            <div class="form-section">
+                                <h6>Current Borrower</h6>
+                                <div class="alert alert-info">
+                                    <i class="fas fa-info-circle"></i>
+                                    Currently borrowed by: <strong>{{ borrow.get_borrower_name }}</strong> 
+                                    ({{ borrow.borrower_type|title }})
+                                    <br>
+                                    <small>To change borrower, please create a new borrow record and cancel this one.</small>
+                                </div>
+                            </div>
+                            
+                            <div class="form-section">
+                                <h6>Borrower Type</h6>
+                                <div class="form-group">
+                                    <div class="form-check form-check-inline">
+                                        <input class="form-check-input" type="radio" name="borrower_type" id="borrower_type_staff" 
+                                               value="staff" {% if borrow.borrower_type == 'staff' %}checked{% endif %} disabled>
+                                        <label class="form-check-label" for="borrower_type_staff">
+                                            <i class="fas fa-user-tie"></i> Staff
+                                        </label>
+                                    </div>
+                                    <div class="form-check form-check-inline">
+                                        <input class="form-check-input" type="radio" name="borrower_type" id="borrower_type_student" 
+                                               value="student" {% if borrow.borrower_type == 'student' %}checked{% endif %} disabled>
+                                        <label class="form-check-label" for="borrower_type_student">
+                                            <i class="fas fa-user-graduate"></i> Student
+                                        </label>
+                                    </div>
+                                    <div class="help-text">
+                                        Borrower type cannot be changed for existing borrows.
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Book Information -->
+                        <div class="edit-form-section">
+                            <h5><i class="fas fa-book"></i> Book Information</h5>
+                            
+                            <div class="form-section">
+                                <h6>Select Book</h6>
+                                <div class="form-group">
+                                    <label for="book" class="required-field">Book</label>
+                                    <select class="form-control select2bs4" id="book" name="book" required style="width: 100%;">
+                                        <option value="">Select Book</option>
+                                        {% for book in available_books %}
+                                            <option value="{{ book.id }}" 
+                                                    {% if book.id == borrow.book.id %}selected{% endif %}
+                                                    data-reference="{{ book.is_reference|yesno:'true,false' }}"
+                                                    data-available="{{ book.available_copies }}">
+                                                {{ book.title }} by {{ book.author }} 
+                                                ({{ book.available_copies }} available{% if book.is_reference %}, Reference{% endif %})
+                                            </option>
+                                        {% endfor %}
+                                    </select>
+                                    <div class="help-text">
+                                        Changing the book will automatically return the current book and borrow the new one.
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="form-section">
+                                <h6>Book Copy (Optional)</h6>
+                                <div class="form-group">
+                                    <label for="book_copy">Select Specific Copy</label>
+                                    <select class="form-control select2bs4" id="book_copy" name="book_copy" style="width: 100%;">
+                                        <option value="">Any Available Copy (Auto-assigned)</option>
+                                        {% for copy in book_copies %}
+                                            <option value="{{ copy.id }}" 
+                                                    {% if copy.id == borrow.book_copy.id %}selected{% endif %}>
+                                                Copy #{{ copy.copy_number }} - {{ copy.accession_number }} ({{ copy.get_condition_display }})
+                                            </option>
+                                        {% endfor %}
+                                    </select>
+                                    <div class="help-text">
+                                        Leave empty to auto-assign any available copy, or select a specific copy.
+                                        {% if borrow.book_copy %}
+                                            <br>Current copy: <strong>{{ borrow.book_copy.copy_number }} - {{ borrow.book_copy.accession_number }}</strong>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Borrow Details -->
+                        <div class="edit-form-section">
+                            <h5><i class="fas fa-calendar-alt"></i> Borrow Details</h5>
+                            
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="form-section">
+                                        <h6>Due Date</h6>
+                                        <div class="form-group">
+                                            <label for="due_date" class="required-field">Due Date</label>
+                                            <input type="date" class="form-control" id="due_date" name="due_date" 
+                                                   value="{{ borrow.due_date|date:'Y-m-d' }}" required>
+                                            <div class="help-text">
+                                                Original borrow date: {{ borrow.borrow_date|date:"F d, Y" }}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="col-md-6">
+                                    <div class="form-section">
+                                        <h6>Status</h6>
+                                        <div class="form-group">
+                                            <label for="status" class="required-field">Status</label>
+                                            <select class="form-control" id="status" name="status" required>
+                                                {% for code, name in status_choices %}
+                                                    <option value="{{ code }}" 
+                                                            {% if code == borrow.status %}selected{% endif %}
+                                                            {% if code == 'returned' and borrow.actual_return_date %}disabled{% endif %}>
+                                                        {{ name }}
+                                                    </option>
+                                                {% endfor %}
+                                            </select>
+                                            <div class="help-text">
+                                                Current status: <span class="badge {% if borrow.status == 'active' %}badge-success{% elif borrow.status == 'overdue' %}badge-danger{% elif borrow.status == 'returned' %}badge-secondary{% else %}badge-warning{% endif %}">
+                                                    {{ borrow.get_status_display }}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="form-section">
+                                <h6>Notes</h6>
+                                <div class="form-group">
+                                    <label for="notes">Update Notes</label>
+                                    <textarea class="form-control" id="notes" name="notes" rows="3" 
+                                              placeholder="Add notes about this update..."></textarea>
+                                    <div class="help-text">
+                                        This note will be added to the borrow record with a timestamp.
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Fine Management -->
+                        <div class="edit-form-section">
+                            <h5><i class="fas fa-money-bill-wave"></i> Fine Management</h5>
+                            
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="form-section">
+                                        <h6>Fine Amount</h6>
+                                        <div class="form-group">
+                                            <label for="fine_amount">Manual Fine Adjustment</label>
+                                            <div class="input-group">
+                                                <div class="input-group-prepend">
+                                                    <span class="input-group-text">TZS</span>
+                                                </div>
+                                                <input type="number" class="form-control" id="fine_amount" name="fine_amount" 
+                                                       value="{{ borrow.fine_amount|floatformat:2 }}" step="0.01" min="0">
+                                            </div>
+                                            <div class="help-text">
+                                                Current calculated fine: TZS {{ borrow.calculate_fine|floatformat:0 }}
+                                                <br>Leave empty to use calculated fine.
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="col-md-6">
+                                    <div class="form-section">
+                                        <h6>Fine Notes</h6>
+                                        <div class="form-group">
+                                            <label for="fine_notes">Fine Notes</label>
+                                            <textarea class="form-control" id="fine_notes" name="fine_notes" rows="3">{{ borrow.fine_notes }}</textarea>
+                                            <div class="help-text">
+                                                Notes about fines (damage fees, waivers, etc.)
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Payment History -->
+                            {% if fine_payments %}
+                            <div class="form-section">
+                                <h6>Payment History</h6>
+                                <div class="payment-history">
+                                    <div class="list-group">
+                                        {% for payment in fine_payments %}
+                                        <div class="list-group-item history-item {% if payment.status == 'refunded' %}refunded{% elif payment.status == 'failed' %}failed{% endif %}">
+                                            <div class="d-flex justify-content-between align-items-center">
+                                                <div>
+                                                    <strong>Receipt #{{ payment.receipt_number }}</strong>
+                                                    <br>
+                                                    <small class="text-muted">
+                                                        {{ payment.payment_date|date:"M d, Y" }} - 
+                                                        {{ payment.get_payment_method_display }} - 
+                                                        <span class="{% if payment.status == 'completed' %}text-success{% elif payment.status == 'refunded' %}text-warning{% else %}text-danger{% endif %}">
+                                                            {{ payment.get_status_display }}
+                                                        </span>
+                                                    </small>
+                                                </div>
+                                                <div class="text-right">
+                                                    <span class="badge badge-success">TZS {{ payment.amount|floatformat:0 }}</span>
+                                                    <br>
+                                                    <small class="text-muted">
+                                                        By: {{ payment.received_by.username|default:"System" }}
+                                                    </small>
+                                                </div>
+                                            </div>
+                                            {% if payment.notes %}
+                                            <div class="mt-2">
+                                                <small class="text-muted">{{ payment.notes }}</small>
+                                            </div>
+                                            {% endif %}
+                                        </div>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                                <div class="text-center mt-2">
+                                    <a href="{% url 'admin_fine_payment' borrow.id %}" class="btn btn-sm btn-info">
+                                        <i class="fas fa-plus-circle"></i> Add New Payment
+                                    </a>
+                                </div>
+                            </div>
+                            {% endif %}
+                        </div>
+
+                        <!-- Danger Zone -->
+                        {% if borrow.status != 'active' and borrow.status != 'overdue' %}
+                        <div class="edit-form-section border-danger">
+                            <h5 class="text-danger"><i class="fas fa-exclamation-triangle"></i> Danger Zone</h5>
+                            
+                            <div class="alert alert-danger">
+                                <h6><i class="fas fa-trash"></i> Delete Borrow Record</h6>
+                                <p class="mb-2">This action cannot be undone. Deleting this record will:</p>
+                                <ul class="mb-3">
+                                    <li>Permanently remove this borrow record</li>
+                                    <li>Remove associated payment history</li>
+                                    <li>Affect reporting and statistics</li>
+                                </ul>
+                                <button type="button" class="btn btn-danger delete-borrow-btn" 
+                                        data-id="{{ borrow.id }}"
+                                        data-borrower="{{ borrow.get_borrower_name }}"
+                                        data-book="{{ borrow.book.title }}">
+                                    <i class="fas fa-trash"></i> Delete This Record
+                                </button>
+                            </div>
+                        </div>
+                        {% endif %}
+
+                        <!-- Form Actions -->
+                        <div class="form-group mt-4">
+                            <div class="d-flex justify-content-between">
+                                <a href="{% url 'admin_view_book_borrow' borrow.id %}" class="btn btn-secondary">
+                                    <i class="fas fa-times"></i> Cancel
+                                </a>
+                                <button type="submit" class="btn btn-warning btn-update" id="update-btn">
+                                    <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="display: none;"></span>
+                                    <i class="fas fa-save"></i> Update Record
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // Initialize Select2
+    $('.select2bs4').select2({
+        theme: 'bootstrap4',
+        width: '100%'
+    });
+    
+    // Get CSRF token
+    function getCSRFToken() {
+        return $('input[name="csrfmiddlewaretoken"]').val();
+    }
+    
+    // Book selection handler
+    $('#book').on('change', function() {
+        const bookId = $(this).val();
+        const selectedOption = $(this).find('option:selected');
+        const isReference = selectedOption.data('reference') === 'true';
+        const availableCopies = parseInt(selectedOption.data('available'));
+        
+        // Clear book copy selection
+        $('#book_copy').val('').trigger('change');
+        
+        if (bookId) {
+            // Load available copies for selected book
+            $.ajax({
+                url: '{% url "admin_get_book_copies" %}',
+                method: 'GET',
+                data: { book_id: bookId },
+                success: function(data) {
+                    if (data.success) {
+                        // Update book copies select
+                        $('#book_copy').empty();
+                        $('#book_copy').append('<option value="">Any Available Copy (Auto-assigned)</option>');
+                        
+                        $.each(data.copies, function(index, copy) {
+                            $('#book_copy').append(
+                                `<option value="${copy.id}">${copy.display_text}</option>`
+                            );
+                        });
+                        
+                        // Show warning if book is reference
+                        if (isReference) {
+                            Swal.fire({
+                                icon: 'warning',
+                                title: 'Reference Book',
+                                text: 'This is a reference book and may have different borrowing rules.',
+                                timer: 3000
+                            });
+                        }
+                        
+                        // Show warning if no copies available
+                        if (availableCopies === 0) {
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'No Copies Available',
+                                text: 'This book has no available copies. Please select another book.',
+                            });
+                        }
+                    }
+                },
+                error: function() {
+                    console.error('Error loading book copies');
+                }
+            });
+        }
+    });
+    
+    // Status change handler
+    $('#status').on('change', function() {
+        const newStatus = $(this).val();
+        const currentStatus = '{{ borrow.status }}';
+        
+        // Show confirmation for certain status changes
+        if (newStatus === 'lost' && currentStatus !== 'lost') {
+            Swal.fire({
+                title: 'Mark as Lost?',
+                text: 'This will mark the book as lost and update inventory counts. This action cannot be easily undone.',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#dc3545',
+                cancelButtonColor: '#6c757d',
+                confirmButtonText: 'Yes, mark as lost',
+                cancelButtonText: 'Cancel'
+            }).then((result) => {
+                if (!result.isConfirmed) {
+                    $(this).val(currentStatus);
+                }
+            });
+        } else if (newStatus === 'cancelled' && currentStatus !== 'cancelled') {
+            Swal.fire({
+                title: 'Cancel Borrow?',
+                text: 'This will cancel the borrow and return the book to inventory. Only do this if the book was never actually borrowed.',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#dc3545',
+                cancelButtonColor: '#6c757d',
+                confirmButtonText: 'Yes, cancel borrow',
+                cancelButtonText: 'Cancel'
+            }).then((result) => {
+                if (!result.isConfirmed) {
+                    $(this).val(currentStatus);
+                }
+            });
+        } else if (newStatus === 'returned' && currentStatus !== 'returned') {
+            Swal.fire({
+                title: 'Mark as Returned?',
+                text: 'This will mark the book as returned and update inventory counts.',
+                icon: 'info',
+                showCancelButton: true,
+                confirmButtonColor: '#28a745',
+                cancelButtonColor: '#6c757d',
+                confirmButtonText: 'Yes, mark as returned',
+                cancelButtonText: 'Cancel'
+            }).then((result) => {
+                if (!result.isConfirmed) {
+                    $(this).val(currentStatus);
+                }
+            });
+        }
+    });
+    
+    // Form submission
+    $('#edit-borrow-form').on('submit', function(e) {
+        e.preventDefault();
+        
+        const updateBtn = $('#update-btn');
+        const spinner = updateBtn.find('.spinner-border');
+        
+        // Validate form
+        const bookId = $('#book').val();
+        const dueDate = $('#due_date').val();
+        const status = $('#status').val();
+        
+        if (!bookId || !dueDate || !status) {
+            Swal.fire({
+                icon: 'error',
+                title: 'Validation Error',
+                text: 'Please fill in all required fields.'
+            });
+            return;
+        }
+        
+        // Show loading
+        updateBtn.prop('disabled', true);
+        spinner.show();
+        
+        // Prepare form data
+        const formData = new FormData(this);
+        
+        // Send AJAX request
+        $.ajax({
+            url: '{% url "admin_edit_book_borrow" borrow.id %}',
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': getCSRFToken(),
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            data: formData,
+            processData: false,
+            contentType: false,
+            success: function(data) {
+                if (data.success) {
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Success!',
+                        html: `
+                            <p>${data.message}</p>
+                            <div class="alert alert-info mt-3">
+                                <i class="fas fa-info-circle"></i>
+                                <strong>Updated Details:</strong><br>
+                                New Status: ${data.new_status}<br>
+                                Due Date: ${data.due_date}<br>
+                                Borrow ID: ${data.borrow_id}
+                            </div>
+                        `,
+                        showConfirmButton: false,
+                        timer: 3000
+                    }).then(() => {
+                        window.location.href = '{% url "admin_view_book_borrow" borrow.id %}';
+                    });
+                } else {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Error!',
+                        text: data.message
+                    });
+                    updateBtn.prop('disabled', false);
+                    spinner.hide();
+                }
+            },
+            error: function(xhr, status, error) {
+                console.error('Error:', error);
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error!',
+                    text: 'An error occurred. Please try again.'
+                });
+                updateBtn.prop('disabled', false);
+                spinner.hide();
+            }
+        });
+    });
+    
+    // Delete button handler
+    $('.delete-borrow-btn').on('click', function() {
+        const borrowId = $(this).data('id');
+        const borrowerName = $(this).data('borrower');
+        const bookTitle = $(this).data('book');
+        
+        Swal.fire({
+            title: 'Delete Borrow Record?',
+            html: `
+                <p>Are you sure you want to delete the borrow record for:</p>
+                <div class="alert alert-danger">
+                    <strong>Book:</strong> ${bookTitle}<br>
+                    <strong>Borrower:</strong> ${borrowerName}
+                </div>
+                <p class="text-danger"><small>This action cannot be undone!</small></p>
+            `,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#dc3545',
+            cancelButtonColor: '#6c757d',
+            confirmButtonText: 'Yes, delete it',
+            cancelButtonText: 'Cancel',
+            reverseButtons: true
+        }).then((result) => {
+            if (result.isConfirmed) {
+                // Send delete request
+                $.ajax({
+                    url: '{% url "admin_book_borrows_crud" %}',
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': getCSRFToken(),
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    data: {
+                        'action': 'delete',
+                        'id': borrowId
+                    },
+                    success: function(data) {
+                        if (data.success) {
+                            Swal.fire({
+                                icon: 'success',
+                                title: 'Deleted!',
+                                text: data.message,
+                                showConfirmButton: false,
+                                timer: 2000
+                            }).then(() => {
+                                window.location.href = '{% url "admin_book_borrows_list" %}';
+                            });
+                        } else {
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'Error!',
+                                text: data.message
+                            });
+                        }
+                    },
+                    error: function(xhr, status, error) {
+                        console.error('Error:', error);
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Error!',
+                            text: 'An error occurred. Please try again.'
+                        });
+                    }
+                });
+            }
+        });
+    });
+    
+    // Auto-calculate due date warning
+    $('#due_date').on('change', function() {
+        const dueDate = new Date($(this).val());
+        const borrowDate = new Date('{{ borrow.borrow_date|date:"Y-m-d" }}');
+        const today = new Date();
+        
+        if (dueDate < borrowDate) {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Invalid Due Date',
+                text: 'Due date cannot be before borrow date.'
+            });
+            $(this).val('{{ borrow.due_date|date:"Y-m-d" }}');
+        } else if (dueDate < today) {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Past Due Date',
+                text: 'Due date is in the past. Consider marking the book as overdue.',
+                showCancelButton: true,
+                confirmButtonText: 'Mark as Overdue',
+                cancelButtonText: 'Keep Date'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    $('#status').val('overdue').trigger('change');
+                }
+            });
+        }
+    });
+    
+    // Fine amount validation
+    $('#fine_amount').on('change', function() {
+        const fineAmount = parseFloat($(this).val()) || 0;
+        const finePaid = parseFloat('{{ borrow.fine_paid }}') || 0;
+        
+        if (fineAmount < finePaid) {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Invalid Fine Amount',
+                text: `Fine amount (TZS ${fineAmount.toLocaleString()}) cannot be less than amount already paid (TZS ${finePaid.toLocaleString()}).`
+            });
+            $(this).val('{{ borrow.fine_amount|floatformat:2 }}');
+        }
+    });
+});
+</script>
+{% endblock extra_js %}

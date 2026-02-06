@@ -1,0 +1,398 @@
+{% extends 'admin/base.html' %}
+{% load static %}
+{% block title %} Return Book {% endblock title %}
+
+{% block breadcrumb %}
+    <a href="{% url 'admin_book_borrows_list' %}" class="btn btn-outline-secondary">
+        <i class="fas fa-arrow-left"></i> Back to Borrow List
+    </a>
+{% endblock breadcrumb %}
+
+{% block extra_css %}
+<style>
+    .book-info-card {
+        border-left: 4px solid #0d6efd;
+    }
+    .fine-info-card {
+        border-left: 4px solid #ffc107;
+    }
+    .borrower-info-card {
+        border-left: 4px solid #198754;
+    }
+    .condition-indicator {
+        display: inline-block;
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        margin-right: 5px;
+    }
+    .condition-excellent { background-color: #198754; }
+    .condition-good { background-color: #0dcaf0; }
+    .condition-fair { background-color: #ffc107; }
+    .condition-poor { background-color: #fd7e14; }
+    .condition-damaged { background-color: #dc3545; }
+</style>
+{% endblock extra_css %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-lg-8 offset-lg-2">
+            <div class="card">
+                <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-undo"></i> Return Book
+                    </h5>
+                    <span class="badge bg-light text-dark">
+                        Borrow ID: #{{ borrow.id|stringformat:"06d" }}
+                    </span>
+                </div>
+                <div class="card-body">
+                    <!-- Borrower Information -->
+                    <div class="card borrower-info-card mb-4">
+                        <div class="card-body">
+                            <h6 class="card-title"><i class="fas fa-user"></i> Borrower Details</h6>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <p class="mb-1"><strong>Name:</strong> {{ borrow.get_borrower_name }}</p>
+                                    <p class="mb-1"><strong>Type:</strong> {{ borrow.get_borrower_type_display }}</p>
+                                </div>
+                                <div class="col-md-6">
+                                    {% if borrow.borrower_type == 'student' and borrow.student_borrower.registration_number %}
+                                    <p class="mb-1"><strong>Registration:</strong> {{ borrow.student_borrower.registration_number }}</p>
+                                    {% endif %}
+                                    {% if borrow.borrower_type == 'staff' and borrow.staff_borrower.admin.email %}
+                                    <p class="mb-1"><strong>Email:</strong> {{ borrow.staff_borrower.admin.email }}</p>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Book Information -->
+                    <div class="card book-info-card mb-4">
+                        <div class="card-body">
+                            <h6 class="card-title"><i class="fas fa-book"></i> Book Details</h6>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <p class="mb-1"><strong>Title:</strong> {{ borrow.book.title }}</p>
+                                    <p class="mb-1"><strong>Author:</strong> {{ borrow.book.author }}</p>
+                                    <p class="mb-1"><strong>ISBN:</strong> {{ borrow.book.isbn|default:"Not specified" }}</p>
+                                </div>
+                                <div class="col-md-6">
+                                    <p class="mb-1"><strong>Accession No:</strong> {{ borrow.book.accession_number }}</p>
+                                    {% if borrow.book_copy %}
+                                    <p class="mb-1"><strong>Copy:</strong> #{{ borrow.book_copy.copy_number }}</p>
+                                    <p class="mb-1"><strong>Copy Barcode:</strong> {{ borrow.book_copy.barcode }}</p>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Borrowing Timeline -->
+                    <div class="card mb-4">
+                        <div class="card-body">
+                            <h6 class="card-title"><i class="fas fa-calendar-alt"></i> Borrowing Timeline</h6>
+                            <div class="row">
+                                <div class="col-md-4 text-center">
+                                    <div class="p-3 border rounded bg-light">
+                                        <small class="text-muted d-block">Borrow Date</small>
+                                        <strong>{{ borrow.borrow_date|date:"M d, Y" }}</strong>
+                                        <small class="text-muted d-block mt-1">{{ borrow.borrow_date|timesince }} ago</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-4 text-center">
+                                    <div class="p-3 border rounded {% if borrow.is_overdue %}bg-danger text-white{% else %}bg-light{% endif %}">
+                                        <small class="{% if borrow.is_overdue %}text-white{% else %}text-muted{% endif %} d-block">Due Date</small>
+                                        <strong>{{ borrow.due_date|date:"M d, Y" }}</strong>
+                                        {% if borrow.is_overdue %}
+                                        <small class="d-block mt-1">Overdue by {{ borrow.overdue_days }} day(s)</small>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <div class="col-md-4 text-center">
+                                    <div class="p-3 border rounded bg-info text-white">
+                                        <small class="text-white d-block">Today's Date</small>
+                                        <strong>{% now "M d, Y" %}</strong>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Fine Information -->
+                    <div class="card fine-info-card mb-4">
+                        <div class="card-body">
+                            <h6 class="card-title"><i class="fas fa-money-bill-wave"></i> Fine Information</h6>
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <div class="text-center p-3 bg-light rounded">
+                                        <small class="text-muted d-block">Total Fine</small>
+                                        <h4 class="mb-0">TZS {{ borrow.fine_amount|floatformat:0 }}</h4>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="text-center p-3 bg-success text-white rounded">
+                                        <small class="text-white d-block">Amount Paid</small>
+                                        <h4 class="mb-0">TZS {{ borrow.fine_paid|floatformat:0 }}</h4>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="text-center p-3 {% if borrow.fine_balance > 0 %}bg-warning{% else %}bg-info text-white{% endif %} rounded">
+                                        <small class="{% if borrow.fine_balance > 0 %}text-dark{% else %}text-white{% endif %} d-block">Balance Due</small>
+                                        <h4 class="mb-0">TZS {{ borrow.fine_balance|floatformat:0 }}</h4>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            {% if borrow.fine_balance > 0 %}
+                            <div class="alert alert-warning mt-3">
+                                <i class="fas fa-exclamation-triangle"></i>
+                                <strong>Note:</strong> There is an outstanding balance of TZS {{ borrow.fine_balance|floatformat:0 }}.
+                                You can process the payment after returning the book.
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <!-- Return Form -->
+                    <div class="card">
+                        <div class="card-header bg-light">
+                            <h6 class="card-title mb-0"><i class="fas fa-clipboard-check"></i> Return Details</h6>
+                        </div>
+                        <div class="card-body">
+                            <form id="return-form">
+                                {% csrf_token %}
+                                <input type="hidden" name="borrow_id" value="{{ borrow.id }}">
+                                
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="form-group">
+                                            <label for="return_date" class="form-label">
+                                                <i class="fas fa-calendar-day"></i> Return Date
+                                            </label>
+                                            <input type="date" class="form-control" id="return_date" name="return_date" 
+                                                   value="{% now 'Y-m-d' %}" max="{% now 'Y-m-d' %}" required>
+                                            <small class="form-text text-muted">Date when book is being returned</small>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="form-group">
+                                            <label for="condition" class="form-label">
+                                                <i class="fas fa-stethoscope"></i> Book Condition
+                                            </label>
+                                            <select class="form-control" id="condition" name="condition" required>
+                                                <option value="">Select Condition</option>
+                                                {% for code, name in condition_choices %}
+                                                    <option value="{{ code }}" 
+                                                            {% if code == 'good' %}selected{% endif %}
+                                                            data-indicator="condition-{{ code }}">
+                                                        <span class="condition-indicator condition-{{ code }}"></span>
+                                                        {{ name }}
+                                                    </option>
+                                                {% endfor %}
+                                            </select>
+                                            <small class="form-text text-muted">Select the condition of the returned book</small>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="notes" class="form-label">
+                                        <i class="fas fa-sticky-note"></i> Notes (Optional)
+                                    </label>
+                                    <textarea class="form-control" id="notes" name="notes" rows="3" 
+                                              placeholder="Any notes about the return condition, damage, or other issues..."></textarea>
+                                    <small class="form-text text-muted">Describe any damage, missing pages, or other issues</small>
+                                </div>
+                                
+                                <!-- Return Options -->
+                                <div class="form-group mt-4">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="process_payment" name="process_payment">
+                                        <label class="form-check-label" for="process_payment">
+                                            <i class="fas fa-credit-card"></i> Process fine payment after return
+                                        </label>
+                                        <small class="form-text text-muted d-block">
+                                            If checked, you will be redirected to the payment page after successful return.
+                                        </small>
+                                    </div>
+                                </div>
+                                
+                                <div class="form-group mt-4">
+                                    <button type="submit" class="btn btn-success btn-lg" id="submit-btn">
+                                        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="display: none;"></span>
+                                        <i class="fas fa-check"></i> Return Book
+                                    </button>
+                                    <a href="{% url 'admin_book_borrows_list' %}" class="btn btn-secondary btn-lg">
+                                        <i class="fas fa-times"></i> Cancel
+                                    </a>
+                                    
+                                    <div class="mt-3">
+                                        <small class="text-muted">
+                                            <i class="fas fa-info-circle"></i>
+                                            Returning this book will update its availability status and calculate any applicable fines.
+                                        </small>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // Set maximum date to today
+    const today = new Date().toISOString().split('T')[0];
+    $('#return_date').attr('max', today);
+    
+    // Update condition indicator preview
+    function updateConditionIndicator() {
+        const selectedOption = $('#condition option:selected');
+        const indicator = selectedOption.data('indicator');
+        $('#condition').removeClass(function(index, className) {
+            return (className.match(/(^|\s)condition-\S+/g) || []).join(' ');
+        });
+        if (indicator) {
+            $('#condition').addClass('border-' + indicator.replace('condition-', ''));
+        }
+    }
+    
+    $('#condition').on('change', updateConditionIndicator);
+    updateConditionIndicator(); // Initial call
+    
+    // Form submission
+    $('#return-form').on('submit', function(e) {
+        e.preventDefault();
+        
+        // Validate return date
+        const returnDate = $('#return_date').val();
+        const borrowDate = '{{ borrow.borrow_date|date:"Y-m-d" }}';
+        
+        if (returnDate < borrowDate) {
+            Swal.fire({
+                icon: 'error',
+                title: 'Invalid Date',
+                text: 'Return date cannot be earlier than borrow date (' + borrowDate + ').'
+            });
+            return;
+        }
+        
+        const submitBtn = $('#submit-btn');
+        const spinner = submitBtn.find('.spinner-border');
+        const originalText = submitBtn.html();
+        
+        // Show loading spinner
+        submitBtn.prop('disabled', true);
+        spinner.show();
+        
+        // Get form data
+        const formData = new FormData(this);
+        
+        // Send AJAX request
+        $.ajax({
+            url: window.location.href,
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': $('input[name="csrfmiddlewaretoken"]').val(),
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            data: formData,
+            processData: false,
+            contentType: false,
+            success: function(data) {
+                if (data.success) {
+                    // Show success message
+                    const processPayment = $('#process_payment').is(':checked');
+                    const fineBalance = parseFloat(data.fine_balance);
+                    
+                    let htmlMessage = `
+                        <div class="text-start">
+                            <p>${data.message}</p>
+                            <div class="alert ${fineBalance > 0 ? 'alert-warning' : 'alert-success'} mt-3">
+                                <p class="mb-1"><strong>Fine Summary:</strong></p>
+                                <p class="mb-1">Total Fine: TZS ${parseFloat(data.fine_amount).toLocaleString()}</p>
+                                <p class="mb-1">Balance Due: TZS ${parseFloat(data.fine_balance).toLocaleString()}</p>
+                            </div>
+                        </div>
+                    `;
+                    
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Book Returned Successfully!',
+                        html: htmlMessage,
+                        showCancelButton: fineBalance > 0,
+                        confirmButtonText: processPayment ? 'Process Payment' : 'Back to List',
+                        cancelButtonText: 'Back to List',
+                        allowOutsideClick: false
+                    }).then((result) => {
+                        if (fineBalance > 0 && (result.isConfirmed || processPayment)) {
+                            // Redirect to fine payment page
+                            window.location.href = '{% url "admin_fine_payment" borrow.id %}';
+                        } else {
+                            // Redirect back to borrow list
+                            window.location.href = '{% url "admin_book_borrows_list" %}';
+                        }
+                    });
+                } else {
+                    // Show error message
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Return Failed!',
+                        text: data.message || 'An error occurred while returning the book.',
+                        confirmButtonText: 'Try Again'
+                    });
+                    submitBtn.prop('disabled', false);
+                    spinner.hide();
+                }
+            },
+            error: function(xhr, status, error) {
+                console.error('Error:', error);
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Server Error!',
+                    text: 'An error occurred while processing your request. Please try again.',
+                    confirmButtonText: 'OK'
+                });
+                submitBtn.prop('disabled', false);
+                spinner.hide();
+            }
+        });
+    });
+    
+    // Add date validation
+    $('#return_date').on('change', function() {
+        const selectedDate = new Date(this.value);
+        const today = new Date();
+        const borrowDate = new Date('{{ borrow.borrow_date|date:"Y-m-d" }}');
+        
+        if (selectedDate > today) {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Future Date',
+                text: 'Return date cannot be in the future. Please select today or an earlier date.',
+                timer: 3000
+            });
+            this.value = today.toISOString().split('T')[0];
+        }
+        
+        if (selectedDate < borrowDate) {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Invalid Date',
+                text: 'Return date cannot be earlier than borrow date (' + '{{ borrow.borrow_date|date:"M d, Y" }}' + ').',
+                timer: 3000
+            });
+            this.value = '{{ borrow.borrow_date|date:"Y-m-d" }}';
+        }
+    });
+});
+</script>
+{% endblock %}

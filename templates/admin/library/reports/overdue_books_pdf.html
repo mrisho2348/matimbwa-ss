@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Overdue Books Report - {{ export_date }}</title>
+    <style>
+        @page {
+            size: A4 portrait;
+            margin: 20mm;
+            
+            @top-center {
+                content: "Overdue Books Report";
+                font-size: 12pt;
+                font-weight: bold;
+            }
+            
+            @bottom-center {
+                content: "Page " counter(page) " of " counter(pages);
+                font-size: 10pt;
+            }
+        }
+        
+        body {
+            font-family: 'Helvetica', 'Arial', sans-serif;
+            font-size: 11pt;
+            line-height: 1.5;
+            color: #333;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #f56565;
+        }
+        
+        .header h1 {
+            color: #f56565;
+            font-size: 18pt;
+            margin-bottom: 5px;
+        }
+        
+        .header .subtitle {
+            color: #666;
+            font-size: 12pt;
+        }
+        
+        .report-info {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 15px;
+            padding: 10px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+        }
+        
+        .info-item {
+            flex: 1;
+        }
+        
+        .info-label {
+            font-weight: bold;
+            color: #666;
+            font-size: 10pt;
+        }
+        
+        .info-value {
+            color: #333;
+            font-size: 11pt;
+        }
+        
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .summary-card {
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            text-align: center;
+            background-color: #f8f9fa;
+        }
+        
+        .summary-number {
+            font-size: 16pt;
+            font-weight: bold;
+            color: #f56565;
+        }
+        
+        .summary-label {
+            font-size: 9pt;
+            color: #666;
+            text-transform: uppercase;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+            font-size: 9pt;
+        }
+        
+        th {
+            background-color: #f56565;
+            color: white;
+            padding: 8px;
+            text-align: left;
+            font-weight: bold;
+            border: 1px solid #ddd;
+        }
+        
+        td {
+            padding: 8px;
+            border: 1px solid #ddd;
+            vertical-align: top;
+        }
+        
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        
+        .borrower-info {
+            font-weight: bold;
+            margin-bottom: 2px;
+        }
+        
+        .borrower-type {
+            display: inline-block;
+            padding: 2px 6px;
+            font-size: 8pt;
+            border-radius: 3px;
+            background-color: #4299e1;
+            color: white;
+        }
+        
+        .borrower-type-student {
+            background-color: #38b2ac;
+        }
+        
+        .book-title {
+            font-weight: bold;
+            margin-bottom: 2px;
+        }
+        
+        .book-author {
+            color: #666;
+            font-size: 9pt;
+        }
+        
+        .dates {
+            font-size: 9pt;
+        }
+        
+        .date-label {
+            font-weight: bold;
+        }
+        
+        .due-date {
+            color: #f56565;
+            font-weight: bold;
+        }
+        
+        .overdue-badge {
+            display: inline-block;
+            padding: 2px 6px;
+            font-size: 8pt;
+            border-radius: 3px;
+            color: white;
+            margin-top: 2px;
+        }
+        
+        .severity-critical { background-color: #c53030; }
+        .severity-high { background-color: #ed8936; }
+        .severity-medium { background-color: #ecc94b; color: #333; }
+        .severity-low { background-color: #48bb78; }
+        
+        .severity-text {
+            font-weight: bold;
+        }
+        
+        .severity-critical-text { color: #c53030; }
+        .severity-high-text { color: #ed8936; }
+        .severity-medium-text { color: #d69e2e; }
+        .severity-low-text { color: #38a169; }
+        
+        .fine-details {
+            font-size: 9pt;
+        }
+        
+        .fine-total { color: #f56565; font-weight: bold; }
+        .fine-paid { color: #48bb78; }
+        .fine-balance { color: #ed8936; font-weight: bold; }
+        
+        .footer {
+            margin-top: 30px;
+            padding-top: 10px;
+            border-top: 1px solid #ddd;
+            text-align: center;
+            font-size: 9pt;
+            color: #666;
+        }
+        
+        .filters-section {
+            margin-bottom: 15px;
+            padding: 10px;
+            background-color: #f8f9fa;
+            border-left: 3px solid #f56565;
+        }
+        
+        .filter-item {
+            margin-bottom: 5px;
+        }
+        
+        .filter-label {
+            font-weight: bold;
+            color: #666;
+        }
+        
+        .section-title {
+            font-size: 12pt;
+            font-weight: bold;
+            color: #f56565;
+            margin-top: 20px;
+            margin-bottom: 10px;
+            padding-bottom: 5px;
+            border-bottom: 1px solid #ddd;
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <div class="header">
+        <h1>Overdue Books Report</h1>
+        <div class="subtitle">Generated on: {{ export_date|date:"F d, Y h:i A" }}</div>
+    </div>
+    
+    <!-- Report Information -->
+    <div class="report-info">
+        <div class="info-item">
+            <div class="info-label">Generated By:</div>
+            <div class="info-value">{{ request.user.get_full_name|default:request.user.username }}</div>
+        </div>
+        <div class="info-item">
+            <div class="info-label">Report Period:</div>
+            <div class="info-value">
+                {% if filters.date_from and filters.date_to %}
+                    {{ filters.date_from }} to {{ filters.date_to }}
+                {% else %}
+                    All Time
+                {% endif %}
+            </div>
+        </div>
+        <div class="info-item">
+            <div class="info-label">Total Overdue:</div>
+            <div class="info-value">{{ overdue_books.count }}</div>
+        </div>
+    </div>
+    
+    <!-- Filters Applied -->
+    {% if filters %}
+    <div class="filters-section">
+        <strong>Filters Applied:</strong>
+        <div class="filter-item">
+            {% if filters.borrower_type %}
+            <span class="filter-label">Borrower Type:</span> {{ filters.borrower_type|title }}
+            {% endif %}
+            
+            {% if filters.overdue_days %}
+            <span class="filter-label">Overdue Days:</span> {{ filters.overdue_days|title }}
+            {% endif %}
+            
+            {% if filters.fine_status %}
+            <span class="filter-label">Fine Status:</span> {{ filters.fine_status|title }}
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- Summary Statistics -->
+    <div class="summary-grid">
+        <div class="summary-card">
+            <div class="summary-number">{{ overdue_books.count }}</div>
+            <div class="summary-label">Total Overdue</div>
+        </div>
+        <div class="summary-card">
+            <div class="summary-number">{{ critical_count }}</div>
+            <div class="summary-label">Critical (>90 days)</div>
+        </div>
+        <div class="summary-card">
+            <div class="summary-number">{{ high_count }}</div>
+            <div class="summary-label">High (31-90 days)</div>
+        </div>
+        <div class="summary-card">
+            <div class="summary-number">TZS {{ total_fine|floatformat:0 }}</div>
+            <div class="summary-label">Total Fine</div>
+        </div>
+        <div class="summary-card">
+            <div class="summary-number">TZS {{ total_fine_paid|floatformat:0 }}</div>
+            <div class="summary-label">Fine Paid</div>
+        </div>
+        <div class="summary-card">
+            <div class="summary-number">TZS {{ total_unpaid_fine|floatformat:0 }}</div>
+            <div class="summary-label">Unpaid Balance</div>
+        </div>
+    </div>
+    
+    <!-- Overdue Books Table -->
+    <table>
+        <thead>
+            <tr>
+                <th style="width: 5%;">#</th>
+                <th style="width: 20%;">Borrower</th>
+                <th style="width: 20%;">Book Details</th>
+                <th style="width: 15%;">Dates</th>
+                <th style="width: 15%;">Overdue Status</th>
+                <th style="width: 15%;">Fine Details (TZS)</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for borrow in overdue_books %}
+            <tr>
+                <td>{{ forloop.counter }}</td>
+                <td>
+                    <div class="borrower-info">{{ borrow.get_borrower_name }}</div>
+                    <span class="borrower-type {% if borrow.borrower_type == 'student' %}borrower-type-student{% endif %}">
+                        {{ borrow.borrower_type|title }}
+                    </span>
+                </td>
+                <td>
+                    <div class="book-title">{{ borrow.book.title }}</div>
+                    <div class="book-author">{{ borrow.book.author }}</div>
+                    {% if borrow.book_copy %}
+                    <small>Copy #{{ borrow.book_copy.copy_number }}</small>
+                    {% endif %}
+                </td>
+                <td>
+                    <div class="dates">
+                        <div><span class="date-label">Borrowed:</span> {{ borrow.borrow_date|date:"M d, Y" }}</div>
+                        <div><span class="date-label due-date">Due:</span> {{ borrow.due_date|date:"M d, Y" }}</div>
+                        <div><span class="date-label">Overdue:</span> {{ borrow.overdue_days }} days</div>
+                        <div class="overdue-badge severity-{{ borrow.overdue_severity }}">
+                            {{ borrow.get_overdue_severity_display }}
+                        </div>
+                    </div>
+                </td>
+                <td>
+                    <div class="severity-text severity-{{ borrow.overdue_severity }}-text">
+                        {{ borrow.overdue_days }} days overdue
+                    </div>
+                    <small>Since {{ borrow.due_date|date:"M d, Y" }}</small>
+                </td>
+                <td>
+                    <div class="fine-details">
+                        <div><span class="fine-total">Total:</span> {{ borrow.fine_amount|floatformat:0 }}</div>
+                        <div><span class="fine-paid">Paid:</span> {{ borrow.fine_paid|floatformat:0 }}</div>
+                        <div><span class="fine-balance">Balance:</span> {{ borrow.fine_balance|floatformat:0 }}</div>
+                        {% if borrow.fine_per_day > 0 %}
+                        <small>{{ borrow.fine_per_day|floatformat:0 }} per day</small>
+                        {% endif %}
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    
+    <!-- Summary Section -->
+    <div style="page-break-before: always;">
+        <h3>Overdue Analysis Summary</h3>
+        
+        <div style="display: flex; margin-bottom: 20px;">
+            <div style="flex: 1; margin-right: 10px;">
+                <h4>Severity Distribution</h4>
+                <table style="font-size: 9pt;">
+                    <tr>
+                        <td>Critical (>90 days)</td>
+                        <td><strong>{{ critical_count }}</strong></td>
+                        <td>{{ critical_percentage|floatformat:1 }}%</td>
+                    </tr>
+                    <tr>
+                        <td>High (31-90 days)</td>
+                        <td><strong>{{ high_count }}</strong></td>
+                        <td>{{ high_percentage|floatformat:1 }}%</td>
+                    </tr>
+                    <tr>
+                        <td>Medium (15-30 days)</td>
+                        <td><strong>{{ medium_count }}</strong></td>
+                        <td>{{ medium_percentage|floatformat:1 }}%</td>
+                    </tr>
+                    <tr>
+                        <td>Low (1-14 days)</td>
+                        <td><strong>{{ low_count }}</strong></td>
+                        <td>{{ low_percentage|floatformat:1 }}%</td>
+                    </tr>
+                </table>
+            </div>
+            
+            <div style="flex: 1; margin-right: 10px;">
+                <h4>Borrower Analysis</h4>
+                <table style="font-size: 9pt;">
+                    <tr>
+                        <td>Staff Overdue</td>
+                        <td><strong>{{ staff_overdue }}</strong></td>
+                        <td>{{ staff_percentage|floatformat:1 }}%</td>
+                    </tr>
+                    <tr>
+                        <td>Student Overdue</td>
+                        <td><strong>{{ student_overdue }}</strong></td>
+                        <td>{{ student_percentage|floatformat:1 }}%</td>
+                    </tr>
+                    <tr>
+                        <td>Total Overdue</td>
+                        <td><strong>{{ overdue_books.count }}</strong></td>
+                        <td>100%</td>
+                    </tr>
+                    <tr>
+                        <td>Average Overdue Days</td>
+                        <td colspan="2"><strong>{{ avg_overdue_days|floatformat:1 }} days</strong></td>
+                    </tr>
+                </table>
+            </div>
+            
+            <div style="flex: 1;">
+                <h4>Financial Analysis</h4>
+                <table style="font-size: 9pt;">
+                    <tr>
+                        <td>Total Fine Charged</td>
+                        <td><strong>TZS {{ total_fine|floatformat:0 }}</strong></td>
+                    </tr>
+                    <tr>
+                        <td>Fine Collected</td>
+                        <td><strong>TZS {{ total_fine_paid|floatformat:0 }}</strong></td>
+                    </tr>
+                    <tr>
+                        <td>Unpaid Balance</td>
+                        <td><strong>TZS {{ total_unpaid_fine|floatformat:0 }}</strong></td>
+                    </tr>
+                    <tr>
+                        <td>Collection Rate</td>
+                        <td><strong>{{ collection_rate|floatformat:1 }}%</strong></td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+        
+        <!-- Top Overdue Analysis -->
+        <div class="section-title">Top 10 Longest Overdue Books</div>
+        <table style="width: 100%; font-size: 9pt; margin-bottom: 20px;">
+            <thead>
+                <tr>
+                    <th>Book Title</th>
+                    <th>Borrower</th>
+                    <th>Days Overdue</th>
+                    <th>Total Fine</th>
+                    <th>Balance Due</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for borrow in top_longest_overdue %}
+                <tr>
+                    <td>{{ borrow.book.title|truncatechars:30 }}</td>
+                    <td>{{ borrow.get_borrower_name }}</td>
+                    <td>{{ borrow.overdue_days }}</td>
+                    <td>TZS {{ borrow.fine_amount|floatformat:0 }}</td>
+                    <td>TZS {{ borrow.fine_balance|floatformat:0 }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        
+        <!-- Top Fine Amounts -->
+        <div class="section-title">Top 10 Highest Fines</div>
+        <table style="width: 100%; font-size: 9pt; margin-bottom: 20px;">
+            <thead>
+                <tr>
+                    <th>Book Title</th>
+                    <th>Borrower</th>
+                    <th>Days Overdue</th>
+                    <th>Total Fine</th>
+                    <th>Paid Amount</th>
+                    <th>Balance</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for borrow in top_highest_fines %}
+                <tr>
+                    <td>{{ borrow.book.title|truncatechars:30 }}</td>
+                    <td>{{ borrow.get_borrower_name }}</td>
+                    <td>{{ borrow.overdue_days }}</td>
+                    <td>TZS {{ borrow.fine_amount|floatformat:0 }}</td>
+                    <td>TZS {{ borrow.fine_paid|floatformat:0 }}</td>
+                    <td>TZS {{ borrow.fine_balance|floatformat:0 }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    
+    <!-- Footer -->
+    <div class="footer">
+        <p>This report was generated on {{ export_date|date:"F d, Y \a\t h:i A" }}</p>
+        <p>Library Management System &copy; {% now "Y" %}</p>
+        <p><strong>Action Required:</strong> Please follow up on critical overdue items immediately.</p>
+    </div>
+</body>
+</html>

@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Returned Books Report - {{ export_date }}</title>
+    <style>
+        @page {
+            size: A4 portrait;
+            margin: 20mm;
+            
+            @top-center {
+                content: "Returned Books Report";
+                font-size: 12pt;
+                font-weight: bold;
+            }
+            
+            @bottom-center {
+                content: "Page " counter(page) " of " counter(pages);
+                font-size: 10pt;
+            }
+        }
+        
+        body {
+            font-family: 'Helvetica', 'Arial', sans-serif;
+            font-size: 11pt;
+            line-height: 1.5;
+            color: #333;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #10b981;
+        }
+        
+        .header h1 {
+            color: #10b981;
+            font-size: 18pt;
+            margin-bottom: 5px;
+        }
+        
+        .header .subtitle {
+            color: #666;
+            font-size: 12pt;
+        }
+        
+        .report-info {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 15px;
+            padding: 10px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+        }
+        
+        .info-item {
+            flex: 1;
+        }
+        
+        .info-label {
+            font-weight: bold;
+            color: #666;
+            font-size: 10pt;
+        }
+        
+        .info-value {
+            color: #333;
+            font-size: 11pt;
+        }
+        
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .summary-card {
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            text-align: center;
+            background-color: #f8f9fa;
+        }
+        
+        .summary-number {
+            font-size: 16pt;
+            font-weight: bold;
+            color: #10b981;
+        }
+        
+        .summary-label {
+            font-size: 9pt;
+            color: #666;
+            text-transform: uppercase;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+            font-size: 9pt;
+        }
+        
+        th {
+            background-color: #10b981;
+            color: white;
+            padding: 8px;
+            text-align: left;
+            font-weight: bold;
+            border: 1px solid #ddd;
+        }
+        
+        td {
+            padding: 8px;
+            border: 1px solid #ddd;
+            vertical-align: top;
+        }
+        
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        
+        .borrower-info {
+            font-weight: bold;
+            margin-bottom: 2px;
+        }
+        
+        .borrower-type {
+            display: inline-block;
+            padding: 2px 6px;
+            font-size: 8pt;
+            border-radius: 3px;
+            background-color: #4299e1;
+            color: white;
+        }
+        
+        .borrower-type-student {
+            background-color: #38b2ac;
+        }
+        
+        .book-title {
+            font-weight: bold;
+            margin-bottom: 2px;
+        }
+        
+        .book-author {
+            color: #666;
+            font-size: 9pt;
+        }
+        
+        .dates {
+            font-size: 9pt;
+        }
+        
+        .date-label {
+            font-weight: bold;
+        }
+        
+        .returned-date {
+            color: #10b981;
+            font-weight: bold;
+        }
+        
+        .late-badge {
+            display: inline-block;
+            padding: 2px 6px;
+            font-size: 8pt;
+            border-radius: 3px;
+            background-color: #ed8936;
+            color: white;
+            margin-top: 2px;
+        }
+        
+        .on-time-badge {
+            display: inline-block;
+            padding: 2px 6px;
+            font-size: 8pt;
+            border-radius: 3px;
+            background-color: #48bb78;
+            color: white;
+            margin-top: 2px;
+        }
+        
+        .condition-excellent { color: #38b2ac; font-weight: bold; }
+        .condition-good { color: #48bb78; font-weight: bold; }
+        .condition-fair { color: #ed8936; font-weight: bold; }
+        .condition-poor { color: #f56565; font-weight: bold; }
+        .condition-damaged { color: #9b2c2c; font-weight: bold; }
+        
+        .fine-details {
+            font-size: 9pt;
+        }
+        
+        .fine-total { color: #f56565; font-weight: bold; }
+        .fine-paid { color: #48bb78; }
+        .fine-balance { color: #ed8936; font-weight: bold; }
+        
+        .footer {
+            margin-top: 30px;
+            padding-top: 10px;
+            border-top: 1px solid #ddd;
+            text-align: center;
+            font-size: 9pt;
+            color: #666;
+        }
+        
+        .filters-section {
+            margin-bottom: 15px;
+            padding: 10px;
+            background-color: #f8f9fa;
+            border-left: 3px solid #10b981;
+        }
+        
+        .filter-item {
+            margin-bottom: 5px;
+        }
+        
+        .filter-label {
+            font-weight: bold;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <div class="header">
+        <h1>Returned Books Report</h1>
+        <div class="subtitle">Generated on: {{ export_date|date:"F d, Y h:i A" }}</div>
+    </div>
+    
+    <!-- Report Information -->
+    <div class="report-info">
+        <div class="info-item">
+            <div class="info-label">Generated By:</div>
+            <div class="info-value">{{ request.user.get_full_name|default:request.user.username }}</div>
+        </div>
+        <div class="info-item">
+            <div class="info-label">Report Period:</div>
+            <div class="info-value">
+                {% if filters.date_from and filters.date_to %}
+                    {{ filters.date_from }} to {{ filters.date_to }}
+                {% else %}
+                    All Time
+                {% endif %}
+            </div>
+        </div>
+        <div class="info-item">
+            <div class="info-label">Total Records:</div>
+            <div class="info-value">{{ returns.count }}</div>
+        </div>
+    </div>
+    
+    <!-- Filters Applied -->
+    {% if filters %}
+    <div class="filters-section">
+        <strong>Filters Applied:</strong>
+        <div class="filter-item">
+            {% if filters.borrower_type %}
+            <span class="filter-label">Borrower Type:</span> {{ filters.borrower_type|title }}
+            {% endif %}
+            
+            {% if filters.fine_status %}
+            <span class="filter-label">Fine Status:</span> {{ filters.fine_status|title }}
+            {% endif %}
+            
+            {% if filters.return_condition %}
+            <span class="filter-label">Return Condition:</span> {{ filters.return_condition|title }}
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- Summary Statistics -->
+    <div class="summary-grid">
+        <div class="summary-card">
+            <div class="summary-number">{{ returns.count }}</div>
+            <div class="summary-label">Total Returns</div>
+        </div>
+        <div class="summary-card">
+            <div class="summary-number">{{ late_returns }}</div>
+            <div class="summary-label">Late Returns</div>
+        </div>
+        <div class="summary-card">
+            <div class="summary-number">{{ on_time_returns }}</div>
+            <div class="summary-label">On Time Returns</div>
+        </div>
+        <div class="summary-card">
+            <div class="summary-number">TZS {{ total_fine_charged|floatformat:0 }}</div>
+            <div class="summary-label">Fine Charged</div>
+        </div>
+        <div class="summary-card">
+            <div class="summary-number">TZS {{ total_fine_collected|floatformat:0 }}</div>
+            <div class="summary-label">Fine Collected</div>
+        </div>
+        <div class="summary-card">
+            <div class="summary-number">TZS {{ total_fine_outstanding|floatformat:0 }}</div>
+            <div class="summary-label">Outstanding</div>
+        </div>
+    </div>
+    
+    <!-- Returned Books Table -->
+    <table>
+        <thead>
+            <tr>
+                <th style="width: 5%;">#</th>
+                <th style="width: 20%;">Borrower</th>
+                <th style="width: 20%;">Book Details</th>
+                <th style="width: 15%;">Dates</th>
+                <th style="width: 10%;">Condition</th>
+                <th style="width: 15%;">Fine Details (TZS)</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for return in returns %}
+            <tr>
+                <td>{{ forloop.counter }}</td>
+                <td>
+                    <div class="borrower-info">{{ return.borrow.get_borrower_name }}</div>
+                    <span class="borrower-type {% if return.borrow.borrower_type == 'student' %}borrower-type-student{% endif %}">
+                        {{ return.borrow.borrower_type|title }}
+                    </span>
+                </td>
+                <td>
+                    <div class="book-title">{{ return.borrow.book.title }}</div>
+                    <div class="book-author">{{ return.borrow.book.author }}</div>
+                    {% if return.borrow.book_copy %}
+                    <small>Copy #{{ return.borrow.book_copy.copy_number }}</small>
+                    {% endif %}
+                </td>
+                <td>
+                    <div class="dates">
+                        <div><span class="date-label">Borrowed:</span> {{ return.borrow.borrow_date|date:"M d, Y" }}</div>
+                        <div><span class="date-label">Due:</span> {{ return.borrow.due_date|date:"M d, Y" }}</div>
+                        <div><span class="date-label returned-date">Returned:</span> {{ return.return_date|date:"M d, Y" }}</div>
+                        
+                        {% if return.borrow.actual_return_date and return.borrow.actual_return_date > return.borrow.due_date %}
+                        <div class="late-badge">{{ return.late_days }} days late</div>
+                        {% elif return.borrow.actual_return_date and return.borrow.actual_return_date <= return.borrow.due_date %}
+                        <div class="on-time-badge">On Time</div>
+                        {% endif %}
+                    </div>
+                </td>
+                <td>
+                    <span class="condition-{{ return.condition }}">
+                        {{ return.get_condition_display }}
+                    </span>
+                </td>
+                <td>
+                    <div class="fine-details">
+                        <div><span class="fine-total">Total:</span> {{ return.borrow.fine_amount|floatformat:0 }}</div>
+                        <div><span class="fine-paid">Paid:</span> {{ return.borrow.fine_paid|floatformat:0 }}</div>
+                        <div><span class="fine-balance">Balance:</span> {{ return.borrow.fine_balance|floatformat:0 }}</div>
+                        {% if return.fine_collected > 0 %}
+                        <div><span style="color: #10b981;">Collected:</span> {{ return.fine_collected|floatformat:0 }}</div>
+                        {% endif %}
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    
+    <!-- Summary Section -->
+    <div style="page-break-before: always;">
+        <h3>Return Summary</h3>
+        
+        <div style="display: flex; margin-bottom: 20px;">
+            <div style="flex: 1; margin-right: 10px;">
+                <h4>Timeline Statistics</h4>
+                <table style="font-size: 9pt;">
+                    <tr>
+                        <td>Total Returns</td>
+                        <td><strong>{{ returns.count }}</strong></td>
+                    </tr>
+                    <tr>
+                        <td>On Time Returns</td>
+                        <td><strong>{{ on_time_returns }}</strong></td>
+                    </tr>
+                    <tr>
+                        <td>Late Returns</td>
+                        <td><strong>{{ late_returns }}</strong></td>
+                    </tr>
+                    <tr>
+                        <td>Average Late Days</td>
+                        <td><strong>{{ avg_late_days|floatformat:1 }} days</strong></td>
+                    </tr>
+                </table>
+            </div>
+            
+            <div style="flex: 1; margin-right: 10px;">
+                <h4>Borrower Distribution</h4>
+                <table style="font-size: 9pt;">
+                    <tr>
+                        <td>Staff Returns</td>
+                        <td><strong>{{ staff_returns }}</strong></td>
+                    </tr>
+                    <tr>
+                        <td>Student Returns</td>
+                        <td><strong>{{ student_returns }}</strong></td>
+                    </tr>
+                    <tr>
+                        <td>Damaged Returns</td>
+                        <td><strong>{{ damaged_books }}</strong></td>
+                    </tr>
+                    <tr>
+                        <td>Good Condition Returns</td>
+                        <td><strong>{{ good_condition_returns }}</strong></td>
+                    </tr>
+                </table>
+            </div>
+            
+            <div style="flex: 1;">
+                <h4>Financial Summary</h4>
+                <table style="font-size: 9pt;">
+                    <tr>
+                        <td>Total Fine Charged</td>
+                        <td><strong>TZS {{ total_fine_charged|floatformat:0 }}</strong></td>
+                    </tr>
+                    <tr>
+                        <td>Fine Collected</td>
+                        <td><strong>TZS {{ total_fine_collected|floatformat:0 }}</strong></td>
+                    </tr>
+                    <tr>
+                        <td>Outstanding Balance</td>
+                        <td><strong>TZS {{ total_fine_outstanding|floatformat:0 }}</strong></td>
+                    </tr>
+                    <tr>
+                        <td>Collection Rate</td>
+                        <td><strong>{{ collection_rate|floatformat:1 }}%</strong></td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+        
+        <h4>Condition Distribution</h4>
+        <table style="width: 100%; font-size: 9pt; margin-bottom: 20px;">
+            <thead>
+                <tr>
+                    <th>Condition</th>
+                    <th>Count</th>
+                    <th>Percentage</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for condition in condition_distribution %}
+                <tr>
+                    <td>{{ condition.name }}</td>
+                    <td>{{ condition.count }}</td>
+                    <td>{{ condition.percentage|floatformat:1 }}%</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    
+    <!-- Footer -->
+    <div class="footer">
+        <p>This report was generated on {{ export_date|date:"F d, Y \a\t h:i A" }}</p>
+        <p>Library Management System &copy; {% now "Y" %}</p>
+    </div>
+</body>
+</html>
