@@ -1,0 +1,761 @@
+{% extends 'admin/base.html' %}
+{% load static %}
+{% load custom_filters %}
+{% block title %} Manage Student Results - {{ exam_session.name }} {% endblock title %}
+
+{% block breadcrumb %}
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'admin_dashboard' %}">Dashboard</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'admin_exam_sessions_list' %}">Exam Sessions</a></li>
+            <li class="breadcrumb-item active">Manage Results</li>
+        </ol>
+    </nav>
+{% endblock breadcrumb %}
+
+{% block extra_css %}
+<style>
+    :root {
+        --primary-color: #4361ee;
+        --success-color: #06d6a0;
+        --warning-color: #ffd166;
+        --danger-color: #ef476f;
+        --info-color: #118ab2;
+        --light-bg: #f8f9fa;
+        --border-color: #dee2e6;
+    }
+
+ 
+
+    .student-info-column {
+        position: sticky;
+        left: 0;
+        z-index: 900;
+        background: white;
+        box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+    }
+
+/* Make ONLY the table header sticky */
+.result-table thead {
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+    background: white;
+}
+
+/* Normal subject header cells */
+.subject-header {
+    background: var(--light-bg);
+    font-weight: 600;
+    white-space: nowrap;
+    text-align: center;
+}
+
+
+    .table-wrapper {
+        overflow-x: auto;
+        position: relative;
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+    }
+
+    .result-table th,
+    .result-table td {
+        vertical-align: middle;
+        padding: 8px;
+        border: 1px solid var(--border-color);
+    }
+
+    .result-table th {
+        background-color: var(--light-bg);
+        font-weight: 600;
+        white-space: nowrap;
+        text-align: center;
+    }
+
+    .result-table td {
+        text-align: center;
+    }
+
+  .student-name-cell {
+    position: sticky;
+    left: 0;
+    background: white;
+    z-index: 500; /* LOWER than thead */
+    box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+    text-align: left !important;
+    min-width: 200px;
+}
+
+    .marks-input {
+        width: 70px;
+        text-align: center;
+        padding: 4px;
+        border: 1px solid var(--border-color);
+        border-radius: 4px;
+        transition: all 0.3s;
+    }
+
+    .marks-input:focus {
+        border-color: var(--primary-color);
+        box-shadow: 0 0 0 0.2rem rgba(67, 97, 238, 0.25);
+        outline: none;
+    }
+
+    .grade-badge {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 12px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-align: center;
+        min-width: 30px;
+    }
+
+    .grade-A { background-color: #28a745; color: white; }
+    .grade-B { background-color: #17a2b8; color: white; }
+    .grade-C { background-color: #ffc107; color: #212529; }
+    .grade-D { background-color: #fd7e14; color: white; }
+    .grade-E { background-color: #6f42c1; color: white; }
+    .grade-F { background-color: #dc3545; color: white; }
+    .grade-S { background-color: #6c757d; color: white; }
+
+    .status-indicator {
+        display: inline-block;
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        margin-right: 5px;
+    }
+
+    .status-saved { background-color: var(--success-color); }
+    .status-pending { background-color: var(--warning-color); }
+    .status-error { background-color: var(--danger-color); }
+
+    .action-buttons {
+        position: sticky;
+        left: 0;
+        bottom: 0;
+        background: white;
+        padding: 15px;
+        border-top: 1px solid var(--border-color);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        z-index: 1000;
+    }
+
+    /* Modal styles */
+    .subject-row {
+        border-bottom: 1px solid var(--border-color);
+        padding: 10px 0;
+        transition: background-color 0.2s;
+    }
+
+    .subject-row:hover {
+        background-color: rgba(67, 97, 238, 0.05);
+    }
+
+    .add-result-row {
+        background-color: #f8f9fa;
+        padding: 10px;
+        border-radius: 4px;
+        margin-bottom: 10px;
+        border: 1px dashed #dee2e6;
+    }
+
+    /* Loading overlay */
+    .loading-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(255, 255, 255, 0.9);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+        display: none;
+    }
+
+    .loading-spinner {
+        width: 50px;
+        height: 50px;
+        border: 5px solid var(--border-color);
+        border-top-color: var(--primary-color);
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+
+    .calculated-cell {
+        font-weight: 600;
+        background-color: #f8f9fa;
+    }
+    
+    .position-cell {
+        font-weight: bold;
+        color: var(--primary-color);
+    }
+    
+    .remark-cell {
+        font-style: italic;
+    }
+</style>
+{% endblock extra_css %}
+
+{% block content %}
+<div class="loading-overlay" id="loading-overlay">
+    <div class="loading-spinner"></div>
+</div>
+
+<section class="content">
+    <div class="container-fluid">
+        <!-- Header Information -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header bg-primary text-white">
+                        <h3 class="card-title mb-0">
+                            <i class="fas fa-file-alt mr-2"></i>Manage Student Results - {{ exam_session.name }}
+                        </h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-3">
+                                <p class="mb-1"><strong>Academic Year:</strong> {{ exam_session.academic_year.name }}</p>
+                            </div>
+                            <div class="col-md-2">
+                                <p class="mb-1"><strong>Term:</strong> {{ exam_session.term.get_term_number_display }}</p>
+                            </div>
+                            <div class="col-md-3">
+                                <p class="mb-1"><strong>Class:</strong> {{ exam_session.class_level.name }}</p>
+                            </div>
+                            <div class="col-md-2">
+                                <p class="mb-1"><strong>Stream:</strong> 
+                                    {% if exam_session.stream_class %}
+                                        {{ exam_session.stream_class.stream_letter }}
+                                    {% else %}
+                                        All Streams
+                                    {% endif %}
+                                </p>
+                            </div>
+                            <div class="col-md-2">
+                                <p class="mb-1"><strong>Students:</strong> {{ student_results_data|length }}</p>
+                            </div>
+                        </div>
+                        <div class="row mt-2">
+                            <div class="col-md-3">
+                                <p class="mb-1"><strong>Exam Type:</strong> {{ exam_session.exam_type.name }}</p>
+                            </div>
+                            <div class="col-md-3">
+                                <p class="mb-1"><strong>Exam Date:</strong> {{ exam_session.exam_date|date:"F d, Y" }}</p>
+                            </div>
+                            <div class="col-md-3">
+                                <p class="mb-1"><strong>Status:</strong> 
+                                    <span class="badge badge-{{ exam_session.status }}">{{ exam_session.get_status_display }}</span>
+                                </p>
+                            </div>
+                            <div class="col-md-3">
+                                <p class="mb-1"><strong>Subjects:</strong> {{ subjects.count }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="d-flex flex-wrap justify-content-between align-items-center">
+                    <div>
+                        <button type="button" class="btn btn-success mr-2" data-toggle="modal" data-target="#addResultModal">
+                            <i class="fas fa-plus-circle mr-1"></i> Add Results
+                        </button>
+                    </div>
+                    <div>
+                        <button type="button" class="btn btn-secondary" onclick="reloadPage()">
+                            <i class="fas fa-sync-alt mr-1"></i> Refresh
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Results Table -->
+        <div class="row">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h4 class="card-title">Student Results</h4>
+                        <div class="card-tools">
+                            <div class="input-group input-group-sm">
+                                <input type="text" class="form-control" placeholder="Search students..." id="search-students">
+                                <div class="input-group-append">
+                                    <button class="btn btn-primary">
+                                        <i class="fas fa-search"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-wrapper">
+                            <table class="table table-hover text-nowrap table-responsive-sm table-bordered table-striped table-sm result-table" id="results-table">
+                                <thead >
+                                    <tr>
+                                        <th class="student-name-cell">Reg/Exam No.</th>
+                                        <th class="student-name-cell">Candidate Name</th>
+                                        <th>Sex</th>
+                                        <th>Point</th>
+                                        <th>Div</th>
+                                        {% for subject in subjects %}
+                                            <th class="subject-header">{{ subject.code }}</th>
+                                        {% endfor %}
+                                        <th>Total</th>
+                                        <th>Avg</th>
+                                        <th>GRD</th>
+                                        <th>POS</th>
+                                        <th>Remark</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for student_data in student_results_data %}
+                                    <tr data-student-id="{{ student_data.student_id }}" data-student-name="{{ student_data.full_name }}">
+                                        <!-- Student Information -->
+                                        <td class="student-name-cell">{{ student_data.registration_number }}</td>
+                                        <td class="student-name-cell">{{ student_data.full_name }}</td>
+                                        <td>{{ student_data.gender|slice:":1" }}</td>
+                                        <td class="calculated-cell" id="points-{{ student_data.student_id }}">
+                                            {% if student_data.total_grade_points %}
+                                                {{ student_data.total_grade_points|floatformat:1 }}
+                                            {% else %}
+                                                -
+                                            {% endif %}
+                                        </td>
+                                        <td class="calculated-cell" id="division-{{ student_data.student_id }}">
+                                            {{ student_data.division|default:"-" }}
+                                        </td>
+                                        
+                                        <!-- Subject Marks -->
+                                        {% for subject in subjects %}
+                                        <td>
+                                            {% with subject_result=student_data.subject_results|get_item:subject.id %}
+                                            <div class="marks-input-container">
+                                                <input type="number" 
+                                                       class="marks-input form-control form-control-sm" 
+                                                       data-student-id="{{ student_data.student_id }}" 
+                                                       data-subject-id="{{ subject.id }}"
+                                                       data-result-id="{{ subject_result.result_id|default:'' }}"
+                                                       placeholder="Marks"
+                                                       min="0" 
+                                                       max="{{ exam_session.exam_type.max_score }}"
+                                                       step="0.01"
+                                                       value="{% if subject_result.marks %}{{ subject_result.marks|floatformat:1 }}{% endif %}">
+                                                <div class="status-indicator mt-1">
+                                                    {% if subject_result.result_id %}
+                                                        <span class="status-saved" title="Saved"></span>
+                                                    {% endif %}
+                                                </div>
+                                            </div>
+                                            {% endwith %}
+                                        </td>
+                                        {% endfor %}
+                                        
+                                        <!-- Calculated Fields -->
+                                        <td class="calculated-cell" id="total-{{ student_data.student_id }}">
+                                            {% if student_data.total_marks %}
+                                                {{ student_data.total_marks|floatformat:1 }}
+                                            {% else %}
+                                                -
+                                            {% endif %}
+                                        </td>
+                                        <td class="calculated-cell" id="average-{{ student_data.student_id }}">
+                                            {% if student_data.average_marks %}
+                                                {{ student_data.average_marks|floatformat:1 }}
+                                            {% else %}
+                                                -
+                                            {% endif %}
+                                        </td>
+                                        <td class="calculated-cell" id="grade-{{ student_data.student_id }}">
+                                            {{ student_data.average_grade|default:"-" }}
+                                        </td>
+                                        <td class="position-cell" id="position-{{ student_data.student_id }}">
+                                            {% if student_data.position %}
+                                                {{ student_data.position }}
+                                            {% else %}
+                                                -
+                                            {% endif %}
+                                        </td>
+                                        <td class="remark-cell" id="remark-{{ student_data.student_id }}">
+                                            {{ student_data.remark|default:"-" }}
+                                        </td>
+                                    </tr>
+                                    {% empty %}
+                                    <tr>
+                                        <td colspan="{{ subjects.count|add:11 }}" class="text-center py-5">
+                                            <div class="text-muted">
+                                                <i class="fas fa-users fa-3x mb-3"></i>
+                                                <h5>No students found</h5>
+                                                <p>Add students to this class level to start entering results.</p>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+<input type="hidden" id="csrf-token" value="{{ csrf_token }}">
+
+<!-- Add Results Modal -->
+<div class="modal fade" id="addResultModal" tabindex="-1" role="dialog" aria-labelledby="addResultModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title" id="addResultModalLabel">
+                    <i class="fas fa-plus-circle mr-2"></i>Add Multiple Results
+                </h5>
+                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle mr-2"></i>
+                    Add multiple result entries. Click "Add Row" to add more entries.
+                </div>
+                
+                <div id="add-result-rows">
+                    <!-- Rows will be added here dynamically -->
+                </div>
+                
+                <div class="text-center mt-3">
+                    <button type="button" class="btn btn-primary" onclick="addResultRow()">
+                        <i class="fas fa-plus mr-1"></i> Add Row
+                    </button>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-success" onclick="saveNewResults()">
+                    <i class="fas fa-save mr-1"></i> Save All Results
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Fixed Action Buttons at Bottom -->
+<div class="action-buttons">
+    <div class="d-flex align-items-center">
+        <span class="text-muted mr-3">
+            <i class="fas fa-save text-success"></i>
+            <span id="auto-save-status">Changes are saved automatically</span>
+        </span>
+    </div>
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+<script>
+// CSRF Token
+function getCSRFToken() {
+    return document.getElementById('csrf-token').value;
+}
+
+// Show/hide loading overlay
+function showLoading(show) {
+    if (show) {
+        $('#loading-overlay').fadeIn();
+    } else {
+        $('#loading-overlay').fadeOut();
+    }
+}
+
+// Reload page
+function reloadPage() {
+    window.location.reload();
+}
+
+// Initialize variables
+let changedResults = new Set();
+
+// Initialize on page load
+$(document).ready(function() {
+    initializeEventListeners();
+    
+    // Initialize first result row
+    addResultRow();
+});
+
+// Initialize event listeners
+function initializeEventListeners() {
+    // Marks input change
+    $(document).on('change', '.marks-input', function() {
+        const studentId = $(this).data('student-id');
+        const subjectId = $(this).data('subject-id');
+        const marks = $(this).val();
+        
+        if (marks !== '') {
+            const key = `${studentId}_${subjectId}`;
+            changedResults.add(key);
+            updateInputStatus($(this), 'pending');
+            // Auto-save after a short delay
+            setTimeout(saveResult, 500);
+        }
+    });
+    
+    // Search students
+    $('#search-students').on('keyup', function() {
+        const searchTerm = $(this).val().toLowerCase();
+        $('#results-table tbody tr').each(function() {
+            const studentName = $(this).data('student-name').toLowerCase();
+            const admissionNo = $(this).find('td:first').text().toLowerCase();
+            
+            if (studentName.includes(searchTerm) || admissionNo.includes(searchTerm)) {
+                $(this).show();
+            } else {
+                $(this).hide();
+            }
+        });
+    });
+}
+
+// Update input status
+function updateInputStatus(inputElement, status) {
+    const container = inputElement.closest('td');
+    const indicator = container.find('.status-indicator');
+    
+    indicator.empty();
+    let indicatorClass = '';
+    
+    switch(status) {
+        case 'saved':
+            indicatorClass = 'status-saved';
+            break;
+        case 'pending':
+            indicatorClass = 'status-pending';
+            break;
+        case 'error':
+            indicatorClass = 'status-error';
+            break;
+    }
+    
+    indicator.html(`<span class="${indicatorClass}" title="${status}"></span>`);
+}
+
+// Add result row
+function addResultRow() {
+    const rowCount = $('#add-result-rows .add-result-row').length;
+    const rowId = `result-row-${rowCount + 1}`;
+    
+    const rowHtml = `
+        <div class="add-result-row" id="${rowId}">
+            <div class="row">
+                <div class="col-md-4">
+                    <div class="form-group">
+                        <label>Student</label>
+                        <select class="form-control student-select" data-row-id="${rowId}">
+                            <option value="">Select Student</option>
+                            {% for student_data in student_results_data %}
+                                <option value="{{ student_data.student_id }}">
+                                    {{ student_data.full_name }} ({{ student_data.registration_number }})
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="form-group">
+                        <label>Subject</label>
+                        <select class="form-control subject-select" data-row-id="${rowId}">
+                            <option value="">Select Subject</option>
+                            {% for subject in subjects %}
+                                <option value="{{ subject.id }}">
+                                    {{ subject.code }} - {{ subject.name|truncatechars:20 }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="form-group">
+                        <label>Marks</label>
+                        <input type="number" 
+                               class="form-control marks-input" 
+                               data-row-id="${rowId}"
+                               min="0" 
+                               max="{{ exam_session.exam_type.max_score }}"
+                               step="0.01"
+                               placeholder="Enter marks">
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="form-group" style="margin-top: 28px;">
+                        <button type="button" class="btn btn-danger btn-sm" onclick="removeResultRow('${rowId}')">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    $('#add-result-rows').append(rowHtml);
+}
+
+// Remove result row
+function removeResultRow(rowId) {
+    $(`#${rowId}`).remove();
+}
+
+// Save individual result
+function saveResult() {
+    if (changedResults.size === 0) return;
+    
+    const key = Array.from(changedResults)[0];
+    changedResults.delete(key);
+    
+    const [studentId, subjectId] = key.split('_');
+    const inputElement = $(`.marks-input[data-student-id="${studentId}"][data-subject-id="${subjectId}"]`);
+    const marks = inputElement.val();
+    const resultId = inputElement.data('result-id');
+    
+    if (!marks) return;
+    
+    $.ajax({
+        url: '{% url "save_student_results" %}',
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCSRFToken(),
+            'Content-Type': 'application/json'
+        },
+        data: JSON.stringify({
+            'exam_session_id': '{{ exam_session.id }}',
+            'results': [{
+                'student_id': studentId,
+                'subject_id': subjectId,
+                'marks_obtained': parseFloat(marks),
+                'result_id': resultId || null
+            }],
+            'is_auto_save': true
+        }),
+        success: function(data) {
+            if (data.success) {
+                updateInputStatus(inputElement, 'saved');
+                // Update calculated fields
+                updateStudentCalculations(studentId);
+            } else {
+                updateInputStatus(inputElement, 'error');
+                showToast(data.message, 'danger');
+            }
+        },
+        error: function() {
+            updateInputStatus(inputElement, 'error');
+            showToast('Error saving result.', 'danger');
+        }
+    });
+}
+
+// Save new results from modal
+function saveNewResults() {
+    const rows = [];
+    let hasErrors = false;
+    
+    $('.add-result-row').each(function() {
+        const rowId = $(this).attr('id');
+        const studentId = $(`.student-select[data-row-id="${rowId}"]`).val();
+        const subjectId = $(`.subject-select[data-row-id="${rowId}"]`).val();
+        const marks = $(`.marks-input[data-row-id="${rowId}"]`).val();
+        
+        if (studentId && subjectId && marks) {
+            rows.push({
+                'student_id': studentId,
+                'subject_id': subjectId,
+                'marks_obtained': parseFloat(marks)
+            });
+        } else if (studentId || subjectId || marks) {
+            hasErrors = true;
+        }
+    });
+    
+    if (hasErrors) {
+        alert('Please fill all fields for each row, or delete incomplete rows.');
+        return;
+    }
+    
+    if (rows.length === 0) {
+        alert('No results to save.');
+        return;
+    }
+    
+    showLoading(true);
+    
+    $.ajax({
+        url: '{% url "save_multiple_results" %}',
+        method: 'POST',
+        data: {
+            'csrfmiddlewaretoken': getCSRFToken(),
+            'exam_session_id': '{{ exam_session.id }}',
+            'results': JSON.stringify(rows)
+        },
+        success: function(data) {
+            showLoading(false);
+            if (data.success) {
+                $('#addResultModal').modal('hide');
+                showToast(`${data.saved_count} results saved successfully!`, 'success');
+                $('#add-result-rows').empty();
+                addResultRow(); // Add one empty row for next time
+                location.reload();
+            } else {
+                showToast(data.message, 'danger');
+            }
+        },
+        error: function() {
+            showLoading(false);
+            showToast('Error saving results.', 'danger');
+        }
+    });
+}
+
+// Update student calculations (called after saving)
+function updateStudentCalculations(studentId) {
+    // This would ideally call an endpoint to recalculate metrics
+    // For now, we'll just reload the page to show updated calculations
+    setTimeout(() => {
+        // Optionally reload the page or update via AJAX
+        // location.reload();
+    }, 1000);
+}
+
+// Show toast message
+function showToast(message, type = 'success') {
+    const toast = $(`
+        <div class="alert alert-${type} alert-dismissible fade show position-fixed" 
+             style="top: 20px; right: 20px; z-index: 9999;">
+            ${message}
+            <button type="button" class="close" data-dismiss="alert">
+                <span>&times;</span>
+            </button>
+        </div>
+    `);
+    
+    $('body').append(toast);
+    
+    setTimeout(() => {
+        toast.alert('close');
+    }, 3000);
+}
+</script>
+{% endblock extra_js %}

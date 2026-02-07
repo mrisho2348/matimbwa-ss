@@ -182,44 +182,22 @@ class ExamSession(models.Model):
         return f"{self.name} - {self.class_level}"
 
 
-class ExamPaper(models.Model):
-    """
-    A subject paper under an exam session
-    """
+class StudentResult(models.Model):
     exam_session = models.ForeignKey(
         ExamSession,
-        on_delete=models.CASCADE,
-        related_name='papers'
-    )
-    subject = models.ForeignKey(Subject, on_delete=models.CASCADE)
-
-    total_marks = models.DecimalField(
-        max_digits=5,
-        decimal_places=2,
-        default=100
-    )
-
-    class Meta:
-        unique_together = ['exam_session', 'subject']
-
-    def __str__(self):
-        return f"{self.exam_session} - {self.subject}"
-
-
-class StudentResult(models.Model):
-    exam_paper = models.ForeignKey(
-        ExamPaper,
         on_delete=models.CASCADE,
         related_name='results'
     )
     student = models.ForeignKey(Student, on_delete=models.CASCADE)
+
+    subject = models.ForeignKey('core.Subject', on_delete=models.CASCADE,default =1)
 
     marks_obtained = models.DecimalField(
         max_digits=5,
         decimal_places=2,
         null=True,
         blank=True,
-        validators=[MinValueValidator(0)]
+        validators=[MinValueValidator(0), MaxValueValidator(100)]
     )
 
     percentage = models.DecimalField(
@@ -236,7 +214,7 @@ class StudentResult(models.Model):
     position_in_paper = models.PositiveIntegerField(null=True, blank=True)
 
     class Meta:
-        unique_together = ['exam_paper', 'student']
+        unique_together = ['exam_session', 'student', 'subject']
         ordering = ['-marks_obtained']
 
     def __str__(self):

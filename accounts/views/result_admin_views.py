@@ -7,12 +7,24 @@ from django.views.decorators.http import require_POST
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 import json
-from results.models import ExamPaper, ExamSession, ExamType, GradingScale, DivisionScale, StudentResult
+from results.models import  ExamSession, ExamType, GradingScale, DivisionScale, StudentExamMetrics, StudentExamPosition, StudentResult
 from core.models import AcademicYear, ClassLevel, EducationalLevel, StreamClass, Subject, Term
 from django.contrib import messages
 from students.models import Student
 from django.db.models import Count, Sum, Avg, Max, Min
 from django.utils import timezone
+from django.utils.timesince import timesince
+from django.db.models import Q
+from django.core.paginator import Paginator, EmptyPage
+from django.http import HttpResponse, JsonResponse, HttpResponseRedirect
+from django.shortcuts import get_object_or_404, render
+from django.views.decorators.http import require_GET, require_POST, require_http_methods
+import pandas as pd
+from io import BytesIO
+import openpyxl
+from openpyxl.utils import get_column_letter
+import csv
+import math
 
 @login_required
 def grading_scales_list(request):
@@ -2019,49 +2031,7 @@ def exam_session_detail(request, exam_session_id):
     
     return render(request, 'admin/results/exam_session_detail.html', context)
 
-@login_required
-def manage_exam_papers(request, exam_session_id):
-    """Manage exam papers for an exam session"""
-    exam_session = get_object_or_404(ExamSession, id=exam_session_id)
-    
-    # Get existing papers
-    papers = exam_session.papers.select_related('subject').all()
-    
-    # Get available subjects for this class level's educational level
-    available_subjects = Subject.objects.filter(
-        educational_level=exam_session.class_level.educational_level,
-        is_active=True
-    ).exclude(
-        id__in=papers.values_list('subject_id', flat=True)
-    ).order_by('name')
-    
-    if request.method == 'POST':
-        # Handle paper addition
-        if 'add_paper' in request.POST:
-            subject_id = request.POST.get('subject')
-            total_marks = request.POST.get('total_marks', 100)
-            
-            if subject_id:
-                try:
-                    subject = Subject.objects.get(id=subject_id)
-                    paper = ExamPaper.objects.create(
-                        exam_session=exam_session,
-                        subject=subject,
-                        total_marks=total_marks
-                    )
-                    messages.success(request, f'Paper for {subject.name} added successfully.')
-                    return redirect('admin_manage_exam_papers', exam_session_id=exam_session_id)
-                except Subject.DoesNotExist:
-                    messages.error(request, 'Selected subject does not exist.')
-    
-    context = {
-        'exam_session': exam_session,
-        'papers': papers,
-        'available_subjects': available_subjects,
-        'page_title': f'Manage Papers: {exam_session.name}',
-    }
-    
-    return render(request, 'admin/results/manage_exam_papers.html', context)
+
 
 @login_required
 def get_streams_for_exam_session(request):
@@ -2141,3 +2111,538 @@ def get_exam_session_stats(request):
         return JsonResponse({'success': False, 'message': 'Exam session not found'})
     except Exception as e:
         return JsonResponse({'success': False, 'message': str(e)})        
+    
+def admin_exam_sessions_data(request):
+    """Return exam sessions data as JSON for DataTable"""
+    try:
+        # Get DataTable parameters
+        draw = int(request.GET.get('draw', 1))
+        start = int(request.GET.get('start', 0))
+        length = int(request.GET.get('length', 10))
+        search_value = request.GET.get('search[value]', '')
+        
+        # Get filter parameters
+        academic_year = request.GET.get('academic_year')
+        term = request.GET.get('term')
+        class_level = request.GET.get('class_level')
+        stream = request.GET.get('stream')
+        status = request.GET.get('status')
+        
+        # Log the filters for debugging
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.debug(f"Filters - Academic Year: {academic_year}, Term: {term}, Class Level: {class_level}, Stream: {stream}, Status: {status}")
+        
+        # Build base queryset
+        queryset = ExamSession.objects.select_related(
+            'exam_type', 'academic_year', 'term', 
+            'class_level', 'stream_class'
+        ).order_by('-exam_date')
+        
+        # Apply filters
+        if academic_year:
+            queryset = queryset.filter(academic_year_id=academic_year)
+        if term:
+            queryset = queryset.filter(term_id=term)
+        if class_level:
+            queryset = queryset.filter(class_level_id=class_level)
+        if stream:
+            queryset = queryset.filter(stream_class_id=stream)
+        if status:
+            queryset = queryset.filter(status=status)
+        
+        # Apply search
+        if search_value:
+            queryset = queryset.filter(
+                Q(name__icontains=search_value) |
+                Q(exam_type__name__icontains=search_value) |
+                Q(academic_year__name__icontains=search_value) |
+                Q(class_level__name__icontains=search_value)
+            )
+        
+        # Get total count
+        total_records = queryset.count()
+        logger.debug(f"Total records found: {total_records}")
+        
+        # If no records, return empty response immediately
+        if total_records == 0:
+            return JsonResponse({
+                'draw': draw,
+                'recordsTotal': 0,
+                'recordsFiltered': 0,
+                'data': []
+            })
+        
+        # Paginate
+        paginator = Paginator(queryset, length)
+        page_number = (start // length) + 1
+        try:
+            page_obj = paginator.get_page(page_number)
+        except EmptyPage:
+            # If page is out of range, return empty results
+            return JsonResponse({
+                'draw': draw,
+                'recordsTotal': total_records,
+                'recordsFiltered': total_records,
+                'data': []
+            })
+        
+        # Prepare data
+        data = []
+        today = date.today()
+        
+        for session in page_obj:
+            # Determine exam date status
+            if session.exam_date < today:
+                exam_date_status = 'past'
+            elif session.exam_date == today:
+                exam_date_status = 'today'
+            else:
+                exam_date_status = 'future'
+            
+            data.append({
+                'id': session.id,
+                'name': session.name,
+                'exam_type': session.exam_type.id,
+                'exam_type_name': session.exam_type.name,
+                'academic_year': session.academic_year.id,
+                'academic_year_name': session.academic_year.name,
+                'term': session.term.id,
+                'term_display': session.term.get_term_number_display(),
+                'class_level': session.class_level.id,
+                'class_level_name': session.class_level.name,
+                'stream_class': session.stream_class.id if session.stream_class else None,
+                'stream_class_stream_letter': session.stream_class.stream_letter if session.stream_class else None,
+                'exam_date': session.exam_date.isoformat(),
+                'exam_date_formatted': session.exam_date.strftime('%Y-%m-%d'),
+                'exam_date_status': exam_date_status,
+                'status': session.status,
+                'status_display': session.get_status_display(),
+                'created_at': session.created_at.isoformat(),
+                'created_at_formatted': session.created_at.strftime('%Y-%m-%d'),
+                'created_at_relative': timesince(session.created_at),
+            })
+        
+        logger.debug(f"Returning {len(data)} records")
+        return JsonResponse({
+            'draw': draw,
+            'recordsTotal': total_records,
+            'recordsFiltered': total_records,
+            'data': data
+        })
+        
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error in admin_exam_sessions_data: {str(e)}")
+        return JsonResponse({
+            'draw': 1,
+            'recordsTotal': 0,
+            'recordsFiltered': 0,
+            'data': [],
+            'error': str(e)
+        }, status=500)
+
+
+@login_required
+def get_exam_session_by_id(request):
+    """Get single exam session data for editing"""
+    try:
+        exam_session_id = request.GET.get('exam_session_id')
+        if not exam_session_id:
+            return JsonResponse({
+                'success': False,
+                'message': 'Exam session ID is required.'
+            })
+        
+        session = ExamSession.objects.select_related(
+            'exam_type', 'academic_year', 'term', 
+            'class_level', 'stream_class'
+        ).get(id=exam_session_id)
+        
+        data = {
+            'id': session.id,
+            'name': session.name,
+            'exam_type': session.exam_type.id,
+            'exam_type_name': session.exam_type.name,
+            'academic_year': session.academic_year.id,
+            'academic_year_name': session.academic_year.name,
+            'term': session.term.id,
+            'term_name': session.term.get_term_number_display(),
+            'class_level': session.class_level.id,
+            'class_level_name': session.class_level.name,
+            'stream_class': session.stream_class.id if session.stream_class else '',
+            'stream_class_name': str(session.stream_class) if session.stream_class else '',
+            'exam_date': session.exam_date.strftime('%Y-%m-%d'),
+            'status': session.status,
+            'status_display': session.get_status_display(),
+        }
+        
+        return JsonResponse({
+            'success': True,
+            'exam_session': data
+        })
+    except ExamSession.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'message': 'Exam session not found.'
+        })
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error in get_exam_session_by_id: {str(e)}")
+        return JsonResponse({
+            'success': False,
+            'message': f'Error loading exam session: {str(e)}'
+        })
+
+
+
+
+@login_required
+def manage_results(request, exam_session_id):
+    exam_session = get_object_or_404(
+        ExamSession.objects.select_related(
+            'exam_type',
+            'academic_year',
+            'term',
+            'class_level',
+            'class_level__educational_level',
+            'stream_class'
+        ),
+        id=exam_session_id
+    )
+
+    subjects = Subject.objects.filter(
+        educational_level=exam_session.class_level.educational_level,
+        is_active=True
+    ).order_by('code')
+
+    if exam_session.stream_class:
+        students = Student.objects.filter(
+            class_level=exam_session.class_level,
+            stream_class=exam_session.stream_class,
+            is_active=True
+        )
+    else:
+        students = Student.objects.filter(
+            class_level=exam_session.class_level,
+            is_active=True
+        )
+
+    students = students.order_by('first_name')
+
+    results = StudentResult.objects.filter(
+        exam_session=exam_session
+    ).select_related('student', 'subject')
+
+    student_results_data = []
+
+    for student in students:
+        student_results = results.filter(student=student)
+
+        subject_results = {}
+        total_subjects = 0
+
+        for subject in subjects:
+            result = student_results.filter(subject=subject).first()
+
+            if result:
+                subject_results[subject.id] = {
+                    'marks': result.marks_obtained,
+                    'grade': result.grade,
+                    'grade_point': result.grade_point,
+                    'position': result.position_in_paper,
+                    'result_id': result.id
+                }
+                if result.marks_obtained is not None:
+                    total_subjects += 1
+            else:
+                subject_results[subject.id] = {
+                    'marks': None,
+                    'grade': '',
+                    'grade_point': None,
+                    'position': None,
+                    'result_id': None
+                }
+
+        # 🔹 Pull pre-calculated exam metrics
+        try:
+            metrics = StudentExamMetrics.objects.get(
+                student=student,
+                exam_session=exam_session
+            )
+        except StudentExamMetrics.DoesNotExist:
+            metrics = None
+
+        # 🔹 Pull pre-calculated positions
+        try:
+            position = StudentExamPosition.objects.get(
+                student=student,
+                exam_session=exam_session
+            )
+        except StudentExamPosition.DoesNotExist:
+            position = None
+
+        student_results_data.append({
+            'student': student,
+            'student_id': student.id,
+            'registration_number': student.registration_number or f"S{student.id:04d}",
+            'full_name': student.full_name,
+            'gender': student.get_gender_display(),
+
+            # Metrics (already computed elsewhere)
+            'total_marks': metrics.total_marks if metrics else None,
+            'average_marks': metrics.average_marks if metrics else None,
+            'average_percentage': metrics.average_percentage if metrics else None,
+            'average_grade': metrics.average_grade if metrics else '',
+            'average_remark': metrics.average_remark if metrics else '',
+            'total_grade_points': metrics.total_grade_points if metrics else None,
+            'division': metrics.division if metrics else '',
+
+            # Positions
+            'class_position': position.class_position if position else None,
+            'stream_position': position.stream_position if position else None,
+
+            'subject_results': subject_results,
+            'has_results': total_subjects > 0
+        })
+
+    context = {
+        'exam_session': exam_session,
+        'subjects': subjects,
+        'students': students,
+        'student_results_data': student_results_data,
+        'page_title': f'Manage Results - {exam_session.name}',
+    }
+
+    return render(request, 'admin/results/manage_results.html', context)
+
+
+
+@login_required
+@require_POST
+def save_student_results(request):
+    """Save multiple student results"""
+    try:
+        data = json.loads(request.body)
+        exam_session_id = data.get('exam_session_id')
+        results_data = data.get('results', [])
+        is_auto_save = data.get('is_auto_save', False)
+        
+        if not exam_session_id or not results_data:
+            return JsonResponse({
+                'success': False,
+                'message': 'Invalid data provided.'
+            })
+        
+        exam_session = get_object_or_404(ExamSession, id=exam_session_id)
+        
+        saved_results = []
+        saved_count = 0
+        
+        with transaction.atomic():
+            for result_data in results_data:
+                student_id = result_data.get('student_id')
+                subject_id = result_data.get('subject_id')
+                marks_obtained = result_data.get('marks_obtained')
+                
+                if not all([student_id, subject_id, marks_obtained is not None]):
+                    continue
+                
+                try:
+                    # Get or create result
+                    result, created = StudentResult.objects.get_or_create(
+                        exam_session=exam_session,
+                        student_id=student_id,
+                        subject_id=subject_id,
+                        defaults={'marks_obtained': marks_obtained}
+                    )
+                    
+                    if not created:
+                        result.marks_obtained = marks_obtained
+                    
+                    # Calculate percentage
+                    max_score = exam_session.exam_type.max_score
+                    if max_score > 0:
+                        result.percentage = (marks_obtained / max_score) * 100
+                    
+                    # Calculate grade
+                    education_level = exam_session.class_level.educational_level
+                    grade_scale = GradingScale.objects.filter(
+                        education_level=education_level,
+                        min_mark__lte=marks_obtained,
+                        max_mark__gte=marks_obtained
+                    ).first()
+                    
+                    if grade_scale:
+                        result.grade = grade_scale.grade
+                        result.grade_point = grade_scale.points
+                    
+                    result.save()
+                    
+                    saved_results.append({
+                        'student_id': student_id,
+                        'subject_id': subject_id,
+                        'result_id': result.id
+                    })
+                    saved_count += 1
+                    
+                except (Student.DoesNotExist, Subject.DoesNotExist):
+                    continue
+                except ValidationError as e:
+                    continue
+        
+        # Calculate positions after saving results
+        if saved_count > 0 and not is_auto_save:
+            calculate_subject_positions(exam_session)
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'Successfully saved {saved_count} results.',
+            'saved_count': saved_count,
+            'saved_results': saved_results
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'Error saving results: {str(e)}'
+        })
+
+@login_required
+@require_POST
+def save_multiple_results(request):
+    """Save multiple new results from modal"""
+    try:
+        exam_session_id = request.POST.get('exam_session_id')
+        results_json = request.POST.get('results')
+        
+        if not exam_session_id or not results_json:
+            return JsonResponse({
+                'success': False,
+                'message': 'Invalid data provided.'
+            })
+        
+        results_data = json.loads(results_json)
+        exam_session = get_object_or_404(ExamSession, id=exam_session_id)
+        
+        saved_count = 0
+        errors = []
+        
+        with transaction.atomic():
+            for result_data in results_data:
+                try:
+                    # Check if result already exists
+                    existing_result = StudentResult.objects.filter(
+                        exam_session=exam_session,
+                        student_id=result_data['studentId'],
+                        subject_id=result_data['subjectId']
+                    ).exists()
+                    
+                    if existing_result:
+                        errors.append(f"Result already exists for student {result_data['studentId']} and subject {result_data['subjectId']}")
+                        continue
+                    
+                    # Create new result
+                    result = StudentResult.objects.create(
+                        exam_session=exam_session,
+                        student_id=result_data['studentId'],
+                        subject_id=result_data['subjectId'],
+                        marks_obtained=result_data['marks']
+                    )
+                    
+                    # Calculate percentage
+                    max_score = exam_session.exam_type.max_score
+                    if max_score > 0:
+                        result.percentage = (result.marks_obtained / max_score) * 100
+                    
+                    # Calculate grade
+                    education_level = exam_session.class_level.educational_level
+                    grade_scale = GradingScale.objects.filter(
+                        education_level=education_level,
+                        min_mark__lte=result.marks_obtained,
+                        max_mark__gte=result.marks_obtained
+                    ).first()
+                    
+                    if grade_scale:
+                        result.grade = grade_scale.grade
+                        result.grade_point = grade_scale.points
+                    
+                    result.save()
+                    saved_count += 1
+                    
+                except Exception as e:
+                    errors.append(str(e))
+                    continue
+        
+        # Calculate positions
+        if saved_count > 0:
+            calculate_subject_positions(exam_session)
+        
+        response_data = {
+            'success': True,
+            'message': f'Successfully saved {saved_count} results.',
+            'saved_count': saved_count
+        }
+        
+        if errors:
+            response_data['errors'] = errors[:5]  # Limit errors to first 5
+        
+        return JsonResponse(response_data)
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'Error saving results: {str(e)}'
+        })
+
+
+def calculate_subject_positions(exam_session):
+    """Calculate positions for all subjects in an exam session"""
+    try:
+        # Get all subjects in this exam session
+        subjects = Subject.objects.filter(
+            educational_level=exam_session.class_level.educational_level,
+            is_active=True
+        )
+        
+        for subject in subjects:
+            calculate_subject_position(exam_session, subject)
+            
+    except Exception as e:
+        print(f"Error calculating positions: {str(e)}")
+
+def calculate_subject_position(exam_session, subject):
+    """Calculate positions for a specific subject"""
+    try:
+        # Get all results for this subject ordered by marks (descending)
+        results = StudentResult.objects.filter(
+            exam_session=exam_session,
+            subject=subject,
+            marks_obtained__isnull=False
+        ).select_related('student').order_by('-marks_obtained')
+        
+        position = 1
+        previous_marks = None
+        skip_position = 0
+        
+        for index, result in enumerate(results):
+            current_marks = result.marks_obtained
+            
+            # Handle equal marks (same position)
+            if previous_marks is not None and current_marks == previous_marks:
+                # Same position as previous student
+                result.position_in_paper = position - 1
+                skip_position += 1
+            else:
+                # New position
+                result.position_in_paper = position
+                position += 1 + skip_position
+                skip_position = 0
+            
+            result.save(update_fields=['position_in_paper'])
+            previous_marks = current_marks
+            
+    except Exception as e:
+        print(f"Error calculating position for subject {subject.id}: {str(e)}")

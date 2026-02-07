@@ -49,14 +49,12 @@
         font-size: 0.9em;
         color: #6c757d;
     }
-    /* Action buttons container */
     .quick-actions {
         display: flex;
         gap: 4px;
         justify-content: center;
         align-items: center;
     }
-    /* Base button styling */
     .quick-action-btn {
         width: 28px;
         height: 28px;
@@ -78,18 +76,15 @@
         box-shadow: 0 2px 5px rgba(0,0,0,0.2);
         filter: brightness(1.05);
     }
-    /* Button colors */
     .btn-info.quick-action-btn { background-color: #17a2b8; }
     .btn-primary.quick-action-btn { background-color: #007bff; }
     .btn-warning.quick-action-btn { background-color: #ffc107; }
     .btn-danger.quick-action-btn  { background-color: #dc3545; }
     .btn-success.quick-action-btn { background-color: #28a745; }
     .btn-secondary.quick-action-btn { background-color: #6c757d; }
-    /* Adjust warning button icon color */
     .btn-warning.quick-action-btn i {
         color: #212529 !important;
     }
-    /* Filter panel - ensure proper z-index */
     .filter-panel {
         background-color: #f8f9fa;
         border-radius: 8px;
@@ -106,7 +101,6 @@
         padding-bottom: 8px;
         border-bottom: 2px solid #dee2e6;
     }
-    /* Statistics cards */
     .stat-card {
         border-radius: 8px;
         padding: 15px;
@@ -131,7 +125,6 @@
         font-size: 2rem;
         opacity: 0.8;
     }
-    /* Toast messages */
     .success-toast, .error-toast {
         position: fixed;
         top: 20px;
@@ -139,7 +132,6 @@
         z-index: 99999 !important;
         min-width: 300px;
     }
-    /* Fix Select2 z-index for modals */
     .modal {
         z-index: 1060 !important;
     }
@@ -152,25 +144,23 @@
     .select2-dropdown {
         z-index: 999999 !important;
     }
-    /* Ensure select2 in modal has proper z-index */
     .modal .select2-container {
         z-index: 999999 !important;
     }
-    /* Filter select2 containers */
     #filter-academic-year + .select2-container,
     #filter-term + .select2-container,
     #filter-class-level + .select2-container,
-    #filter-status + .select2-container {
+    #filter-status + .select2-container,
+    #filter-stream + .select2-container {
         z-index: 2 !important;
     }
-    /* When modal is open, reduce filter select2 z-index */
     .modal-open #filter-academic-year + .select2-container,
     .modal-open #filter-term + .select2-container,
     .modal-open #filter-class-level + .select2-container,
-    .modal-open #filter-status + .select2-container {
+    .modal-open #filter-status + .select2-container,
+    .modal-open #filter-stream + .select2-container {
         z-index: 1 !important;
     }
-    /* Modal select2 should have highest priority */
     #exam_type + .select2-container,
     #academic_year + .select2-container,
     #term + .select2-container,
@@ -183,6 +173,13 @@
     #edit-class_level + .select2-container,
     #edit-stream_class + .select2-container {
         z-index: 999999 !important;
+    }
+    .dataTables_filter {
+        float: right !important;
+        margin-bottom: 15px;
+    }
+    .dataTables_filter input {
+        margin-left: 10px !important;
     }
 </style>
 {% endblock extra_css %}
@@ -214,7 +211,7 @@
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
                             <h5>Total Sessions</h5>
-                            <h3 id="total-sessions">{{ total_sessions }}</h3>
+                            <h3 id="total-sessions">0</h3>
                         </div>
                         <div class="stat-icon">
                             <i class="fas fa-clipboard-list"></i>
@@ -227,7 +224,7 @@
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
                             <h5>Draft</h5>
-                            <h3 id="draft-sessions">{{ draft_sessions }}</h3>
+                            <h3 id="draft-sessions">0</h3>
                         </div>
                         <div class="stat-icon">
                             <i class="fas fa-edit"></i>
@@ -240,7 +237,7 @@
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
                             <h5>Verified</h5>
-                            <h3 id="verified-sessions">{{ verified_sessions }}</h3>
+                            <h3 id="verified-sessions">0</h3>
                         </div>
                         <div class="stat-icon">
                             <i class="fas fa-check-circle"></i>
@@ -253,7 +250,7 @@
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
                             <h5>Published</h5>
-                            <h3 id="published-sessions">{{ published_sessions }}</h3>
+                            <h3 id="published-sessions">0</h3>
                         </div>
                         <div class="stat-icon">
                             <i class="fas fa-globe"></i>
@@ -277,9 +274,7 @@
                         <select class="form-control select2bs4" id="filter-academic-year" style="width: 100%;">
                             <option value="">All Academic Years</option>
                             {% for year in academic_years %}
-                                <option value="{{ year.id }}" {% if year.id|stringformat:"i" == request.GET.academic_year %}selected{% endif %}>
-                                    {{ year.name }}
-                                </option>
+                                <option value="{{ year.id }}">{{ year.name }}</option>
                             {% endfor %}
                         </select>
                     </div>
@@ -288,8 +283,7 @@
                     <div class="form-group">
                         <label for="filter-term">Term</label>
                         <select class="form-control select2bs4" id="filter-term" style="width: 100%;" disabled>
-                            <option value="">Select Academic Year First</option>
-                            <!-- Terms will be populated dynamically -->
+                            <option value="">All Terms</option>
                         </select>
                     </div>
                 </div>
@@ -299,9 +293,7 @@
                         <select class="form-control select2bs4" id="filter-class-level" style="width: 100%;">
                             <option value="">All Classes</option>
                             {% for class_level in class_levels %}
-                                <option value="{{ class_level.id }}" {% if class_level.id|stringformat:"i" == request.GET.class_level %}selected{% endif %}>
-                                    {{ class_level.name }}
-                                </option>
+                                <option value="{{ class_level.id }}">{{ class_level.name }}</option>
                             {% endfor %}
                         </select>
                     </div>
@@ -310,8 +302,7 @@
                     <div class="form-group">
                         <label for="filter-stream">Stream (Optional)</label>
                         <select class="form-control select2bs4" id="filter-stream" style="width: 100%;" disabled>
-                            <option value="">Select Class First</option>
-                            <!-- Streams will be populated dynamically -->
+                            <option value="">All Streams</option>
                         </select>
                     </div>
                 </div>
@@ -335,7 +326,7 @@
                         </h6>
                         <div class="d-flex align-items-center">
                             <span class="badge badge-light mr-2">
-                                Showing: <span id="showing-count">{{ exam_sessions|length }}</span> sessions
+                                Showing: <span id="showing-count">0</span> sessions
                             </span>
                         </div>
                     </div>
@@ -356,154 +347,7 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {% for session in exam_sessions %}
-                                    <tr id="row-{{ session.id }}">
-                                        <td>
-                                            <strong>{{ session.name }}</strong>
-                                            <br>
-                                            <small class="text-muted">{{ session.exam_type.name }}</small>
-                                        </td>
-                                        <td>
-                                            <span class="badge badge-info">
-                                                {{ session.exam_type.name }}
-                                            </span>
-                                        </td>
-                                        <td>{{ session.academic_year.name }}</td>
-                                        <td>{{ session.term.get_term_number_display }}</td>
-                                        <td>
-                                            <strong>{{ session.class_level.name }}</strong>
-                                            {% if session.stream_class %}
-                                            <br>
-                                            <small class="stream-info">
-                                                <i class="fas fa-stream"></i> {{ session.stream_class.stream_letter }}
-                                            </small>
-                                            {% else %}
-                                            <br>
-                                            <small class="stream-info">
-                                                <i class="fas fa-layer-group"></i> All Streams
-                                            </small>
-                                            {% endif %}
-                                        </td>
-                                        <td class="exam-date-cell">
-                                            {{ session.exam_date|date:"Y-m-d" }}
-                                            <br>
-                                            <small class="text-muted">
-                                                {% if session.exam_date < today %}
-                                                    <i class="fas fa-check text-success"></i> Past
-                                                {% elif session.exam_date == today %}
-                                                    <i class="fas fa-clock text-warning"></i> Today
-                                                {% else %}
-                                                    <i class="fas fa-calendar text-info"></i> Future
-                                                {% endif %}
-                                            </small>
-                                        </td>
-                                        <td>
-                                            {% if session.status == 'draft' %}
-                                                <span class="status-badge status-draft" id="status-badge-{{ session.id }}">
-                                                    <i class="fas fa-edit"></i> {{ session.get_status_display }}
-                                                </span>
-                                            {% elif session.status == 'submitted' %}
-                                                <span class="status-badge status-submitted" id="status-badge-{{ session.id }}">
-                                                    <i class="fas fa-paper-plane"></i> {{ session.get_status_display }}
-                                                </span>
-                                            {% elif session.status == 'verified' %}
-                                                <span class="status-badge status-verified" id="status-badge-{{ session.id }}">
-                                                    <i class="fas fa-check-circle"></i> {{ session.get_status_display }}
-                                                </span>
-                                            {% elif session.status == 'published' %}
-                                                <span class="status-badge status-published" id="status-badge-{{ session.id }}">
-                                                    <i class="fas fa-globe"></i> {{ session.get_status_display }}
-                                                </span>
-                                            {% endif %}
-                                        </td>
-                                        <td>
-                                            {{ session.created_at|date:"Y-m-d" }}
-                                            <br>
-                                            <small class="text-muted">{{ session.created_at|timesince }} ago</small>
-                                        </td>
-                                        <td class="text-center">
-                                            <div class="quick-actions">
-                                                <!-- View Details -->
-                                                <a href="{% url 'admin_exam_session_detail' session.id %}" 
-                                                   class="btn btn-sm btn-info quick-action-btn" 
-                                                   title="View Details">
-                                                    <i class="fas fa-eye"></i>
-                                                </a>
-                                                
-                                                <!-- Manage Papers -->
-                                                <a href="{% url 'admin_manage_exam_papers' session.id %}" 
-                                                   class="btn btn-sm btn-primary quick-action-btn" 
-                                                   title="Manage Papers">
-                                                    <i class="fas fa-file-alt"></i>
-                                                </a>
-                                                
-                                                <!-- Edit Button -->
-                                                {% if session.status in 'draft submitted' %}
-                                                <button class="btn btn-sm btn-warning quick-action-btn edit-btn" 
-                                                        data-id="{{ session.id }}"
-                                                        data-name="{{ session.name }}"
-                                                        data-exam-type="{{ session.exam_type.id }}"
-                                                        data-academic-year="{{ session.academic_year.id }}"
-                                                        data-term="{{ session.term.id }}"
-                                                        data-class-level="{{ session.class_level.id }}"
-                                                        data-stream-class="{{ session.stream_class.id|default:'' }}"
-                                                        data-exam-date="{{ session.exam_date|date:'Y-m-d' }}"
-                                                        data-status="{{ session.status }}"
-                                                        title="Edit Exam Session">
-                                                    <i class="fas fa-edit"></i>
-                                                </button>
-                                                {% else %}
-                                                <button class="btn btn-sm btn-secondary quick-action-btn" disabled
-                                                        title="Cannot edit published/verified sessions">
-                                                    <i class="fas fa-edit"></i>
-                                                </button>
-                                                {% endif %}
-                                                
-                                                <!-- Status Management -->
-                                                {% if session.status == 'draft' %}
-                                                <button class="btn btn-sm btn-success quick-action-btn status-btn" 
-                                                        data-id="{{ session.id }}"
-                                                        data-current-status="draft"
-                                                        data-new-status="submitted"
-                                                        title="Submit for Review">
-                                                    <i class="fas fa-paper-plane"></i>
-                                                </button>
-                                                {% elif session.status == 'submitted' %}
-                                                <button class="btn btn-sm btn-info quick-action-btn status-btn" 
-                                                        data-id="{{ session.id }}"
-                                                        data-current-status="submitted"
-                                                        data-new-status="verified"
-                                                        title="Mark as Verified">
-                                                    <i class="fas fa-check-circle"></i>
-                                                </button>
-                                                {% elif session.status == 'verified' %}
-                                                <button class="btn btn-sm btn-success quick-action-btn status-btn" 
-                                                        data-id="{{ session.id }}"
-                                                        data-current-status="verified"
-                                                        data-new-status="published"
-                                                        title="Publish Results">
-                                                    <i class="fas fa-globe"></i>
-                                                </button>
-                                                {% endif %}
-                                                
-                                                <!-- Delete Button -->
-                                                {% if session.status in 'draft submitted' %}
-                                                <button class="btn btn-sm btn-danger quick-action-btn delete-btn" 
-                                                        data-id="{{ session.id }}"
-                                                        data-name="{{ session.name }}"
-                                                        title="Delete Exam Session">
-                                                    <i class="fas fa-trash"></i>
-                                                </button>
-                                                {% else %}
-                                                <button class="btn btn-sm btn-secondary quick-action-btn" disabled
-                                                        title="Cannot delete published/verified sessions">
-                                                    <i class="fas fa-trash"></i>
-                                                </button>
-                                                {% endif %}
-                                            </div>
-                                        </td>
-                                    </tr>                                    
-                                    {% endfor %}
+                                    <!-- Data will be populated by DataTable via AJAX -->
                                 </tbody>
                             </table>
                         </div>
@@ -567,7 +411,6 @@
                                 <label for="term">Term <span class="text-danger">*</span></label>
                                 <select class="form-control select2bs4" id="term" name="term" required style="width: 100%;" disabled>
                                     <option value="">Select Academic Year First</option>
-                                    <!-- Terms will be populated dynamically -->
                                 </select>
                             </div>
                         </div>
@@ -596,7 +439,6 @@
                                 <label for="stream_class">Stream (Optional)</label>
                                 <select class="form-control select2bs4" id="stream_class" name="stream_class" style="width: 100%;" disabled>
                                     <option value="">Select Class Level First</option>
-                                    <!-- Streams will be populated dynamically -->
                                 </select>
                                 <small class="form-text text-muted">Leave empty for all streams in the class</small>
                             </div>
@@ -682,7 +524,6 @@
                                 <label for="edit-term">Term <span class="text-danger">*</span></label>
                                 <select class="form-control select2bs4" id="edit-term" name="term" required style="width: 100%;" disabled>
                                     <option value="">Select Academic Year First</option>
-                                    <!-- Terms will be populated dynamically -->
                                 </select>
                             </div>
                         </div>
@@ -710,7 +551,6 @@
                                 <label for="edit-stream_class">Stream (Optional)</label>
                                 <select class="form-control select2bs4" id="edit-stream_class" name="stream_class" style="width: 100%;" disabled>
                                     <option value="">Select Class Level First</option>
-                                    <!-- Streams will be populated dynamically -->
                                 </select>
                             </div>
                         </div>
@@ -785,200 +625,437 @@
 
 {% block extra_js %}
 <script>
-    $(document).ready(function() {
-        // Initialize variables
-        let sessionToDelete = null;
-        let sessionToChangeStatus = null;
-        let today = new Date().toISOString().split('T')[0];
+$(document).ready(function() {
+    // Initialize variables
+    let sessionToDelete = null;
+    let sessionToChangeStatus = null;
+    let today = new Date().toISOString().split('T')[0];
+    let table = null;
+    
+    // Set today as max date for exam date
+    $('#exam_date, #edit-exam_date').attr('max', today);
+
+    // CSRF token for AJAX requests
+    function getCSRFToken() {
+        return $('input[name="csrfmiddlewaretoken"]').val();
+    }
+
+    // Show toast message
+    function showToast(message, type = 'success') {
+        const toastId = type === 'success' ? '#success-toast' : '#error-toast';
+        const messageId = type === 'success' ? '#success-message' : '#error-message';
         
-        // Set today as max date for exam date
-        $('#exam_date').attr('max', today);
-        $('#edit-exam_date').attr('max', today);
-
-        // CSRF token for AJAX requests
-        function getCSRFToken() {
-            return $('input[name="csrfmiddlewaretoken"]').val();
-        }
-
-        // Show toast message
-        function showToast(message, type = 'success') {
-            const toastId = type === 'success' ? '#success-toast' : '#error-toast';
-            const messageId = type === 'success' ? '#success-message' : '#error-message';
-            
-            $(messageId).text(message);
-            $(toastId).addClass('show').fadeIn();
-            
-            setTimeout(function() {
-                $(toastId).fadeOut(function() {
-                    $(this).removeClass('show');
-                });
-            }, type === 'success' ? 3000 : 5000);
-        }
-
-        // Function to reload page after delay
-        function reloadPageAfterDelay(message, type = 'success') {
-            showToast(message, type);
-            var delay = type === 'success' ? 2000 : 3000;
-            setTimeout(function() {
-                location.reload();
-            }, delay);
-        }
-
-        // Helper function to handle button loading state
-        function setButtonLoading(btn, isLoading) {
-            const spinner = btn.find('.spinner-border');
-            if (isLoading) {
-                btn.data('original-text', btn.html());
-                btn.prop('disabled', true);
-                spinner.show();
-                btn.html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>');
-            } else {
-                btn.prop('disabled', false);
-                spinner.hide();
-                btn.html(btn.data('original-text'));
-            }
-        }
-
-        // Initialize Select2 with proper z-index handling
-        function initializeSelect2(selector, modalSelector = null) {
-            const options = {
-                theme: 'bootstrap4',
-                width: '100%',
-                placeholder: 'Select an option',
-                allowClear: false
-            };
-            
-            if (modalSelector) {
-                options.dropdownParent = $(modalSelector);
-            }
-            
-            $(selector).select2(options);
-        }
-
-        // Initialize page-level select2
-        initializeSelect2('#filter-academic-year');
-        initializeSelect2('#filter-class-level');
-        initializeSelect2('#filter-status');
-
-        // Function to load terms for academic year
-        function loadTerms(academicYearId, targetSelect, selectedTermId = null) {
-            if (!academicYearId) {
-                targetSelect.empty();
-                targetSelect.append('<option value="">Select Academic Year First</option>');
-                targetSelect.prop('disabled', true).trigger('change');
-                return;
-            }
-
-            $.ajax({
-                url: '{% url "admin_get_terms_for_academic_year" %}',
-                method: 'GET',
-                data: {
-                    'academic_year_id': academicYearId
-                },
-                success: function(data) {
-                    if (data.success) {
-                        targetSelect.empty();
-                        $.each(data.terms, function(index, term) {
-                            targetSelect.append(
-                                $('<option>', {
-                                    value: term.id,
-                                    text: term.text,
-                                    selected: term.id == selectedTermId
-                                })
-                            );
-                        });
-                        targetSelect.prop('disabled', false).trigger('change');
-                        
-                        // Reinitialize select2 after populating options
-                        targetSelect.select2({
-                            theme: 'bootstrap4',
-                            width: '100%',
-                            dropdownParent: targetSelect.closest('.modal')
-                        });
-                    } else {
-                        console.error('Error loading terms:', data.message);
-                        showToast('Failed to load terms. Please try again.', 'danger');
-                    }
-                },
-                error: function(xhr, status, error) {
-                    console.error('AJAX Error:', error);
-                    showToast('Error loading terms. Please try again.', 'danger');
-                }
+        $(messageId).text(message);
+        $(toastId).addClass('show').fadeIn();
+        
+        setTimeout(function() {
+            $(toastId).fadeOut(function() {
+                $(this).removeClass('show');
             });
+        }, type === 'success' ? 3000 : 5000);
+    }
+
+    // Update statistics
+    function updateStatistics() {
+        if (!table) return;
+        
+        const data = table.rows({ search: 'applied' }).data();
+        let total = 0, draft = 0, submitted = 0, verified = 0, published = 0;
+        
+        data.each(function(value, index) {
+            total++;
+            const status = value[6]; // Status column index
+            if (status === 'draft') draft++;
+            else if (status === 'submitted') submitted++;
+            else if (status === 'verified') verified++;
+            else if (status === 'published') published++;
+        });
+        
+        $('#total-sessions').text(total);
+        $('#draft-sessions').text(draft);
+        $('#verified-sessions').text(verified);
+        $('#published-sessions').text(published);
+        $('#showing-count').text(total);
+    }
+
+    // Helper function to handle button loading state
+    function setButtonLoading(btn, isLoading) {
+        const spinner = btn.find('.spinner-border');
+        if (isLoading) {
+            btn.data('original-text', btn.html());
+            btn.prop('disabled', true);
+            spinner.show();
+            btn.html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>');
+        } else {
+            btn.prop('disabled', false);
+            spinner.hide();
+            btn.html(btn.data('original-text'));
+        }
+    }
+
+    // Initialize Select2 for filter fields
+    function initializeFilterSelect2(selector) {
+        $(selector).select2({
+            theme: 'bootstrap4',
+            width: '100%',
+            placeholder: 'Select an option',
+            allowClear: true,
+            dropdownParent: $('body')
+        });
+    }
+
+    // Initialize filter select2
+    initializeFilterSelect2('#filter-academic-year');
+    initializeFilterSelect2('#filter-class-level');
+    
+    $('#filter-term').select2({
+        theme: 'bootstrap4',
+        width: '100%',
+        placeholder: 'All Terms',
+        allowClear: true,
+        dropdownParent: $('body'),
+        disabled: true
+    });
+    
+    $('#filter-stream').select2({
+        theme: 'bootstrap4',
+        width: '100%',
+        placeholder: 'All Streams',
+        allowClear: true,
+        dropdownParent: $('body'),
+        disabled: true
+    });
+
+    // Function to load terms for academic year (for filter)
+    function loadFilterTerms(academicYearId, targetSelect) {
+        if (!academicYearId) {
+            targetSelect.empty();
+            targetSelect.append('<option value="">All Terms</option>');
+            targetSelect.prop('disabled', true).trigger('change');
+            return;
         }
 
-        // Function to load streams for class level
-        function loadStreams(classLevelId, targetSelect, selectedStreamId = null) {
-            if (!classLevelId) {
-                targetSelect.empty();
-                targetSelect.append('<option value="">Select Class Level First</option>');
-                targetSelect.prop('disabled', true).trigger('change');
-                return;
-            }
-
-            $.ajax({
-                url: '{% url "admin_get_streams_for_exam_session" %}',
-                method: 'GET',
-                data: {
-                    'class_level_id': classLevelId
-                },
-                success: function(data) {
-                    if (data.success) {
-                        targetSelect.empty();
-                        targetSelect.append('<option value="">All Streams</option>');
-                        $.each(data.streams, function(index, stream) {
-                            targetSelect.append(
-                                $('<option>', {
-                                    value: stream.id,
-                                    text: stream.text,
-                                    selected: stream.id == selectedStreamId
-                                })
-                            );
-                        });
-                        targetSelect.prop('disabled', false).trigger('change');
-                        
-                        // Reinitialize select2 after populating options
-                        targetSelect.select2({
-                            theme: 'bootstrap4',
-                            width: '100%',
-                            dropdownParent: targetSelect.closest('.modal')
-                        });
-                    } else {
-                        console.error('Error loading streams:', data.message);
-                        showToast('Failed to load streams. Please try again.', 'danger');
-                    }
-                },
-                error: function(xhr, status, error) {
-                    console.error('AJAX Error:', error);
-                    showToast('Error loading streams. Please try again.', 'danger');
+        $.ajax({
+            url: '{% url "admin_get_terms_for_academic_year" %}',
+            method: 'GET',
+            data: { 'academic_year_id': academicYearId },
+            success: function(data) {
+                if (data.success) {
+                    targetSelect.empty();
+                    targetSelect.append('<option value="">All Terms</option>');
+                    $.each(data.terms, function(index, term) {
+                        targetSelect.append(
+                            $('<option>', {
+                                value: term.id,
+                                text: term.text
+                            })
+                        );
+                    });
+                    targetSelect.prop('disabled', false).trigger('change');
+                } else {
+                    console.error('Error loading terms:', data.message);
+                    showToast('Failed to load terms.', 'danger');
                 }
-            });
+            },
+            error: function(xhr, status, error) {
+                console.error('AJAX Error:', error);
+                showToast('Error loading terms.', 'danger');
+            }
+        });
+    }
+
+    // Function to load streams for class level (for filter)
+    function loadFilterStreams(classLevelId, targetSelect) {
+        if (!classLevelId) {
+            targetSelect.empty();
+            targetSelect.append('<option value="">All Streams</option>');
+            targetSelect.prop('disabled', true).trigger('change');
+            return;
         }
 
-        // Initialize DataTable
-        var table = $('#exam-sessions-table').DataTable({
-            "dom": "<'row'<'col-sm-12 col-md-6'l><'col-sm-12 col-md-6'f>>" +
-                   "<'row'<'col-sm-12'tr>>" +
-                   "<'row'<'col-sm-12 col-md-5'i><'col-sm-12 col-md-7'p>>",
-            "lengthMenu": [[10, 25, 50, -1], [10, 25, 50, "All"]],
-            "pageLength": 10,
-            "responsive": true,
-            "autoWidth": false,
-            "ordering": true,
-            "order": [[5, 'desc']], // Sort by exam date descending
-            
-            "destroy": true,
-            "retrieve": true,
-            "deferRender": true,
-            
-            "columnDefs": [
+        $.ajax({
+            url: '{% url "admin_get_streams_for_exam_session" %}',
+            method: 'GET',
+            data: { 'class_level_id': classLevelId },
+            success: function(data) {
+                if (data.success) {
+                    targetSelect.empty();
+                    targetSelect.append('<option value="">All Streams</option>');
+                    $.each(data.streams, function(index, stream) {
+                        targetSelect.append(
+                            $('<option>', {
+                                value: stream.id,
+                                text: stream.text
+                            })
+                        );
+                    });
+                    targetSelect.prop('disabled', false).trigger('change');
+                } else {
+                    console.error('Error loading streams:', data.message);
+                    showToast('Failed to load streams.', 'danger');
+                }
+            },
+            error: function(xhr, status, error) {
+                console.error('AJAX Error:', error);
+                showToast('Error loading streams.', 'danger');
+            }
+        });
+    }
+
+    // Function to load terms for academic year (for modal forms)
+    function loadModalTerms(academicYearId, targetSelect, selectedTermId = null) {
+        if (!academicYearId) {
+            targetSelect.empty();
+            targetSelect.append('<option value="">Select Academic Year First</option>');
+            targetSelect.prop('disabled', true).trigger('change');
+            return;
+        }
+
+        $.ajax({
+            url: '{% url "admin_get_terms_for_academic_year" %}',
+            method: 'GET',
+            data: { 'academic_year_id': academicYearId },
+            success: function(data) {
+                if (data.success) {
+                    targetSelect.empty();
+                    targetSelect.append('<option value="">Select Term</option>');
+                    $.each(data.terms, function(index, term) {
+                        const isSelected = (term.id == selectedTermId);
+                        const option = new Option(term.text, term.id, false, isSelected);
+                        targetSelect.append(option);
+                    });
+                    targetSelect.prop('disabled', false).trigger('change');
+                } else {
+                    console.error('Error loading terms:', data.message);
+                    showToast('Failed to load terms.', 'danger');
+                }
+            },
+            error: function(xhr, status, error) {
+                console.error('AJAX Error:', error);
+                showToast('Error loading terms.', 'danger');
+            }
+        });
+    }
+
+    // Function to load streams for class level (for modal forms)
+    function loadModalStreams(classLevelId, targetSelect, selectedStreamId = null) {
+        if (!classLevelId) {
+            targetSelect.empty();
+            targetSelect.append('<option value="">Select Class Level First</option>');
+            targetSelect.prop('disabled', true).trigger('change');
+            return;
+        }
+
+        $.ajax({
+            url: '{% url "admin_get_streams_for_exam_session" %}',
+            method: 'GET',
+            data: { 'class_level_id': classLevelId },
+            success: function(data) {
+                if (data.success) {
+                    targetSelect.empty();
+                    targetSelect.append('<option value="">All Streams</option>');
+                    $.each(data.streams, function(index, stream) {
+                        const isSelected = (stream.id == selectedStreamId);
+                        const option = new Option(stream.text, stream.id, false, isSelected);
+                        targetSelect.append(option);
+                    });
+                    targetSelect.prop('disabled', false).trigger('change');
+                } else {
+                    console.error('Error loading streams:', data.message);
+                    showToast('Failed to load streams.', 'danger');
+                }
+            },
+            error: function(xhr, status, error) {
+                console.error('AJAX Error:', error);
+                showToast('Error loading streams.', 'danger');
+            }
+        });
+    }
+
+    // Load exam session data for editing
+    function loadExamSessionForEdit(id) {
+        console.log('Loading exam session for edit, ID:', id);
+        
+        $.ajax({
+            url: '{% url "admin_get_exam_session_by_id" %}',
+            method: 'GET',
+            data: { 'exam_session_id': id },
+            success: function(data) {
+                console.log('Edit data received:', data);
+                
+                if (data.success && data.exam_session) {
+                    const session = data.exam_session;
+                    
+                    // Set form values
+                    $('#edit-id').val(session.id);
+                    $('#edit-name').val(session.name);
+                    $('#edit-exam_date').val(session.exam_date);
+                    
+                    // Set select values
+                    setTimeout(function() {
+                        $('#edit-exam_type').val(session.exam_type).trigger('change');
+                        $('#edit-academic_year').val(session.academic_year).trigger('change');
+                        $('#edit-class_level').val(session.class_level).trigger('change');
+                        
+                        // Load terms and streams
+                        loadModalTerms(session.academic_year, $('#edit-term'), session.term);
+                        loadModalStreams(session.class_level, $('#edit-stream_class'), session.stream_class);
+                        
+                        // Show modal
+                        $('#editExamSessionModal').modal('show');
+                    }, 100);
+                    
+                } else {
+                    console.error('Failed to load data:', data.message);
+                    showToast(data.message || 'Failed to load exam session data.', 'danger');
+                }
+            },
+            error: function(xhr, status, error) {
+                console.error('Error loading exam session:', error);
+                showToast('Error loading exam session data. Please try again.', 'danger');
+            }
+        });
+    }
+
+    // Initialize DataTable with AJAX
+    function initializeDataTable() {
+        table = $('#exam-sessions-table').DataTable({
+            "processing": true,
+            "serverSide": true,
+            "ajax": {
+                "url": "{% url 'admin_exam_sessions_data' %}",
+                "type": "GET",
+                "data": function(d) {
+                    // Add custom filter parameters
+                    d.academic_year = $('#filter-academic-year').val();
+                    d.term = $('#filter-term').val();
+                    d.class_level = $('#filter-class-level').val();
+                    d.stream = $('#filter-stream').val();
+                    d.status = $('#filter-status').val();
+                }
+            },
+            "columns": [
                 { 
-                    "targets": 8, // Actions column
+                    "data": "name",
+                    "render": function(data, type, row) {
+                        return '<strong>' + data + '</strong><br><small class="text-muted">' + row.exam_type_name + '</small>';
+                    }
+                },
+                { 
+                    "data": "exam_type_name",
+                    "render": function(data) {
+                        return '<span class="badge badge-info">' + data + '</span>';
+                    }
+                },
+                { "data": "academic_year_name" },
+                { "data": "term_display" },
+                { 
+                    "data": null,
+                    "render": function(data, type, row) {
+                        let html = '<strong>' + row.class_level_name + '</strong><br>';
+                        if (row.stream_class_stream_letter) {
+                            html += '<small class="stream-info"><i class="fas fa-stream"></i> ' + row.stream_class_stream_letter + '</small>';
+                        } else {
+                            html += '<small class="stream-info"><i class="fas fa-layer-group"></i> All Streams</small>';
+                        }
+                        return html;
+                    }
+                },
+                { 
+                    "data": "exam_date_formatted",
+                    "render": function(data, type, row) {
+                        let html = data + '<br>';
+                        if (row.exam_date_status === 'past') {
+                            html += '<small class="text-muted"><i class="fas fa-check text-success"></i> Past</small>';
+                        } else if (row.exam_date_status === 'today') {
+                            html += '<small class="text-muted"><i class="fas fa-clock text-warning"></i> Today</small>';
+                        } else {
+                            html += '<small class="text-muted"><i class="fas fa-calendar text-info"></i> Future</small>';
+                        }
+                        return html;
+                    }
+                },
+                { 
+                    "data": "status_display",
+                    "render": function(data, type, row) {
+                        let statusClass = '';
+                        let icon = '';
+                        
+                        switch(row.status) {
+                            case 'draft':
+                                statusClass = 'status-draft';
+                                icon = 'fas fa-edit';
+                                break;
+                            case 'submitted':
+                                statusClass = 'status-submitted';
+                                icon = 'fas fa-paper-plane';
+                                break;
+                            case 'verified':
+                                statusClass = 'status-verified';
+                                icon = 'fas fa-check-circle';
+                                break;
+                            case 'published':
+                                statusClass = 'status-published';
+                                icon = 'fas fa-globe';
+                                break;
+                        }
+                        
+                        return '<span class="status-badge ' + statusClass + '"><i class="' + icon + '"></i> ' + data + '</span>';
+                    }
+                },
+                { 
+                    "data": "created_at_formatted",
+                    "render": function(data, type, row) {
+                        return data + '<br><small class="text-muted">' + row.created_at_relative + ' ago</small>';
+                    }
+                },
+                { 
+                    "data": null,
+                    "render": function(data, type, row) {
+                        let html = '<div class="quick-actions">';
+                        
+                        // View Details
+                        html += '<a href="/result/exam-sessions/' + row.id + '/" class="btn btn-sm btn-info quick-action-btn" title="View Details"><i class="fas fa-eye"></i></a>';
+                        
+                        // Manage Papers
+                        html += '<a href="/result/exam-sessions/' + row.id + '/manage-result/" class="btn btn-sm btn-primary quick-action-btn" title="Manage Result"><i class="fas fa-file-alt"></i></a>';
+                        
+                        // Edit Button
+                        if (row.status === 'draft' || row.status === 'submitted') {
+                            html += '<button class="btn btn-sm btn-warning quick-action-btn edit-btn" data-id="' + row.id + '" title="Edit Exam Session"><i class="fas fa-edit"></i></button>';
+                        } else {
+                            html += '<button class="btn btn-sm btn-secondary quick-action-btn" disabled title="Cannot edit published/verified sessions"><i class="fas fa-edit"></i></button>';
+                        }
+                        
+                        // Status Management
+                        if (row.status === 'draft') {
+                            html += '<button class="btn btn-sm btn-success quick-action-btn status-btn" data-id="' + row.id + '" data-current-status="draft" data-new-status="submitted" title="Submit for Review"><i class="fas fa-paper-plane"></i></button>';
+                        } else if (row.status === 'submitted') {
+                            html += '<button class="btn btn-sm btn-info quick-action-btn status-btn" data-id="' + row.id + '" data-current-status="submitted" data-new-status="verified" title="Mark as Verified"><i class="fas fa-check-circle"></i></button>';
+                        } else if (row.status === 'verified') {
+                            html += '<button class="btn btn-sm btn-success quick-action-btn status-btn" data-id="' + row.id + '" data-current-status="verified" data-new-status="published" title="Publish Results"><i class="fas fa-globe"></i></button>';
+                        }
+                        
+                        // Delete Button
+                        if (row.status === 'draft' || row.status === 'submitted') {
+                            html += '<button class="btn btn-sm btn-danger quick-action-btn delete-btn" data-id="' + row.id + '" data-name="' + row.name + '" title="Delete Exam Session"><i class="fas fa-trash"></i></button>';
+                        } else {
+                            html += '<button class="btn btn-sm btn-secondary quick-action-btn" disabled title="Cannot delete published/verified sessions"><i class="fas fa-trash"></i></button>';
+                        }
+                        
+                        html += '</div>';
+                        return html;
+                    },
                     "orderable": false,
                     "searchable": false
                 }
             ],
-            
+            "order": [[5, 'desc']], // Sort by exam date descending
+            "pageLength": 10,
+            "responsive": true,
+            "autoWidth": false,
+            "destroy": true,
+            "retrieve": true,
             "language": {
                 "emptyTable": "<div class='text-center py-4'><i class='fas fa-inbox fa-2x mb-2'></i><br>No exam sessions found. Click \"Add Exam Session\" to create one.</div>",
                 "search": "_INPUT_",
@@ -995,272 +1072,27 @@
                 }
             },
             "drawCallback": function(settings) {
-                var api = this.api();
-                var total = api.rows().count();
-                $('#showing-count').text(total);
+                updateStatistics();
+                // Reattach event handlers to dynamically created buttons
+                attachEventHandlers();
             }
         });
+    }
 
-        // Filter functionality
-        // Load terms when academic year changes (filter)
-        $('#filter-academic-year').on('change', function() {
-            const academicYearId = $(this).val();
-            const termSelect = $('#filter-term');
-            
-            if (academicYearId) {
-                loadTerms(academicYearId, termSelect);
-            } else {
-                termSelect.empty().prop('disabled', true).trigger('change');
-            }
-            
-            applyFilters();
-        });
-
-        // Load streams when class level changes (filter)
-        $('#filter-class-level').on('change', function() {
-            const classLevelId = $(this).val();
-            const streamSelect = $('#filter-stream');
-            
-            if (classLevelId) {
-                loadStreams(classLevelId, streamSelect);
-            } else {
-                streamSelect.empty().prop('disabled', true).trigger('change');
-            }
-            
-            applyFilters();
-        });
-
-        // Stream filter change
-        $('#filter-stream').on('change', function() {
-            applyFilters();
-        });
-
-        // Status filter change
-        $('#filter-status').on('change', function() {
-            applyFilters();
-        });
-
-        function applyFilters() {
-            const academicYear = $('#filter-academic-year').val();
-            const term = $('#filter-term').val();
-            const classLevel = $('#filter-class-level').val();
-            const stream = $('#filter-stream').val();
-            const status = $('#filter-status').val();
-            
-            // Build URL with filters
-            let url = window.location.pathname;
-            let params = [];
-            
-            if (academicYear) params.push(`academic_year=${academicYear}`);
-            if (term) params.push(`term=${term}`);
-            if (classLevel) params.push(`class_level=${classLevel}`);
-            if (stream) params.push(`stream=${stream}`);
-            if (status) params.push(`status=${status}`);
-            
-            if (params.length > 0) {
-                url += '?' + params.join('&');
-            }
-            
-            window.location.href = url;
-        }
-
-        $('#reset-filters').on('click', function() {
-            window.location.href = window.location.pathname;
-        });
-
-        // Add Exam Session Modal
-        $('#addExamSessionModal').on('shown.bs.modal', function() {
-            // Initialize select2 for modal fields
-            initializeSelect2('#exam_type', '#addExamSessionModal');
-            initializeSelect2('#academic_year', '#addExamSessionModal');
-            initializeSelect2('#class_level', '#addExamSessionModal');
-            initializeSelect2('#status', '#addExamSessionModal');
-        });
-
-        // Load terms when academic year changes (add form)
-        $('#academic_year').on('change', function() {
-            const academicYearId = $(this).val();
-            const termSelect = $('#term');
-            
-            if (academicYearId) {
-                loadTerms(academicYearId, termSelect);
-            } else {
-                termSelect.empty().prop('disabled', true).trigger('change');
-            }
-        });
-
-        // Load streams when class level changes (add form)
-        $('#class_level').on('change', function() {
-            const classLevelId = $(this).val();
-            const streamSelect = $('#stream_class');
-            
-            if (classLevelId) {
-                loadStreams(classLevelId, streamSelect);
-            } else {
-                streamSelect.empty().prop('disabled', true).trigger('change');
-            }
-        });
-
-        // Edit Exam Session Modal
-        $('#editExamSessionModal').on('shown.bs.modal', function() {
-            // Initialize select2 for modal fields
-            initializeSelect2('#edit-exam_type', '#editExamSessionModal');
-            initializeSelect2('#edit-academic_year', '#editExamSessionModal');
-            initializeSelect2('#edit-class_level', '#editExamSessionModal');
-        });
-
-        // Load terms when academic year changes (edit form)
-        $('#edit-academic_year').on('change', function() {
-            const academicYearId = $(this).val();
-            const termSelect = $('#edit-term');
-            
-            if (academicYearId) {
-                loadTerms(academicYearId, termSelect);
-            } else {
-                termSelect.empty().prop('disabled', true).trigger('change');
-            }
-        });
-
-        // Load streams when class level changes (edit form)
-        $('#edit-class_level').on('change', function() {
-            const classLevelId = $(this).val();
-            const streamSelect = $('#edit-stream_class');
-            
-            if (classLevelId) {
-                loadStreams(classLevelId, streamSelect);
-            } else {
-                streamSelect.empty().prop('disabled', true).trigger('change');
-            }
-        });
-
-        // Handle modal close/cancel buttons
-        $(document).on('click', '[data-dismiss="modal"]', function(e) {
+    // Attach event handlers to dynamically created elements
+    function attachEventHandlers() {
+        // Edit button
+        $(document).off('click', '.edit-btn').on('click', '.edit-btn', function(e) {
             e.preventDefault();
-            $(this).closest('.modal').modal('hide');
-        });
-
-        // Handle cancel buttons
-        $('#cancel-add-btn, #cancel-edit-btn, #cancel-delete-btn').on('click', function(e) {
-            e.preventDefault();
-            $(this).closest('.modal').modal('hide');
+            const id = $(this).data('id');
+            if (id) {
+                loadExamSessionForEdit(id);
+            }
         });
         
-        // Add Exam Session
-        $('#add-form').on('submit', function(e) {
+        // Status button
+        $(document).off('click', '.status-btn').on('click', '.status-btn', function(e) {
             e.preventDefault();
-            
-            const saveBtn = $('#save-btn');
-            setButtonLoading(saveBtn, true);
-            
-            const formData = new FormData(this);
-            formData.append('action', 'create');
-            
-            $.ajax({
-                url: '{% url "admin_exam_sessions_crud" %}',
-                method: 'POST',
-                headers: {
-                    'X-CSRFToken': getCSRFToken(),
-                    'X-Requested-With': 'XMLHttpRequest'
-                },
-                data: formData,
-                processData: false,
-                contentType: false,
-                success: function(data) {
-                    if (data.success) {
-                        $('#addExamSessionModal').modal('hide');
-                        reloadPageAfterDelay(data.message, 'success');
-                    } else {
-                        showToast(data.message, 'danger');
-                        setButtonLoading(saveBtn, false);
-                    }
-                },
-                error: function(xhr, status, error) {
-                    console.error('Error:', error);
-                    showToast('An error occurred while saving. Please try again.', 'danger');
-                    setButtonLoading(saveBtn, false);
-                }
-            });
-        });
-
-        // Edit Exam Session - Setup modal
-        $(document).on('click', '.edit-btn', function() {
-            const btn = $(this);
-            
-            $('#edit-id').val(btn.data('id'));
-            
-            // Store values
-            const name = btn.data('name');
-            const examTypeId = btn.data('exam-type');
-            const academicYearId = btn.data('academic-year');
-            const termId = btn.data('term');
-            const classLevelId = btn.data('class-level');
-            const streamClassId = btn.data('stream-class');
-            const examDate = btn.data('exam-date');
-            
-            // Show modal first
-            $('#editExamSessionModal').modal('show');
-            
-            // Set values after modal is shown
-            setTimeout(function() {
-                $('#edit-name').val(name);
-                $('#edit-exam_date').val(examDate);
-                
-                // Set select values
-                $('#edit-exam_type').val(examTypeId).trigger('change');
-                $('#edit-academic_year').val(academicYearId).trigger('change');
-                $('#edit-class_level').val(classLevelId).trigger('change');
-                
-                // Load terms for selected academic year
-                if (academicYearId) {
-                    loadTerms(academicYearId, $('#edit-term'), termId);
-                }
-                
-                // Load streams for selected class level
-                if (classLevelId) {
-                    loadStreams(classLevelId, $('#edit-stream_class'), streamClassId);
-                }
-            }, 500);
-        });
-
-        // Edit Exam Session - Submit form
-        $('#edit-form').on('submit', function(e) {
-            e.preventDefault();
-            
-            const updateBtn = $('#update-btn');
-            setButtonLoading(updateBtn, true);
-            
-            const formData = new FormData(this);
-            formData.append('action', 'update');
-            
-            $.ajax({
-                url: '{% url "admin_exam_sessions_crud" %}',
-                method: 'POST',
-                headers: {
-                    'X-CSRFToken': getCSRFToken(),
-                    'X-Requested-With': 'XMLHttpRequest'
-                },
-                data: formData,
-                processData: false,
-                contentType: false,
-                success: function(data) {
-                    if (data.success) {
-                        $('#editExamSessionModal').modal('hide');
-                        reloadPageAfterDelay(data.message, 'success');
-                    } else {
-                        showToast(data.message, 'danger');
-                        setButtonLoading(updateBtn, false);
-                    }
-                },
-                error: function(xhr, status, error) {
-                    console.error('Error:', error);
-                    showToast('An error occurred while updating. Please try again.', 'danger');
-                    setButtonLoading(updateBtn, false);
-                }
-            });
-        });
-
-        // Status Change - Setup confirmation
-        $(document).on('click', '.status-btn', function() {
             const btn = $(this);
             sessionToChangeStatus = {
                 id: btn.data('id'),
@@ -1277,51 +1109,11 @@
             $('#status-confirm-message').text(statusMessages[sessionToChangeStatus.currentStatus] || 'Change status?');
             $('#statusConfirmModal').modal('show');
         });
-
-        // Status Change - Confirm
-        $('#confirm-status-btn').on('click', function() {
-            if (!sessionToChangeStatus) return;
-            
-            const confirmBtn = $(this);
-            setButtonLoading(confirmBtn, true);
-            
-            $.ajax({
-                url: '{% url "admin_exam_sessions_crud" %}',
-                method: 'POST',
-                headers: {
-                    'X-CSRFToken': getCSRFToken(),
-                    'X-Requested-With': 'XMLHttpRequest'
-                },
-                data: {
-                    'action': 'toggle_status',
-                    'id': sessionToChangeStatus.id,
-                    'status': sessionToChangeStatus.newStatus,
-                    'csrfmiddlewaretoken': getCSRFToken()
-                },
-                success: function(data) {
-                    if (data.success) {
-                        $('#statusConfirmModal').modal('hide');
-                        showToast(data.message, 'success');
-                        reloadPageAfterDelay('Status updated successfully', 'success');
-                    } else {
-                        showToast(data.message, 'danger');
-                    }
-                    setButtonLoading(confirmBtn, false);
-                    sessionToChangeStatus = null;
-                },
-                error: function(xhr, status, error) {
-                    console.error('Error:', error);
-                    showToast('An error occurred while changing status. Please try again.', 'danger');
-                    setButtonLoading(confirmBtn, false);
-                    sessionToChangeStatus = null;
-                }
-            });
-        });
-
-        // Delete Exam Session - Setup modal
-        $(document).on('click', '.delete-btn', function() {
+        
+        // Delete button
+        $(document).off('click', '.delete-btn').on('click', '.delete-btn', function(e) {
+            e.preventDefault();
             const btn = $(this);
-            
             sessionToDelete = {
                 id: btn.data('id'),
                 name: btn.data('name')
@@ -1330,97 +1122,352 @@
             $('#delete-session-name').text(btn.data('name'));
             $('#deleteExamSessionModal').modal('show');
         });
+    }
 
-        // Delete Exam Session - Confirm
-        $('#confirm-delete-btn').on('click', function() {
-            if (!sessionToDelete) return;
-            
-            const deleteBtn = $(this);
-            setButtonLoading(deleteBtn, true);
-            
-            $.ajax({
-                url: '{% url "admin_exam_sessions_crud" %}',
-                method: 'POST',
-                headers: {
-                    'X-CSRFToken': getCSRFToken(),
-                    'X-Requested-With': 'XMLHttpRequest'
-                },
-                data: {
-                    'action': 'delete',
-                    'id': sessionToDelete.id,
-                    'csrfmiddlewaretoken': getCSRFToken()
-                },
-                success: function(data) {
-                    if (data.success) {
-                        $('#deleteExamSessionModal').modal('hide');
-                        reloadPageAfterDelay(data.message, 'success');
-                    } else {
-                        showToast(data.message, 'danger');
-                        setButtonLoading(deleteBtn, false);
-                    }
-                },
-                error: function(xhr, status, error) {
-                    console.error('Error:', error);
-                    showToast('An error occurred while deleting. Please try again.', 'danger');
-                    setButtonLoading(deleteBtn, false);
-                }
-            });
-        });
+    // Initialize DataTable
+    initializeDataTable();
 
-        // Clear form and reset button state on modal close
-        $('#addExamSessionModal').on('hidden.bs.modal', function() {
-            $('#add-form')[0].reset();
-            $('#term, #stream_class').empty().prop('disabled', true).trigger('change');
-            setButtonLoading($('#save-btn'), false);
-        });
+    // Filter functionality
+    $('#filter-academic-year').on('change', function() {
+        const academicYearId = $(this).val();
+        const termSelect = $('#filter-term');
         
-        $('#editExamSessionModal').on('hidden.bs.modal', function() {
-            $('#edit-term, #edit-stream_class').empty().prop('disabled', true).trigger('change');
-            setButtonLoading($('#update-btn'), false);
-        });
+        if (academicYearId) {
+            loadFilterTerms(academicYearId, termSelect);
+        } else {
+            termSelect.empty();
+            termSelect.append('<option value="">All Terms</option>');
+            termSelect.prop('disabled', true).trigger('change');
+            $('#filter-stream').empty();
+            $('#filter-stream').append('<option value="">All Streams</option>');
+            $('#filter-stream').prop('disabled', true).trigger('change');
+        }
         
-        $('#deleteExamSessionModal').on('hidden.bs.modal', function() {
-            sessionToDelete = null;
-            setButtonLoading($('#confirm-delete-btn'), false);
-        });
+        // Trigger DataTable reload with new filters
+        table.ajax.reload();
+    });
+
+    $('#filter-class-level').on('change', function() {
+        const classLevelId = $(this).val();
+        const streamSelect = $('#filter-stream');
         
-        $('#statusConfirmModal').on('hidden.bs.modal', function() {
-            sessionToChangeStatus = null;
-            setButtonLoading($('#confirm-status-btn'), false);
-        });
+        if (classLevelId) {
+            loadFilterStreams(classLevelId, streamSelect);
+        } else {
+            streamSelect.empty();
+            streamSelect.append('<option value="">All Streams</option>');
+            streamSelect.prop('disabled', true).trigger('change');
+        }
+        
+        table.ajax.reload();
+    });
 
-        // Form validation
-        $('#add-form, #edit-form').on('submit', function(e) {
-            const isAddForm = $(this).attr('id') === 'add-form';
-            const nameInput = isAddForm ? '#name' : '#edit-name';
-            const examDateInput = isAddForm ? '#exam_date' : '#edit-exam_date';
-            
-            const name = $(nameInput).val().trim();
-            const examDate = $(examDateInput).val();
-            
-            // Validate name length
-            if (name.length < 5) {
-                e.preventDefault();
-                showToast('Exam session name must be at least 5 characters long.', 'danger');
-                $(nameInput).addClass('is-invalid');
-                return false;
-            }
-            
-            // Validate exam date
-            if (!examDate) {
-                e.preventDefault();
-                showToast('Exam date is required.', 'danger');
-                $(examDateInput).addClass('is-invalid');
-                return false;
-            }
-            
-            return true;
-        });
+    $('#filter-term, #filter-stream').on('change', function() {
+        table.ajax.reload();
+    });
 
-        // Remove validation classes on input
-        $('#name, #edit-name, #exam_date, #edit-exam_date').on('input', function() {
-            $(this).removeClass('is-invalid');
+    $('#reset-filters').on('click', function() {
+        $('#filter-academic-year, #filter-class-level, #filter-term, #filter-stream').val('').trigger('change');
+        $('#filter-term, #filter-stream').prop('disabled', true).trigger('change');
+        $('#filter-term').empty().append('<option value="">All Terms</option>');
+        $('#filter-stream').empty().append('<option value="">All Streams</option>');
+        table.ajax.reload();
+    });
+
+    // Add Exam Session Modal
+    $('#addExamSessionModal').on('shown.bs.modal', function() {
+        $('#exam_type, #academic_year, #class_level, #status').select2({
+            theme: 'bootstrap4',
+            width: '100%',
+            dropdownParent: $('#addExamSessionModal')
         });
     });
+
+    // Load terms when academic year changes (add form)
+    $('#academic_year').on('change', function() {
+        const academicYearId = $(this).val();
+        const termSelect = $('#term');
+        
+        if (academicYearId) {
+            loadModalTerms(academicYearId, termSelect);
+        } else {
+            termSelect.empty();
+            termSelect.append('<option value="">Select Academic Year First</option>');
+            termSelect.prop('disabled', true).trigger('change');
+        }
+    });
+
+    // Load streams when class level changes (add form)
+    $('#class_level').on('change', function() {
+        const classLevelId = $(this).val();
+        const streamSelect = $('#stream_class');
+        
+        if (classLevelId) {
+            loadModalStreams(classLevelId, streamSelect);
+        } else {
+            streamSelect.empty();
+            streamSelect.append('<option value="">Select Class Level First</option>');
+            streamSelect.prop('disabled', true).trigger('change');
+        }
+    });
+
+    // Edit Exam Session Modal
+    $('#editExamSessionModal').on('shown.bs.modal', function() {
+        $('#edit-exam_type, #edit-academic_year, #edit-class_level, #edit-term, #edit-stream_class').select2({
+            theme: 'bootstrap4',
+            width: '100%',
+            dropdownParent: $('#editExamSessionModal')
+        });
+    });
+
+    // Load terms when academic year changes (edit form)
+    $('#edit-academic_year').on('change', function() {
+        const academicYearId = $(this).val();
+        const termSelect = $('#edit-term');
+        
+        if (academicYearId) {
+            loadModalTerms(academicYearId, termSelect);
+        } else {
+            termSelect.empty();
+            termSelect.append('<option value="">Select Academic Year First</option>');
+            termSelect.prop('disabled', true).trigger('change');
+        }
+    });
+
+    // Load streams when class level changes (edit form)
+    $('#edit-class_level').on('change', function() {
+        const classLevelId = $(this).val();
+        const streamSelect = $('#edit-stream_class');
+        
+        if (classLevelId) {
+            loadModalStreams(classLevelId, streamSelect);
+        } else {
+            streamSelect.empty();
+            streamSelect.append('<option value="">Select Class Level First</option>');
+            streamSelect.prop('disabled', true).trigger('change');
+        }
+    });
+
+    // Handle modal close/cancel buttons
+    $(document).on('click', '[data-dismiss="modal"]', function(e) {
+        e.preventDefault();
+        $(this).closest('.modal').modal('hide');
+    });
+
+    // Add Exam Session
+    $('#add-form').on('submit', function(e) {
+        e.preventDefault();
+        
+        const saveBtn = $('#save-btn');
+        setButtonLoading(saveBtn, true);
+        
+        const formData = new FormData(this);
+        formData.append('action', 'create');
+        
+        $.ajax({
+            url: '{% url "admin_exam_sessions_crud" %}',
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': getCSRFToken(),
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            data: formData,
+            processData: false,
+            contentType: false,
+            success: function(data) {
+                if (data.success) {
+                    $('#addExamSessionModal').modal('hide');
+                    showToast(data.message, 'success');
+                    table.ajax.reload(null, false); // Reload table without resetting pagination
+                } else {
+                    showToast(data.message, 'danger');
+                }
+                setButtonLoading(saveBtn, false);
+            },
+            error: function(xhr, status, error) {
+                console.error('Error:', error);
+                showToast('An error occurred while saving. Please try again.', 'danger');
+                setButtonLoading(saveBtn, false);
+            }
+        });
+    });
+
+    // Edit Exam Session - Submit form
+    $('#edit-form').on('submit', function(e) {
+        e.preventDefault();
+        
+        const updateBtn = $('#update-btn');
+        setButtonLoading(updateBtn, true);
+        
+        const formData = new FormData(this);
+        formData.append('action', 'update');
+        
+        $.ajax({
+            url: '{% url "admin_exam_sessions_crud" %}',
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': getCSRFToken(),
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            data: formData,
+            processData: false,
+            contentType: false,
+            success: function(data) {
+                if (data.success) {
+                    $('#editExamSessionModal').modal('hide');
+                    showToast(data.message, 'success');
+                    table.ajax.reload(null, false);
+                } else {
+                    showToast(data.message, 'danger');
+                }
+                setButtonLoading(updateBtn, false);
+            },
+            error: function(xhr, status, error) {
+                console.error('Error:', error);
+                showToast('An error occurred while updating. Please try again.', 'danger');
+                setButtonLoading(updateBtn, false);
+            }
+        });
+    });
+
+    // Status Change - Confirm
+    $('#confirm-status-btn').on('click', function() {
+        if (!sessionToChangeStatus) return;
+        
+        const confirmBtn = $(this);
+        setButtonLoading(confirmBtn, true);
+        
+        $.ajax({
+            url: '{% url "admin_exam_sessions_crud" %}',
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': getCSRFToken(),
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            data: {
+                'action': 'toggle_status',
+                'id': sessionToChangeStatus.id,
+                'status': sessionToChangeStatus.newStatus,
+                'csrfmiddlewaretoken': getCSRFToken()
+            },
+            success: function(data) {
+                if (data.success) {
+                    $('#statusConfirmModal').modal('hide');
+                    showToast(data.message, 'success');
+                    table.ajax.reload(null, false);
+                } else {
+                    showToast(data.message, 'danger');
+                }
+                setButtonLoading(confirmBtn, false);
+                sessionToChangeStatus = null;
+            },
+            error: function(xhr, status, error) {
+                console.error('Error:', error);
+                showToast('An error occurred while changing status. Please try again.', 'danger');
+                setButtonLoading(confirmBtn, false);
+                sessionToChangeStatus = null;
+            }
+        });
+    });
+
+    // Delete Exam Session - Confirm
+    $('#confirm-delete-btn').on('click', function() {
+        if (!sessionToDelete) return;
+        
+        const deleteBtn = $(this);
+        setButtonLoading(deleteBtn, true);
+        
+        $.ajax({
+            url: '{% url "admin_exam_sessions_crud" %}',
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': getCSRFToken(),
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            data: {
+                'action': 'delete',
+                'id': sessionToDelete.id,
+                'csrfmiddlewaretoken': getCSRFToken()
+            },
+            success: function(data) {
+                if (data.success) {
+                    $('#deleteExamSessionModal').modal('hide');
+                    showToast(data.message, 'success');
+                    table.ajax.reload(null, false);
+                } else {
+                    showToast(data.message, 'danger');
+                }
+                setButtonLoading(deleteBtn, false);
+                sessionToDelete = null;
+            },
+            error: function(xhr, status, error) {
+                console.error('Error:', error);
+                showToast('An error occurred while deleting. Please try again.', 'danger');
+                setButtonLoading(deleteBtn, false);
+                sessionToDelete = null;
+            }
+        });
+    });
+
+    // Clear form and reset button state on modal close
+    $('#addExamSessionModal').on('hidden.bs.modal', function() {
+        $('#add-form')[0].reset();
+        $('#term, #stream_class').empty();
+        $('#term').append('<option value="">Select Academic Year First</option>');
+        $('#stream_class').append('<option value="">Select Class Level First</option>');
+        $('#term, #stream_class').prop('disabled', true).trigger('change');
+        setButtonLoading($('#save-btn'), false);
+    });
+    
+    $('#editExamSessionModal').on('hidden.bs.modal', function() {
+        $('#edit-form')[0].reset();
+        $('#edit-term, #edit-stream_class').empty();
+        $('#edit-term').append('<option value="">Select Academic Year First</option>');
+        $('#edit-stream_class').append('<option value="">Select Class Level First</option>');
+        $('#edit-term, #edit-stream_class').prop('disabled', true).trigger('change');
+        setButtonLoading($('#update-btn'), false);
+    });
+    
+    $('#deleteExamSessionModal').on('hidden.bs.modal', function() {
+        sessionToDelete = null;
+        setButtonLoading($('#confirm-delete-btn'), false);
+    });
+    
+    $('#statusConfirmModal').on('hidden.bs.modal', function() {
+        sessionToChangeStatus = null;
+        setButtonLoading($('#confirm-status-btn'), false);
+    });
+
+    // Form validation
+    $('#add-form, #edit-form').on('submit', function(e) {
+        const isAddForm = $(this).attr('id') === 'add-form';
+        const nameInput = isAddForm ? '#name' : '#edit-name';
+        const examDateInput = isAddForm ? '#exam_date' : '#edit-exam_date';
+        
+        const name = $(nameInput).val().trim();
+        const examDate = $(examDateInput).val();
+        
+        if (name.length < 5) {
+            e.preventDefault();
+            showToast('Exam session name must be at least 5 characters long.', 'danger');
+            $(nameInput).addClass('is-invalid');
+            return false;
+        }
+        
+        if (!examDate) {
+            e.preventDefault();
+            showToast('Exam date is required.', 'danger');
+            $(examDateInput).addClass('is-invalid');
+            return false;
+        }
+        
+        return true;
+    });
+
+    // Remove validation classes on input
+    $('#name, #edit-name, #exam_date, #edit-exam_date').on('input', function() {
+        $(this).removeClass('is-invalid');
+    });
+});
 </script>
 {% endblock extra_js %}

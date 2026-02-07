@@ -14,10 +14,17 @@ urlpatterns = [
     path('academic/exam-types/crud/', exam_types_crud, name='admin_exam_types_crud'),
     path('results/exam-sessions/', exam_sessions_list, name='admin_exam_sessions_list'),
     path('results/exam-sessions/crud/', exam_sessions_crud, name='admin_exam_sessions_crud'),
-    path('results/exam-sessions/<int:exam_session_id>/', exam_session_detail, name='admin_exam_session_detail'),
-    path('results/exam-sessions/<int:exam_session_id>/papers/', manage_exam_papers, name='admin_manage_exam_papers'),
+    path('exam-sessions/<int:exam_session_id>/', exam_session_detail, name='admin_exam_session_detail'),    
     path('results/exam-sessions/get-streams/', get_streams_for_exam_session, name='admin_get_streams_for_exam_session'),
     path('results/exam-sessions/stats/', get_exam_session_stats, name='admin_exam_session_stats'),
     path('exam-sessions/get-terms/', get_terms_for_academic_year, name='admin_get_terms_for_academic_year'),
     path('exam-sessions/get-streams/', get_streams_for_exam_session, name='admin_get_streams_for_exam_session'),
+    path('exam-sessions/data/', admin_exam_sessions_data, name='admin_exam_sessions_data'),
+    path('exam-sessions/details/', get_exam_session_by_id, name='admin_get_exam_session_by_id'),
+      # Student Results Management
+    path('exam-sessions/<int:exam_session_id>/manage-result/', manage_results,  name='manage_results'),    
+    # AJAX endpoints
+    path('save-results/', save_student_results, name='save_student_results'),
+    path('save-multiple-results/',  save_multiple_results, name='save_multiple_results'),
+
 ]
