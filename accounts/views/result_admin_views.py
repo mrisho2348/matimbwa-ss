@@ -1,30 +1,37 @@
 # results/views/grading_scales.py
-from datetime import date, datetime
-from django.shortcuts import render, get_object_or_404, redirect
-from django.contrib.auth.decorators import login_required
-from django.http import JsonResponse
-from django.views.decorators.http import require_POST
-from django.core.exceptions import ValidationError
-from django.db import IntegrityError, transaction
+import csv
 import json
-from results.models import  ExamSession, ExamType, GradingScale, DivisionScale, StudentExamMetrics, StudentExamPosition, StudentResult
-from core.models import AcademicYear, ClassLevel, EducationalLevel, StreamClass, Subject, Term
+import math
+from datetime import date, datetime
+from decimal import Decimal, InvalidOperation
+from io import BytesIO
+from openpyxl.styles import PatternFill, Font, Border, Side, Alignment
+import openpyxl
+import pandas as pd
+from django.template.loader import render_to_string
 from django.contrib import messages
-from students.models import Student
-from django.db.models import Count, Sum, Avg, Max, Min
+from django.contrib.auth.decorators import login_required
+from django.core.exceptions import ValidationError
+from django.core.paginator import EmptyPage, Paginator
+from django.db import IntegrityError, transaction
+from django.db.models import Avg, Count, Max, Min, Q, Sum
+from django.http import HttpResponse, HttpResponseRedirect, JsonResponse
+from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.utils.timesince import timesince
-from django.db.models import Q
-from django.core.paginator import Paginator, EmptyPage
-from django.http import HttpResponse, JsonResponse, HttpResponseRedirect
-from django.shortcuts import get_object_or_404, render
-from django.views.decorators.http import require_GET, require_POST, require_http_methods
-import pandas as pd
-from io import BytesIO
-import openpyxl
+from django.views.decorators.http import (require_GET, require_http_methods,
+                                          require_POST)
+
 from openpyxl.utils import get_column_letter
-import csv
-import math
+from weasyprint import HTML
+
+from core.models import (AcademicYear, ClassLevel, EducationalLevel,
+                         StreamClass, Subject, Term)
+from results.models import (DivisionScale, ExamSession, ExamType, GradingScale,
+                            StudentExamMetrics, StudentExamPosition,
+                            StudentResult)
+from students.models import Student
+
 
 @login_required
 def grading_scales_list(request):
@@ -105,10 +112,10 @@ def create_grading_scale(request):
     
     # Convert to appropriate types
     try:
-        min_mark_val = float(min_mark)
-        max_mark_val = float(max_mark)
-        points_val = float(points) if points else 0.0
-    except ValueError:
+        min_mark_val = Decimal(min_mark)
+        max_mark_val = Decimal(max_mark)
+        points_val = Decimal(points) if points else Decimal('0.0')
+    except (ValueError, TypeError):
         return JsonResponse({
             'success': False,
             'message': 'Invalid number format for marks or points.'
@@ -242,10 +249,10 @@ def update_grading_scale(request):
     
     # Convert to appropriate types
     try:
-        min_mark_val = float(min_mark)
-        max_mark_val = float(max_mark)
-        points_val = float(points) if points else grading_scale.points
-    except ValueError:
+        min_mark_val = Decimal(min_mark)
+        max_mark_val = Decimal(max_mark)
+        points_val = Decimal(points) if points else grading_scale.points
+    except (ValueError, TypeError):
         return JsonResponse({
             'success': False,
             'message': 'Invalid number format for marks or points.'
@@ -298,10 +305,11 @@ def update_grading_scale(request):
     
     if overlapping_scales.exists():
         overlapping = overlapping_scales.first()
-        return JsonResponse({
-            'success': False,
-            'message': f'Mark range overlaps with existing grade "{overlapping.grade}" ({overlapping.min_mark}-{overlapping.max_mark}).'
-        })
+        if overlapping:
+            return JsonResponse({
+                'success': False,
+                'message': f'Mark range overlaps with existing grade "{overlapping.grade}" ({overlapping.min_mark}-{overlapping.max_mark}).'
+            })
     
     try:
         with transaction.atomic():
@@ -1863,7 +1871,7 @@ def toggle_exam_session_status(request):
             })
         
         # Check if there are papers added
-        if not exam_session.papers.exists():
+        if not exam_session.results.exists():
             return JsonResponse({
                 'success': False,
                 'message': 'Cannot publish an exam session without any papers.'
@@ -1919,7 +1927,7 @@ def delete_exam_session(request):
         })
     
     # Check if there are any papers or results
-    if exam_session.papers.exists():
+    if exam_session.results.exists():
         return JsonResponse({
             'success': False,
             'message': 'Cannot delete exam session with papers. Delete papers first.'
@@ -2423,180 +2431,251 @@ def manage_results(request, exam_session_id):
 @login_required
 @require_POST
 def save_student_results(request):
-    """Save multiple student results"""
+    """Save multiple student results with strict marks validation (0–100 or empty)"""
+
     try:
         data = json.loads(request.body)
+
         exam_session_id = data.get('exam_session_id')
         results_data = data.get('results', [])
         is_auto_save = data.get('is_auto_save', False)
-        
-        if not exam_session_id or not results_data:
+
+        if not exam_session_id or not isinstance(results_data, list):
             return JsonResponse({
                 'success': False,
                 'message': 'Invalid data provided.'
-            })
-        
+            }, status=400)
+
         exam_session = get_object_or_404(ExamSession, id=exam_session_id)
-        
+
         saved_results = []
         saved_count = 0
-        
+        skipped_count = 0
+
         with transaction.atomic():
             for result_data in results_data:
                 student_id = result_data.get('student_id')
                 subject_id = result_data.get('subject_id')
                 marks_obtained = result_data.get('marks_obtained')
-                
-                if not all([student_id, subject_id, marks_obtained is not None]):
+
+                # Required IDs
+                if not student_id or not subject_id:
+                    skipped_count += 1
                     continue
-                
+
+                # Allow empty marks (skip save)
+                if marks_obtained in ("", None):
+                    skipped_count += 1
+                    continue
+
+                # Ensure numeric (use Decimal to match model DecimalFields)
                 try:
-                    # Get or create result
-                    result, created = StudentResult.objects.get_or_create(
-                        exam_session=exam_session,
-                        student_id=student_id,
-                        subject_id=subject_id,
-                        defaults={'marks_obtained': marks_obtained}
-                    )
-                    
-                    if not created:
-                        result.marks_obtained = marks_obtained
-                    
-                    # Calculate percentage
-                    max_score = exam_session.exam_type.max_score
-                    if max_score > 0:
-                        result.percentage = (marks_obtained / max_score) * 100
-                    
-                    # Calculate grade
-                    education_level = exam_session.class_level.educational_level
-                    grade_scale = GradingScale.objects.filter(
-                        education_level=education_level,
-                        min_mark__lte=marks_obtained,
-                        max_mark__gte=marks_obtained
-                    ).first()
-                    
-                    if grade_scale:
-                        result.grade = grade_scale.grade
-                        result.grade_point = grade_scale.points
-                    
-                    result.save()
-                    
-                    saved_results.append({
-                        'student_id': student_id,
-                        'subject_id': subject_id,
-                        'result_id': result.id
-                    })
-                    saved_count += 1
-                    
-                except (Student.DoesNotExist, Subject.DoesNotExist):
+                    marks_obtained = Decimal(str(marks_obtained))
+                except (TypeError, ValueError, InvalidOperation):
+                    skipped_count += 1
                     continue
-                except ValidationError as e:
+
+                # Enforce range 0–100
+                if marks_obtained < 0 or marks_obtained > 100:
+                    skipped_count += 1
                     continue
-        
-        # Calculate positions after saving results
+
+                # Save or update result
+                result, created = StudentResult.objects.get_or_create(
+                    exam_session=exam_session,
+                    student_id=student_id,
+                    subject_id=subject_id,
+                    defaults={'marks_obtained': marks_obtained}
+                )
+
+                if not created:
+                    result.marks_obtained = marks_obtained
+
+                # Percentage (use Decimal arithmetic)
+                max_score = exam_session.exam_type.max_score
+                if max_score and max_score > 0:
+                    try:
+                        max_score_decimal = Decimal(str(max_score))
+                        result.percentage = (marks_obtained / max_score_decimal) * Decimal('100')
+                    except (InvalidOperation, TypeError):
+                        result.percentage = None
+
+                # Grade calculation
+                education_level = exam_session.class_level.educational_level
+                grade_scale = GradingScale.objects.filter(
+                    education_level=education_level,
+                    min_mark__lte=marks_obtained,
+                    max_mark__gte=marks_obtained
+                ).first()
+
+                if grade_scale:
+                    result.grade = grade_scale.grade
+                    result.grade_point = grade_scale.points
+                else:
+                    result.grade = None
+                    result.grade_point = None
+
+                result.save()
+
+                saved_results.append({
+                    'student_id': student_id,
+                    'subject_id': subject_id,
+                    'result_id': result.id
+                })
+
+                saved_count += 1
+
+        # Calculate positions only for manual save
         if saved_count > 0 and not is_auto_save:
             calculate_subject_positions(exam_session)
-        
+
         return JsonResponse({
             'success': True,
-            'message': f'Successfully saved {saved_count} results.',
+            'message': f'Saved {saved_count} results. Skipped {skipped_count}.',
             'saved_count': saved_count,
+            'skipped_count': skipped_count,
             'saved_results': saved_results
         })
-        
+
+    except json.JSONDecodeError:
+        return JsonResponse({
+            'success': False,
+            'message': 'Invalid JSON payload.'
+        }, status=400)
+
     except Exception as e:
         return JsonResponse({
             'success': False,
             'message': f'Error saving results: {str(e)}'
-        })
+        }, status=500)
+
+
 
 @login_required
 @require_POST
 def save_multiple_results(request):
-    """Save multiple new results from modal"""
+    """Save multiple new results from modal with marks validation (0–100 or empty)"""
+
     try:
         exam_session_id = request.POST.get('exam_session_id')
         results_json = request.POST.get('results')
-        
+
         if not exam_session_id or not results_json:
             return JsonResponse({
                 'success': False,
                 'message': 'Invalid data provided.'
-            })
-        
-        results_data = json.loads(results_json)
+            }, status=400)
+
+        try:
+            results_data = json.loads(results_json)
+        except json.JSONDecodeError:
+            return JsonResponse({
+                'success': False,
+                'message': 'Invalid results JSON.'
+            }, status=400)
+
         exam_session = get_object_or_404(ExamSession, id=exam_session_id)
-        
+
         saved_count = 0
+        skipped_count = 0
         errors = []
-        
+
         with transaction.atomic():
             for result_data in results_data:
-                try:
-                    # Check if result already exists
-                    existing_result = StudentResult.objects.filter(
-                        exam_session=exam_session,
-                        student_id=result_data['studentId'],
-                        subject_id=result_data['subjectId']
-                    ).exists()
-                    
-                    if existing_result:
-                        errors.append(f"Result already exists for student {result_data['studentId']} and subject {result_data['subjectId']}")
-                        continue
-                    
-                    # Create new result
-                    result = StudentResult.objects.create(
-                        exam_session=exam_session,
-                        student_id=result_data['studentId'],
-                        subject_id=result_data['subjectId'],
-                        marks_obtained=result_data['marks']
-                    )
-                    
-                    # Calculate percentage
-                    max_score = exam_session.exam_type.max_score
-                    if max_score > 0:
-                        result.percentage = (result.marks_obtained / max_score) * 100
-                    
-                    # Calculate grade
-                    education_level = exam_session.class_level.educational_level
-                    grade_scale = GradingScale.objects.filter(
-                        education_level=education_level,
-                        min_mark__lte=result.marks_obtained,
-                        max_mark__gte=result.marks_obtained
-                    ).first()
-                    
-                    if grade_scale:
-                        result.grade = grade_scale.grade
-                        result.grade_point = grade_scale.points
-                    
-                    result.save()
-                    saved_count += 1
-                    
-                except Exception as e:
-                    errors.append(str(e))
+                student_id = result_data.get('studentId')
+                subject_id = result_data.get('subjectId')
+                marks = result_data.get('marks')
+
+                # Validate IDs
+                if not student_id or not subject_id:
+                    skipped_count += 1
                     continue
-        
-        # Calculate positions
+
+                # Allow empty marks → skip
+                if marks in ("", None):
+                    skipped_count += 1
+                    continue
+
+                # Ensure numeric marks (use Decimal)
+                try:
+                    marks = Decimal(str(marks))
+                except (TypeError, ValueError, InvalidOperation):
+                    errors.append(
+                        f"Invalid marks for student {student_id}, subject {subject_id}"
+                    )
+                    continue
+
+                # Enforce range 0–100
+                if marks < 0 or marks > 100:
+                    errors.append(
+                        f"Marks out of range (0–100) for student {student_id}, subject {subject_id}"
+                    )
+                    continue
+
+                # Prevent duplicate result
+                if StudentResult.objects.filter(
+                    exam_session=exam_session,
+                    student_id=student_id,
+                    subject_id=subject_id
+                ).exists():
+                    errors.append(
+                        f"Result already exists for student {student_id}, subject {subject_id}"
+                    )
+                    continue
+
+                # Create result
+                result = StudentResult.objects.create(
+                    exam_session=exam_session,
+                    student_id=student_id,
+                    subject_id=subject_id,
+                    marks_obtained=marks
+                )
+
+                # Percentage (use Decimal arithmetic)
+                max_score = exam_session.exam_type.max_score
+                if max_score and max_score > 0:
+                    try:
+                        max_score_decimal = Decimal(str(max_score))
+                        result.percentage = (marks / max_score_decimal) * Decimal('100')
+                    except (InvalidOperation, TypeError):
+                        result.percentage = None
+
+                # Grade
+                education_level = exam_session.class_level.educational_level
+                grade_scale = GradingScale.objects.filter(
+                    education_level=education_level,
+                    min_mark__lte=marks,
+                    max_mark__gte=marks
+                ).first()
+
+                if grade_scale:
+                    result.grade = grade_scale.grade
+                    result.grade_point = grade_scale.points
+
+                result.save()
+                saved_count += 1
+
+        # Calculate positions only if something was saved
         if saved_count > 0:
             calculate_subject_positions(exam_session)
-        
+
         response_data = {
             'success': True,
-            'message': f'Successfully saved {saved_count} results.',
-            'saved_count': saved_count
+            'message': f'Saved {saved_count} results. Skipped {skipped_count}.',
+            'saved_count': saved_count,
+            'skipped_count': skipped_count
         }
-        
+
         if errors:
-            response_data['errors'] = errors[:5]  # Limit errors to first 5
-        
+            response_data['errors'] = errors[:5]  # limit noise
+
         return JsonResponse(response_data)
-        
+
     except Exception as e:
         return JsonResponse({
             'success': False,
             'message': f'Error saving results: {str(e)}'
-        })
-
+        }, status=500)
 
 def calculate_subject_positions(exam_session):
     """Calculate positions for all subjects in an exam session"""
@@ -2646,3 +2725,1490 @@ def calculate_subject_position(exam_session, subject):
             
     except Exception as e:
         print(f"Error calculating position for subject {subject.id}: {str(e)}")
+
+@login_required
+def subject_results_entry(request, exam_session_id, subject_id):
+    """Entry page for entering marks for all students in a specific subject"""
+    exam_session = get_object_or_404(
+        ExamSession.objects.select_related(
+            'exam_type',
+            'academic_year',
+            'term',
+            'class_level',
+            'class_level__educational_level',
+            'stream_class'
+        ),
+        id=exam_session_id
+    )
+    
+    subject = get_object_or_404(Subject, id=subject_id)
+    
+    # Get students based on stream
+    if exam_session.stream_class:
+        students = Student.objects.filter(
+            class_level=exam_session.class_level,
+            stream_class=exam_session.stream_class,
+            is_active=True
+        )
+    else:
+        students = Student.objects.filter(
+            class_level=exam_session.class_level,
+            is_active=True
+        )
+    
+    students = students.order_by('first_name', 'last_name')
+    
+    # Get existing results for this subject
+    existing_results = StudentResult.objects.filter(
+        exam_session=exam_session,
+        subject=subject
+    ).select_related('student')
+    
+    # Create a dictionary of existing results for quick lookup
+    results_dict = {result.student_id: result for result in existing_results}
+    
+    # Prepare student data with existing marks
+    students_data = []
+    for student in students:
+        result = results_dict.get(student.id)
+        students_data.append({
+            'id': student.id,
+            'registration_number': student.registration_number or f"S{student.id:04d}",
+            'full_name': student.full_name,
+            'gender': student.get_gender_display(),
+            'existing_marks': result.marks_obtained if result else None,
+            'existing_grade': result.grade if result else '',
+            'result_id': result.id if result else None,
+            'has_result': bool(result)
+        })
+    
+    # Get statistics
+    total_students = students.count()
+    with_marks = len([s for s in students_data if s['existing_marks'] is not None])
+    without_marks = total_students - with_marks
+    
+    context = {
+        'exam_session': exam_session,
+        'subject': subject,
+        'students_data': students_data,
+        'total_students': total_students,
+        'with_marks': with_marks,
+        'without_marks': without_marks,
+        'progress_percentage': (with_marks / total_students * 100) if total_students > 0 else 0,
+        'page_title': f'Enter Marks - {subject.name}',
+    }
+    
+    return render(request, 'admin/results/subject_results_entry.html', context)        
+
+
+
+
+@login_required
+def download_excel_template(request, exam_session_id, subject_id):
+    """Generate and download Excel template for marks entry"""
+    try:
+        exam_session = get_object_or_404(
+            ExamSession.objects.select_related(
+                'exam_type', 'class_level', 'stream_class',
+                'academic_year', 'term'
+            ),
+            id=exam_session_id
+        )
+        subject = get_object_or_404(Subject, id=subject_id)
+        
+        # Get students for this exam session
+        if exam_session.stream_class:
+            students = Student.objects.filter(
+                class_level=exam_session.class_level,
+                stream_class=exam_session.stream_class,
+                is_active=True
+            )
+        else:
+            students = Student.objects.filter(
+                class_level=exam_session.class_level,
+                is_active=True
+            )
+        
+        students = students.order_by('first_name', 'last_name')
+        
+        # Get existing results
+        existing_results = StudentResult.objects.filter(
+            exam_session=exam_session,
+            subject=subject
+        )
+        results_dict = {r.student_id: r.marks_obtained for r in existing_results}
+        
+        # Create workbook
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "Marks Entry"
+        
+        # Define styles
+        header_fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+        header_font = Font(name="Arial", size=11, bold=True, color="FFFFFF")
+        header_border = Border(
+            left=Side(style='thin'),
+            right=Side(style='thin'),
+            top=Side(style='thin'),
+            bottom=Side(style='thin')
+        )
+        
+        info_fill = PatternFill(start_color="F2F2F2", end_color="F2F2F2", fill_type="solid")
+        info_font = Font(name="Arial", size=10, bold=True)
+        
+        cell_border = Border(
+            left=Side(style='thin'),
+            right=Side(style='thin'),
+            top=Side(style='thin'),
+            bottom=Side(style='thin')
+        )
+        
+        center_alignment = Alignment(horizontal="center", vertical="center")
+        left_alignment = Alignment(horizontal="left", vertical="center")
+        
+        # Add header information
+        ws['A1'] = "MARKS ENTRY TEMPLATE"
+        ws['A1'].font = Font(name="Arial", size=14, bold=True)
+        ws['A1'].alignment = center_alignment
+        ws.merge_cells('A1:D1')
+        
+        ws['A2'] = f"Exam Session: {exam_session.name}"
+        ws['A2'].font = info_font
+        ws.merge_cells('A2:D2')
+        
+        ws['A3'] = f"Subject: {subject.name} ({subject.code})"
+        ws['A3'].font = info_font
+        ws.merge_cells('A3:D3')
+        
+        ws['A4'] = f"Class: {exam_session.class_level.name}"
+        if exam_session.stream_class:
+            ws['A4'] += f" {exam_session.stream_class.stream_letter}"
+        ws['A4'].font = info_font
+        ws.merge_cells('A4:D4')
+        
+        ws['A5'] = f"Academic Year: {exam_session.academic_year.name}"
+        ws['A5'].font = info_font
+        ws.merge_cells('A5:D5')
+        
+        ws['A6'] = f"Term: {exam_session.term.get_term_number_display()}"
+        ws['A6'].font = info_font
+        ws.merge_cells('A6:D6')
+        
+        ws['A7'] = f"Maximum Score: {exam_session.exam_type.max_score}"
+        ws['A7'].font = info_font
+        ws.merge_cells('A7:D7')
+        
+        # Add instruction rows
+        ws['A9'] = "INSTRUCTIONS:"
+        ws['A9'].font = Font(name="Arial", size=11, bold=True, color="FF0000")
+        ws.merge_cells('A9:D9')
+        
+        instructions = [
+            "1. Fill marks in the 'Marks' column (Column D).",
+            "2. Leave blank for absent students.",
+            "3. Enter 0 for zero marks (it's a valid mark).",
+            "4. Do not modify Student ID, Registration No., or Student Name columns.",
+            f"5. Marks range: 0 - {exam_session.exam_type.max_score}",
+            "6. Save file and upload using the upload feature."
+        ]
+        
+        for i, instruction in enumerate(instructions, start=10):
+            cell = ws[f'A{i}']
+            cell.value = instruction
+            cell.font = Font(name="Arial", size=10)
+            cell.alignment = Alignment(wrap_text=True)
+            ws.merge_cells(f'A{i}:D{i}')
+        
+        # Add headers for data
+        header_row = 16
+        headers = ["Student ID", "Registration No.", "Student Name", "Marks"]
+        
+        for col_num, header in enumerate(headers, start=1):
+            cell = ws.cell(row=header_row, column=col_num, value=header)
+            cell.fill = header_fill
+            cell.font = header_font
+            cell.border = header_border
+            cell.alignment = center_alignment
+            ws.column_dimensions[get_column_letter(col_num)].width = 20
+        
+        # Add student data
+        data_start_row = header_row + 1
+        
+        for i, student in enumerate(students, start=data_start_row):
+            # Student ID
+            ws.cell(row=i, column=1, value=student.id)
+            ws.cell(row=i, column=1).border = cell_border
+            ws.cell(row=i, column=1).alignment = center_alignment
+            
+            # Registration Number
+            ws.cell(row=i, column=2, value=student.registration_number or f"S{student.id:04d}")
+            ws.cell(row=i, column=2).border = cell_border
+            ws.cell(row=i, column=2).alignment = left_alignment
+            
+            # Student Name
+            ws.cell(row=i, column=3, value=student.full_name)
+            ws.cell(row=i, column=3).border = cell_border
+            ws.cell(row=i, column=3).alignment = left_alignment
+            
+            # Marks (pre-filled if exists)
+            existing_marks = results_dict.get(student.id)
+            ws.cell(row=i, column=4, value=existing_marks)
+            ws.cell(row=i, column=4).border = cell_border
+            ws.cell(row=i, column=4).alignment = center_alignment
+            
+            # Add data validation for marks
+            if exam_session.exam_type.max_score:
+                dv = openpyxl.worksheet.datavalidation.DataValidation(
+                    type="decimal",
+                    operator="between",
+                    formula1=0,
+                    formula2=exam_session.exam_type.max_score,
+                    allow_blank=True,
+                    showErrorMessage=True,
+                    errorTitle="Invalid Marks",
+                    error="Marks must be between 0 and " + str(exam_session.exam_type.max_score)
+                )
+                ws.add_data_validation(dv)
+                dv.add(f'D{i}:D{i}')
+        
+        # Add summary row
+        summary_row = data_start_row + len(students) + 2
+        ws.cell(row=summary_row, column=1, value="Summary:")
+        ws.cell(row=summary_row, column=1).font = Font(bold=True)
+        
+        ws.cell(row=summary_row + 1, column=1, value="Total Students:")
+        ws.cell(row=summary_row + 1, column=2, value=len(students))
+        ws.cell(row=summary_row + 1, column=2).font = Font(bold=True)
+        
+        ws.cell(row=summary_row + 2, column=1, value="With Existing Marks:")
+        ws.cell(row=summary_row + 2, column=2, 
+                value=f"=COUNTIF(D{data_start_row}:D{data_start_row + len(students) - 1},\"<>\"&\"\")")
+        ws.cell(row=summary_row + 2, column=2).font = Font(bold=True)
+        
+        # Create response
+        response = HttpResponse(
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        filename = f"Marks_Template_{subject.code}_{exam_session.name.replace(' ', '_')}.xlsx"
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        
+        # Save workbook to response
+        wb.save(response)
+        return response
+        
+    except Exception as e:
+        messages.error(request, f"Error generating template: {str(e)}")
+        return redirect('manage_results', exam_session_id=exam_session_id)
+
+@login_required
+@require_POST
+def upload_excel_marks(request):
+    """Handle Excel file upload for bulk marks entry"""
+    try:
+        excel_file = request.FILES.get('excel_file')
+        exam_session_id = request.POST.get('exam_session_id')
+        subject_id = request.POST.get('subject_id')
+        
+        if not excel_file:
+            return JsonResponse({
+                'success': False,
+                'message': 'No file uploaded'
+            })
+        
+        if not exam_session_id or not subject_id:
+            return JsonResponse({
+                'success': False,
+                'message': 'Missing exam session or subject ID'
+            })
+        
+        exam_session = get_object_or_404(ExamSession, id=exam_session_id)
+        subject = get_object_or_404(Subject, id=subject_id)
+        
+        # Read Excel file
+        wb = openpyxl.load_workbook(excel_file, data_only=True)
+        ws = wb.active
+        
+        # Parse data
+        data = []
+        errors = []
+        processed_count = 0
+        
+        # Find header row
+        header_row = None
+        for row in ws.iter_rows(min_row=1, max_row=20, values_only=True):
+            if row and row[0] and isinstance(row[0], str) and "Student ID" in str(row[0]):
+                header_row = row
+                break
+        
+        if not header_row:
+            return JsonResponse({
+                'success': False,
+                'message': 'Could not find header row in Excel file'
+            })
+        
+        # Find start of data
+        data_start_row = None
+        for i, row in enumerate(ws.iter_rows(min_row=1, max_row=100, values_only=True), start=1):
+            if row and isinstance(row[0], (int, float)):
+                data_start_row = i
+                break
+        
+        if not data_start_row:
+            return JsonResponse({
+                'success': False,
+                'message': 'No data found in Excel file'
+            })
+        
+        # Process each row
+        for i, row in enumerate(ws.iter_rows(min_row=data_start_row, max_row=ws.max_row, values_only=True), start=data_start_row):
+            if not row or not row[0]:
+                continue
+            
+            try:
+                student_id = int(row[0])
+                marks = row[3] if len(row) > 3 else None
+                
+                # Validate student exists
+                try:
+                    student = Student.objects.get(id=student_id, is_active=True)
+                except Student.DoesNotExist:
+                    errors.append(f"Row {i}: Student ID {student_id} not found")
+                    continue
+                
+                # Validate marks
+                if marks is not None and marks != '':
+                    try:
+                        marks = Decimal(str(marks))
+                        max_score = exam_session.exam_type.max_score
+                        
+                        if marks < 0 or marks > max_score:
+                            errors.append(f"Row {i}: Marks {marks} out of range (0-{max_score})")
+                            continue
+                    except (ValueError, InvalidOperation):
+                        errors.append(f"Row {i}: Invalid marks format '{marks}'")
+                        continue
+                else:
+                    marks = None
+                
+                data.append({
+                    'student_id': student_id,
+                    'marks': marks
+                })
+                
+            except Exception as e:
+                errors.append(f"Row {i}: Error processing row - {str(e)}")
+        
+        # Save marks in transaction
+        with transaction.atomic():
+            for item in data:
+                try:
+                    # Get or create result
+                    result, created = StudentResult.objects.get_or_create(
+                        exam_session=exam_session,
+                        student_id=item['student_id'],
+                        subject=subject,
+                        defaults={'marks_obtained': item['marks']}
+                    )
+                    
+                    if not created:
+                        result.marks_obtained = item['marks']
+                    
+                    # Calculate percentage
+                    if item['marks'] is not None and exam_session.exam_type.max_score > 0:
+                        result.percentage = (Decimal(str(item['marks'])) / 
+                                           Decimal(str(exam_session.exam_type.max_score))) * Decimal('100')
+                    
+                    # Calculate grade
+                    if item['marks'] is not None:
+                        education_level = exam_session.class_level.educational_level
+                        grade_scale = GradingScale.objects.filter(
+                            education_level=education_level,
+                            min_mark__lte=item['marks'],
+                            max_mark__gte=item['marks']
+                        ).first()
+                        
+                        if grade_scale:
+                            result.grade = grade_scale.grade
+                            result.grade_point = grade_scale.points
+                    
+                    result.save()
+                    processed_count += 1
+                    
+                except Exception as e:
+                    errors.append(f"Student ID {item['student_id']}: Error saving - {str(e)}")
+        
+        # Calculate positions after upload
+        calculate_subject_positions(exam_session)
+        
+        response_data = {
+            'success': True,
+            'message': f'Successfully processed {processed_count} marks',
+            'processed_count': processed_count,
+            'total_rows': len(data)
+        }
+        
+        if errors:
+            response_data['errors'] = errors[:10]  # Limit errors to first 10
+        
+        return JsonResponse(response_data)
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'Error processing file: {str(e)}'
+        })
+
+
+
+
+@login_required
+def download_pdf_report(request, exam_session_id, subject_id):
+    """Generate and download PDF report with gender + subject performance analytics"""
+    try:
+        # ==================================================
+        # 1. LOAD CORE OBJECTS
+        # ==================================================
+        exam_session = get_object_or_404(
+            ExamSession.objects.select_related(
+                'exam_type',
+                'class_level',
+                'stream_class',
+                'academic_year',
+                'term',
+                'class_level__educational_level'
+            ),
+            id=exam_session_id
+        )
+
+        subject = get_object_or_404(Subject, id=subject_id)
+
+        # ==================================================
+        # 2. LOAD STUDENTS
+        # ==================================================
+        student_filters = {
+            'class_level': exam_session.class_level,
+            'is_active': True
+        }
+
+        if exam_session.stream_class:
+            student_filters['stream_class'] = exam_session.stream_class
+
+        students = Student.objects.filter(**student_filters).order_by(
+            'first_name', 'last_name'
+        )
+
+        # ==================================================
+        # 3. LOAD RESULTS (THIS SUBJECT)
+        # ==================================================
+        results = StudentResult.objects.filter(
+            exam_session=exam_session,
+            subject=subject
+        ).select_related('student')
+
+        results_by_student = {r.student_id: r for r in results}
+
+        # ==================================================
+        # 4. PREPARE STUDENT DATA + GENDER STATS
+        # ==================================================
+        students_data = []
+        total_marks = 0
+        students_with_marks = 0
+
+        gender_totals = {}
+        gender_marks_sum = {}
+        gender_with_marks = {}
+
+        for student in students:
+            result = results_by_student.get(student.id)
+            marks = result.marks_obtained if result else None
+            grade = ''
+
+            gender = student.get_gender_display() or 'Unknown'
+
+            gender_totals.setdefault(gender, 0)
+            gender_marks_sum.setdefault(gender, 0)
+            gender_with_marks.setdefault(gender, 0)
+
+            gender_totals[gender] += 1
+
+            if marks is not None:
+                total_marks += marks
+                students_with_marks += 1
+
+                gender_marks_sum[gender] += marks
+                gender_with_marks[gender] += 1
+
+                grade_scale = GradingScale.objects.filter(
+                    education_level=exam_session.class_level.educational_level,
+                    min_mark__lte=marks,
+                    max_mark__gte=marks
+                ).first()
+
+                if grade_scale:
+                    grade = grade_scale.grade
+
+            students_data.append({
+                'reg_number': student.registration_number or f"S{student.id:04d}",
+                'name': student.full_name,
+                'gender': gender,
+                'marks': marks,
+                'grade': grade,
+                'has_marks': marks is not None
+            })
+
+        # ==================================================
+        # 5. OVERALL STATISTICS
+        # ==================================================
+        statistics = {
+            'total_students': students.count(),
+            'students_with_marks': students_with_marks,
+            'students_without_marks': students.count() - students_with_marks,
+            'percentage_completed': (
+                (students_with_marks / students.count()) * 100
+                if students.exists() else 0
+            ),
+            'average_marks': (
+                total_marks / students_with_marks
+                if students_with_marks > 0 else 0
+            ),
+            'highest_marks': max(
+                [s['marks'] for s in students_data if s['marks'] is not None],
+                default=0
+            ),
+            'lowest_marks': min(
+                [s['marks'] for s in students_data if s['marks'] is not None],
+                default=0
+            ),
+        }
+
+        # ==================================================
+        # 6. GRADE DISTRIBUTION
+        # ==================================================
+        grade_distribution = {}
+        for s in students_data:
+            if s['grade']:
+                grade_distribution[s['grade']] = (
+                    grade_distribution.get(s['grade'], 0) + 1
+                )
+
+        # ==================================================
+        # 7. GENDER STATISTICS
+        # ==================================================
+        gender_statistics = []
+
+        for gender, total in gender_totals.items():
+            with_marks = gender_with_marks.get(gender, 0)
+            avg = (
+                gender_marks_sum[gender] / with_marks
+                if with_marks > 0 else 0
+            )
+
+            gender_statistics.append({
+                'gender': gender,
+                'total': total,
+                'with_marks': with_marks,
+                'average': round(avg, 2)
+            })
+
+        # ==================================================
+        # 8. SUBJECT PERFORMANCE (THIS SUBJECT)
+        # ==================================================
+        subject_performance = results.aggregate(
+            average=Avg('marks_obtained'),
+            highest=Max('marks_obtained'),
+            lowest=Min('marks_obtained')
+        )
+
+        # ==================================================
+        # 9. SUBJECT POSITION IN EXAM SESSION
+        # ==================================================
+        subject_averages = (
+            StudentResult.objects
+            .filter(exam_session=exam_session)
+            .values('subject')
+            .annotate(avg_marks=Avg('marks_obtained'))
+            .order_by('-avg_marks')
+        )
+
+        subject_position = None
+        total_subjects = len(subject_averages)
+
+        for index, row in enumerate(subject_averages, start=1):
+            if row['subject'] == subject.id:
+                subject_position = index
+                break
+
+        subject_ranking = {
+            'position': subject_position,
+            'total_subjects': total_subjects
+        }
+
+        # ==================================================
+        # 10. CONTEXT
+        # ==================================================
+        context = {
+            'exam_session': exam_session,
+            'subject': subject,
+            'students_data': students_data,
+            'statistics': statistics,
+            'grade_distribution': grade_distribution,
+            'gender_statistics': gender_statistics,
+            'subject_performance': subject_performance,
+            'subject_ranking': subject_ranking,
+            'today': timezone.now().date(),
+            'generated_by': request.user.get_full_name() or request.user.username,
+        }
+
+        # ==================================================
+        # 11. RENDER PDF
+        # ==================================================
+        html_string = render_to_string(
+            'admin/results/pdf_subject_report.html',
+            context
+        )
+
+        pdf = HTML(
+            string=html_string,
+            base_url=request.build_absolute_uri()
+        ).write_pdf()
+
+        response = HttpResponse(pdf, content_type='application/pdf')
+        response['Content-Disposition'] = (
+            f'attachment; filename='
+            f'"Marks_Report_{subject.code}_{exam_session.name}.pdf"'
+        )
+
+        return response
+
+    except Exception as e:
+        messages.error(request, f"Error generating PDF: {e}")
+        return redirect('manage_results', exam_session_id=exam_session_id)
+
+
+# Add these new views to the existing file
+
+@login_required
+def download_session_excel_template(request, exam_session_id):
+    """Generate and download Excel template for entire exam session"""
+    try:
+        exam_session = get_object_or_404(
+            ExamSession.objects.select_related(
+                'exam_type', 'class_level', 'stream_class',
+                'academic_year', 'term'
+            ),
+            id=exam_session_id
+        )
+        
+        subjects = Subject.objects.filter(
+            educational_level=exam_session.class_level.educational_level,
+            is_active=True
+        ).order_by('code')
+        
+        # Get students for this exam session
+        if exam_session.stream_class:
+            students = Student.objects.filter(
+                class_level=exam_session.class_level,
+                stream_class=exam_session.stream_class,
+                is_active=True
+            )
+        else:
+            students = Student.objects.filter(
+                class_level=exam_session.class_level,
+                is_active=True
+            )
+        
+        students = students.order_by('first_name', 'last_name')
+        
+        # Create workbook
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "Session Marks Entry"
+        
+        # Define styles
+        header_fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+        header_font = Font(name="Arial", size=11, bold=True, color="FFFFFF")
+        header_border = Border(
+            left=Side(style='thin'),
+            right=Side(style='thin'),
+            top=Side(style='thin'),
+            bottom=Side(style='thin')
+        )
+        
+        info_fill = PatternFill(start_color="F2F2F2", end_color="F2F2F2", fill_type="solid")
+        info_font = Font(name="Arial", size=10, bold=True)
+        
+        cell_border = Border(
+            left=Side(style='thin'),
+            right=Side(style='thin'),
+            top=Side(style='thin'),
+            bottom=Side(style='thin')
+        )
+        
+        center_alignment = Alignment(horizontal="center", vertical="center")
+        left_alignment = Alignment(horizontal="left", vertical="center")
+        
+        # Add header information
+        ws['A1'] = "EXAM SESSION MARKS ENTRY TEMPLATE"
+        ws['A1'].font = Font(name="Arial", size=14, bold=True)
+        ws['A1'].alignment = center_alignment
+        ws.merge_cells(f'A1:{get_column_letter(3 + len(subjects))}1')
+        
+        ws['A2'] = f"Exam Session: {exam_session.name}"
+        ws['A2'].font = info_font
+        ws.merge_cells(f'A2:{get_column_letter(3 + len(subjects))}2')
+        
+        ws['A3'] = f"Class: {exam_session.class_level.name}"
+        if exam_session.stream_class:
+            ws['A3'] += f" {exam_session.stream_class.stream_letter}"
+        ws['A3'].font = info_font
+        ws.merge_cells(f'A3:{get_column_letter(3 + len(subjects))}3')
+        
+        ws['A4'] = f"Academic Year: {exam_session.academic_year.name} - Term: {exam_session.term.get_term_number_display()}"
+        ws['A4'].font = info_font
+        ws.merge_cells(f'A4:{get_column_letter(3 + len(subjects))}4')
+        
+        ws['A5'] = f"Maximum Score per Subject: {exam_session.exam_type.max_score}"
+        ws['A5'].font = info_font
+        ws.merge_cells(f'A5:{get_column_letter(3 + len(subjects))}5')
+        
+        # Add instruction rows
+        ws['A7'] = "INSTRUCTIONS:"
+        ws['A7'].font = Font(name="Arial", size=11, bold=True, color="FF0000")
+        ws.merge_cells(f'A7:{get_column_letter(3 + len(subjects))}7')
+        
+        instructions = [
+            "1. Fill marks in the subject columns (Column D onwards).",
+            "2. Leave cells blank for absent students or unmarked subjects.",
+            "3. Enter 0 for zero marks (it's a valid mark).",
+            "4. Do not modify Student ID, Registration No., or Student Name columns.",
+            f"5. Marks range: 0 - {exam_session.exam_type.max_score} for each subject",
+            "6. Save file and upload using the upload feature.",
+            "7. All subjects are included in this template."
+        ]
+        
+        for i, instruction in enumerate(instructions, start=8):
+            cell = ws[f'A{i}']
+            cell.value = instruction
+            cell.font = Font(name="Arial", size=10)
+            cell.alignment = Alignment(wrap_text=True)
+            ws.merge_cells(f'A{i}:{get_column_letter(3 + len(subjects))}{i}')
+        
+        # Add headers for data
+        header_row = 15
+        headers = ["Student ID", "Registration No.", "Student Name"]
+        
+        # Add subject headers
+        for subject in subjects:
+            headers.append(f"{subject.name}")
+        
+        for col_num, header in enumerate(headers, start=1):
+            cell = ws.cell(row=header_row, column=col_num, value=header)
+            cell.fill = header_fill
+            cell.font = header_font
+            cell.border = header_border
+            cell.alignment = center_alignment
+            # Set column widths
+            if col_num <= 3:
+                ws.column_dimensions[get_column_letter(col_num)].width = 20
+            else:
+                ws.column_dimensions[get_column_letter(col_num)].width = 15
+        
+        # Add student data
+        data_start_row = header_row + 1
+        
+        for i, student in enumerate(students, start=data_start_row):
+            # Student ID
+            ws.cell(row=i, column=1, value=student.id)
+            ws.cell(row=i, column=1).border = cell_border
+            ws.cell(row=i, column=1).alignment = center_alignment
+            
+            # Registration Number
+            ws.cell(row=i, column=2, value=student.registration_number or f"S{student.id:04d}")
+            ws.cell(row=i, column=2).border = cell_border
+            ws.cell(row=i, column=2).alignment = left_alignment
+            
+            # Student Name
+            ws.cell(row=i, column=3, value=student.full_name)
+            ws.cell(row=i, column=3).border = cell_border
+            ws.cell(row=i, column=3).alignment = left_alignment
+            
+            # Get existing results for this student
+            existing_results = StudentResult.objects.filter(
+                exam_session=exam_session,
+                student=student
+            ).select_related('subject')
+            
+            results_dict = {r.subject_id: r.marks_obtained for r in existing_results}
+            
+            # Add marks columns for each subject
+            for col_num, subject in enumerate(subjects, start=4):
+                existing_marks = results_dict.get(subject.id)
+                cell = ws.cell(row=i, column=col_num, value=existing_marks)
+                cell.border = cell_border
+                cell.alignment = center_alignment
+                
+                # Add data validation for marks
+                if exam_session.exam_type.max_score:
+                    dv = openpyxl.worksheet.datavalidation.DataValidation(
+                        type="decimal",
+                        operator="between",
+                        formula1=0,
+                        formula2=exam_session.exam_type.max_score,
+                        allow_blank=True,
+                        showErrorMessage=True,
+                        errorTitle="Invalid Marks",
+                        error=f"Marks must be between 0 and {exam_session.exam_type.max_score}"
+                    )
+                    ws.add_data_validation(dv)
+                    dv.add(f'{get_column_letter(col_num)}{i}:{get_column_letter(col_num)}{i}')
+        
+        # Create response
+        response = HttpResponse(
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        filename = f"Session_Template_{exam_session.name.replace(' ', '_')}.xlsx"
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        
+        # Save workbook to response
+        wb.save(response)
+        return response
+        
+    except Exception as e:
+        return HttpResponse(f"Error generating template: {str(e)}", status=500)
+
+@login_required
+@require_POST
+def upload_session_excel(request):
+    excel_file = request.FILES.get('excel_file')
+    exam_session_id = request.POST.get('exam_session_id')
+
+    if not excel_file or not exam_session_id:
+        return JsonResponse({'success': False, 'message': 'Missing file or exam session ID'})
+
+    exam_session = get_object_or_404(ExamSession, id=exam_session_id)
+
+    if exam_session.status == 'published':
+        return JsonResponse({'success': False, 'message': 'Cannot modify a published exam session'})
+
+    wb = openpyxl.load_workbook(excel_file, data_only=True)
+    ws = wb.active
+
+    subjects = Subject.objects.filter(
+        educational_level=exam_session.class_level.educational_level,
+        is_active=True
+    )
+
+    subject_map = {
+        normalize(subject.name): subject
+        for subject in subjects
+    }
+
+    # ----------------------------
+    # FIND HEADER ROW
+    # ----------------------------
+    header_row_idx = None
+    header_values = []
+
+    for i, row in enumerate(ws.iter_rows(min_row=1, max_row=20, values_only=True), start=1):
+        if row and "Student ID" in [str(c) for c in row if c]:
+            header_row_idx = i
+            header_values = [normalize(str(c)) for c in row]
+            break
+
+    if not header_row_idx:
+        return JsonResponse({'success': False, 'message': 'Header row not found'})
+
+    # ----------------------------
+    # MAP SUBJECT COLUMNS
+    # ----------------------------
+    subject_columns = {}
+
+    for idx, header in enumerate(header_values):
+        if header in subject_map:
+            subject_columns[idx] = subject_map[header]
+
+    if not subject_columns:
+        return JsonResponse({'success': False, 'message': 'No valid subject columns found'})
+
+    processed = 0
+    errors = []
+
+    with transaction.atomic():
+        for row_idx, row in enumerate(
+            ws.iter_rows(min_row=header_row_idx + 1, values_only=True),
+            start=header_row_idx + 1
+        ):
+            if not row or not row[0]:
+                continue
+
+            try:
+                student = Student.objects.get(id=int(row[0]), is_active=True)
+            except Student.DoesNotExist:
+                errors.append(f"Row {row_idx}: Invalid student ID")
+                continue
+
+            for col_idx, subject in subject_columns.items():
+                if col_idx >= len(row):
+                    continue
+
+                marks = row[col_idx]
+
+                if marks is None or marks == "":
+                    continue
+
+                try:
+                    marks = Decimal(str(marks))
+                except:
+                    errors.append(f"Row {row_idx}, {subject.name}: Invalid mark")
+                    continue
+
+                max_score = exam_session.exam_type.max_score
+                if marks < 0 or marks > max_score:
+                    errors.append(f"Row {row_idx}, {subject.name}: Out of range")
+                    continue
+
+                result, _ = StudentResult.objects.get_or_create(
+                    exam_session=exam_session,
+                    student=student,
+                    subject=subject
+                )
+
+                result.marks_obtained = marks
+                result.percentage = (marks / Decimal(max_score)) * 100
+
+                grade_scale = GradingScale.objects.filter(
+                    education_level=exam_session.class_level.educational_level,
+                    min_mark__lte=marks,
+                    max_mark__gte=marks
+                ).first()
+
+                if grade_scale:
+                    result.grade = grade_scale.grade
+                    result.grade_point = grade_scale.points
+
+                result.save()
+                processed += 1
+
+    return JsonResponse({
+        'success': True,
+        'message': f'Processed {processed} marks successfully',
+        'errors': errors[:10]
+    })
+
+def normalize(text):
+    return text.strip().lower() if text else ""
+
+
+@login_required
+def download_session_excel_report(request, exam_session_id):
+    """Generate comprehensive Excel report for entire exam session with subject-wise performance"""
+    try:
+        exam_session = get_object_or_404(
+            ExamSession.objects.select_related(
+                'exam_type',
+                'class_level',
+                'stream_class',
+                'academic_year',
+                'term',
+                'class_level__educational_level'
+            ),
+            id=exam_session_id
+        )
+
+        subjects = list(
+            Subject.objects.filter(
+                educational_level=exam_session.class_level.educational_level,
+                is_active=True
+            ).order_by('code')
+        )
+
+        # Get students
+        student_qs = Student.objects.filter(
+            class_level=exam_session.class_level,
+            is_active=True
+        )
+        if exam_session.stream_class:
+            student_qs = student_qs.filter(stream_class=exam_session.stream_class)
+        
+        students = list(student_qs.order_by('first_name', 'last_name'))
+
+        # Get all results
+        results = StudentResult.objects.filter(
+            exam_session=exam_session
+        ).select_related('student', 'subject')
+
+        # Get metrics and positions
+        metrics = StudentExamMetrics.objects.filter(
+            exam_session=exam_session
+        ).select_related('student', 'division')
+
+        positions = StudentExamPosition.objects.filter(
+            exam_session=exam_session
+        ).select_related('student')
+
+        # Create lookup dictionaries
+        results_map = {}
+        for r in results:
+            results_map.setdefault(r.student_id, {})[r.subject_id] = r
+
+        metrics_map = {m.student_id: m for m in metrics}
+        position_map = {p.student_id: p for p in positions}
+
+        # ============================================
+        # CREATE EXCEL WORKBOOK
+        # ============================================
+        wb = openpyxl.Workbook()
+        
+        # ============================================
+        # SHEET 1: COMPREHENSIVE RESULTS
+        # ============================================
+        ws_main = wb.active
+        ws_main.title = "Comprehensive Results"
+        
+        # Define styles
+        header_fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+        header_font = Font(name="Arial", size=11, bold=True, color="FFFFFF")
+        title_font = Font(name="Arial", size=14, bold=True)
+        info_font = Font(name="Arial", size=10, bold=True)
+        normal_font = Font(name="Arial", size=10)
+        bold_font = Font(name="Arial", size=10, bold=True)
+        
+        header_border = Border(
+            left=Side(style='thin'),
+            right=Side(style='thin'),
+            top=Side(style='thin'),
+            bottom=Side(style='thin')
+        )
+        
+        cell_border = Border(
+            left=Side(style='thin'),
+            right=Side(style='thin'),
+            top=Side(style='thin'),
+            bottom=Side(style='thin')
+        )
+        
+        center_alignment = Alignment(horizontal="center", vertical="center")
+        left_alignment = Alignment(horizontal="left", vertical="center")
+        
+        # Add header information
+        ws_main['A1'] = "EXAM SESSION COMPREHENSIVE REPORT"
+        ws_main['A1'].font = title_font
+        ws_main['A1'].alignment = center_alignment
+        ws_main.merge_cells(f'A1:{get_column_letter(7 + len(subjects))}1')
+        
+        ws_main['A2'] = f"Exam Session: {exam_session.name}"
+        ws_main['A2'].font = info_font
+        ws_main.merge_cells(f'A2:{get_column_letter(7 + len(subjects))}2')
+        
+        ws_main['A3'] = f"Class: {exam_session.class_level.name}"
+        if exam_session.stream_class:
+            ws_main['A3'] += f" {exam_session.stream_class.stream_letter}"
+        ws_main['A3'].font = info_font
+        ws_main.merge_cells(f'A3:{get_column_letter(7 + len(subjects))}3')
+        
+        ws_main['A4'] = f"Academic Year: {exam_session.academic_year.name} | Term: {exam_session.term.get_term_number_display()}"
+        ws_main['A4'].font = info_font
+        ws_main.merge_cells(f'A4:{get_column_letter(7 + len(subjects))}4')
+        
+        ws_main['A5'] = f"Exam Date: {exam_session.exam_date.strftime('%B %d, %Y')}"
+        ws_main['A5'].font = info_font
+        ws_main.merge_cells(f'A5:{get_column_letter(7 + len(subjects))}5')
+        
+        # Column headers
+        header_row = 7
+        headers = ["S.No", "Registration No.", "Student Name", "Gender"]
+        
+        # Add subject headers
+        for subject in subjects:
+            headers.append(f"{subject.name}")
+        
+        headers.extend(["Total Marks", "Average", "Grade Points", "Division", "Position"])
+        
+        # Write headers
+        for col_num, header in enumerate(headers, start=1):
+            cell = ws_main.cell(row=header_row, column=col_num, value=header)
+            cell.fill = header_fill
+            cell.font = header_font
+            cell.border = header_border
+            cell.alignment = center_alignment
+            
+            # Set column widths
+            if col_num == 1:  # S.No
+                ws_main.column_dimensions[get_column_letter(col_num)].width = 8
+            elif col_num == 2:  # Reg No
+                ws_main.column_dimensions[get_column_letter(col_num)].width = 15
+            elif col_num == 3:  # Name
+                ws_main.column_dimensions[get_column_letter(col_num)].width = 25
+            elif col_num == 4:  # Gender
+                ws_main.column_dimensions[get_column_letter(col_num)].width = 10
+            elif col_num <= 4 + len(subjects):  # Subject columns
+                ws_main.column_dimensions[get_column_letter(col_num)].width = 12
+            else:  # Summary columns
+                ws_main.column_dimensions[get_column_letter(col_num)].width = 15
+        
+        # Add student data
+        data_start_row = header_row + 1
+        
+        for i, student in enumerate(students, start=data_start_row):
+            # Basic info
+            ws_main.cell(row=i, column=1, value=i - header_row).border = cell_border
+            ws_main.cell(row=i, column=2, value=student.registration_number or f"S{student.id:04d}").border = cell_border
+            ws_main.cell(row=i, column=3, value=student.full_name).border = cell_border
+            ws_main.cell(row=i, column=4, value=student.get_gender_display()).border = cell_border
+            
+            # Subject marks
+            total_marks = 0
+            subjects_with_marks = 0
+            
+            for col_num, subject in enumerate(subjects, start=5):
+                result = results_map.get(student.id, {}).get(subject.id)
+                if result and result.marks_obtained is not None:
+                    marks = result.marks_obtained
+                    grade = result.grade or ""
+                    cell_value = f"{marks:.1f}"
+                    if grade:
+                        cell_value += f" ({grade})"
+                    
+                    ws_main.cell(row=i, column=col_num, value=cell_value)
+                    
+                    total_marks += float(marks)
+                    subjects_with_marks += 1
+                else:
+                    ws_main.cell(row=i, column=col_num, value="-")
+                
+                ws_main.cell(row=i, column=col_num).border = cell_border
+                ws_main.cell(row=i, column=col_num).alignment = center_alignment
+            
+            # Summary columns
+            summary_col = 5 + len(subjects)
+            
+            # Total Marks
+            ws_main.cell(row=i, column=summary_col, value=total_marks if subjects_with_marks > 0 else "-")
+            ws_main.cell(row=i, column=summary_col).border = cell_border
+            ws_main.cell(row=i, column=summary_col).alignment = center_alignment
+            
+            # Average
+            average = total_marks / subjects_with_marks if subjects_with_marks > 0 else None
+            ws_main.cell(row=i, column=summary_col + 1, value=f"{average:.2f}" if average else "-")
+            ws_main.cell(row=i, column=summary_col + 1).border = cell_border
+            ws_main.cell(row=i, column=summary_col + 1).alignment = center_alignment
+            
+            # Grade Points (from metrics)
+            metrics = metrics_map.get(student.id)
+            ws_main.cell(row=i, column=summary_col + 2, 
+                        value=f"{metrics.total_grade_points:.1f}" if metrics and metrics.total_grade_points else "-")
+            ws_main.cell(row=i, column=summary_col + 2).border = cell_border
+            ws_main.cell(row=i, column=summary_col + 2).alignment = center_alignment
+            
+            # Division
+            division = metrics.division.division if metrics and metrics.division else "-"
+            ws_main.cell(row=i, column=summary_col + 3, value=division)
+            ws_main.cell(row=i, column=summary_col + 3).border = cell_border
+            ws_main.cell(row=i, column=summary_col + 3).alignment = center_alignment
+            
+            # Position
+            position = position_map.get(student.id)
+            ws_main.cell(row=i, column=summary_col + 4, 
+                        value=position.class_position if position and position.class_position else "-")
+            ws_main.cell(row=i, column=summary_col + 4).border = cell_border
+            ws_main.cell(row=i, column=summary_col + 4).alignment = center_alignment
+        
+        # Add summary statistics at the bottom
+        summary_start = data_start_row + len(students) + 2
+        
+        ws_main.cell(row=summary_start, column=1, value="SUMMARY STATISTICS").font = title_font
+        ws_main.merge_cells(f'A{summary_start}:C{summary_start}')
+        
+        summary_rows = [
+            ("Total Students", len(students)),
+            ("Total Subjects", len(subjects)),
+            ("Exam Type", exam_session.exam_type.name),
+            ("Max Score per Subject", f"{exam_session.exam_type.max_score:.1f}"),
+            ("Report Generated", timezone.now().strftime("%Y-%m-%d %H:%M:%S")),
+            ("Generated By", request.user.get_full_name() or request.user.username),
+        ]
+        
+        for idx, (label, value) in enumerate(summary_rows, start=1):
+            ws_main.cell(row=summary_start + idx, column=1, value=label).font = bold_font
+            ws_main.cell(row=summary_start + idx, column=2, value=value).font = normal_font
+        
+        # ============================================
+        # SHEET 2: SUBJECT-WISE PERFORMANCE
+        # ============================================
+        ws_performance = wb.create_sheet(title="Subject Performance")
+        
+        # Title
+        ws_performance['A1'] = "SUBJECT-WISE PERFORMANCE ANALYSIS"
+        ws_performance['A1'].font = title_font
+        ws_performance.merge_cells('A1:G1')
+        ws_performance['A1'].alignment = center_alignment
+        
+        # Headers for subject performance
+        perf_headers = ["Subject Code", "Subject Name", "Students with Marks", 
+                        "Average Marks", "Highest Marks", "Lowest Marks", 
+                        "Pass Rate (%)", "Grade Distribution"]
+        
+        for col_num, header in enumerate(perf_headers, start=1):
+            cell = ws_performance.cell(row=3, column=col_num, value=header)
+            cell.fill = header_fill
+            cell.font = header_font
+            cell.border = header_border
+            cell.alignment = center_alignment
+            
+            # Set column widths
+            if col_num == 1:  # Code
+                ws_performance.column_dimensions[get_column_letter(col_num)].width = 12
+            elif col_num == 2:  # Name
+                ws_performance.column_dimensions[get_column_letter(col_num)].width = 30
+            elif col_num in [3, 7]:  # Count and Pass Rate
+                ws_performance.column_dimensions[get_column_letter(col_num)].width = 18
+            elif col_num == 8:  # Grade Distribution
+                ws_performance.column_dimensions[get_column_letter(col_num)].width = 25
+            else:  # Marks columns
+                ws_performance.column_dimensions[get_column_letter(col_num)].width = 15
+        
+        # Calculate subject performance
+        perf_start_row = 4
+        
+        for idx, subject in enumerate(subjects, start=perf_start_row):
+            subject_results = results.filter(subject=subject, marks_obtained__isnull=False)
+            marks_list = [float(r.marks_obtained) for r in subject_results if r.marks_obtained is not None]
+            
+            # Basic info
+            ws_performance.cell(row=idx, column=1, value=subject.code).border = cell_border
+            ws_performance.cell(row=idx, column=2, value=subject.name).border = cell_border
+            
+            # Students with marks
+            students_with_marks = len(marks_list)
+            ws_performance.cell(row=idx, column=3, value=students_with_marks).border = cell_border
+            ws_performance.cell(row=idx, column=3).alignment = center_alignment
+            
+            if marks_list:
+                # Average marks
+                avg_marks = sum(marks_list) / len(marks_list)
+                ws_performance.cell(row=idx, column=4, value=f"{avg_marks:.2f}").border = cell_border
+                ws_performance.cell(row=idx, column=4).alignment = center_alignment
+                
+                # Highest marks
+                highest = max(marks_list)
+                ws_performance.cell(row=idx, column=5, value=f"{highest:.1f}").border = cell_border
+                ws_performance.cell(row=idx, column=5).alignment = center_alignment
+                
+                # Lowest marks
+                lowest = min(marks_list)
+                ws_performance.cell(row=idx, column=6, value=f"{lowest:.1f}").border = cell_border
+                ws_performance.cell(row=idx, column=6).alignment = center_alignment
+                
+                # Pass rate (assuming pass mark is 40)
+                pass_mark = 40
+                passed = sum(1 for m in marks_list if m >= pass_mark)
+                pass_rate = (passed / len(marks_list)) * 100 if marks_list else 0
+                ws_performance.cell(row=idx, column=7, value=f"{pass_rate:.1f}%").border = cell_border
+                ws_performance.cell(row=idx, column=7).alignment = center_alignment
+                
+                # Grade distribution
+                grades = {}
+                for r in subject_results:
+                    if r.grade:
+                        grades[r.grade] = grades.get(r.grade, 0) + 1
+                
+                grade_dist = ", ".join([f"{grade}:{count}" for grade, count in grades.items()])
+                ws_performance.cell(row=idx, column=8, value=grade_dist).border = cell_border
+            else:
+                # No marks for this subject
+                for col in range(4, 9):
+                    ws_performance.cell(row=idx, column=col, value="-").border = cell_border
+                    ws_performance.cell(row=idx, column=col).alignment = center_alignment
+        
+        # Add subject performance summary
+        perf_summary_row = perf_start_row + len(subjects) + 2
+        ws_performance.cell(row=perf_summary_row, column=1, value="PERFORMANCE SUMMARY").font = title_font
+        ws_performance.merge_cells(f'A{perf_summary_row}:B{perf_summary_row}')
+        
+        # ============================================
+        # SHEET 3: GRADE DISTRIBUTION
+        # ============================================
+        ws_grades = wb.create_sheet(title="Grade Distribution")
+        
+        # Title
+        ws_grades['A1'] = "GRADE DISTRIBUTION ACROSS ALL SUBJECTS"
+        ws_grades['A1'].font = title_font
+        ws_grades.merge_cells('A1:D1')
+        ws_grades['A1'].alignment = center_alignment
+        
+        # Grade headers
+        grade_headers = ["Grade", "Description", "Marks Range", "Count", "Percentage (%)"]
+        
+        for col_num, header in enumerate(grade_headers, start=1):
+            cell = ws_grades.cell(row=3, column=col_num, value=header)
+            cell.fill = header_fill
+            cell.font = header_font
+            cell.border = header_border
+            cell.alignment = center_alignment
+            
+            # Set column widths
+            if col_num == 2:  # Description
+                ws_grades.column_dimensions[get_column_letter(col_num)].width = 20
+            else:
+                ws_grades.column_dimensions[get_column_letter(col_num)].width = 15
+        
+        # Grade definitions and counts
+        grade_definitions = [
+            ("A", "Excellent", "80-100"),
+            ("B", "Very Good", "70-79"),
+            ("C", "Good", "60-69"),
+            ("D", "Satisfactory", "50-59"),
+            ("E", "Fair", "40-49"),
+            ("F", "Fail", "0-39"),
+            ("S", "Subsidiary", "N/A"),
+        ]
+        
+        # Count grades across all results
+        grade_counts = {}
+        total_grades = 0
+        
+        for result in results:
+            if result.grade:
+                grade_counts[result.grade] = grade_counts.get(result.grade, 0) + 1
+                total_grades += 1
+        
+        # Write grade data
+        grade_start_row = 4
+        
+        for idx, (grade, description, range_text) in enumerate(grade_definitions, start=grade_start_row):
+            ws_grades.cell(row=idx, column=1, value=grade).border = cell_border
+            ws_grades.cell(row=idx, column=2, value=description).border = cell_border
+            ws_grades.cell(row=idx, column=3, value=range_text).border = cell_border
+            
+            count = grade_counts.get(grade, 0)
+            ws_grades.cell(row=idx, column=4, value=count).border = cell_border
+            ws_grades.cell(row=idx, column=4).alignment = center_alignment
+            
+            percentage = (count / total_grades * 100) if total_grades > 0 else 0
+            ws_grades.cell(row=idx, column=5, value=f"{percentage:.1f}%").border = cell_border
+            ws_grades.cell(row=idx, column=5).alignment = center_alignment
+        
+        # Add total row
+        total_row = grade_start_row + len(grade_definitions)
+        ws_grades.cell(row=total_row, column=3, value="TOTAL").font = bold_font
+        ws_grades.cell(row=total_row, column=3).border = cell_border
+        
+        ws_grades.cell(row=total_row, column=4, value=total_grades).font = bold_font
+        ws_grades.cell(row=total_row, column=4).border = cell_border
+        ws_grades.cell(row=total_row, column=4).alignment = center_alignment
+        
+        ws_grades.cell(row=total_row, column=5, value="100.0%").font = bold_font
+        ws_grades.cell(row=total_row, column=5).border = cell_border
+        ws_grades.cell(row=total_row, column=5).alignment = center_alignment
+        
+        # ============================================
+        # SHEET 4: TOP PERFORMERS
+        # ============================================
+        ws_top = wb.create_sheet(title="Top Performers")
+        
+        # Title
+        ws_top['A1'] = "TOP PERFORMERS - CLASS RANKING"
+        ws_top['A1'].font = title_font
+        ws_top.merge_cells('A1:F1')
+        ws_top['A1'].alignment = center_alignment
+        
+        # Headers
+        top_headers = ["Position", "Registration No.", "Student Name", 
+                      "Total Marks", "Average", "Division"]
+        
+        for col_num, header in enumerate(top_headers, start=1):
+            cell = ws_top.cell(row=3, column=col_num, value=header)
+            cell.fill = header_fill
+            cell.font = header_font
+            cell.border = header_border
+            cell.alignment = center_alignment
+            
+            # Set column widths
+            if col_num == 3:  # Name
+                ws_top.column_dimensions[get_column_letter(col_num)].width = 25
+            else:
+                ws_top.column_dimensions[get_column_letter(col_num)].width = 15
+        
+        # Get top 10 performers based on position
+        top_students = []
+        for position in positions.order_by('class_position')[:20]:  # Top 20
+            metrics = metrics_map.get(position.student_id)
+            if metrics and position.class_position:
+                student = next((s for s in students if s.id == position.student_id), None)
+                if student:
+                    top_students.append({
+                        'position': position.class_position,
+                        'reg_no': student.registration_number or f"S{student.id:04d}",
+                        'name': student.full_name,
+                        'total_marks': metrics.total_marks,
+                        'average': metrics.average_marks,
+                        'division': metrics.division.division if metrics.division else "-"
+                    })
+        
+        # Write top performers
+        top_start_row = 4
+        
+        for idx, student_data in enumerate(top_students, start=top_start_row):
+            ws_top.cell(row=idx, column=1, value=student_data['position']).border = cell_border
+            ws_top.cell(row=idx, column=1).alignment = center_alignment
+            
+            ws_top.cell(row=idx, column=2, value=student_data['reg_no']).border = cell_border
+            
+            ws_top.cell(row=idx, column=3, value=student_data['name']).border = cell_border
+            
+            ws_top.cell(row=idx, column=4, 
+                       value=f"{student_data['total_marks']:.1f}" if student_data['total_marks'] else "-").border = cell_border
+            ws_top.cell(row=idx, column=4).alignment = center_alignment
+            
+            ws_top.cell(row=idx, column=5, 
+                       value=f"{student_data['average']:.2f}" if student_data['average'] else "-").border = cell_border
+            ws_top.cell(row=idx, column=5).alignment = center_alignment
+            
+            ws_top.cell(row=idx, column=6, value=student_data['division']).border = cell_border
+            ws_top.cell(row=idx, column=6).alignment = center_alignment
+        
+        # ============================================
+        # CREATE RESPONSE
+        # ============================================
+        response = HttpResponse(
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        filename = f"Session_Report_{exam_session.name.replace(' ', '_')}_{timezone.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        
+        # Save workbook to response
+        wb.save(response)
+        return response
+        
+    except Exception as e:
+        return HttpResponse(f"Error generating Excel report: {str(e)}", status=500)
+    
+
+@login_required
+def download_session_summary(request, exam_session_id):
+    """Download session summary as CSV"""
+    try:
+        exam_session = get_object_or_404(ExamSession, id=exam_session_id)
+        
+        response = HttpResponse(content_type='text/csv')
+        response['Content-Disposition'] = f'attachment; filename="Session_Summary_{exam_session.name}.csv"'
+        
+        writer = csv.writer(response)
+        
+        # Write headers
+        writer.writerow(['Exam Session Summary', exam_session.name])
+        writer.writerow(['Academic Year', exam_session.academic_year.name])
+        writer.writerow(['Term', exam_session.term.get_term_number_display()])
+        writer.writerow(['Class', exam_session.class_level.name])
+        writer.writerow(['Stream', exam_session.stream_class.stream_letter if exam_session.stream_class else 'All'])
+        writer.writerow(['Exam Date', exam_session.exam_date])
+        writer.writerow([])
+        
+        # Add summary statistics
+        writer.writerow(['Summary Statistics'])
+        # You can add more statistics here
+        
+        return response
+        
+    except Exception as e:
+        return HttpResponse(f"Error generating summary: {str(e)}", status=500)

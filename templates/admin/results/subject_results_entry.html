@@ -1,0 +1,1767 @@
+{% extends 'admin/base.html' %}
+{% load static %}
+{% load custom_filters %}
+{% block title %}{% if exam_session.status == 'published' %}View Marks - {% else %}Enter Marks - {% endif %}{{ subject.name }}{% endblock title %}
+
+{% block breadcrumb %}
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'admin_dashboard' %}">Dashboard</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'admin_exam_sessions_list' %}">Exam Sessions</a></li>
+            <li class="breadcrumb-item">
+                <a href="{% url 'manage_results' exam_session.id %}">
+                    Manage Results - {{ exam_session.name }}
+                </a>
+            </li>
+            <li class="breadcrumb-item active">
+                {% if exam_session.status == 'published' %}
+                    View Marks - {{ subject.code }}
+                {% else %}
+                    Enter Marks - {{ subject.code }}
+                {% endif %}
+            </li>
+        </ol>
+    </nav>
+{% endblock breadcrumb %}
+
+{% block extra_css %}
+<style>
+    :root {
+        --primary-color: #4361ee;
+        --success-color: #06d6a0;
+        --warning-color: #ffd166;
+        --danger-color: #ef476f;
+        --info-color: #118ab2;
+        --light-bg: #f8f9fa;
+        --border-color: #dee2e6;
+    }
+
+    .loading-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(255, 255, 255, 0.9);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+        display: none;
+    }
+
+    .loading-spinner {
+        width: 50px;
+        height: 50px;
+        border: 5px solid var(--border-color);
+        border-top-color: var(--primary-color);
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+
+    .progress-wrapper {
+        position: relative;
+        height: 30px;
+        background-color: #e9ecef;
+        border-radius: 15px;
+        overflow: hidden;
+        margin: 20px 0;
+    }
+
+    .progress-bar-custom {
+        position: absolute;
+        top: 0;
+        left: 0;
+        height: 100%;
+        background: linear-gradient(90deg, #06d6a0 0%, #4361ee 100%);
+        border-radius: 15px;
+        transition: width 0.5s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-weight: bold;
+        font-size: 14px;
+    }
+
+    .student-row {
+        transition: all 0.3s ease;
+        border-left: 4px solid transparent;
+    }
+
+    .student-row:hover {
+        background-color: rgba(67, 97, 238, 0.05);
+        border-left-color: var(--primary-color);
+        transform: translateX(5px);
+    }
+
+    .student-row.has-marks {
+        background-color: rgba(6, 214, 160, 0.05);
+        border-left-color: var(--success-color);
+    }
+
+    .student-row.hidden {
+        display: none !important;
+    }
+
+    .marks-input {
+        width: 100px;
+        text-align: center;
+        font-weight: 600;
+        border: 2px solid #dee2e6;
+        border-radius: 6px;
+        padding: 8px 12px;
+        transition: all 0.3s ease;
+    }
+
+    .marks-input:focus {
+        border-color: var(--primary-color);
+        box-shadow: 0 0 0 0.2rem rgba(67, 97, 238, 0.25);
+        outline: none;
+    }
+
+    .marks-input.has-marks {
+        border-color: var(--success-color);
+        background-color: rgba(6, 214, 160, 0.1);
+    }
+
+    .marks-input.error {
+        border-color: var(--danger-color);
+        background-color: rgba(239, 71, 111, 0.1);
+    }
+
+    .marks-display {
+        width: 100px;
+        text-align: center;
+        font-weight: 600;
+        padding: 8px 12px;
+        background-color: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 6px;
+    }
+
+    .grade-badge {
+        display: inline-block;
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 0.85rem;
+        font-weight: 600;
+        min-width: 50px;
+        text-align: center;
+    }
+
+    .grade-A { background-color: #28a745; color: white; }
+    .grade-B { background-color: #17a2b8; color: white; }
+    .grade-C { background-color: #ffc107; color: #212529; }
+    .grade-D { background-color: #fd7e14; color: white; }
+    .grade-E { background-color: #6f42c1; color: white; }
+    .grade-F { background-color: #dc3545; color: white; }
+    .grade-S { background-color: #6c757d; color: white; }
+
+    .btn-save-individual {
+        opacity: 0;
+        transition: all 0.3s ease;
+    }
+
+    .student-row:hover .btn-save-individual {
+        opacity: 1;
+    }
+
+    .auto-save-toggle {
+        position: relative;
+        display: inline-block;
+        width: 60px;
+        height: 30px;
+    }
+
+    .auto-save-toggle input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+    }
+
+    .auto-save-slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: #ccc;
+        transition: .4s;
+        border-radius: 34px;
+    }
+
+    .auto-save-slider:before {
+        position: absolute;
+        content: "";
+        height: 22px;
+        width: 22px;
+        left: 4px;
+        bottom: 4px;
+        background-color: white;
+        transition: .4s;
+        border-radius: 50%;
+    }
+
+    input:checked + .auto-save-slider {
+        background-color: var(--success-color);
+    }
+
+    input:checked + .auto-save-slider:before {
+        transform: translateX(30px);
+    }
+
+    .status-indicator {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        display: inline-block;
+        margin-right: 8px;
+    }
+
+    .status-saved { background-color: var(--success-color); }
+    .status-unsaved { background-color: var(--warning-color); }
+    .status-error { background-color: var(--danger-color); }
+
+    .card-header.bg-gradient-primary {
+        background: linear-gradient(135deg, #4361ee 0%, #3a56d4 100%);
+    }
+
+    .form-control-lg {
+        padding: 12px 16px;
+        font-size: 1.1rem;
+        border-radius: 8px;
+    }
+
+    .search-container {
+        position: relative;
+    }
+
+    .search-icon {
+        position: absolute;
+        left: 12px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #6c757d;
+        z-index: 4;
+    }
+
+    .search-input {
+        padding-left: 40px;
+        border-radius: 25px;
+        border: 2px solid #dee2e6;
+        transition: all 0.3s ease;
+    }
+
+    .search-input:focus {
+        border-color: var(--primary-color);
+        box-shadow: 0 0 0 0.2rem rgba(67, 97, 238, 0.25);
+    }
+
+    .search-stats {
+        font-size: 0.85rem;
+        color: #6c757d;
+        margin-top: 5px;
+    }
+
+    .published-badge {
+        font-size: 0.75rem;
+        padding: 0.25rem 0.75rem;
+    }
+
+    .view-only-message {
+        background-color: #fff3cd;
+        border-color: #ffeaa7;
+    }
+
+    .action-buttons-container {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        flex-wrap: wrap;
+    }
+
+    .file-upload-wrapper {
+        position: relative;
+        overflow: hidden;
+        display: inline-block;
+    }
+
+    .file-upload-wrapper input[type=file] {
+        position: absolute;
+        left: 0;
+        top: 0;
+        opacity: 0;
+        cursor: pointer;
+        height: 100%;
+        width: 100%;
+    }
+
+    .file-upload-button {
+        padding: 8px 16px;
+        border-radius: 6px;
+        background-color: #6c757d;
+        color: white;
+        border: none;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .file-upload-button:hover {
+        background-color: #5a6268;
+    }
+
+    .file-upload-button i {
+        font-size: 14px;
+    }
+
+    .modal-backdrop {
+        z-index: 1040 !important;
+    }
+
+    .modal {
+        z-index: 1050 !important;
+    }
+
+    .progress-bar {
+        transition: width 0.3s ease;
+    }
+
+    .template-info {
+        background-color: #e8f4fd;
+        border-left: 4px solid #17a2b8;
+        padding: 15px;
+        border-radius: 4px;
+        margin-bottom: 20px;
+    }
+
+    .template-info h6 {
+        color: #17a2b8;
+        font-weight: 600;
+        margin-bottom: 10px;
+    }
+
+    .template-info ul {
+        margin-bottom: 0;
+        padding-left: 20px;
+    }
+
+    .template-info li {
+        margin-bottom: 5px;
+        color: #495057;
+    }
+
+    @media (max-width: 768px) {
+        .marks-input, .marks-display {
+            width: 80px;
+            padding: 6px 8px;
+        }
+        
+        .grade-badge {
+            padding: 2px 8px;
+            font-size: 0.75rem;
+            min-width: 40px;
+        }
+        
+        .btn-save-individual {
+            opacity: 1;
+            margin-top: 10px;
+        }
+        
+        .search-input {
+            margin-bottom: 10px;
+        }
+
+        .action-buttons-container {
+            flex-direction: column;
+            align-items: stretch;
+        }
+
+        .file-upload-button {
+            width: 100%;
+            justify-content: center;
+        }
+    }
+</style>
+{% endblock extra_css %}
+
+{% block content %}
+<div class="loading-overlay" id="loading-overlay">
+    <div class="loading-spinner"></div>
+</div>
+
+<!-- Excel Upload Modal -->
+<div class="modal fade" id="excelUploadModal" tabindex="-1" role="dialog" aria-labelledby="excelUploadModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="excelUploadModalLabel">
+                    <i class="fas fa-file-upload mr-2"></i>Upload Excel Marks
+                </h5>
+                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="template-info">
+                    <h6><i class="fas fa-info-circle mr-2"></i>Instructions:</h6>
+                    <ul>
+                        <li>Download the template first using the "Download Excel Template" button</li>
+                        <li>Update marks in the "Marks" column (leave blank for absent)</li>
+                        <li>Zero (0) is treated as a valid mark</li>
+                        <li>Do not modify the Student ID, Registration Number, or Student Name columns</li>
+                        <li>Save the file and upload it here</li>
+                        <li>Maximum file size: 10MB</li>
+                        <li>Supported formats: .xlsx, .xls</li>
+                    </ul>
+                </div>
+
+                <div class="form-group">
+                    <label for="excelFile">Select Excel File:</label>
+                    <div class="file-upload-wrapper">
+                        <button type="button" class="file-upload-button" id="fileUploadButton">
+                            <i class="fas fa-file-excel"></i> Choose Excel File
+                        </button>
+                        <input type="file" id="excelFile" name="excelFile" accept=".xlsx,.xls" style="display: none;">
+                    </div>
+                    <small class="form-text text-muted" id="fileName"></small>
+                </div>
+
+                <div class="form-group">
+                    <label>Upload Progress:</label>
+                    <div class="progress">
+                        <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                             id="uploadProgressBar" 
+                             role="progressbar" 
+                             style="width: 0%">
+                            0%
+                        </div>
+                    </div>
+                </div>
+
+                <div id="uploadPreview" style="display: none;">
+                    <h6><i class="fas fa-eye mr-2"></i>Preview (First 5 rows):</h6>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-bordered" id="previewTable">
+                            <thead class="thead-light">
+                                <tr>
+                                    <th>Student ID</th>
+                                    <th>Registration No.</th>
+                                    <th>Student Name</th>
+                                    <th>Marks</th>
+                                </tr>
+                            </thead>
+                            <tbody id="previewTableBody">
+                                <!-- Preview rows will be added here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="alert alert-danger" id="uploadError" style="display: none;">
+                    <i class="fas fa-exclamation-triangle mr-2"></i>
+                    <span id="errorMessage"></span>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="btnUploadExcel" disabled onclick="uploadExcelFile()">
+                    <i class="fas fa-upload mr-1"></i> Upload & Process
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<section class="content">
+    <div class="container-fluid">
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header {% if exam_session.status == 'published' %}bg-success text-white{% else %}bg-primary text-white{% endif %}">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h3 class="card-title mb-0">
+                                <i class="fas {% if exam_session.status == 'published' %}fa-eye mr-2{% else %}fa-edit mr-2{% endif %}"></i>
+                                {% if exam_session.status == 'published' %}
+                                    View Marks - {{ subject.name }} ({{ subject.code }})
+                                {% else %}
+                                    Enter Marks - {{ subject.name }} ({{ subject.code }})
+                                {% endif %}
+                                {% if exam_session.status == 'published' %}
+                                    <span class="badge bg-warning text-dark published-badge ml-2">
+                                        <i class="fas fa-lock mr-1"></i> Published - View Only
+                                    </span>
+                                {% endif %}
+                            </h3>
+                            <a href="{% url 'manage_results' exam_session.id %}" 
+                               class="btn btn-light btn-sm">
+                                <i class="fas fa-arrow-left mr-1"></i> Back to Results
+                            </a>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        {% if exam_session.status == 'published' %}
+                            <div class="alert alert-warning view-only-message mb-4">
+                                <div class="d-flex align-items-center">
+                                    <i class="fas fa-lock fa-2x mr-3"></i>
+                                    <div>
+                                        <h5 class="alert-heading">Results Published - View Only</h5>
+                                        <p class="mb-0">
+                                            This exam session has been published. Results are now finalized and cannot be edited.
+                                            If you need to make changes, please contact an administrator to unpublish the session first.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        {% endif %}
+                        
+                        <div class="row">
+                            <div class="col-md-4">
+                                <p class="mb-2">
+                                    <strong>Exam Session:</strong> {{ exam_session.name }}
+                                </p>
+                                <p class="mb-2">
+                                    <strong>Class:</strong> 
+                                    {{ exam_session.class_level.name }}
+                                    {% if exam_session.stream_class %}
+                                        {{ exam_session.stream_class.stream_letter }}
+                                    {% endif %}
+                                </p>
+                            </div>
+                            <div class="col-md-4">
+                                <p class="mb-2">
+                                    <strong>Academic Year:</strong> {{ exam_session.academic_year.name }}
+                                </p>
+                                <p class="mb-2">
+                                    <strong>Term:</strong> {{ exam_session.term.get_term_number_display }}
+                                </p>
+                            </div>
+                            <div class="col-md-4">
+                                <p class="mb-2">
+                                    <strong>Exam Type:</strong> {{ exam_session.exam_type.name }}
+                                </p>
+                                <p class="mb-2">
+                                    <strong>Max Score:</strong> {{ exam_session.exam_type.max_score }}
+                                </p>
+                            </div>
+                        </div>
+                        
+                        <div class="progress-wrapper mt-4">
+                            <div class="progress-bar-custom" id="progress-bar" 
+                                 style="width: {{ progress_percentage }}%">
+                                {{ progress_percentage|floatformat:1 }}%
+                            </div>
+                        </div>
+                        
+                        <div class="row text-center mt-3">
+                            <div class="col-md-3">
+                                <div class="card bg-light">
+                                    <div class="card-body py-2">
+                                        <h5 class="mb-0">{{ total_students }}</h5>
+                                        <small class="text-muted">Total Students</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="card bg-success text-white">
+                                    <div class="card-body py-2">
+                                        <h5 class="mb-0">{{ with_marks }}</h5>
+                                        <small>With Marks</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="card bg-warning">
+                                    <div class="card-body py-2">
+                                        <h5 class="mb-0">{{ without_marks }}</h5>
+                                        <small>Without Marks</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="card bg-info text-white">
+                                    <div class="card-body py-2">
+                                        <h5 class="mb-0" id="visible-students-count">{{ total_students }}</h5>
+                                        <small>Visible</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h4 class="card-title mb-0">
+                                <i class="fas fa-users mr-2"></i>
+                                {% if exam_session.status == 'published' %}
+                                    Student Marks View
+                                {% else %}
+                                    Student Marks Entry
+                                {% endif %}
+                            </h4>
+                            {% if exam_session.status != 'published' %}
+                                <div class="d-flex align-items-center action-buttons-container">
+                                    <div class="mr-3">
+                                        <label class="mb-0 mr-2">
+                                            <i class="fas fa-save mr-1"></i> Auto-save
+                                        </label>
+                                        <label class="auto-save-toggle">
+                                            <input type="checkbox" id="auto-save-toggle" checked>
+                                            <span class="auto-save-slider"></span>
+                                        </label>
+                                    </div>
+                                    <button type="button" class="btn btn-success mr-2" 
+                                            id="btn-save-all" onclick="saveAllMarks()">
+                                        <i class="fas fa-save mr-1"></i> Save All
+                                    </button>
+                                    <button type="button" class="btn btn-info" 
+                                            onclick="clearAllMarks()">
+                                        <i class="fas fa-eraser mr-1"></i> Clear All
+                                    </button>
+                                    <!-- New Action Buttons -->
+                                    <button type="button" class="btn btn-warning" 
+                                            onclick="downloadExcelTemplate()">
+                                        <i class="fas fa-file-excel mr-1"></i> Excel Template
+                                    </button>
+                                    <button type="button" class="btn btn-primary" 
+                                            data-toggle="modal" data-target="#excelUploadModal">
+                                        <i class="fas fa-file-upload mr-1"></i> Upload Excel
+                                    </button>
+                                    <button type="button" class="btn btn-danger" 
+                                            onclick="downloadPdfReport()">
+                                        <i class="fas fa-file-pdf mr-1"></i> PDF Report
+                                    </button>
+                                </div>
+                            {% else %}
+                                <!-- Action buttons for published sessions (view-only actions) -->
+                                <div class="d-flex align-items-center action-buttons-container">
+                                    <button type="button" class="btn btn-warning" 
+                                            onclick="downloadExcelTemplate()">
+                                        <i class="fas fa-file-excel mr-1"></i> Download Excel
+                                    </button>
+                                    <button type="button" class="btn btn-danger" 
+                                            onclick="downloadPdfReport()">
+                                        <i class="fas fa-file-pdf mr-1"></i> PDF Report
+                                    </button>
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <!-- Search Bar -->
+                        <div class="row mb-4">
+                            <div class="col-md-6">
+                                <div class="search-container">
+                                    <i class="fas fa-search search-icon"></i>
+                                    <input type="text" 
+                                           class="form-control search-input" 
+                                           id="search-students" 
+                                           placeholder="Search students by name or registration number...">
+                                </div>
+                                <div class="search-stats">
+                                    <span id="search-results-count">{{ total_students }}</span> students found
+                                </div>
+                            </div>
+                            <div class="col-md-6 text-md-right">
+                                <div class="btn-group" role="group">
+                                    <button type="button" 
+                                            class="btn btn-outline-primary btn-sm" 
+                                            id="filter-with-marks"
+                                            onclick="filterStudents('with-marks')">
+                                        <i class="fas fa-check-circle mr-1"></i> With Marks
+                                    </button>
+                                    <button type="button" 
+                                            class="btn btn-outline-warning btn-sm" 
+                                            id="filter-without-marks"
+                                            onclick="filterStudents('without-marks')">
+                                        <i class="fas fa-times-circle mr-1"></i> Without Marks
+                                    </button>
+                                    <button type="button" 
+                                            class="btn btn-outline-secondary btn-sm" 
+                                            onclick="filterStudents('all')">
+                                        <i class="fas fa-eye mr-1"></i> Show All
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Marks Entry/View Table -->
+                        <div class="table-responsive">
+                            <table class="table table-hover text-nowrap table-responsive-sm table-bordered table-striped table-sm" id="marks-entry-table">
+                                <thead class="thead-light">
+                                    <tr>
+                                        <th width="5%">#</th>
+                                        <th width="15%">Reg No.</th>
+                                        <th width="25%">Student Name</th>
+                                        <th width="10%">Gender</th>
+                                        <th width="15%">
+                                            {% if exam_session.status == 'published' %}
+                                                Marks
+                                            {% else %}
+                                                Marks (0-{{ exam_session.exam_type.max_score }})
+                                                <small class="d-block text-muted">Enter marks or leave blank</small>
+                                            {% endif %}
+                                        </th>
+                                        <th width="15%">Grade</th>
+                                        {% if exam_session.status != 'published' %}
+                                            <th width="15%">Actions</th>
+                                        {% endif %}
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for student in students_data %}
+                                    <tr class="student-row {% if student.has_result %}has-marks{% endif %}" 
+                                        id="student-row-{{ student.id }}"
+                                        data-student-id="{{ student.id }}"
+                                        data-student-name="{{ student.full_name|lower }}"
+                                        data-reg-number="{{ student.registration_number|lower }}"
+                                        data-reg-gender="{{ student.gender|lower }}">
+                                        <td>{{ forloop.counter }}</td>
+                                        <td>{{ student.registration_number }}</td>
+                                        <td>{{ student.full_name }}</td>
+                                        <td>{{ student.gender }}</td>
+                                        <td>
+                                            {% if exam_session.status == 'published' %}
+                                                <!-- View-only display for published sessions -->
+                                                <div class="marks-display">
+                                                    {% if student.existing_marks %}
+                                                        {{ student.existing_marks|floatformat:1 }}
+                                                    {% else %}
+                                                        -
+                                                    {% endif %}
+                                                </div>
+                                            {% else %}
+                                                <!-- Editable input for non-published sessions -->
+                                                <div class="input-group">
+                                                    <input type="number" 
+                                                           class="form-control marks-input {% if student.has_result %}has-marks{% endif %}" 
+                                                           id="marks-{{ student.id }}"
+                                                           value="{% if student.existing_marks is not None %}{{ student.existing_marks|floatformat:1 }}{% endif %}"
+                                                           placeholder="Marks"
+                                                           min="0"
+                                                           max="{{ exam_session.exam_type.max_score }}"
+                                                           step="0.5"
+                                                           data-original-value="{% if student.existing_marks is not None %}{{ student.existing_marks|floatformat:1 }}{% else %}''{% endif %}"
+                                                           {% if exam_session.status == 'published' %}disabled{% endif %}>
+                                                </div>
+                                                <small class="text-muted" id="hint-{{ student.id }}" style="display: none;">
+                                                    Press Enter to save
+                                                </small>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if student.existing_grade %}
+                                                <span class="grade-badge grade-{{ student.existing_grade }}" 
+                                                      id="grade-display-{{ student.id }}">
+                                                    {{ student.existing_grade }}
+                                                </span>
+                                            {% else %}
+                                                <span id="grade-display-{{ student.id }}">-</span>
+                                            {% endif %}
+                                        </td>
+                                        {% if exam_session.status != 'published' %}
+                                            <td>
+                                                <button type="button" 
+                                                        class="btn btn-sm btn-success btn-save-individual" 
+                                                        onclick="saveStudentMarks({{ student.id }})"
+                                                        id="save-btn-{{ student.id }}"
+                                                        {% if not student.existing_marks and not student.has_result %}disabled{% endif %}>
+                                                    <i class="fas fa-save mr-1"></i> Save
+                                                </button>
+                                                <span class="ml-2" id="status-{{ student.id }}"></span>
+                                            </td>
+                                        {% endif %}
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        
+                        <!-- No Results Message -->
+                        <div class="alert alert-warning mt-3" id="no-results-message" style="display: none;">
+                            <i class="fas fa-search mr-2"></i>
+                            No students found matching your search criteria.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {% if exam_session.status != 'published' %}
+            <div class="row">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h4 class="card-title mb-0">
+                                <i class="fas fa-lightbulb mr-2"></i>
+                                Quick Actions & Tips
+                            </h4>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="alert alert-info">
+                                        <h6><i class="fas fa-info-circle mr-2"></i>Tips for Quick Entry:</h6>
+                                        <ul class="mb-0 pl-3">
+                                            <li>Press <kbd>Tab</kbd> to move to next field</li>
+                                            <li>Press <kbd>Enter</kbd> to save and move down</li>
+                                            <li>Use <kbd>Shift</kbd> + <kbd>Tab</kbd> to move up</li>
+                                            <li>Leave field blank for absent students</li>
+                                            <li>Use the search bar to quickly find students</li>
+                                            <li>Filter by "With Marks" or "Without Marks" for quick review</li>
+                                            <li>Use Excel Template for bulk upload</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="alert alert-warning">
+                                        <h6><i class="fas fa-exclamation-triangle mr-2"></i>Important Notes:</h6>
+                                        <ul class="mb-0 pl-3">
+                                            <li>Marks are validated (0-{{ exam_session.exam_type.max_score }})</li>
+                                            <li>Blank marks = absent/not applicable</li>
+                                            <li>Zero (0) is treated as a valid mark</li>
+                                            <li>Grades are auto-calculated</li>
+                                            <li>Save periodically to avoid data loss</li>
+                                            <li>Search is case-insensitive</li>
+                                            <li>Filters and search work together</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+    <input type="hidden" id="csrf-token" value="{{ csrf_token }}">
+    <input type="hidden" id="exam-session-status" value="{{ exam_session.status }}">
+    <input type="hidden" id="exam-session-id" value="{{ exam_session.id }}">
+    <input type="hidden" id="subject-id" value="{{ subject.id }}">
+</section>
+{% endblock content %}
+
+{% block extra_js %}
+<script>
+    // Global variables
+    let autoSaveEnabled = true;
+    let savedStudentIds = new Set();
+    let unsavedChanges = new Set();
+    let activeFilter = 'all';
+    let searchTerm = '';
+    let selectedFile = null;
+
+    // ============================================
+    // URL GENERATION FUNCTIONS
+    // ============================================
+    function getUrlByName(urlName, params = {}) {
+        // This function should map URL names to actual URLs
+        const urlMap = {
+            'download_excel_template': `{% url 'download_excel_template' 0 0 %}`.replace('/0/0/', `/${params.examSessionId}/${params.subjectId}/`),
+            'upload_excel_marks': `{% url 'upload_excel_marks' %}`,
+            'download_pdf_report': `{% url 'download_pdf_report' 0 0 %}`.replace('/0/0/', `/${params.examSessionId}/${params.subjectId}/`),
+            'save_student_results': `{% url 'save_student_results' %}`,
+            'manage_results': `{% url 'manage_results' 0 %}`.replace('/0/', `/${params.examSessionId}/`)
+        };
+        
+        if (!urlMap[urlName]) {
+            console.error(`URL name "${urlName}" not found in URL map`);
+            return '#';
+        }
+        
+        return urlMap[urlName];
+    }
+
+    // ============================================
+    // EXCEL TEMPLATE DOWNLOAD FUNCTION
+    // ============================================
+    function downloadExcelTemplate() {
+        showLoading(true);
+        
+        const examSessionId = document.getElementById('exam-session-id').value;
+        const subjectId = document.getElementById('subject-id').value;
+        
+        // Create download URL using URL name
+        const downloadUrl = getUrlByName('download_excel_template', {
+            examSessionId: examSessionId,
+            subjectId: subjectId
+        });
+        
+        // Create hidden iframe for download
+        const iframe = document.createElement('iframe');
+        iframe.style.display = 'none';
+        iframe.src = downloadUrl;
+        document.body.appendChild(iframe);
+        
+        // Remove iframe after download
+        setTimeout(() => {
+            document.body.removeChild(iframe);
+            showLoading(false);
+            showToast('Excel template download started!', 'success');
+        }, 2000);
+    }
+
+    // ============================================
+    // EXCEL UPLOAD FUNCTIONS
+    // ============================================
+    document.addEventListener('DOMContentLoaded', function() {
+        // File input change handler
+        document.getElementById('excelFile').addEventListener('change', function(e) {
+            selectedFile = e.target.files[0];
+            
+            if (selectedFile) {
+                // Validate file
+                if (!validateExcelFile(selectedFile)) {
+                    return;
+                }
+                
+                // Show file name
+                document.getElementById('fileName').textContent = `Selected: ${selectedFile.name} (${formatFileSize(selectedFile.size)})`;
+                document.getElementById('btnUploadExcel').disabled = false;
+                
+                // Preview file (without XLSX library, show basic info)
+                previewExcelFileBasic(selectedFile);
+            }
+        });
+
+        // File upload button click handler
+        document.getElementById('fileUploadButton').addEventListener('click', function() {
+            document.getElementById('excelFile').click();
+        });
+
+        // Modal show/hide handlers
+        $('#excelUploadModal').on('show.bs.modal', function() {
+            resetUploadModal();
+        });
+
+        $('#excelUploadModal').on('hidden.bs.modal', function() {
+            resetUploadModal();
+        });
+    });
+
+    function validateExcelFile(file) {
+        const validExtensions = ['.xlsx', '.xls'];
+        const maxSize = 10 * 1024 * 1024; // 10MB
+        
+        // Check extension
+        const fileName = file.name.toLowerCase();
+        const isValidExtension = validExtensions.some(ext => fileName.endsWith(ext));
+        
+        if (!isValidExtension) {
+            showUploadError('Please select a valid Excel file (.xlsx or .xls)');
+            return false;
+        }
+        
+        // Check size
+        if (file.size > maxSize) {
+            showUploadError('File size must be less than 10MB');
+            return false;
+        }
+        
+        return true;
+    }
+
+    function formatFileSize(bytes) {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
+
+    function previewExcelFileBasic(file) {
+        // Basic preview without XLSX library
+        document.getElementById('previewTableBody').innerHTML = `
+            <tr>
+                <td colspan="4" class="text-center">
+                    <div class="py-3">
+                        <i class="fas fa-file-excel fa-3x text-success mb-3"></i>
+                        <h6>File Ready for Upload</h6>
+                        <p class="mb-0 text-muted">
+                            ${file.name}<br>
+                            ${formatFileSize(file.size)}
+                        </p>
+                        <small class="text-muted">
+                            Preview unavailable. File will be processed on upload.
+                        </small>
+                    </div>
+                </td>
+            </tr>
+        `;
+        
+        document.getElementById('uploadPreview').style.display = 'block';
+    }
+
+    function showUploadError(message) {
+        const errorDiv = document.getElementById('uploadError');
+        const errorMessage = document.getElementById('errorMessage');
+        
+        errorMessage.textContent = message;
+        errorDiv.style.display = 'block';
+        
+        // Hide error after 5 seconds
+        setTimeout(() => {
+            errorDiv.style.display = 'none';
+        }, 5000);
+    }
+
+    function resetUploadModal() {
+        document.getElementById('excelFile').value = '';
+        document.getElementById('fileName').textContent = '';
+        document.getElementById('btnUploadExcel').disabled = true;
+        document.getElementById('uploadPreview').style.display = 'none';
+        document.getElementById('uploadError').style.display = 'none';
+        document.getElementById('uploadProgressBar').style.width = '0%';
+        document.getElementById('uploadProgressBar').textContent = '0%';
+        selectedFile = null;
+    }
+
+    async function uploadExcelFile() {
+        if (!selectedFile) {
+            showUploadError('Please select a file first');
+            return;
+        }
+        
+        showLoading(true);
+        
+        const formData = new FormData();
+        formData.append('excel_file', selectedFile);
+        formData.append('exam_session_id', document.getElementById('exam-session-id').value);
+        formData.append('subject_id', document.getElementById('subject-id').value);
+        
+        try {
+            // Use URL name for upload endpoint
+            const uploadUrl = getUrlByName('upload_excel_marks');
+            
+            // Show upload progress
+            updateUploadProgress(0);
+            
+            const response = await fetch(uploadUrl, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCSRFToken(),
+                },
+                body: formData
+            });
+            
+            // Update progress to simulate upload
+            updateUploadProgress(100);
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                showToast(`Successfully uploaded ${result.processed_count} marks!`, 'success');
+                
+                // Close modal after delay
+                setTimeout(() => {
+                    $('#excelUploadModal').modal('hide');
+                    // Refresh the page to show updated marks
+                    window.location.reload();
+                }, 2000);
+            } else {
+                throw new Error(result.message || 'Upload failed');
+            }
+        } catch (error) {
+            showUploadError('Upload failed: ' + error.message);
+        } finally {
+            showLoading(false);
+        }
+    }
+
+    function updateUploadProgress(percentage) {
+        const progressBar = document.getElementById('uploadProgressBar');
+        progressBar.style.width = percentage + '%';
+        progressBar.textContent = percentage + '%';
+    }
+
+    // ============================================
+    // PDF REPORT DOWNLOAD FUNCTION
+    // ============================================
+    function downloadPdfReport() {
+        showLoading(true);
+        
+        const examSessionId = document.getElementById('exam-session-id').value;
+        const subjectId = document.getElementById('subject-id').value;
+        
+        // Create download URL using URL name
+        const downloadUrl = getUrlByName('download_pdf_report', {
+            examSessionId: examSessionId,
+            subjectId: subjectId
+        });
+        
+        // Use fetch to trigger the download and handle authentication
+        fetch(downloadUrl, {
+            method: 'GET',
+            headers: {
+                'X-CSRFToken': getCSRFToken(),
+                'Accept': 'application/pdf'
+            }
+        })
+        .then(response => {
+            if (response.ok) {
+                return response.blob();
+            }
+            throw new Error('Failed to generate PDF');
+        })
+        .then(blob => {
+            // Create download link
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `Marks_Report_${subjectId}_${examSessionId}.pdf`;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+            
+            showToast('PDF report downloaded successfully!', 'success');
+            showLoading(false);
+        })
+        .catch(error => {
+            console.error('Error downloading PDF:', error);
+            showToast('Error downloading PDF: ' + error.message, 'danger');
+            showLoading(false);
+            
+            // Fallback to iframe method if fetch fails
+            const iframe = document.createElement('iframe');
+            iframe.style.display = 'none';
+            iframe.src = downloadUrl;
+            document.body.appendChild(iframe);
+            
+            setTimeout(() => {
+                document.body.removeChild(iframe);
+                showToast('PDF download started via fallback method', 'info');
+            }, 1000);
+        });
+    }
+
+    // ============================================
+    // UTILITY FUNCTIONS
+    // ============================================
+    function showLoading(show) {
+        if (show) {
+            $('#loading-overlay').fadeIn();
+        } else {
+            $('#loading-overlay').fadeOut();
+        }
+    }
+
+    function showToast(message, type = 'success') {
+        const toast = $(`
+            <div class="alert alert-${type} alert-dismissible fade show position-fixed" 
+                 style="top: 20px; right: 20px; z-index: 9999; min-width: 300px;">
+                <div class="d-flex align-items-center">
+                    <i class="fas ${type === 'success' ? 'fa-check-circle' : type === 'warning' ? 'fa-exclamation-triangle' : 'fa-times-circle'} mr-2"></i>
+                    <div>${message}</div>
+                </div>
+                <button type="button" class="close" data-dismiss="alert">
+                    <span>&times;</span>
+                </button>
+            </div>
+        `);
+        
+        $('body').append(toast);
+        
+        setTimeout(() => {
+            toast.alert('close');
+        }, 5000);
+    }
+
+    function getCSRFToken() {
+        return document.getElementById('csrf-token').value;
+    }
+
+    // ============================================
+    // REST OF THE EXISTING JAVASCRIPT FUNCTIONS
+    // ============================================
+    {% if exam_session.status != 'published' %}
+    // Auto-save toggle
+    $('#auto-save-toggle').on('change', function() {
+        autoSaveEnabled = $(this).is(':checked');
+        showToast(`Auto-save ${autoSaveEnabled ? 'enabled' : 'disabled'}`, 
+                 autoSaveEnabled ? 'success' : 'warning');
+    });
+
+    function updateProgressBar() {
+        const totalRows = $('.student-row').length;
+        const savedRows = $('.student-row.has-marks').length;
+        const progress = (savedRows / totalRows) * 100;
+        
+        $('#progress-bar')
+            .css('width', `${progress}%`)
+            .text(`${progress.toFixed(1)}%`);
+    }
+
+    function validateMarks(marks) {
+        const maxScore = parseFloat("{{ exam_session.exam_type.max_score }}");
+        
+        if (marks === '' || marks === null) {
+            return { valid: true, message: '' };
+        }
+        
+        const marksNum = parseFloat(marks);
+        
+        if (isNaN(marksNum)) {
+            return { valid: false, message: 'Please enter a valid number' };
+        }
+        
+        if (marksNum < 0) {
+            return { valid: false, message: 'Marks cannot be negative' };
+        }
+        
+        if (marksNum > maxScore) {
+            return { valid: false, message: `Marks cannot exceed ${maxScore}` };
+        }
+        
+        return { valid: true, message: '' };
+    }
+
+    // Search functionality
+    function filterAndSearch() {
+        const rows = $('.student-row');
+        let visibleCount = 0;
+        
+        rows.each(function() {
+            const row = $(this);
+            const studentName = row.data('student-name') || '';
+            const regNumber = row.data('reg-number') || '';
+            const regGender = row.data('reg-gender') || '';
+            const hasMarks = row.hasClass('has-marks');
+            
+            // Apply search filter
+            let matchesSearch = true;
+            if (searchTerm) {
+                matchesSearch = studentName.includes(searchTerm) || 
+                               regNumber.includes(searchTerm) || regGender.includes(searchTerm);
+            }
+            
+            // Apply marks filter
+            let matchesFilter = true;
+            if (activeFilter === 'with-marks') {
+                matchesFilter = hasMarks;
+            } else if (activeFilter === 'without-marks') {
+                matchesFilter = !hasMarks;
+            }
+            
+            // Show/hide row based on both filters
+            if (matchesSearch && matchesFilter) {
+                row.removeClass('hidden');
+                visibleCount++;
+            } else {
+                row.addClass('hidden');
+            }
+        });
+        
+        // Update counters
+        updateVisibleStudentsCount(visibleCount);
+        
+        // Show/hide no results message
+        if (visibleCount === 0) {
+            $('#no-results-message').show();
+        } else {
+            $('#no-results-message').hide();
+        }
+        
+        // Update row numbers
+        updateRowNumbers();
+    }
+
+    function updateVisibleStudentsCount(count) {
+        $('#visible-students-count').text(count);
+        $('#search-results-count').text(count);
+    }
+
+    function updateRowNumbers() {
+        let counter = 1;
+        $('.student-row:not(.hidden)').each(function() {
+            $(this).find('td:first').text(counter++);
+        });
+    }
+
+    function filterStudents(filterType) {
+        activeFilter = filterType;
+        
+        // Update button states
+        $('#filter-with-marks').removeClass('btn-primary').addClass('btn-outline-primary');
+        $('#filter-without-marks').removeClass('btn-primary').addClass('btn-outline-warning');
+        
+        if (filterType === 'with-marks') {
+            $('#filter-with-marks').removeClass('btn-outline-primary').addClass('btn-primary');
+            showToast('Showing only students with marks', 'info');
+        } else if (filterType === 'without-marks') {
+            $('#filter-without-marks').removeClass('btn-outline-warning').addClass('btn-primary');
+            showToast('Showing only students without marks', 'info');
+        } else {
+            showToast('Showing all students', 'info');
+        }
+        
+        filterAndSearch();
+    }
+
+    // Handle search input
+    $('#search-students').on('keyup', function() {
+        searchTerm = $(this).val().toLowerCase().trim();
+        filterAndSearch();
+    });
+
+    // Clear search
+    $('#search-students').on('search', function() {
+        searchTerm = $(this).val().toLowerCase().trim();
+        filterAndSearch();
+    });
+
+    async function saveStudentMarks(studentId) {
+        const marksInput = $(`#marks-${studentId}`);
+        const marks = marksInput.val().trim();
+        const originalValue = marksInput.data('original-value');
+        const saveBtn = $(`#save-btn-${studentId}`);
+        const statusEl = $(`#status-${studentId}`);
+        const row = $(`#student-row-${studentId}`);
+        
+        // If marks haven't changed and we already have saved marks
+        if (marks === originalValue && row.hasClass('has-marks')) {
+            showToast(`No changes to save for ${marksInput.closest('tr').find('td:nth-child(3)').text()}`, 'info');
+            return;
+        }
+        
+        // Validate marks
+        const validation = validateMarks(marks);
+        if (!validation.valid) {
+            marksInput.addClass('error');
+            showToast(validation.message, 'danger');
+            return;
+        }
+        
+        // Prepare data
+        const data = {
+            student_id: studentId,
+            subject_id: "{{ subject.id }}",
+            marks_obtained: marks || null
+        };
+        
+        // Show loading
+        saveBtn.prop('disabled', true);
+        statusEl.html('<i class="fas fa-spinner fa-spin"></i> Saving...');
+        
+        try {
+            // Use URL name for save endpoint
+            const saveUrl = getUrlByName('save_student_results');
+            const response = await fetch(saveUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCSRFToken(),
+                },
+                body: JSON.stringify({
+                    exam_session_id: "{{ exam_session.id }}",
+                    results: [data],
+                    is_auto_save: autoSaveEnabled
+                })
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                // Update UI
+                marksInput.removeClass('error');
+                marksInput.data('original-value', marks || '');
+                
+                if (marks) {
+                    marksInput.addClass('has-marks');
+                    row.addClass('has-marks');
+                    saveBtn.prop('disabled', false);
+                    
+                    // Update grade display
+                    const gradeDisplay = $(`#grade-display-${studentId}`);
+                    const savedResult = result.saved_results.find(r => r.student_id == studentId);
+                    if (savedResult && savedResult.grade) {
+                        gradeDisplay.html(`<span class="grade-badge grade-${savedResult.grade}">${savedResult.grade}</span>`);
+                    }
+                } else {
+                    marksInput.removeClass('has-marks');
+                    row.removeClass('has-marks');
+                    $(`#grade-display-${studentId}`).html('-');
+                }
+                
+                statusEl.html('<span class="text-success"><i class="fas fa-check"></i> Saved</span>');
+                savedStudentIds.add(studentId);
+                unsavedChanges.delete(studentId);
+                
+                // Update progress
+                updateProgressBar();
+                
+                // Reapply filters if needed
+                if (activeFilter !== 'all') {
+                    filterAndSearch();
+                }
+                
+                if (!autoSaveEnabled) {
+                    showToast(`Marks saved for ${row.find('td:nth-child(3)').text()}`, 'success');
+                }
+            } else {
+                throw new Error(result.message || 'Failed to save marks');
+            }
+        } catch (error) {
+            console.error('Error saving marks:', error);
+            statusEl.html('<span class="text-danger"><i class="fas fa-times"></i> Error</span>');
+            showToast(`Failed to save marks: ${error.message}`, 'danger');
+        } finally {
+            setTimeout(() => {
+                statusEl.empty();
+                saveBtn.prop('disabled', false);
+            }, 3000);
+        }
+    }
+
+    async function saveAllMarks() {
+        showLoading(true);
+        
+        const results = [];
+        const studentsToSave = [];
+        
+        // Collect all changed marks from visible rows only
+        $('.marks-input').each(function() {
+            const row = $(this).closest('.student-row');
+            if (!row.hasClass('hidden')) {
+                const studentId = $(this).attr('id').replace('marks-', '');
+                const marks = $(this).val().trim();
+                const originalValue = $(this).data('original-value');
+                
+                // Only save if changed or if we need to save empty marks
+                if (marks !== originalValue || (marks === '' && originalValue !== '')) {
+                    results.push({
+                        student_id: studentId,
+                        subject_id: "{{ subject.id }}",
+                        marks_obtained: marks || null
+                    });
+                    studentsToSave.push(studentId);
+                }
+            }
+        });
+        
+        if (results.length === 0) {
+            showLoading(false);
+            showToast('No changes to save', 'info');
+            return;
+        }
+        
+        try {
+            // Use URL name for save endpoint
+            const saveUrl = getUrlByName('save_student_results');
+            const response = await fetch(saveUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCSRFToken(),
+                },
+                body: JSON.stringify({
+                    exam_session_id: "{{ exam_session.id }}",
+                    results: results,
+                    is_auto_save: false
+                })
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                // Update all UI elements
+                studentsToSave.forEach(studentId => {
+                    const marksInput = $(`#marks-${studentId}`);
+                    const marks = marksInput.val().trim();
+                    const row = $(`#student-row-${studentId}`);
+                    const saveBtn = $(`#save-btn-${studentId}`);
+                    
+                    marksInput.data('original-value', marks || '');
+                    
+                    if (marks) {
+                        marksInput.addClass('has-marks');
+                        row.addClass('has-marks');
+                        
+                        // Update grade if available
+                        const savedResult = result.saved_results.find(r => r.student_id == studentId);
+                        if (savedResult && savedResult.grade) {
+                            $(`#grade-display-${studentId}`).html(
+                                `<span class="grade-badge grade-${savedResult.grade}">${savedResult.grade}</span>`
+                            );
+                        }
+                    } else {
+                        marksInput.removeClass('has-marks');
+                        row.removeClass('has-marks');
+                        $(`#grade-display-${studentId}`).html('-');
+                    }
+                    
+                    saveBtn.prop('disabled', !marks && !row.hasClass('has-marks'));
+                    savedStudentIds.add(studentId);
+                    unsavedChanges.delete(studentId);
+                });
+                
+                updateProgressBar();
+                
+                // Reapply filters if needed
+                if (activeFilter !== 'all') {
+                    filterAndSearch();
+                }
+                
+                showToast(`Successfully saved ${result.saved_count} results`, 'success');
+            } else {
+                throw new Error(result.message || 'Failed to save marks');
+            }
+        } catch (error) {
+            console.error('Error saving all marks:', error);
+            showToast(`Failed to save marks: ${error.message}`, 'danger');
+        } finally {
+            showLoading(false);
+        }
+    }
+
+    function clearAllMarks() {
+        if (!confirm('Are you sure you want to clear all marks? This action cannot be undone.')) {
+            return;
+        }
+        
+        // Clear only visible rows if filtered
+        $('.marks-input').each(function() {
+            const row = $(this).closest('.student-row');
+            if (!row.hasClass('hidden')) {
+                $(this).val('');
+                $(this).removeClass('has-marks error');
+                $(this).data('original-value', '');
+                
+                const studentId = $(this).attr('id').replace('marks-', '');
+                $(`#student-row-${studentId}`).removeClass('has-marks');
+                $(`#grade-display-${studentId}`).html('-');
+                $(`#save-btn-${studentId}`).prop('disabled', true);
+                
+                unsavedChanges.add(studentId);
+            }
+        });
+        
+        updateProgressBar();
+        
+        // Reapply filters if needed
+        if (activeFilter !== 'all') {
+            filterAndSearch();
+        }
+        
+        showToast('All visible marks cleared. Remember to save changes!', 'warning');
+    }
+
+    // Handle Enter key press for quick saving
+    $(document).on('keydown', '.marks-input', function(e) {
+        const studentId = $(this).attr('id').replace('marks-', '');
+        
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            saveStudentMarks(studentId);
+            
+            // Move to next visible input
+            const nextRow = $(this).closest('tr').nextAll('.student-row:not(.hidden)').first();
+            if (nextRow.length) {
+                nextRow.find('.marks-input').focus();
+            }
+        } else if (e.key === 'Tab' && !e.shiftKey) {
+            // Show hint on tab
+            $(`#hint-${studentId}`).fadeIn().delay(2000).fadeOut();
+        }
+    });
+
+    // Handle input changes
+    $(document).on('input', '.marks-input', function() {
+        const studentId = $(this).attr('id').replace('marks-', '');
+        const marks = $(this).val().trim();
+        const saveBtn = $(`#save-btn-${studentId}`);
+        
+        // Enable save button if marks are valid
+        const validation = validateMarks(marks);
+        if (validation.valid) {
+            $(this).removeClass('error');
+            saveBtn.prop('disabled', false);
+            unsavedChanges.add(studentId);
+        } else {
+            $(this).addClass('error');
+            saveBtn.prop('disabled', true);
+        }
+        
+        // Auto-save if enabled
+        if (autoSaveEnabled && validation.valid) {
+            // Debounce auto-save
+            clearTimeout(window.autoSaveTimeout);
+            window.autoSaveTimeout = setTimeout(() => {
+                saveStudentMarks(studentId);
+            }, 1000);
+        }
+    });
+
+    // Initialize
+    $(document).ready(function() {
+        // Check if session is published
+        const examSessionStatus = $('#exam-session-status').val();
+        if (examSessionStatus === 'published') {
+            // Disable all interactive elements for published sessions
+            $('.marks-input').prop('disabled', true);
+            $('.btn-save-individual').prop('disabled', true);
+            $('#btn-save-all').prop('disabled', true);
+            $('#auto-save-toggle').prop('disabled', true);
+            $('.btn[onclick="clearAllMarks()"]').prop('disabled', true);
+            $('.marks-input').css('background-color', '#f8f9fa');
+            $('.marks-input').css('cursor', 'not-allowed');
+        } else {
+            // Initialize only for non-published sessions
+            // Mark existing saved marks
+            {% for student in students_data %}
+                {% if student.has_result %}
+                    savedStudentIds.add("{{ student.id }}");
+                {% endif %}
+            {% endfor %}
+            
+            // Focus on first empty input
+            const firstEmptyInput = $('.marks-input').filter(function() {
+                return $(this).val() === '' && $(this).data('original-value') === '';
+            }).first();
+            
+            if (firstEmptyInput.length) {
+                firstEmptyInput.focus();
+            } else {
+                $('.marks-input').first().focus();
+            }
+            
+            // Initialize search
+            filterAndSearch();
+            
+            // Warn before leaving if there are unsaved changes
+            $(window).on('beforeunload', function() {
+                if (unsavedChanges.size > 0) {
+                    return 'You have unsaved changes. Are you sure you want to leave?';
+                }
+            });
+            
+            // Add keyboard shortcut for search (Ctrl+F)
+            $(document).on('keydown', function(e) {
+                if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+                    e.preventDefault();
+                    $('#search-students').focus();
+                    showToast('Use Ctrl+F to quickly search for students', 'info');
+                }
+            });
+        }
+    });
+    {% else %}
+    // ============================================
+    // VIEW-ONLY MODE JAVASCRIPT FOR PUBLISHED SESSIONS
+    // ============================================
+    let activeFilter = 'all';
+    let searchTerm = '';
+
+    // Search functionality for view-only mode
+    function filterAndSearch() {
+        const rows = $('.student-row');
+        let visibleCount = 0;
+        
+        rows.each(function() {
+            const row = $(this);
+            const studentName = row.data('student-name') || '';
+            const regNumber = row.data('reg-number') || '';
+            const regGender = row.data('reg-gender') || '';
+            const hasMarks = row.hasClass('has-marks');
+            
+            // Apply search filter
+            let matchesSearch = true;
+            if (searchTerm) {
+                matchesSearch = studentName.includes(searchTerm) || 
+                               regNumber.includes(searchTerm) || regGender.includes(searchTerm);
+            }
+            
+            // Apply marks filter
+            let matchesFilter = true;
+            if (activeFilter === 'with-marks') {
+                matchesFilter = hasMarks;
+            } else if (activeFilter === 'without-marks') {
+                matchesFilter = !hasMarks;
+            }
+            
+            // Show/hide row based on both filters
+            if (matchesSearch && matchesFilter) {
+                row.removeClass('hidden');
+                visibleCount++;
+            } else {
+                row.addClass('hidden');
+            }
+        });
+        
+        // Update counters
+        $('#visible-students-count').text(visibleCount);
+        $('#search-results-count').text(visibleCount);
+        
+        // Show/hide no results message
+        if (visibleCount === 0) {
+            $('#no-results-message').show();
+        } else {
+            $('#no-results-message').hide();
+        }
+        
+        // Update row numbers
+        updateRowNumbers();
+    }
+
+    function updateRowNumbers() {
+        let counter = 1;
+        $('.student-row:not(.hidden)').each(function() {
+            $(this).find('td:first').text(counter++);
+        });
+    }
+
+    function filterStudents(filterType) {
+        activeFilter = filterType;
+        
+        // Update button states
+        $('#filter-with-marks').removeClass('btn-primary').addClass('btn-outline-primary');
+        $('#filter-without-marks').removeClass('btn-primary').addClass('btn-outline-warning');
+        
+        if (filterType === 'with-marks') {
+            $('#filter-with-marks').removeClass('btn-outline-primary').addClass('btn-primary');
+        } else if (filterType === 'without-marks') {
+            $('#filter-without-marks').removeClass('btn-outline-warning').addClass('btn-primary');
+        }
+        
+        filterAndSearch();
+    }
+
+    // Handle search input
+    $('#search-students').on('keyup', function() {
+        searchTerm = $(this).val().toLowerCase().trim();
+        filterAndSearch();
+    });
+
+    // Clear search
+    $('#search-students').on('search', function() {
+        searchTerm = $(this).val().toLowerCase().trim();
+        filterAndSearch();
+    });
+
+    $(document).ready(function() {
+        filterAndSearch();
+        
+        // Add keyboard shortcut for search (Ctrl+F)
+        $(document).on('keydown', function(e) {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+                e.preventDefault();
+                $('#search-students').focus();
+            }
+        });
+    });
+    {% endif %}
+</script>
+{% endblock extra_js %}

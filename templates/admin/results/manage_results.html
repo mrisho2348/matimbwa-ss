@@ -1,7 +1,7 @@
 {% extends 'admin/base.html' %}
 {% load static %}
 {% load custom_filters %}
-{% block title %} Manage Student Results - {{ exam_session.name }} {% endblock title %}
+{% block title %}Manage Student Results - {{ exam_session.name }}{% endblock title %}
 
 {% block breadcrumb %}
     <nav aria-label="breadcrumb">
@@ -25,8 +25,6 @@
         --border-color: #dee2e6;
     }
 
- 
-
     .student-info-column {
         position: sticky;
         left: 0;
@@ -35,28 +33,27 @@
         box-shadow: 2px 0 5px rgba(0,0,0,0.1);
     }
 
-/* Make ONLY the table header sticky */
-.result-table thead {
-    position: sticky;
-    top: 0;
-    z-index: 1000;
-    background: white;
-}
+    .result-table thead {
+        position: sticky;
+        top: 0;
+        z-index: 1000;
+        background: white;
+    }
 
-/* Normal subject header cells */
-.subject-header {
-    background: var(--light-bg);
-    font-weight: 600;
-    white-space: nowrap;
-    text-align: center;
-}
-
+    .subject-header {
+        background: var(--light-bg);
+        font-weight: 600;
+        white-space: nowrap;
+        text-align: center;
+        min-width: 80px;
+    }
 
     .table-wrapper {
         overflow-x: auto;
         position: relative;
         border: 1px solid var(--border-color);
         border-radius: 8px;
+        margin-top: 20px;
     }
 
     .result-table th,
@@ -77,29 +74,33 @@
         text-align: center;
     }
 
-  .student-name-cell {
-    position: sticky;
-    left: 0;
-    background: white;
-    z-index: 500; /* LOWER than thead */
-    box-shadow: 2px 0 5px rgba(0,0,0,0.1);
-    text-align: left !important;
-    min-width: 200px;
-}
-
-    .marks-input {
-        width: 70px;
-        text-align: center;
-        padding: 4px;
-        border: 1px solid var(--border-color);
-        border-radius: 4px;
-        transition: all 0.3s;
+    .student-name-cell {
+        position: sticky;
+        left: 0;
+        background: white;
+        z-index: 500;
+        box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+        text-align: left !important;
+        min-width: 200px;
     }
 
-    .marks-input:focus {
-        border-color: var(--primary-color);
-        box-shadow: 0 0 0 0.2rem rgba(67, 97, 238, 0.25);
-        outline: none;
+    .marks-display {
+        font-weight: 500;
+        padding: 4px 8px;
+        border-radius: 4px;
+        display: inline-block;
+        min-width: 40px;
+    }
+
+    .marks-display.has-marks {
+        background-color: rgba(6, 214, 160, 0.1);
+        color: var(--success-color);
+        font-weight: 600;
+    }
+
+    .marks-display.no-marks {
+        color: #6c757d;
+        font-style: italic;
     }
 
     .grade-badge {
@@ -120,51 +121,6 @@
     .grade-F { background-color: #dc3545; color: white; }
     .grade-S { background-color: #6c757d; color: white; }
 
-    .status-indicator {
-        display: inline-block;
-        width: 10px;
-        height: 10px;
-        border-radius: 50%;
-        margin-right: 5px;
-    }
-
-    .status-saved { background-color: var(--success-color); }
-    .status-pending { background-color: var(--warning-color); }
-    .status-error { background-color: var(--danger-color); }
-
-    .action-buttons {
-        position: sticky;
-        left: 0;
-        bottom: 0;
-        background: white;
-        padding: 15px;
-        border-top: 1px solid var(--border-color);
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        z-index: 1000;
-    }
-
-    /* Modal styles */
-    .subject-row {
-        border-bottom: 1px solid var(--border-color);
-        padding: 10px 0;
-        transition: background-color 0.2s;
-    }
-
-    .subject-row:hover {
-        background-color: rgba(67, 97, 238, 0.05);
-    }
-
-    .add-result-row {
-        background-color: #f8f9fa;
-        padding: 10px;
-        border-radius: 4px;
-        margin-bottom: 10px;
-        border: 1px dashed #dee2e6;
-    }
-
-    /* Loading overlay */
     .loading-overlay {
         position: fixed;
         top: 0;
@@ -205,24 +161,318 @@
     .remark-cell {
         font-style: italic;
     }
+
+    .card-header.bg-gradient-primary {
+        background: linear-gradient(135deg, #4361ee 0%, #3a56d4 100%);
+    }
+
+    .text-white-80 {
+        color: rgba(255, 255, 255, 0.85) !important;
+    }
+
+    .select2-subject-selector {
+        border: 2px solid #e9ecef;
+        border-radius: 0.375rem;
+        transition: all 0.3s ease;
+    }
+
+    .select2-subject-selector:focus {
+        border-color: #4361ee;
+        box-shadow: 0 0 0 0.2rem rgba(67, 97, 238, 0.25);
+    }
+
+    .quick-subject-btn {
+        border-radius: 20px;
+        padding: 0.375rem 1rem;
+        transition: all 0.2s ease;
+        border-width: 2px;
+    }
+
+    .quick-subject-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(67, 97, 238, 0.15);
+    }
+
+    .btn-lg {
+        min-width: 160px;
+        transition: all 0.3s ease;
+    }
+
+    .btn-lg:hover:not(:disabled) {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 12px rgba(40, 167, 69, 0.25);
+    }
+
+    .btn-lg:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+
+    .badge-light {
+        background-color: #f8f9fa;
+        border: 1px solid #dee2e6;
+    }
+
+    /* Action Buttons Styles */
+    .action-buttons-container {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        flex-wrap: wrap;
+        margin-top: 15px;
+    }
+
+    .file-upload-wrapper {
+        position: relative;
+        overflow: hidden;
+        display: inline-block;
+    }
+
+    .file-upload-wrapper input[type=file] {
+        position: absolute;
+        left: 0;
+        top: 0;
+        opacity: 0;
+        cursor: pointer;
+        height: 100%;
+        width: 100%;
+    }
+
+    .file-upload-button {
+        padding: 8px 16px;
+        border-radius: 6px;
+        background-color: #6c757d;
+        color: white;
+        border: none;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .file-upload-button:hover {
+        background-color: #5a6268;
+    }
+
+    .file-upload-button i {
+        font-size: 14px;
+    }
+
+    .modal-backdrop {
+        z-index: 1040 !important;
+    }
+
+    .modal {
+        z-index: 1050 !important;
+    }
+
+    .progress-bar {
+        transition: width 0.3s ease;
+    }
+
+    .template-info {
+        background-color: #e8f4fd;
+        border-left: 4px solid #17a2b8;
+        padding: 15px;
+        border-radius: 4px;
+        margin-bottom: 20px;
+    }
+
+    .template-info h6 {
+        color: #17a2b8;
+        font-weight: 600;
+        margin-bottom: 10px;
+    }
+
+    .template-info ul {
+        margin-bottom: 0;
+        padding-left: 20px;
+    }
+
+    .template-info li {
+        margin-bottom: 5px;
+        color: #495057;
+    }
+
+    .published-badge {
+        font-size: 0.75rem;
+        padding: 0.25rem 0.75rem;
+    }
+
+    .view-only-message {
+        background-color: #fff3cd;
+        border-color: #ffeaa7;
+    }
+
+    .session-export-card {
+        border: 2px solid #e9ecef;
+        border-radius: 10px;
+        transition: all 0.3s ease;
+    }
+
+    .session-export-card:hover {
+        border-color: var(--primary-color);
+        box-shadow: 0 0 15px rgba(67, 97, 238, 0.1);
+    }
+
+    .session-export-header {
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        border-bottom: 1px solid #dee2e6;
+    }
+
+    @media (max-width: 768px) {
+        .subject-stats {
+            margin-bottom: 15px !important;
+        }
+        
+        .btn-lg {
+            width: 100%;
+            margin-top: 10px;
+        }
+        
+        .quick-subject-btn {
+            margin-bottom: 5px;
+        }
+
+        .action-buttons-container {
+            flex-direction: column;
+            align-items: stretch;
+        }
+
+        .file-upload-button {
+            width: 100%;
+            justify-content: center;
+        }
+
+        .subject-header {
+            min-width: 60px;
+            font-size: 0.8rem;
+        }
+
+        .student-name-cell {
+            min-width: 150px;
+        }
+    }
 </style>
 {% endblock extra_css %}
 
 {% block content %}
+<!-- Loading Overlay -->
 <div class="loading-overlay" id="loading-overlay">
     <div class="loading-spinner"></div>
 </div>
 
+<!-- Excel Upload Modal (for entire session) -->
+<div class="modal fade" id="sessionExcelUploadModal" tabindex="-1" role="dialog" aria-labelledby="sessionExcelUploadModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="sessionExcelUploadModalLabel">
+                    <i class="fas fa-file-upload mr-2"></i>Upload Session Results (Excel)
+                </h5>
+                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="template-info">
+                    <h6><i class="fas fa-info-circle mr-2"></i>Instructions for Session Upload:</h6>
+                    <ul>
+                        <li>Download the session template first using the "Download Excel Template" button</li>
+                        <li>Template includes all subjects for this exam session</li>
+                        <li>Fill marks for multiple students across all subjects</li>
+                        <li>Leave cells blank for absent students</li>
+                        <li>Zero (0) is treated as a valid mark</li>
+                        <li>Do not modify Student ID or Registration Number columns</li>
+                        <li>Maximum file size: 10MB</li>
+                        <li>Supported formats: .xlsx, .xls</li>
+                    </ul>
+                </div>
+
+                <div class="form-group">
+                    <label for="sessionExcelFile">Select Excel File:</label>
+                    <div class="file-upload-wrapper">
+                        <button type="button" class="file-upload-button" id="sessionFileUploadButton">
+                            <i class="fas fa-file-excel"></i> Choose Excel File
+                        </button>
+                        <input type="file" id="sessionExcelFile" name="sessionExcelFile" accept=".xlsx,.xls" style="display: none;">
+                    </div>
+                    <small class="form-text text-muted" id="sessionFileName"></small>
+                </div>
+
+                <div class="form-group">
+                    <label>Upload Progress:</label>
+                    <div class="progress">
+                        <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                             id="sessionUploadProgressBar" 
+                             role="progressbar" 
+                             style="width: 0%">
+                            0%
+                        </div>
+                    </div>
+                </div>
+
+                <div id="sessionUploadPreview" style="display: none;">
+                    <h6><i class="fas fa-eye mr-2"></i>File Preview:</h6>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-bordered" id="sessionPreviewTable">
+                            <thead class="thead-light">
+                                <tr>
+                                    <th>Student ID</th>
+                                    <th>Registration No.</th>
+                                    <th>Student Name</th>
+                                    <th>Subject 1</th>
+                                    <th>Subject 2</th>
+                                    <th>...</th>
+                                </tr>
+                            </thead>
+                            <tbody id="sessionPreviewTableBody">
+                                <tr>
+                                    <td colspan="6" class="text-center text-muted py-3">
+                                        <i class="fas fa-file-excel fa-2x mb-2"></i><br>
+                                        File ready for upload. Preview will show first few rows after selection.
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="alert alert-danger" id="sessionUploadError" style="display: none;">
+                    <i class="fas fa-exclamation-triangle mr-2"></i>
+                    <span id="sessionErrorMessage"></span>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="btnUploadSessionExcel" disabled onclick="uploadSessionExcelFile()">
+                    <i class="fas fa-upload mr-1"></i> Upload & Process Session
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <section class="content">
     <div class="container-fluid">
-        <!-- Header Information -->
+        <!-- Session Header Card -->
         <div class="row mb-4">
             <div class="col-12">
                 <div class="card">
-                    <div class="card-header bg-primary text-white">
-                        <h3 class="card-title mb-0">
-                            <i class="fas fa-file-alt mr-2"></i>Manage Student Results - {{ exam_session.name }}
-                        </h3>
+                    <div class="card-header {% if exam_session.status == 'published' %}bg-success text-white{% else %}bg-primary text-white{% endif %}">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h3 class="card-title mb-0">
+                                <i class="fas fa-file-alt mr-2"></i>Manage Student Results - {{ exam_session.name }}
+                            </h3>
+                            <div>
+                                <span class="badge badge-light mr-2">
+                                    <i class="fas fa-calendar mr-1"></i>{{ exam_session.exam_date|date:"M d, Y" }}
+                                </span>
+                                <span class="badge badge-{{ exam_session.status }}">
+                                    {{ exam_session.get_status_display }}
+                                </span>
+                            </div>
+                        </div>
                     </div>
                     <div class="card-body">
                         <div class="row">
@@ -249,19 +499,14 @@
                             </div>
                         </div>
                         <div class="row mt-2">
-                            <div class="col-md-3">
+                            <div class="col-md-4">
                                 <p class="mb-1"><strong>Exam Type:</strong> {{ exam_session.exam_type.name }}</p>
                             </div>
-                            <div class="col-md-3">
-                                <p class="mb-1"><strong>Exam Date:</strong> {{ exam_session.exam_date|date:"F d, Y" }}</p>
-                            </div>
-                            <div class="col-md-3">
-                                <p class="mb-1"><strong>Status:</strong> 
-                                    <span class="badge badge-{{ exam_session.status }}">{{ exam_session.get_status_display }}</span>
-                                </p>
-                            </div>
-                            <div class="col-md-3">
+                            <div class="col-md-4">
                                 <p class="mb-1"><strong>Subjects:</strong> {{ subjects.count }}</p>
+                            </div>
+                            <div class="col-md-4">
+                                <p class="mb-1"><strong>Max Score:</strong> {{ exam_session.exam_type.max_score }}</p>
                             </div>
                         </div>
                     </div>
@@ -269,32 +514,195 @@
             </div>
         </div>
 
-        <!-- Action Buttons -->
+        <!-- Session Export Card -->
         <div class="row mb-4">
             <div class="col-12">
-                <div class="d-flex flex-wrap justify-content-between align-items-center">
-                    <div>
-                        <button type="button" class="btn btn-success mr-2" data-toggle="modal" data-target="#addResultModal">
-                            <i class="fas fa-plus-circle mr-1"></i> Add Results
-                        </button>
+                <div class="card session-export-card">
+                    <div class="card-header session-export-header">
+                        <h4 class="card-title mb-0">
+                            <i class="fas fa-download mr-2"></i>Session Export & Import Tools
+                        </h4>
                     </div>
-                    <div>
-                        <button type="button" class="btn btn-secondary" onclick="reloadPage()">
-                            <i class="fas fa-sync-alt mr-1"></i> Refresh
-                        </button>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h5><i class="fas fa-upload mr-2"></i>Bulk Import</h5>
+                                <p class="text-muted">Upload Excel file with marks for all students and subjects in this session.</p>
+                                {% if exam_session.status != 'published' %}
+                                    <button type="button" class="btn btn-primary" 
+                                            data-toggle="modal" data-target="#sessionExcelUploadModal">
+                                        <i class="fas fa-file-upload mr-1"></i> Upload Session Excel
+                                    </button>
+                                {% else %}
+                                    <div class="alert alert-warning view-only-message">
+                                        <i class="fas fa-lock mr-2"></i>
+                                        Session is published. Upload disabled.
+                                    </div>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-6">
+                                <h5><i class="fas fa-download mr-2"></i>Bulk Export</h5>
+                                <p class="text-muted">Download results in various formats for reporting and analysis.</p>
+                                <div class="action-buttons-container">
+                                    <button type="button" class="btn btn-warning" 
+                                            onclick="downloadSessionExcelTemplate()">
+                                        <i class="fas fa-file-excel mr-1"></i> Excel Template
+                                    </button>
+                                    <button type="button" class="btn btn-danger" 
+                                            onclick="downloadSessionExcelReport()">
+                                        <i class="fas fa-file-pdf mr-1"></i> Excel Report
+                                    </button>
+                                    <button type="button" class="btn btn-info" 
+                                            onclick="downloadSessionSummary()">
+                                        <i class="fas fa-chart-bar mr-1"></i> Summary
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Quick Stats -->
+                        <div class="row mt-4">
+                            <div class="col-md-3">
+                                <div class="card bg-light">
+                                    <div class="card-body text-center py-2">
+                                        <h5 class="mb-0">{{ subjects.count }}</h5>
+                                        <small class="text-muted">Subjects</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="card bg-light">
+                                    <div class="card-body text-center py-2">
+                                        <h5 class="mb-0">{{ student_results_data|length }}</h5>
+                                        <small class="text-muted">Students</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="card bg-light">
+                                    <div class="card-body text-center py-2">
+                                        <h5 class="mb-0" id="total-results-count">0</h5>
+                                        <small class="text-muted">Results Entered</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="card bg-light">
+                                    <div class="card-body text-center py-2">
+                                        <h5 class="mb-0" id="completion-percentage">0%</h5>
+                                        <small class="text-muted">Completion</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Results Table -->
+        <!-- Subject Selection Card -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-gradient-primary text-white py-3">
+                        <h4 class="card-title mb-0 d-flex align-items-center">
+                            <i class="fas fa-clipboard-check mr-2"></i>
+                            Select a Subject to Enter Marks
+                        </h4>
+                    </div>
+                    <div class="card-body">
+                        <div class="row align-items-center">
+                            <div class="col-md-8 mb-3 mb-md-0">
+                                <div class="form-group mb-0">
+                                    <label for="subject-selector" class="font-weight-bold mb-2">
+                                        <i class="fas fa-book mr-1"></i>Select Subject
+                                    </label>
+                                    <div class="input-group">
+                                        <select id="subject-selector" 
+                                                class="form-control select2-subject-selector border-left-0" 
+                                                style="width: 100%;">
+                                            <option value="">-- Select a subject from the list --</option>
+                                            {% for subject in subjects %}
+                                                <option value="{{ subject.id }}">
+                                                    {{ subject.code }} - {{ subject.name }}
+                                                    {% if subject.is_core %}
+                                                        <span class="badge badge-info ml-2">Core</span>
+                                                    {% endif %}
+                                                </option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <small class="form-text text-muted mt-2">
+                                        <i class="fas fa-info-circle mr-1"></i>
+                                        Choose one subject at a time to enter marks for all students
+                                    </small>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="text-md-right">
+                                    <div class="subject-stats mb-3">
+                                        <div class="d-inline-block mr-3">
+                                            <span class="badge badge-light px-3 py-2">
+                                                <i class="fas fa-book-open mr-1"></i>
+                                                {{ subjects.count }} Subjects
+                                            </span>
+                                        </div>
+                                        <div class="d-inline-block">
+                                            <span class="badge badge-light px-3 py-2">
+                                                <i class="fas fa-users mr-1"></i>
+                                                {{ student_results_data|length }} Students
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <button type="button" 
+                                            class="btn btn-success btn-lg px-4 py-3 font-weight-bold"
+                                            id="btn-go-to-subject"
+                                            onclick="goToSubjectEntry()"
+                                            disabled>
+                                        <i class="fas fa-pencil-alt mr-2"></i>
+                                        Enter Marks
+                                        <i class="fas fa-arrow-right ml-2"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row mt-4">
+                            <div class="col-12">
+                                <h6 class="text-muted mb-3">
+                                    <i class="fas fa-bolt mr-1"></i>Quick Access - Recent Subjects:
+                                </h6>
+                                <div class="d-flex flex-wrap gap-2">
+                                    {% for subject in subjects|slice:":6" %}
+                                    <button type="button" 
+                                            class="btn btn-outline-primary btn-sm quick-subject-btn"
+                                            data-subject-id="{{ subject.id }}"
+                                            onclick="quickSelectSubject('{{ subject.id }}')">
+                                        <i class="fas fa-book mr-1"></i>
+                                        {{ subject.code }}
+                                    </button>
+                                    {% endfor %}
+                                    {% if subjects.count > 6 %}
+                                    <span class="align-self-center text-muted ml-2">
+                                        +{{ subjects.count|add:"-6" }} more subjects
+                                    </span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Student Results Table -->
         <div class="row">
             <div class="col-12">
                 <div class="card">
                     <div class="card-header">
-                        <h4 class="card-title">Student Results</h4>
-                        <div class="card-tools">
-                            <div class="input-group input-group-sm">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h4 class="card-title mb-0">Student Results Overview</h4>
+                            <div class="input-group input-group-sm" style="width: 300px;">
                                 <input type="text" class="form-control" placeholder="Search students..." id="search-students">
                                 <div class="input-group-append">
                                     <button class="btn btn-primary">
@@ -307,7 +715,7 @@
                     <div class="card-body p-0">
                         <div class="table-wrapper">
                             <table class="table table-hover text-nowrap table-responsive-sm table-bordered table-striped table-sm result-table" id="results-table">
-                                <thead >
+                                <thead>
                                     <tr>
                                         <th class="student-name-cell">Reg/Exam No.</th>
                                         <th class="student-name-cell">Candidate Name</th>
@@ -315,7 +723,9 @@
                                         <th>Point</th>
                                         <th>Div</th>
                                         {% for subject in subjects %}
-                                            <th class="subject-header">{{ subject.code }}</th>
+                                            <th class="subject-header" title="{{ subject.name }}">
+                                                {{ subject.code }}
+                                            </th>
                                         {% endfor %}
                                         <th>Total</th>
                                         <th>Avg</th>
@@ -326,8 +736,7 @@
                                 </thead>
                                 <tbody>
                                     {% for student_data in student_results_data %}
-                                    <tr data-student-id="{{ student_data.student_id }}" data-student-name="{{ student_data.full_name }}">
-                                        <!-- Student Information -->
+                                    <tr data-student-id="{{ student_data.student_id }}" data-student-name="{{ student_data.full_name|lower }}">
                                         <td class="student-name-cell">{{ student_data.registration_number }}</td>
                                         <td class="student-name-cell">{{ student_data.full_name }}</td>
                                         <td>{{ student_data.gender|slice:":1" }}</td>
@@ -342,32 +751,23 @@
                                             {{ student_data.division|default:"-" }}
                                         </td>
                                         
-                                        <!-- Subject Marks -->
                                         {% for subject in subjects %}
                                         <td>
                                             {% with subject_result=student_data.subject_results|get_item:subject.id %}
-                                            <div class="marks-input-container">
-                                                <input type="number" 
-                                                       class="marks-input form-control form-control-sm" 
-                                                       data-student-id="{{ student_data.student_id }}" 
-                                                       data-subject-id="{{ subject.id }}"
-                                                       data-result-id="{{ subject_result.result_id|default:'' }}"
-                                                       placeholder="Marks"
-                                                       min="0" 
-                                                       max="{{ exam_session.exam_type.max_score }}"
-                                                       step="0.01"
-                                                       value="{% if subject_result.marks %}{{ subject_result.marks|floatformat:1 }}{% endif %}">
-                                                <div class="status-indicator mt-1">
-                                                    {% if subject_result.result_id %}
-                                                        <span class="status-saved" title="Saved"></span>
-                                                    {% endif %}
-                                                </div>
-                                            </div>
+                                                {% if subject_result.marks is not None %}
+                                                    <div class="marks-display has-marks" 
+                                                         title="{{ subject.name }}: {{ subject_result.marks|floatformat:1 }} marks">
+                                                        {{ subject_result.grade }}-{{ subject_result.marks|floatformat:1 }}
+                                                    </div>
+                                                {% else %}
+                                                    <div class="marks-display no-marks">
+                                                        -
+                                                    </div>
+                                                {% endif %}
                                             {% endwith %}
                                         </td>
                                         {% endfor %}
                                         
-                                        <!-- Calculated Fields -->
                                         <td class="calculated-cell" id="total-{{ student_data.student_id }}">
                                             {% if student_data.total_marks %}
                                                 {{ student_data.total_marks|floatformat:1 }}
@@ -386,24 +786,14 @@
                                             {{ student_data.average_grade|default:"-" }}
                                         </td>
                                         <td class="position-cell" id="position-{{ student_data.student_id }}">
-                                            {% if student_data.position %}
-                                                {{ student_data.position }}
+                                            {% if student_data.class_position %}
+                                                {{ student_data.class_position }}
                                             {% else %}
                                                 -
                                             {% endif %}
                                         </td>
                                         <td class="remark-cell" id="remark-{{ student_data.student_id }}">
-                                            {{ student_data.remark|default:"-" }}
-                                        </td>
-                                    </tr>
-                                    {% empty %}
-                                    <tr>
-                                        <td colspan="{{ subjects.count|add:11 }}" class="text-center py-5">
-                                            <div class="text-muted">
-                                                <i class="fas fa-users fa-3x mb-3"></i>
-                                                <h5>No students found</h5>
-                                                <p>Add students to this class level to start entering results.</p>
-                                            </div>
+                                            {{ student_data.average_remark|default:"-" }}
                                         </td>
                                     </tr>
                                     {% endfor %}
@@ -416,346 +806,495 @@
         </div>
     </div>
 </section>
+
+<!-- Hidden inputs -->
 <input type="hidden" id="csrf-token" value="{{ csrf_token }}">
-
-<!-- Add Results Modal -->
-<div class="modal fade" id="addResultModal" tabindex="-1" role="dialog" aria-labelledby="addResultModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg" role="document">
-        <div class="modal-content">
-            <div class="modal-header bg-success text-white">
-                <h5 class="modal-title" id="addResultModalLabel">
-                    <i class="fas fa-plus-circle mr-2"></i>Add Multiple Results
-                </h5>
-                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
-                    <span aria-hidden="true">&times;</span>
-                </button>
-            </div>
-            <div class="modal-body">
-                <div class="alert alert-info">
-                    <i class="fas fa-info-circle mr-2"></i>
-                    Add multiple result entries. Click "Add Row" to add more entries.
-                </div>
-                
-                <div id="add-result-rows">
-                    <!-- Rows will be added here dynamically -->
-                </div>
-                
-                <div class="text-center mt-3">
-                    <button type="button" class="btn btn-primary" onclick="addResultRow()">
-                        <i class="fas fa-plus mr-1"></i> Add Row
-                    </button>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-success" onclick="saveNewResults()">
-                    <i class="fas fa-save mr-1"></i> Save All Results
-                </button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Fixed Action Buttons at Bottom -->
-<div class="action-buttons">
-    <div class="d-flex align-items-center">
-        <span class="text-muted mr-3">
-            <i class="fas fa-save text-success"></i>
-            <span id="auto-save-status">Changes are saved automatically</span>
-        </span>
-    </div>
-</div>
+<input type="hidden" id="exam-session-status" value="{{ exam_session.status }}">
+<input type="hidden" id="exam-session-id" value="{{ exam_session.id }}">
+<input type="hidden" id="exam-session-name" value="{{ exam_session.name|slugify }}">
 {% endblock content %}
 
 {% block extra_js %}
 <script>
-// CSRF Token
-function getCSRFToken() {
-    return document.getElementById('csrf-token').value;
-}
+    // Global variables
+    let selectedSessionFile = null;
 
-// Show/hide loading overlay
-function showLoading(show) {
-    if (show) {
-        $('#loading-overlay').fadeIn();
-    } else {
-        $('#loading-overlay').fadeOut();
+    // ============================================
+    // UTILITY FUNCTIONS
+    // ============================================
+    function getCSRFToken() {
+        return document.getElementById('csrf-token').value;
     }
-}
 
-// Reload page
-function reloadPage() {
-    window.location.reload();
-}
-
-// Initialize variables
-let changedResults = new Set();
-
-// Initialize on page load
-$(document).ready(function() {
-    initializeEventListeners();
-    
-    // Initialize first result row
-    addResultRow();
-});
-
-// Initialize event listeners
-function initializeEventListeners() {
-    // Marks input change
-    $(document).on('change', '.marks-input', function() {
-        const studentId = $(this).data('student-id');
-        const subjectId = $(this).data('subject-id');
-        const marks = $(this).val();
-        
-        if (marks !== '') {
-            const key = `${studentId}_${subjectId}`;
-            changedResults.add(key);
-            updateInputStatus($(this), 'pending');
-            // Auto-save after a short delay
-            setTimeout(saveResult, 500);
+    function showLoading(show) {
+        if (show) {
+            $('#loading-overlay').fadeIn();
+        } else {
+            $('#loading-overlay').fadeOut();
         }
-    });
-    
-    // Search students
-    $('#search-students').on('keyup', function() {
-        const searchTerm = $(this).val().toLowerCase();
-        $('#results-table tbody tr').each(function() {
-            const studentName = $(this).data('student-name').toLowerCase();
-            const admissionNo = $(this).find('td:first').text().toLowerCase();
+    }
+
+    function showToast(message, type = 'success') {
+        const toast = $(`
+            <div class="alert alert-${type} alert-dismissible fade show position-fixed" 
+                 style="top: 20px; right: 20px; z-index: 9999; min-width: 300px;">
+                <div class="d-flex align-items-center">
+                    <i class="fas ${type === 'success' ? 'fa-check-circle' : type === 'warning' ? 'fa-exclamation-triangle' : 'fa-times-circle'} mr-2"></i>
+                    <div>${message}</div>
+                </div>
+                <button type="button" class="close" data-dismiss="alert">
+                    <span>&times;</span>
+                </button>
+            </div>
+        `);
+        
+        $('body').append(toast);
+        
+        setTimeout(() => {
+            toast.alert('close');
+        }, 5000);
+    }
+
+    function formatFileSize(bytes) {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
+
+    function calculateCompletionStats() {
+        const totalStudents = {{ student_results_data|length }};
+        const totalSubjects = {{ subjects.count }};
+        const totalPossibleResults = totalStudents * totalSubjects;
+        
+        let resultsEntered = 0;
+        
+        // Count entered results
+        $('.marks-display.has-marks').each(function() {
+            resultsEntered++;
+        });
+        
+        // Update UI
+        $('#total-results-count').text(resultsEntered);
+        
+        if (totalPossibleResults > 0) {
+            const percentage = Math.round((resultsEntered / totalPossibleResults) * 100);
+            $('#completion-percentage').text(percentage + '%');
+        }
+    }
+
+    // ============================================
+    // SESSION EXPORT FUNCTIONS
+    // ============================================
+    function downloadSessionExcelTemplate() {
+        showLoading(true);
+        
+        const examSessionId = document.getElementById('exam-session-id').value;
+        const examSessionName = document.getElementById('exam-session-name').value;
+        
+        // Create download URL - You'll need to create this view in Django
+        const downloadUrl = `/result/exam-sessions/${examSessionId}/download-excel-template/`;
+        
+        // Create hidden iframe for download
+        const iframe = document.createElement('iframe');
+        iframe.style.display = 'none';
+        iframe.src = downloadUrl;
+        document.body.appendChild(iframe);
+        
+        // Remove iframe after download
+        setTimeout(() => {
+            document.body.removeChild(iframe);
+            showLoading(false);
+            showToast('Session Excel template download started!', 'success');
+        }, 2000);
+    }
+
+         // ============================================
+        // EXCEL REPORT DOWNLOAD FUNCTION
+        // ============================================
+        function downloadSessionExcelReport() {
+            showLoading(true);
             
-            if (studentName.includes(searchTerm) || admissionNo.includes(searchTerm)) {
-                $(this).show();
-            } else {
-                $(this).hide();
+            const examSessionId = document.getElementById('exam-session-id').value;
+            const examSessionName = document.getElementById('exam-session-name').value;
+            const timestamp = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+            
+            // Create download URL for Excel report
+            const downloadUrl = `/result/exam-sessions/${examSessionId}/download-excel-report/`;
+            
+            // Use fetch to trigger the download
+            fetch(downloadUrl, {
+                method: 'GET',
+                headers: {
+                    'X-CSRFToken': getCSRFToken(),
+                    'Accept': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+                }
+            })
+            .then(response => {
+                if (response.ok) {
+                    return response.blob();
+                }
+                throw new Error('Failed to generate Excel report');
+            })
+            .then(blob => {
+                // Create download link
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `Session_Excel_Report_${examSessionName}_${timestamp}.xlsx`;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+                
+                showToast('Excel report downloaded successfully!', 'success');
+                showLoading(false);
+            })
+            .catch(error => {
+                console.error('Error downloading Excel:', error);
+                showToast('Error downloading Excel: ' + error.message, 'danger');
+                showLoading(false);
+                
+                // Fallback to direct link
+                window.location.href = downloadUrl;
+            });
+        }
+
+    function downloadSessionSummary() {
+        showLoading(true);
+        
+        const examSessionId = document.getElementById('exam-session-id').value;
+        const examSessionName = document.getElementById('exam-session-name').value;
+        
+        // Create download URL - You'll need to create this view in Django
+        const downloadUrl = `/result/exam-sessions/${examSessionId}/download-summary/`;
+        
+        // Simple download via iframe
+        const iframe = document.createElement('iframe');
+        iframe.style.display = 'none';
+        iframe.src = downloadUrl;
+        document.body.appendChild(iframe);
+        
+        setTimeout(() => {
+            document.body.removeChild(iframe);
+            showLoading(false);
+            showToast('Session summary download started!', 'success');
+        }, 2000);
+    }
+
+    // ============================================
+    // SESSION EXCEL UPLOAD FUNCTIONS
+    // ============================================
+    document.addEventListener('DOMContentLoaded', function() {
+        // File input change handler for session upload
+        document.getElementById('sessionExcelFile').addEventListener('change', function(e) {
+            selectedSessionFile = e.target.files[0];
+            
+            if (selectedSessionFile) {
+                // Validate file
+                if (!validateExcelFile(selectedSessionFile)) {
+                    return;
+                }
+                
+                // Show file name
+                document.getElementById('sessionFileName').textContent = 
+                    `Selected: ${selectedSessionFile.name} (${formatFileSize(selectedSessionFile.size)})`;
+                document.getElementById('btnUploadSessionExcel').disabled = false;
+                
+                // Show basic preview
+                previewSessionExcelFile(selectedSessionFile);
             }
         });
+
+        // File upload button click handler
+        document.getElementById('sessionFileUploadButton').addEventListener('click', function() {
+            document.getElementById('sessionExcelFile').click();
+        });
+
+        // Modal show/hide handlers
+        $('#sessionExcelUploadModal').on('show.bs.modal', function() {
+            resetSessionUploadModal();
+        });
+
+        $('#sessionExcelUploadModal').on('hidden.bs.modal', function() {
+            resetSessionUploadModal();
+        });
     });
-}
 
-// Update input status
-function updateInputStatus(inputElement, status) {
-    const container = inputElement.closest('td');
-    const indicator = container.find('.status-indicator');
-    
-    indicator.empty();
-    let indicatorClass = '';
-    
-    switch(status) {
-        case 'saved':
-            indicatorClass = 'status-saved';
-            break;
-        case 'pending':
-            indicatorClass = 'status-pending';
-            break;
-        case 'error':
-            indicatorClass = 'status-error';
-            break;
-    }
-    
-    indicator.html(`<span class="${indicatorClass}" title="${status}"></span>`);
-}
-
-// Add result row
-function addResultRow() {
-    const rowCount = $('#add-result-rows .add-result-row').length;
-    const rowId = `result-row-${rowCount + 1}`;
-    
-    const rowHtml = `
-        <div class="add-result-row" id="${rowId}">
-            <div class="row">
-                <div class="col-md-4">
-                    <div class="form-group">
-                        <label>Student</label>
-                        <select class="form-control student-select" data-row-id="${rowId}">
-                            <option value="">Select Student</option>
-                            {% for student_data in student_results_data %}
-                                <option value="{{ student_data.student_id }}">
-                                    {{ student_data.full_name }} ({{ student_data.registration_number }})
-                                </option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                </div>
-                <div class="col-md-3">
-                    <div class="form-group">
-                        <label>Subject</label>
-                        <select class="form-control subject-select" data-row-id="${rowId}">
-                            <option value="">Select Subject</option>
-                            {% for subject in subjects %}
-                                <option value="{{ subject.id }}">
-                                    {{ subject.code }} - {{ subject.name|truncatechars:20 }}
-                                </option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                </div>
-                <div class="col-md-3">
-                    <div class="form-group">
-                        <label>Marks</label>
-                        <input type="number" 
-                               class="form-control marks-input" 
-                               data-row-id="${rowId}"
-                               min="0" 
-                               max="{{ exam_session.exam_type.max_score }}"
-                               step="0.01"
-                               placeholder="Enter marks">
-                    </div>
-                </div>
-                <div class="col-md-2">
-                    <div class="form-group" style="margin-top: 28px;">
-                        <button type="button" class="btn btn-danger btn-sm" onclick="removeResultRow('${rowId}')">
-                            <i class="fas fa-trash"></i>
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    `;
-    
-    $('#add-result-rows').append(rowHtml);
-}
-
-// Remove result row
-function removeResultRow(rowId) {
-    $(`#${rowId}`).remove();
-}
-
-// Save individual result
-function saveResult() {
-    if (changedResults.size === 0) return;
-    
-    const key = Array.from(changedResults)[0];
-    changedResults.delete(key);
-    
-    const [studentId, subjectId] = key.split('_');
-    const inputElement = $(`.marks-input[data-student-id="${studentId}"][data-subject-id="${subjectId}"]`);
-    const marks = inputElement.val();
-    const resultId = inputElement.data('result-id');
-    
-    if (!marks) return;
-    
-    $.ajax({
-        url: '{% url "save_student_results" %}',
-        method: 'POST',
-        headers: {
-            'X-CSRFToken': getCSRFToken(),
-            'Content-Type': 'application/json'
-        },
-        data: JSON.stringify({
-            'exam_session_id': '{{ exam_session.id }}',
-            'results': [{
-                'student_id': studentId,
-                'subject_id': subjectId,
-                'marks_obtained': parseFloat(marks),
-                'result_id': resultId || null
-            }],
-            'is_auto_save': true
-        }),
-        success: function(data) {
-            if (data.success) {
-                updateInputStatus(inputElement, 'saved');
-                // Update calculated fields
-                updateStudentCalculations(studentId);
-            } else {
-                updateInputStatus(inputElement, 'error');
-                showToast(data.message, 'danger');
-            }
-        },
-        error: function() {
-            updateInputStatus(inputElement, 'error');
-            showToast('Error saving result.', 'danger');
-        }
-    });
-}
-
-// Save new results from modal
-function saveNewResults() {
-    const rows = [];
-    let hasErrors = false;
-    
-    $('.add-result-row').each(function() {
-        const rowId = $(this).attr('id');
-        const studentId = $(`.student-select[data-row-id="${rowId}"]`).val();
-        const subjectId = $(`.subject-select[data-row-id="${rowId}"]`).val();
-        const marks = $(`.marks-input[data-row-id="${rowId}"]`).val();
+    function validateExcelFile(file) {
+        const validExtensions = ['.xlsx', '.xls'];
+        const maxSize = 10 * 1024 * 1024; // 10MB
         
-        if (studentId && subjectId && marks) {
-            rows.push({
-                'student_id': studentId,
-                'subject_id': subjectId,
-                'marks_obtained': parseFloat(marks)
+        // Check extension
+        const fileName = file.name.toLowerCase();
+        const isValidExtension = validExtensions.some(ext => fileName.endsWith(ext));
+        
+        if (!isValidExtension) {
+            showSessionUploadError('Please select a valid Excel file (.xlsx or .xls)');
+            return false;
+        }
+        
+        // Check size
+        if (file.size > maxSize) {
+            showSessionUploadError('File size must be less than 10MB');
+            return false;
+        }
+        
+        return true;
+    }
+
+    function previewSessionExcelFile(file) {
+        // Basic preview
+        document.getElementById('sessionPreviewTableBody').innerHTML = `
+            <tr>
+                <td colspan="6" class="text-center">
+                    <div class="py-3">
+                        <i class="fas fa-file-excel fa-3x text-success mb-3"></i>
+                        <h6>Session File Ready</h6>
+                        <p class="mb-0 text-muted">
+                            ${file.name}<br>
+                            ${formatFileSize(file.size)}
+                        </p>
+                        <small class="text-muted">
+                            File will be processed on upload. Expected format: Student ID, Registration No., Student Name, followed by subject columns.
+                        </small>
+                    </div>
+                </td>
+            </tr>
+        `;
+        
+        document.getElementById('sessionUploadPreview').style.display = 'block';
+    }
+
+    function showSessionUploadError(message) {
+        const errorDiv = document.getElementById('sessionUploadError');
+        const errorMessage = document.getElementById('sessionErrorMessage');
+        
+        errorMessage.textContent = message;
+        errorDiv.style.display = 'block';
+        
+        // Hide error after 5 seconds
+        setTimeout(() => {
+            errorDiv.style.display = 'none';
+        }, 5000);
+    }
+
+    function resetSessionUploadModal() {
+        document.getElementById('sessionExcelFile').value = '';
+        document.getElementById('sessionFileName').textContent = '';
+        document.getElementById('btnUploadSessionExcel').disabled = true;
+        document.getElementById('sessionUploadPreview').style.display = 'none';
+        document.getElementById('sessionUploadError').style.display = 'none';
+        document.getElementById('sessionUploadProgressBar').style.width = '0%';
+        document.getElementById('sessionUploadProgressBar').textContent = '0%';
+        selectedSessionFile = null;
+    }
+
+    function updateSessionUploadProgress(percentage) {
+        const progressBar = document.getElementById('sessionUploadProgressBar');
+        progressBar.style.width = percentage + '%';
+        progressBar.textContent = percentage + '%';
+    }
+
+    async function uploadSessionExcelFile() {
+        // Check if session is published
+        const examSessionStatus = document.getElementById('exam-session-status').value;
+        if (examSessionStatus === 'published') {
+            showSessionUploadError('Cannot upload to a published session. Please unpublish first.');
+            return;
+        }
+        
+        if (!selectedSessionFile) {
+            showSessionUploadError('Please select a file first');
+            return;
+        }
+        
+        showLoading(true);
+        
+        const formData = new FormData();
+        formData.append('excel_file', selectedSessionFile);
+        formData.append('exam_session_id', document.getElementById('exam-session-id').value);
+        
+        try {
+            // Update upload progress
+            updateSessionUploadProgress(0);
+            
+            // You'll need to create this endpoint in Django
+            const uploadUrl = '/result/exam-sessions/upload-session-excel/';
+            
+            const response = await fetch(uploadUrl, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCSRFToken(),
+                },
+                body: formData
             });
-        } else if (studentId || subjectId || marks) {
-            hasErrors = true;
-        }
-    });
-    
-    if (hasErrors) {
-        alert('Please fill all fields for each row, or delete incomplete rows.');
-        return;
-    }
-    
-    if (rows.length === 0) {
-        alert('No results to save.');
-        return;
-    }
-    
-    showLoading(true);
-    
-    $.ajax({
-        url: '{% url "save_multiple_results" %}',
-        method: 'POST',
-        data: {
-            'csrfmiddlewaretoken': getCSRFToken(),
-            'exam_session_id': '{{ exam_session.id }}',
-            'results': JSON.stringify(rows)
-        },
-        success: function(data) {
-            showLoading(false);
-            if (data.success) {
-                $('#addResultModal').modal('hide');
-                showToast(`${data.saved_count} results saved successfully!`, 'success');
-                $('#add-result-rows').empty();
-                addResultRow(); // Add one empty row for next time
-                location.reload();
+            
+            // Update progress to simulate upload
+            updateSessionUploadProgress(100);
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                showToast(`Successfully uploaded ${result.processed_count} results across ${result.subjects_processed || 'multiple'} subjects!`, 'success');
+                
+                // Close modal after delay
+                setTimeout(() => {
+                    $('#sessionExcelUploadModal').modal('hide');
+                    // Refresh the page to show updated marks
+                    window.location.reload();
+                }, 2000);
             } else {
-                showToast(data.message, 'danger');
+                throw new Error(result.message || 'Upload failed');
             }
-        },
-        error: function() {
+        } catch (error) {
+            showSessionUploadError('Upload failed: ' + error.message);
+        } finally {
             showLoading(false);
-            showToast('Error saving results.', 'danger');
         }
+    }
+
+    // ============================================
+    // SUBJECT ENTRY FUNCTIONS
+    // ============================================
+    function goToSubjectEntry() {
+        const subjectId = $('#subject-selector').val();
+        
+        if (!subjectId) {
+            showToast('Please select a subject first.', 'warning');
+            $('#subject-selector').focus();
+            return;
+        }
+        
+        const subjectName = $('#subject-selector option:selected').text();
+        
+        // Store in session storage for continuity
+        sessionStorage.setItem('selectedSubject', JSON.stringify({
+            subjectId: subjectId,
+            subjectName: subjectName,
+            examSessionId: '{{ exam_session.id }}',
+            timestamp: new Date().toISOString()
+        }));
+        
+        showLoading(true);
+        
+        // Redirect to subject entry page
+        let urlTemplate = "{% url 'admin_subject_results_entry' exam_session.id 0 %}";
+        let finalUrl = urlTemplate.replace('/0/', '/' + subjectId + '/');
+        
+        setTimeout(() => {
+            window.location.href = finalUrl;
+        }, 500);
+    }
+
+    function quickSelectSubject(subjectId) {
+        $('#subject-selector').val(subjectId).trigger('change');
+        
+        $('html, body').animate({
+            scrollTop: $('#subject-selector').offset().top - 100
+        }, 300);
+        
+        setTimeout(() => {
+            $('#btn-go-to-subject').focus();
+        }, 400);
+    }
+
+    // ============================================
+    // SEARCH FUNCTIONALITY
+    // ============================================
+    function initSearch() {
+        $('#search-students').on('keyup', function() {
+            const searchTerm = $(this).val().toLowerCase();
+            $('#results-table tbody tr').each(function() {
+                const studentName = $(this).data('student-name') || '';
+                const registrationNumber = $(this).find('.student-name-cell:first').text().toLowerCase();
+                
+                if (studentName.includes(searchTerm) || registrationNumber.includes(searchTerm)) {
+                    $(this).show();
+                } else {
+                    $(this).hide();
+                }
+            });
+        });
+    }
+
+    // ============================================
+    // INITIALIZATION
+    // ============================================
+    $(document).ready(function() {
+        // Initialize Select2 for subject selector
+        $('.select2-subject-selector').select2({
+            placeholder: '-- Choose a Subject to Enter Marks --',
+            allowClear: true,
+            width: '100%',
+            theme: 'bootstrap-5',
+            language: {
+                "noResults": function () {
+                    return "No subjects found";
+                }
+            },
+            templateResult: function(data) {
+                if (!data.id) return data.text;
+                return $('<span><i class="fas fa-book mr-2"></i>' + data.text + '</span>');
+            },
+            templateSelection: function(data) {
+                if (!data.id) return data.text;
+                return $('<span><i class="fas fa-book mr-2"></i>' + data.text + '</span>');
+            }
+        });
+
+        // Enable/disable subject entry button based on selection
+        $('#subject-selector').on('change', function() {
+            const btn = $('#btn-go-to-subject');
+            if ($(this).val()) {
+                btn.prop('disabled', false);
+                btn.removeClass('btn-secondary').addClass('btn-success');
+            } else {
+                btn.prop('disabled', true);
+                btn.removeClass('btn-success').addClass('btn-secondary');
+            }
+        }).trigger('change');
+
+        // Initialize search
+        initSearch();
+
+        // Calculate completion stats
+        calculateCompletionStats();
+
+        // Add keyboard shortcuts
+        $(document).on('keydown', function(e) {
+            // Ctrl+F for search
+            if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+                e.preventDefault();
+                $('#search-students').focus();
+                showToast('Use Ctrl+F to quickly search for students', 'info');
+            }
+            
+            // Ctrl+T for template download
+            if ((e.ctrlKey || e.metaKey) && e.key === 't') {
+                e.preventDefault();
+                downloadSessionExcelTemplate();
+            }
+            
+            // Ctrl+P for PDF report
+            if ((e.ctrlKey || e.metaKey) && e.key === 'p') {
+                e.preventDefault();
+                downloadSessionExcelReport();
+            }
+        });
+
+        // Show tooltips for subject headers
+        $('.subject-header').tooltip({
+            placement: 'top',
+            trigger: 'hover'
+        });
+
+        // Show tooltips for marks
+        $('.marks-display.has-marks').tooltip({
+            placement: 'top',
+            trigger: 'hover'
+        });
     });
-}
-
-// Update student calculations (called after saving)
-function updateStudentCalculations(studentId) {
-    // This would ideally call an endpoint to recalculate metrics
-    // For now, we'll just reload the page to show updated calculations
-    setTimeout(() => {
-        // Optionally reload the page or update via AJAX
-        // location.reload();
-    }, 1000);
-}
-
-// Show toast message
-function showToast(message, type = 'success') {
-    const toast = $(`
-        <div class="alert alert-${type} alert-dismissible fade show position-fixed" 
-             style="top: 20px; right: 20px; z-index: 9999;">
-            ${message}
-            <button type="button" class="close" data-dismiss="alert">
-                <span>&times;</span>
-            </button>
-        </div>
-    `);
-    
-    $('body').append(toast);
-    
-    setTimeout(() => {
-        toast.alert('close');
-    }, 3000);
-}
 </script>
 {% endblock extra_js %}
