@@ -1,0 +1,85 @@
+<div class="modal fade" id="combinationDetailsModal" tabindex="-1" role="dialog" aria-labelledby="combinationDetailsLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-info text-white">
+                <h5 class="modal-title" id="combinationDetailsLabel">
+                    <i class="fas fa-layer-group"></i> Combination Details
+                </h5>
+                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h4 id="combination-code"></h4>
+                        <h5 id="combination-name" class="text-muted"></h5>
+                        
+                        <div class="mt-4">
+                            <h6><i class="fas fa-info-circle"></i> Details</h6>
+                            <table class="table table-sm">
+                                <tr>
+                                    <td><strong>Status:</strong></td>
+                                    <td><span id="combination-status" class="badge"></span></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Core Subjects:</strong></td>
+                                    <td><span id="core-count" class="badge badge-success"></span></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Subsidiary Subjects:</strong></td>
+                                    <td><span id="subsidiary-count" class="badge badge-warning"></span></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Total Students:</strong></td>
+                                    <td><span id="student-count" class="badge badge-primary"></span></td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <h6><i class="fas fa-book"></i> Subjects</h6>
+                        <div id="subjects-list" class="mb-3"></div>
+                        
+                        <div class="alert alert-info">
+                            <i class="fas fa-lightbulb"></i>
+                            <strong>Note:</strong> Core subjects are marked with a star (<i class="fas fa-star text-success"></i>), 
+                            subsidiary subjects with a circle (<i class="fas fa-circle text-warning"></i>).
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Students in this combination -->
+                <div class="mt-4">
+                    <h6><i class="fas fa-users"></i> Students in this Combination</h6>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover" id="combination-students-table">
+                            <thead>
+                                <tr>
+                                    <th>Student</th>
+                                    <th>Registration</th>
+                                    <th>Class</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="combination-students-body">
+                                <!-- Students will be populated here -->
+                            </tbody>
+                        </table>
+                    </div>
+                    <div id="no-students-message" class="text-center py-4" style="display: none;">
+                        <i class="fas fa-user-times fa-2x mb-2 text-muted"></i>
+                        <p class="text-muted">No students assigned to this combination</p>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" id="assign-from-details-btn">
+                    <i class="fas fa-user-plus"></i> Assign Students
+                </button>
+            </div>
+        </div>
+    </div>
+</div>

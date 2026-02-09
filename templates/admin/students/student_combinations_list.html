@@ -1,0 +1,1477 @@
+{% extends 'admin/base.html' %}
+{% load static %}
+{% block title %} Student Combinations Management {% endblock title %}
+
+{% block breadcrumb %}
+    <div class="d-flex justify-content-between align-items-center">
+        <div>
+            <button type="button" class="btn btn-primary" data-toggle="modal" data-target="#individualAssignModal">
+                <i class="fas fa-user-plus"></i> Assign to Student
+            </button>
+            <button type="button" class="btn btn-info" data-toggle="modal" data-target="#bulkAssignModal">
+                <i class="fas fa-users"></i> Bulk Assign
+            </button>
+        </div>
+    </div>
+{% endblock breadcrumb %}
+
+{% block extra_css %}
+<style>
+    .table th {
+        font-weight: 600;
+        border-bottom-width: 2px;
+    }
+    .table td {
+        vertical-align: middle;
+    }
+    .student-photo {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        object-fit: cover;
+        border: 2px solid #dee2e6;
+    }
+    .combination-badge {
+        background-color: #6c757d;
+        color: white;
+        padding: 3px 8px;
+        border-radius: 4px;
+        font-size: 0.8em;
+        display: inline-block;
+        margin: 2px;
+    }
+    .assigned-badge {
+        background-color: #28a745;
+    }
+    .unassigned-badge {
+        background-color: #dc3545;
+    }
+    .subject-chip {
+        display: inline-block;
+        background-color: #e9ecef;
+        border-radius: 15px;
+        padding: 3px 10px;
+        margin: 2px;
+        font-size: 0.85em;
+    }
+    .core-subject {
+        background-color: #d4edda;
+        color: #155724;
+    }
+    .subsidiary-subject {
+        background-color: #fff3cd;
+        color: #856404;
+    }
+    .quick-actions {
+        display: flex;
+        gap: 4px;
+        justify-content: center;
+        align-items: center;
+    }
+    .quick-action-btn {
+        width: 28px;
+        height: 28px;
+        padding: 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        border: none;
+        transition: all 0.2s ease;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+    }
+    .quick-action-btn:hover {
+        transform: scale(1.1);
+        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    }
+    .quick-action-btn i {
+        font-size: 0.75rem;
+        color: #ffffff !important;
+    }
+    .btn-success.quick-action-btn { background-color: #28a745; }
+    .btn-primary.quick-action-btn { background-color: #007bff; }
+    .btn-danger.quick-action-btn { background-color: #dc3545; }
+    .btn-warning.quick-action-btn { background-color: #ffc107; }
+    .btn-warning.quick-action-btn i { color: #212529 !important; }
+    .student-select-checkbox {
+        width: 20px;
+        height: 20px;
+        cursor: pointer;
+    }
+    .stats-card {
+        border-radius: 10px;
+        transition: transform 0.3s ease;
+    }
+    .stats-card:hover {
+        transform: translateY(-5px);
+    }
+    .avatar-initials {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        font-size: 14px;
+        color: white;
+        text-transform: uppercase;
+    }
+    .bg-male { background-color: #007bff; }
+    .bg-female { background-color: #e83e8c; }
+    .bg-other { background-color: #6c757d; }
+    .modal-lg-custom {
+        max-width: 800px;
+    }
+    .current-combination-info {
+        background-color: #f8f9fa;
+        border-left: 4px solid #ffc107;
+        padding: 10px;
+        border-radius: 4px;
+        margin-bottom: 15px;
+    }
+.modal-dialog-centered {
+    display: flex;
+    align-items: center;
+    min-height: calc(100% - 1rem);
+    margin-left: auto;
+    margin-right: auto;
+}
+    
+</style>
+{% endblock extra_css %}
+
+{% block content %}
+<section class="content">
+    <div class="container-fluid">
+        <!-- Success/Error Toasts -->
+        <div id="success-toast" class="alert alert-success alert-dismissible fade success-toast" style="display: none;" role="alert">
+            <strong><i class="fas fa-check-circle"></i> Success!</strong> 
+            <span id="success-message"></span>
+            <button type="button" class="close" onclick="$('#success-toast').fadeOut()" data-dismiss="alert" aria-label="Close">
+                <span aria-hidden="true">&times;</span>
+            </button>
+        </div>
+
+        <div id="error-toast" class="alert alert-danger alert-dismissible fade error-toast" style="display: none;" role="alert">
+            <strong><i class="fas fa-exclamation-circle"></i> Error!</strong> 
+            <span id="error-message"></span>
+            <button type="button" class="close" onclick="$('#error-toast').fadeOut()" data-dismiss="alert" aria-label="Close">
+                <span aria-hidden="true">&times;</span>
+            </button>
+        </div>
+
+        <!-- Statistics Cards -->
+        <div class="row mb-4">
+            <div class="col-xl-3 col-md-6 mb-4">
+                <div class="card stats-card shadow h-100 py-2 border-left-primary">
+                    <div class="card-body">
+                        <div class="row no-gutters align-items-center">
+                            <div class="col mr-2">
+                                <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                                    Total Students
+                                </div>
+                                <div class="h5 mb-0 font-weight-bold text-gray-800">{{ total_students }}</div>
+                            </div>
+                            <div class="col-auto">
+                                <i class="fas fa-users fa-2x text-gray-300"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-xl-3 col-md-6 mb-4">
+                <div class="card stats-card shadow h-100 py-2 border-left-success">
+                    <div class="card-body">
+                        <div class="row no-gutters align-items-center">
+                            <div class="col mr-2">
+                                <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
+                                    With Combination
+                                </div>
+                                <div class="h5 mb-0 font-weight-bold text-gray-800">{{ assigned_count }}</div>
+                                <div class="mt-2 mb-0 text-muted text-xs">
+                                    <span class="text-success mr-2"><i class="fas fa-arrow-up"></i> {{ assigned_percentage }}%</span>
+                                    <span>of total students</span>
+                                </div>
+                            </div>
+                            <div class="col-auto">
+                                <i class="fas fa-link fa-2x text-gray-300"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-xl-3 col-md-6 mb-4">
+                <div class="card stats-card shadow h-100 py-2 border-left-warning">
+                    <div class="card-body">
+                        <div class="row no-gutters align-items-center">
+                            <div class="col mr-2">
+                                <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
+                                    Without Combination
+                                </div>
+                                <div class="h5 mb-0 font-weight-bold text-gray-800">{{ unassigned_count }}</div>
+                                <div class="mt-2 mb-0 text-muted text-xs">
+                                    <span class="text-warning mr-2">Needs assignment</span>
+                                </div>
+                            </div>
+                            <div class="col-auto">
+                                <i class="fas fa-unlink fa-2x text-gray-300"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-xl-3 col-md-6 mb-4">
+                <div class="card stats-card shadow h-100 py-2 border-left-info">
+                    <div class="card-body">
+                        <div class="row no-gutters align-items-center">
+                            <div class="col mr-2">
+                                <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
+                                    A-Level Students
+                                </div>
+                                <div class="h5 mb-0 font-weight-bold text-gray-800">{{ a_level_students }}</div>
+                                <div class="mt-2 mb-0 text-muted text-xs">
+                                    <span>Eligible for combinations</span>
+                                </div>
+                            </div>
+                            <div class="col-auto">
+                                <i class="fas fa-graduation-cap fa-2x text-gray-300"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Card -->
+        <div class="row">
+            <div class="col-lg-12">
+                <div class="card shadow-lg">
+                    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                        <h6 class="header-title mb-0 text-uppercase">
+                            <i class="fas fa-user-graduate"></i> Student Combinations Management
+                        </h6>
+                        <div class="d-flex align-items-center">
+                            <span class="badge badge-light mr-2">
+                                <i class="fas fa-sync-alt"></i> 
+                                <span id="selected-count">0</span> selected
+                            </span>
+                            <div class="form-inline">
+                                <input type="text" class="form-control form-control-sm" id="search-students" placeholder="Search students...">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <!-- Filter Info -->
+                        <div class="alert alert-info d-flex justify-content-between align-items-center">
+                            <div>
+                                <i class="fas fa-info-circle"></i> 
+                                <strong>Manage Subject Combinations:</strong> Assign A-Level students to subject combinations (PCM, PCB, BCM, etc.). Students must be in Form 5 or Form 6 to be eligible.
+                            </div>
+                            <button class="btn btn-sm btn-outline-light" id="clear-filters">
+                                <i class="fas fa-times"></i> Clear Filters
+                            </button>
+                        </div>
+                        
+                        <!-- Bulk Actions Toolbar (Hidden by default) -->
+                        <div id="bulk-actions-toolbar" class="alert alert-warning mb-3" style="display: none;">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <i class="fas fa-bullhorn"></i>
+                                    <strong>Bulk Actions:</strong>
+                                    <span id="bulk-count">0</span> student(s) selected
+                                </div>
+                                <div>
+                                    <button class="btn btn-sm btn-primary" id="bulk-assign-btn-toolbar">
+                                        <i class="fas fa-link"></i> Assign Combination
+                                    </button>
+                                    <button class="btn btn-sm btn-danger" id="bulk-remove-btn-toolbar">
+                                        <i class="fas fa-unlink"></i> Remove Combination
+                                    </button>
+                                    <button class="btn btn-sm btn-secondary" id="clear-selection">
+                                        <i class="fas fa-times"></i> Clear Selection
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Students Table -->
+                        <div class="table-responsive">
+                            <table class="table table-hover text-nowrap table-responsive-sm table-bordered table-striped table-sm display" id="students-table">
+                                <thead class="bg-light">
+                                    <tr>
+                                        <th width="30">
+                                            <input type="checkbox" id="select-all" class="student-select-checkbox">
+                                        </th>
+                                        <th>Student</th>
+                                        <th>Registration</th>
+                                        <th>Class</th>
+                                        <th>Current Combination</th>
+                                        <th>Subjects</th>
+                                        <th>Status</th>
+                                        <th class="text-center">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for student in students %}
+                                    <tr id="student-row-{{ student.id }}" class="student-row {% if not student.combination %}table-warning{% endif %}" data-student-id="{{ student.id }}">
+                                        <td>
+                                            <input type="checkbox" class="student-select-checkbox student-checkbox" value="{{ student.id }}">
+                                        </td>
+                                        <td>
+                                            <div class="d-flex align-items-center">
+                                                {% if student.profile_pic %}
+                                                    <img src="{{ student.profile_pic.url }}" alt="{{ student.full_name }}" class="student-photo mr-2">
+                                                {% else %}
+                                                    <div class="avatar-initials mr-2 bg-{{ student.gender|default:'other' }}">
+                                                        {{ student.first_name|first }}{{ student.last_name|first }}
+                                                    </div>
+                                                {% endif %}
+                                                <div>
+                                                    <strong>{{ student.full_name }}</strong>
+                                                    <div class="text-muted small">
+                                                        <i class="fas fa-{% if student.gender == 'male' %}mars{% else %}venus{% endif %}"></i>
+                                                        {{ student.get_gender_display }}
+                                                        {% if student.age %}
+                                                            • {{ student.age }} years
+                                                        {% endif %}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <code>{{ student.registration_number }}</code>
+                                            {% if student.examination_number %}
+                                                <div class="text-muted small">Exam: {{ student.examination_number }}</div>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if student.class_level %}
+                                                <span class="badge badge-info">{{ student.class_level.name }}</span>
+                                                {% if student.stream_class %}
+                                                    <span class="badge badge-secondary">{{ student.stream_class.stream_letter }}</span>
+                                                {% endif %}
+                                            {% else %}
+                                                <span class="text-muted">Not assigned</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if student.combination %}
+                                                <div class="d-flex align-items-center">
+                                                    <span class="combination-badge assigned-badge mr-2">
+                                                        <i class="fas fa-check-circle"></i> {{ student.combination.code }}
+                                                    </span>
+                                                    <small class="text-muted">{{ student.combination.name }}</small>
+                                                </div>
+                                            {% else %}
+                                                <span class="combination-badge unassigned-badge">
+                                                    <i class="fas fa-times-circle"></i> Not Assigned
+                                                </span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if student.combination %}
+                                                {% with subjects=student.combination.combinationsubject_set.all %}
+                                                    {% for cs in subjects %}
+                                                        {% if cs.role == 'CORE' %}
+                                                            <span class="subject-chip core-subject" title="Core Subject">
+                                                                <i class="fas fa-star"></i> {{ cs.subject.code }}
+                                                            </span>
+                                                        {% else %}
+                                                            <span class="subject-chip subsidiary-subject" title="Subsidiary Subject">
+                                                                <i class="fas fa-circle"></i> {{ cs.subject.code }}
+                                                            </span>
+                                                        {% endif %}
+                                                    {% endfor %}
+                                                    <small class="text-muted d-block mt-1">
+                                                        {{ subjects|length }} subjects
+                                                    </small>
+                                                {% endwith %}
+                                            {% else %}
+                                                {% if student.optional_subjects.all %}
+                                                    <div class="mb-1">
+                                                        <small class="text-muted">Optional subjects:</small>
+                                                    </div>
+                                                    {% for subject in student.optional_subjects.all %}
+                                                        <span class="badge badge-light">{{ subject.code }}</span>
+                                                    {% endfor %}
+                                                {% else %}
+                                                    <span class="text-muted">No subjects</span>
+                                                {% endif %}
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if student.is_active %}
+                                                <span class="badge badge-success">
+                                                    <i class="fas fa-check-circle"></i> Active
+                                                </span>
+                                            {% else %}
+                                                <span class="badge badge-secondary">
+                                                    <i class="fas fa-times-circle"></i> Inactive
+                                                </span>
+                                            {% endif %}
+                                            <div class="text-muted small mt-1">
+                                                {{ student.get_status_display }}
+                                            </div>
+                                        </td>
+                                        <td class="text-center">
+                                            <div class="quick-actions">
+                                                <!-- View Student Details -->
+                                                <a href="{% url 'admin_student_detail' student.id %}" class="btn btn-sm btn-info quick-action-btn" title="View Student">
+                                                    <i class="fas fa-eye"></i>
+                                                </a>
+                                                
+                                                <!-- Assign Combination (for students without combination) -->
+                                                {% if not student.combination %}
+                                                <button class="btn btn-sm btn-success quick-action-btn assign-combination-btn" 
+                                                        data-student-id="{{ student.id }}"
+                                                        data-student-name="{{ student.full_name }}"
+                                                        title="Assign Combination">
+                                                    <i class="fas fa-link"></i>
+                                                </button>
+                                                {% endif %}
+                                                
+                                                <!-- Change Combination (for students with combination) -->
+                                                {% if student.combination %}
+                                                <button class="btn btn-sm btn-warning quick-action-btn change-combination-btn" 
+                                                        data-student-id="{{ student.id }}"
+                                                        data-student-name="{{ student.full_name }}"
+                                                        data-current-combination-id="{{ student.combination.id }}"
+                                                        data-current-combination-code="{{ student.combination.code }}"
+                                                        data-current-combination-name="{{ student.combination.name }}"
+                                                        title="Change Combination">
+                                                    <i class="fas fa-exchange-alt"></i>
+                                                </button>
+                                                {% endif %}
+                                                
+                                                <!-- Remove Combination (for students with combination) -->
+                                                {% if student.combination %}
+                                                <button class="btn btn-sm btn-danger quick-action-btn remove-combination-btn" 
+                                                        data-student-id="{{ student.id }}"
+                                                        data-student-name="{{ student.full_name }}"
+                                                        data-combination-code="{{ student.combination.code }}"
+                                                        title="Remove Combination">
+                                                    <i class="fas fa-unlink"></i>
+                                                </button>
+                                                {% endif %}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- MODAL 1: Assign Combination to New Student -->
+<div class="modal fade" id="individualAssignModal" tabindex="-1" role="dialog" aria-labelledby="individualAssignModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="individualAssignModalLabel">
+                    <i class="fas fa-user-plus"></i> Assign Combination to Student
+                </h5>
+                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <form id="individual-assign-form">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i> 
+                        Assign a subject combination to a single student. The student must be in <strong>Form 5 or Form 6</strong> (A-Level).
+                    </div>
+                    
+                    <!-- Student Selection -->
+                    <div class="row mb-3">
+                        <div class="col-md-12">
+                            <div class="form-group">
+                                <label for="individual-student-select">Select Student <span class="text-danger">*</span></label>
+                                <select class="form-control" id="individual-student-select" name="student_id" required style="width: 100%;">
+                                    <option value="">Select a student</option>
+                                    {% for student in eligible_students %}
+                                        {% if not student.combination %}
+                                        <option value="{{ student.id }}" 
+                                                data-class="{{ student.class_level.name|default:'N/A' }}"
+                                                data-stream="{{ student.stream_class.stream_letter|default:'N/A' }}">
+                                            {{ student.full_name }} 
+                                            ({{ student.registration_number }}) 
+                                            - {{ student.class_level.name|default:'No Class' }}
+                                            {% if student.stream_class %}{{ student.stream_class.stream_letter }}{% endif %}
+                                        </option>
+                                        {% endif %}
+                                    {% endfor %}
+                                </select>
+                                <div id="individual-student-info" class="mt-2 p-2 bg-light border rounded" style="display: none;">
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <small class="text-muted">Class:</small>
+                                            <div id="individual-student-class">-</div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <small class="text-muted">Stream:</small>
+                                            <div id="individual-student-stream">-</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Combination Selection -->
+                    <div class="row mb-3">
+                        <div class="col-md-12">
+                            <div class="form-group">
+                                <label for="individual-combination-select">Select Combination <span class="text-danger">*</span></label>
+                                <select class="form-control" id="individual-combination-select" name="combination_id" required style="width: 100%;">
+                                    <option value="">Select a combination</option>
+                                    {% for combination in active_combinations %}
+                                        <option value="{{ combination.id }}" 
+                                                data-code="{{ combination.code }}"
+                                                data-subjects='{{ combination.subjects_info|safe }}'
+                                                data-core="{{ combination.core_count }}"
+                                                data-subsidiary="{{ combination.subsidiary_count }}">
+                                            {{ combination.code }} - {{ combination.name }}
+                                            ({{ combination.core_count }} core, {{ combination.subsidiary_count }} subsidiary)
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Combination Details Preview -->
+                    <div id="individual-combination-details" class="card" style="display: none;">
+                        <div class="card-header bg-light">
+                            <h6 class="card-title mb-0">
+                                <i class="fas fa-info-circle"></i> Selected Combination Details
+                            </h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-12">
+                                    <h5 id="individual-combination-name-preview" class="mb-3"></h5>
+                                    <div id="individual-combination-subjects" class="mb-3">
+                                        <!-- Subjects will be populated here -->
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="individual-assign-btn">
+                        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="display: none;"></span>
+                        Assign Combination
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL 2: Change Combination (for students with existing combination) -->
+<div class="modal fade" id="changeCombinationModal" tabindex="-1" role="dialog" aria-labelledby="changeCombinationModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-warning text-white">
+                <h5 class="modal-title" id="changeCombinationModalLabel">
+                    <i class="fas fa-exchange-alt"></i> Change Student Combination
+                </h5>
+                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <form id="change-combination-form">
+                {% csrf_token %}
+                <input type="hidden" id="change-student-id" name="student_id">
+                <input type="hidden" id="change-current-combination-id" name="current_combination_id">
+                
+                <div class="modal-body">
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle"></i> 
+                        Change the subject combination for a student. This will replace their current combination.
+                    </div>
+                    
+                    <!-- Student Info -->
+                    <div class="row mb-3">
+                        <div class="col-md-12">
+                            <div class="current-combination-info">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <small class="text-muted">Student:</small>
+                                        <div id="change-student-name-display" class="font-weight-bold"></div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <small class="text-muted">Current Combination:</small>
+                                        <div id="change-current-combination-display" class="text-warning font-weight-bold"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- New Combination Selection -->
+                    <div class="row mb-3">
+                        <div class="col-md-12">
+                            <div class="form-group">
+                                <label for="change-combination-select">Select New Combination <span class="text-danger">*</span></label>
+                                <select class="form-control" id="change-combination-select" name="new_combination_id" required style="width: 100%;">
+                                    <option value="">Select a new combination</option>
+                                    {% for combination in active_combinations %}
+                                        <option value="{{ combination.id }}" 
+                                                data-code="{{ combination.code }}"
+                                                data-subjects='{{ combination.subjects_info|safe }}'
+                                                data-core="{{ combination.core_count }}"
+                                                data-subsidiary="{{ combination.subsidiary_count }}">
+                                            {{ combination.code }} - {{ combination.name }}
+                                            ({{ combination.core_count }} core, {{ combination.subsidiary_count }} subsidiary)
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- New Combination Details Preview -->
+                    <div id="change-combination-details" class="card" style="display: none;">
+                        <div class="card-header bg-light">
+                            <h6 class="card-title mb-0">
+                                <i class="fas fa-info-circle"></i> New Combination Details
+                            </h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-12">
+                                    <h5 id="change-combination-name-preview" class="mb-3"></h5>
+                                    <div id="change-combination-subjects" class="mb-3">
+                                        <!-- Subjects will be populated here -->
+                                    </div>
+                                    <div class="alert alert-danger">
+                                        <i class="fas fa-exclamation-triangle"></i>
+                                        <strong>Warning:</strong> Changing the combination will replace the student's current combination. This action cannot be undone.
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-warning" id="change-combination-btn">
+                        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="display: none;"></span>
+                        Change Combination
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL 3: Bulk Assign -->
+<div class="modal fade " id="bulkAssignModal" tabindex="-1" role="dialog" aria-labelledby="bulkAssignModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-lg-custom" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-info text-white">
+                <h5 class="modal-title" id="bulkAssignModalLabel">
+                    <i class="fas fa-users"></i> Bulk Assign Combinations
+                </h5>
+                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle"></i> 
+                    Assign the same combination to multiple students at once. Only A-Level students without existing combinations will be assigned.
+                </div>
+                
+                <!-- Step 1: Select Combination -->
+                <div class="card mb-3">
+                    <div class="card-header">
+                        <h6 class="card-title mb-0">Step 1: Select Combination</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="form-group">
+                            <label for="bulk-combination-select">Combination <span class="text-danger">*</span></label>
+                            <select class="form-control" id="bulk-combination-select" style="width: 100%;">
+                                <option value="">Select a combination</option>
+                                {% for combination in active_combinations %}
+                                    <option value="{{ combination.id }}">
+                                        {{ combination.code }} - {{ combination.name }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Step 2: Select Students -->
+                <div class="card">
+                    <div class="card-header">
+                        <h6 class="card-title mb-0">Step 2: Select Students</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="alert alert-warning">
+                            <i class="fas fa-filter"></i> 
+                            <strong>Filter students:</strong> Only shows A-Level students without combinations
+                        </div>
+                        
+                        <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                            <table class="table table-hover text-nowrap table-responsive-sm table-bordered table-striped table-sm display" id="bulk-students-table">
+                                <thead>
+                                    <tr>
+                                        <th width="30">
+                                            <input type="checkbox" id="bulk-select-all">
+                                        </th>
+                                        <th>Student</th>
+                                        <th>Registration</th>
+                                        <th>Class</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for student in eligible_students %}
+                                        {% if not student.combination %}
+                                        <tr>
+                                            <td>
+                                                <input type="checkbox" class="bulk-student-checkbox" value="{{ student.id }}">
+                                            </td>
+                                            <td>{{ student.full_name }}</td>
+                                            <td><code>{{ student.registration_number }}</code></td>
+                                            <td>{{ student.class_level.name|default:'N/A' }}</td>
+                                            <td>
+                                                {% if student.is_active %}
+                                                    <span class="badge badge-success">Active</span>
+                                                {% else %}
+                                                    <span class="badge badge-secondary">Inactive</span>
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                        {% endif %}
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        
+                        <div class="mt-3">
+                            <strong>Selected: <span id="bulk-selected-count">0</span> student(s)</strong>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-info" id="bulk-assign-confirm-btn" disabled>
+                    <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="display: none;"></span>
+                    Assign to Selected Students
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL 4: Remove Combination Confirmation -->
+<div class="modal fade" id="removeCombinationModal" tabindex="-1" role="dialog" aria-labelledby="removeCombinationModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="removeCombinationModalLabel">
+                    <i class="fas fa-unlink"></i> Remove Combination
+                </h5>
+                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to remove the combination <strong id="remove-combination-code"></strong> from <strong id="remove-student-name"></strong>?</p>
+                <p class="text-warning"><small>This will unassign the student from this combination. The student will need to be reassigned to continue with A-Level studies.</small></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirm-remove-btn">
+                    <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="display: none;"></span>
+                    Remove Combination
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL 5: Bulk Remove Confirmation -->
+<div class="modal fade" id="bulkRemoveModal" tabindex="-1" role="dialog" aria-labelledby="bulkRemoveModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="bulkRemoveModalLabel">
+                    <i class="fas fa-users"></i> Bulk Remove Combinations
+                </h5>
+                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to remove combinations from <strong id="bulk-remove-count">0</strong> selected student(s)?</p>
+                <p class="text-warning"><small>This will unassign all selected students from their current combinations. They will need to be reassigned to continue with A-Level studies.</small></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="bulk-confirm-remove-btn">
+                    <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="display: none;"></span>
+                    Remove Combinations
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+<script>
+    $(document).ready(function() {
+        // Global variables
+        let selectedStudents = new Set();
+        let studentToRemove = null;
+        let table = null;
+        
+        // =============== UTILITY FUNCTIONS ===============
+        function getCSRFToken() {
+            return $('input[name="csrfmiddlewaretoken"]').val();
+        }
+        
+        function showToast(message, type = 'success') {
+            const toastId = type === 'success' ? '#success-toast' : '#error-toast';
+            const messageId = type === 'success' ? '#success-message' : '#error-message';
+            
+            $(messageId).text(message);
+            $(toastId).fadeIn().addClass('show');
+            
+            setTimeout(() => {
+                $(toastId).fadeOut().removeClass('show');
+            }, type === 'success' ? 3000 : 5000);
+        }
+        
+        function reloadPageAfterDelay(message, type = 'success') {
+            showToast(message, type);
+            setTimeout(() => location.reload(), type === 'success' ? 2000 : 3000);
+        }
+        
+        function setButtonLoading(button, loading = true) {
+            if (loading) {
+                button.data('original-text', button.html());
+                button.prop('disabled', true);
+                button.html('<span class="spinner-border spinner-border-sm"></span> Processing...');
+            } else {
+                button.prop('disabled', false);
+                button.html(button.data('original-text') || 'Submit');
+            }
+        }
+        
+        function resetButton(button) {
+            button.prop('disabled', false);
+            button.find('.spinner-border').remove();
+            const originalText = button.data('original-text');
+            if (originalText) button.html(originalText);
+        }
+        
+        function updateSelectionUI() {
+            const count = selectedStudents.size;
+            $('#selected-count').text(count);
+            $('#bulk-count').text(count);
+            
+            if (count > 0) {
+                $('#bulk-actions-toolbar').fadeIn();
+            } else {
+                $('#bulk-actions-toolbar').fadeOut();
+            }
+        }
+        
+        // =============== DATA TABLE INITIALIZATION ===============
+        function initializeDataTable() {
+            table = $('#students-table').DataTable({
+                "dom": "<'row'<'col-sm-12 col-md-6'l><'col-sm-12 col-md-6'f>>" +
+                       "<'row'<'col-sm-12'tr>>" +
+                       "<'row'<'col-sm-12 col-md-5'i><'col-sm-12 col-md-7'p>>",
+                "lengthMenu": [[10, 25, 50, -1], [10, 25, 50, "All"]],
+                "pageLength": 25,
+                "responsive": true,
+                "autoWidth": false,
+                "ordering": true,
+                "order": [[2, 'asc']],
+                "columnDefs": [
+                    { 
+                        "targets": 0,
+                        "orderable": false,
+                        "searchable": false,
+                        "className": "dt-center"
+                    },
+                    { 
+                        "targets": 7,
+                        "orderable": false,
+                        "searchable": false,
+                        "className": "dt-center"
+                    }
+                ],
+                "language": {
+                    "emptyTable": "<div class='text-center py-4'><i class='fas fa-user-graduate fa-2x mb-2'></i><br>No students found.</div>",
+                    "search": "_INPUT_",
+                    "searchPlaceholder": "Search students...",
+                    "lengthMenu": "_MENU_ students per page",
+                    "info": "Showing _START_ to _END_ of _TOTAL_ students",
+                    "infoEmpty": "Showing 0 to 0 of 0 students",
+                    "infoFiltered": "(filtered from _MAX_ total students)",
+                    "paginate": {
+                        "first": "First",
+                        "last": "Last",
+                        "next": "Next",
+                        "previous": "Previous"
+                    }
+                }
+            });
+            
+            // Custom search input
+            $('#search-students').on('keyup', function() {
+                table.search(this.value).draw();
+            });
+        }
+        
+        // =============== SELECT2 MANAGEMENT ===============
+        function initializeSelect2(selector, options = {}) {
+            const defaults = {
+                theme: 'bootstrap4',
+                width: '100%',
+                placeholder: 'Select an option',
+                allowClear: true
+            };
+            
+            return $(selector).select2({ ...defaults, ...options });
+        }
+        
+        // =============== STUDENT SELECTION ===============
+        // Main table selection
+        $('#select-all').on('change', function() {
+            const isChecked = $(this).prop('checked');
+            $('.student-checkbox').prop('checked', isChecked);
+            
+            selectedStudents.clear();
+            if (isChecked) {
+                $('.student-checkbox').each(function() {
+                    selectedStudents.add($(this).val());
+                });
+            }
+            
+            updateSelectionUI();
+        });
+        
+        $(document).on('change', '.student-checkbox', function() {
+            const studentId = $(this).val();
+            
+            if ($(this).prop('checked')) {
+                selectedStudents.add(studentId);
+            } else {
+                selectedStudents.delete(studentId);
+                $('#select-all').prop('checked', false);
+            }
+            
+            updateSelectionUI();
+        });
+        
+        $('#clear-selection').on('click', function() {
+            selectedStudents.clear();
+            $('.student-checkbox').prop('checked', false);
+            $('#select-all').prop('checked', false);
+            updateSelectionUI();
+        });
+        
+        // Bulk modal selection
+        $('#bulk-select-all').on('change', function() {
+            const isChecked = $(this).prop('checked');
+            $('.bulk-student-checkbox').prop('checked', isChecked);
+            updateBulkSelection();
+        });
+        
+        $(document).on('change', '.bulk-student-checkbox', function() {
+            const allChecked = $('.bulk-student-checkbox:checked').length === $('.bulk-student-checkbox').length;
+            $('#bulk-select-all').prop('checked', allChecked);
+            updateBulkSelection();
+        });
+        
+        function updateBulkSelection() {
+            const selectedCount = $('.bulk-student-checkbox:checked').length;
+            const combinationSelected = $('#bulk-combination-select').val() !== '';
+            
+            $('#bulk-selected-count').text(selectedCount);
+            $('#bulk-assign-confirm-btn').prop('disabled', selectedCount === 0 || !combinationSelected);
+        }
+        
+        // =============== ASSIGN COMBINATION (FOR NEW STUDENTS) ===============
+        // Open assign modal from table buttons (green button)
+        $(document).on('click', '.assign-combination-btn', function() {
+            const studentId = $(this).data('student-id');
+            const studentName = $(this).data('student-name');
+            
+            // Clear previous selections
+            $('#individual-student-select').val(null).trigger('change.select2');
+            $('#individual-combination-select').val(null).trigger('change.select2');
+            
+            // Pre-select the student
+            setTimeout(() => {
+                $('#individual-student-select').val(studentId).trigger('change.select2');
+            }, 100);
+            
+            $('#individualAssignModal').modal('show');
+        });
+        
+        // Initialize assign modal
+        $('#individualAssignModal').on('shown.bs.modal', function() {
+            initializeSelect2('#individual-student-select', {
+                placeholder: 'Select a student',
+                dropdownParent: $('#individualAssignModal')
+            });
+            
+            initializeSelect2('#individual-combination-select', {
+                placeholder: 'Select a combination',
+                dropdownParent: $('#individualAssignModal')
+            });
+            
+            // Handle student selection info
+            $('#individual-student-select').on('select2:select', function() {
+                const selectedOption = $(this).find('option:selected');
+                const classInfo = selectedOption.data('class') || 'N/A';
+                const streamInfo = selectedOption.data('stream') || 'N/A';
+                
+                $('#individual-student-class').text(classInfo);
+                $('#individual-student-stream').text(streamInfo);
+                $('#individual-student-info').fadeIn();
+            });
+            
+            $('#individual-student-select').on('select2:unselect', function() {
+                $('#individual-student-info').hide();
+            });
+            
+            // Handle combination preview
+            $('#individual-combination-select').on('select2:select', function(e) {
+                const selectedOption = $(this).find('option:selected');
+                const subjectsInfo = selectedOption.data('subjects');
+                
+                if (subjectsInfo) {
+                    try {
+                        const subjects = JSON.parse(subjectsInfo);
+                        let subjectsHtml = '';
+                        
+                        subjects.forEach(subject => {
+                            const isCore = subject.role === 'CORE';
+                            subjectsHtml += `
+                                <span class="subject-chip ${isCore ? 'core-subject' : 'subsidiary-subject'} mb-1 mr-1">
+                                    <i class="fas ${isCore ? 'fa-star' : 'fa-circle'}"></i> 
+                                    ${subject.subject__name} (${subject.subject__code})
+                                </span>
+                            `;
+                        });
+                        
+                        $('#individual-combination-name-preview').text(selectedOption.text());
+                        $('#individual-combination-subjects').html(subjectsHtml);
+                        $('#individual-combination-details').fadeIn();
+                    } catch (e) {
+                        console.error('Error parsing subjects:', e);
+                        $('#individual-combination-details').hide();
+                    }
+                }
+            });
+        });
+        
+        $('#individualAssignModal').on('hidden.bs.modal', function() {
+            $('#individual-student-select').val(null).trigger('change.select2');
+            $('#individual-combination-select').val(null).trigger('change.select2');
+            $('#individual-student-info').hide();
+            $('#individual-combination-details').hide();
+            $('#individual-assign-form')[0].reset();
+        });
+        
+        // Individual assign form submission
+        $('#individual-assign-form').on('submit', function(e) {
+            e.preventDefault();
+            
+            const studentId = $('#individual-student-select').val();
+            const combinationId = $('#individual-combination-select').val();
+            
+            if (!studentId || !combinationId) {
+                showToast('Please select both student and combination.', 'danger');
+                return;
+            }
+            
+            const assignBtn = $('#individual-assign-btn');
+            setButtonLoading(assignBtn, true);
+            
+            $.ajax({
+                url: '{% url "admin_assign_student_combination" %}',
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCSRFToken(),
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                data: {
+                    'action': 'assign',
+                    'student_id': studentId,
+                    'combination_id': combinationId,
+                    'csrfmiddlewaretoken': getCSRFToken()
+                },
+                success: function(data) {
+                    if (data.success) {
+                        $('#individualAssignModal').modal('hide');
+                        reloadPageAfterDelay(data.message, 'success');
+                    } else {
+                        showToast(data.message, 'danger');
+                        resetButton(assignBtn);
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error:', error);
+                    showToast('An error occurred while assigning combination.', 'danger');
+                    resetButton(assignBtn);
+                }
+            });
+        });
+        
+        // =============== CHANGE COMBINATION (FOR EXISTING STUDENTS) ===============
+        // Open change modal from table buttons (yellow button)
+        $(document).on('click', '.change-combination-btn', function() {
+            const studentId = $(this).data('student-id');
+            const studentName = $(this).data('student-name');
+            const currentCombinationId = $(this).data('current-combination-id');
+            const currentCombinationCode = $(this).data('current-combination-code');
+            const currentCombinationName = $(this).data('current-combination-name');
+            
+            // Set the form data
+            $('#change-student-id').val(studentId);
+            $('#change-current-combination-id').val(currentCombinationId);
+            $('#change-student-name-display').text(studentName);
+            $('#change-current-combination-display').text(`${currentCombinationCode} - ${currentCombinationName}`);
+            
+            // Clear previous combination selection
+            $('#change-combination-select').val(null).trigger('change.select2');
+            $('#change-combination-details').hide();
+            
+            $('#changeCombinationModal').modal('show');
+        });
+        
+        // Initialize change modal
+        $('#changeCombinationModal').on('shown.bs.modal', function() {
+            initializeSelect2('#change-combination-select', {
+                placeholder: 'Select a new combination',
+                dropdownParent: $('#changeCombinationModal')
+            });
+            
+            // Handle combination preview
+            $('#change-combination-select').on('select2:select', function(e) {
+                const selectedOption = $(this).find('option:selected');
+                const subjectsInfo = selectedOption.data('subjects');
+                
+                if (subjectsInfo) {
+                    try {
+                        const subjects = JSON.parse(subjectsInfo);
+                        let subjectsHtml = '';
+                        
+                        subjects.forEach(subject => {
+                            const isCore = subject.role === 'CORE';
+                            subjectsHtml += `
+                                <span class="subject-chip ${isCore ? 'core-subject' : 'subsidiary-subject'} mb-1 mr-1">
+                                    <i class="fas ${isCore ? 'fa-star' : 'fa-circle'}"></i> 
+                                    ${subject.subject__name} (${subject.subject__code})
+                                </span>
+                            `;
+                        });
+                        
+                        $('#change-combination-name-preview').text(selectedOption.text());
+                        $('#change-combination-subjects').html(subjectsHtml);
+                        $('#change-combination-details').fadeIn();
+                    } catch (e) {
+                        console.error('Error parsing subjects:', e);
+                        $('#change-combination-details').hide();
+                    }
+                }
+            });
+        });
+        
+        $('#changeCombinationModal').on('hidden.bs.modal', function() {
+            $('#change-combination-select').val(null).trigger('change.select2');
+            $('#change-combination-details').hide();
+            $('#change-combination-form')[0].reset();
+        });
+        
+        // Change combination form submission
+        $('#change-combination-form').on('submit', function(e) {
+            e.preventDefault();
+            
+            const studentId = $('#change-student-id').val();
+            const newCombinationId = $('#change-combination-select').val();
+            const currentCombinationId = $('#change-current-combination-id').val();
+            
+            if (!studentId || !newCombinationId) {
+                showToast('Please select a new combination.', 'danger');
+                return;
+            }
+            
+            // Check if same combination is selected
+            if (newCombinationId === currentCombinationId) {
+                showToast('Please select a different combination.', 'warning');
+                return;
+            }
+            
+            const changeBtn = $('#change-combination-btn');
+            setButtonLoading(changeBtn, true);
+            
+            $.ajax({
+                url: '{% url "admin_assign_student_combination" %}',
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCSRFToken(),
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                data: {
+                    'action': 'change',
+                    'student_id': studentId,
+                    'new_combination_id': newCombinationId,
+                    'current_combination_id': currentCombinationId,
+                    'csrfmiddlewaretoken': getCSRFToken()
+                },
+                success: function(data) {
+                    if (data.success) {
+                        $('#changeCombinationModal').modal('hide');
+                        reloadPageAfterDelay(data.message, 'success');
+                    } else {
+                        showToast(data.message, 'danger');
+                        resetButton(changeBtn);
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error:', error);
+                    showToast('An error occurred while changing combination.', 'danger');
+                    resetButton(changeBtn);
+                }
+            });
+        });
+        
+        // =============== BULK ASSIGNMENT ===============
+        // Open bulk modal from toolbar
+        $('#bulk-assign-btn-toolbar').on('click', function() {
+            // Populate the bulk modal with selected students
+            $('.bulk-student-checkbox').each(function() {
+                const studentId = $(this).val();
+                $(this).prop('checked', selectedStudents.has(studentId));
+            });
+            
+            // Update the select all checkbox
+            const allChecked = $('.bulk-student-checkbox:checked').length === $('.bulk-student-checkbox').length;
+            $('#bulk-select-all').prop('checked', allChecked);
+            
+            updateBulkSelection();
+            $('#bulkAssignModal').modal('show');
+        });
+        
+        // Initialize bulk modal
+        $('#bulkAssignModal').on('shown.bs.modal', function() {
+            initializeSelect2('#bulk-combination-select', {
+                placeholder: 'Select a combination',
+                dropdownParent: $('#bulkAssignModal')
+            });
+            
+            $('#bulk-combination-select').on('change', updateBulkSelection);
+        });
+        // Handle modal close/cancel buttons
+        $(document).on('click', '[data-dismiss="modal"]', function(e) {
+            e.preventDefault();
+            $(this).closest('.modal').modal('hide');
+        });
+        // Bulk assign confirmation
+        $('#bulk-assign-confirm-btn').on('click', function() {
+            const combinationId = $('#bulk-combination-select').val();
+            const studentIds = $('.bulk-student-checkbox:checked').map(function() {
+                return $(this).val();
+            }).get();
+            
+            if (studentIds.length === 0 || !combinationId) {
+                showToast('Please select both students and combination.', 'danger');
+                return;
+            }
+            
+            const confirmBtn = $(this);
+            setButtonLoading(confirmBtn, true);
+            
+            $.ajax({
+                url: '{% url "admin_assign_student_combination" %}',
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCSRFToken(),
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                data: {
+                    'action': 'bulk_assign',
+                    'student_ids': studentIds,
+                    'combination_id': combinationId,
+                    'csrfmiddlewaretoken': getCSRFToken()
+                },
+                success: function(data) {
+                    if (data.success) {
+                        $('#bulkAssignModal').modal('hide');
+                        reloadPageAfterDelay(data.message, 'success');
+                    } else {
+                        showToast(data.message, 'danger');
+                        resetButton(confirmBtn);
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error:', error);
+                    showToast('An error occurred while bulk assigning combinations.', 'danger');
+                    resetButton(confirmBtn);
+                }
+            });
+        });
+        
+        $('#bulkAssignModal').on('hidden.bs.modal', function() {
+            $('#bulk-combination-select').val(null).trigger('change.select2');
+        });
+        
+        // =============== REMOVE COMBINATION ===============
+        $(document).on('click', '.remove-combination-btn', function() {
+            studentToRemove = {
+                id: $(this).data('student-id'),
+                name: $(this).data('student-name'),
+                combinationCode: $(this).data('combination-code')
+            };
+            
+            $('#remove-student-name').text(studentToRemove.name);
+            $('#remove-combination-code').text(studentToRemove.combinationCode);
+            $('#removeCombinationModal').modal('show');
+        });
+        
+        $('#confirm-remove-btn').on('click', function() {
+            if (!studentToRemove) return;
+            
+            const removeBtn = $(this);
+            setButtonLoading(removeBtn, true);
+            
+            $.ajax({
+                url: '{% url "admin_assign_student_combination" %}',
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCSRFToken(),
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                data: {
+                    'action': 'remove',
+                    'student_id': studentToRemove.id,
+                    'csrfmiddlewaretoken': getCSRFToken()
+                },
+                success: function(data) {
+                    if (data.success) {
+                        $('#removeCombinationModal').modal('hide');
+                        reloadPageAfterDelay(data.message, 'success');
+                    } else {
+                        showToast(data.message, 'danger');
+                        resetButton(removeBtn);
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error:', error);
+                    showToast('An error occurred while removing combination.', 'danger');
+                    resetButton(removeBtn);
+                }
+            });
+        });
+        
+        // =============== BULK REMOVAL ===============
+        $('#bulk-remove-btn-toolbar').on('click', function() {
+            if (selectedStudents.size === 0) {
+                showToast('Please select at least one student.', 'danger');
+                return;
+            }
+            
+            $('#bulk-remove-count').text(selectedStudents.size);
+            $('#bulkRemoveModal').modal('show');
+        });
+        
+        $('#bulk-confirm-remove-btn').on('click', function() {
+            const removeBtn = $(this);
+            setButtonLoading(removeBtn, true);
+            
+            $.ajax({
+                url: '{% url "admin_assign_student_combination" %}',
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCSRFToken(),
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                data: {
+                    'action': 'bulk_remove',
+                    'student_ids': Array.from(selectedStudents),
+                    'csrfmiddlewaretoken': getCSRFToken()
+                },
+                success: function(data) {
+                    if (data.success) {
+                        $('#bulkRemoveModal').modal('hide');
+                        reloadPageAfterDelay(data.message, 'success');
+                    } else {
+                        showToast(data.message, 'danger');
+                        resetButton(removeBtn);
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error:', error);
+                    showToast('An error occurred while removing combinations.', 'danger');
+                    resetButton(removeBtn);
+                }
+            });
+        });
+        
+        // =============== FILTERS ===============
+        $('.filter-btn').on('click', function(e) {
+            e.preventDefault();
+            const filter = $(this).data('filter');
+            
+            // Clear selection when filtering
+            selectedStudents.clear();
+            $('.student-checkbox').prop('checked', false);
+            $('#select-all').prop('checked', false);
+            updateSelectionUI();
+            
+            switch(filter) {
+                case 'all':
+                    table.search('').columns().search('').draw();
+                    break;
+                case 'assigned':
+                    table.columns(4).search('Assigned').draw();
+                    break;
+                case 'unassigned':
+                    table.columns(4).search('Not Assigned').draw();
+                    break;
+                case 'active':
+                    table.columns(6).search('Active').draw();
+                    break;
+            }
+        });
+        
+        $('#clear-filters').on('click', function() {
+            table.search('').columns().search('').draw();
+            selectedStudents.clear();
+            $('.student-checkbox').prop('checked', false);
+            $('#select-all').prop('checked', false);
+            updateSelectionUI();
+        });
+        
+        // =============== INITIALIZATION ===============
+        initializeDataTable();
+        updateSelectionUI();
+    });
+</script>
+{% endblock extra_js %}

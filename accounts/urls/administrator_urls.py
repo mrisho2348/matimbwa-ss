@@ -115,4 +115,20 @@ urlpatterns = [
     # AJAX/API Endpoints
     path('ajax/get-streams/', ajax_get_streams, name='admin_ajax_get_streams'),
     path('ajax/get-student-details/', ajax_get_student_details, name='admin_ajax_get_student_details'),
+
+    # Add these URLs with your other academic management URLs
+    path('academic/combinations/', combinations_list, name='admin_combinations_list'),
+    path('academic/combinations/crud/', combinations_crud, name='admin_combinations_crud'),
+
+       # Student Combination Assignment
+    path('students/<int:student_id>/assign-combination/', assign_student_combination, name='admin_assign_student_combination'),
+    path('students/<int:student_id>/assign-combination/ajax/', assign_student_combination_ajax, name='admin_assign_student_combination_ajax'),
+
+    # Add these URLs to your existing admin_urls.py
+    path('students/combinations/', student_combinations_list, name='admin_student_combinations_list'),
+    path('students/combinations/assign/', assign_student_combination, name='admin_assign_student_combination'),
+    path('students/combinations/details/', get_combination_details_ajax, name='admin_get_combination_details_ajax'),
+
+     path('combination/<int:combination_id>/students/', combination_students, name='admin_combination_students'),
+     path('combinations/<int:combination_id>/pdf-report/', combination_pdf_report, name='admin_combination_pdf_report'),
 ]

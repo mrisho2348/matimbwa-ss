@@ -11,13 +11,15 @@ from django.utils import timezone
 from django.contrib.auth.forms import PasswordChangeForm
 from django.contrib.auth import update_session_auth_hash
 from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
+from weasyprint import HTML
 from accounts.forms.admin_forms import AdminPreferencesForm, AdminProfileUpdateForm
 from accounts.forms.student_forms import ParentForm, ParentStudentForm, PreviousSchoolForm, StudentEditForm, StudentForm,StudentFilterForm
 from accounts.models import GENDER_CHOICES, ROLE_CHOICES, CustomUser, Department, Notification, Staffs, AdminHOD, SystemLog, TeachingAssignment
 from core.models import (
-    EducationalLevel, AcademicYear, Term, Subject, 
+    Combination, CombinationSubject, EducationalLevel, AcademicYear, Term, Subject, 
     ClassLevel, StreamClass
 )
+from weasyprint.text.fonts import FontConfiguration
 from students.models import RELATIONSHIP_CHOICES, STATUS_CHOICES, Parent, PreviousSchool, Student
 from django.core.exceptions import ValidationError
 from django.utils.dateparse import parse_date
@@ -7272,3 +7274,1626 @@ def ajax_get_student_details(request):
         return JsonResponse(data)
     
     return JsonResponse({'error': 'Student ID required'})
+
+
+
+
+@login_required
+def combinations_list(request):
+    """
+    Display combinations management page
+    """
+    # Get only A-Level educational level
+    a_level = EducationalLevel.objects.filter(code='A_LEVEL').first()
+    
+    # Get combinations with their subjects
+    combinations = Combination.objects.filter(
+        educational_level=a_level
+    ).prefetch_related(
+        'subjects',
+        'combinationsubject_set__subject'
+    ).order_by('code')
+    
+    # Get all A-Level subjects
+    a_level_subjects = Subject.objects.filter(
+        educational_level=a_level,
+        is_active=True
+    ).order_by('name')
+    
+    # Get subject count statistics
+    total_combinations = combinations.count()
+    active_combinations = combinations.filter(is_active=True).count()
+    
+    # Get combination subjects grouped by role
+    combination_subjects_data = {}
+    for combination in combinations:
+        subjects = CombinationSubject.objects.filter(
+            combination=combination
+        ).select_related('subject')
+        
+        core_subjects = subjects.filter(role='CORE').values_list('subject__name', flat=True)
+        subsidiary_subjects = subjects.filter(role='SUB').values_list('subject__name', flat=True)
+        
+        combination_subjects_data[combination.id] = {
+            'core': list(core_subjects),
+            'subsidiary': list(subsidiary_subjects),
+            'total_subjects': subjects.count()
+        }
+    
+    context = {
+        'combinations': combinations,
+        'a_level_subjects': a_level_subjects,
+        'total_combinations': total_combinations,
+        'active_combinations': active_combinations,
+        'combination_subjects_data': combination_subjects_data,
+        'subject_role_choices': CombinationSubject.SUBJECT_ROLE_CHOICES,
+        'page_title': 'Subject Combinations Management',
+    }
+    
+    return render(request, 'admin/academic/combinations_list.html', context)
+
+
+@login_required
+def combinations_crud(request):
+    """
+    Handle AJAX CRUD operations for combinations
+    """
+    if request.method == 'POST':
+        action = request.POST.get('action', '').lower()
+        
+        try:
+            if action == 'create':
+                return create_combination(request)
+            elif action == 'update':
+                return update_combination(request)
+            elif action == 'toggle_status':
+                return toggle_combination_status(request)
+            elif action == 'delete':
+                return delete_combination(request)
+            elif action == 'add_subject':
+                return add_subject_to_combination(request)
+            elif action == 'remove_subject':
+                return remove_subject_from_combination(request)
+            elif action == 'update_subject_role':
+                return update_subject_role(request)
+            else:
+                return JsonResponse({
+                    'success': False,
+                    'message': 'Invalid action specified.'
+                })
+                
+        except ValidationError as e:
+            return JsonResponse({
+                'success': False,
+                'message': str(e)
+            })
+        except Exception as e:
+            return JsonResponse({
+                'success': False,
+                'message': f'An error occurred: {str(e)}'
+            })
+    
+    # Handle GET requests
+    elif request.method == 'GET':
+        action = request.GET.get('action', '')
+        
+        if action == 'get_combination_details':
+            return get_combination_details(request)
+        elif action == 'get_combination_subjects':
+            return get_combination_subjects(request)
+        elif action == 'get_available_subjects':
+            return get_available_subjects(request)
+    
+    return JsonResponse({
+        'success': False,
+        'message': 'Invalid request method.'
+    })
+
+
+# Update the create_combination function
+def create_combination(request):
+    """Create a new combination"""
+    try:
+        # Get A-Level educational level
+        a_level = EducationalLevel.objects.filter(code='A_LEVEL').first()
+        if not a_level:
+            return JsonResponse({
+                'success': False,
+                'message': 'A-Level educational level not found. Please create it first.'
+            })
+        
+        # Validate required fields
+        name = request.POST.get('name', '').strip()
+        code = request.POST.get('code', '').strip().upper()
+        
+        if not name or not code:
+            return JsonResponse({
+                'success': False,
+                'message': 'Name and code are required.'
+            })
+        
+        # Validate name and code length
+        if len(name) > 100:
+            return JsonResponse({
+                'success': False,
+                'message': 'Name cannot exceed 100 characters.'
+            })
+        
+        if len(code) > 10:
+            return JsonResponse({
+                'success': False,
+                'message': 'Code cannot exceed 10 characters.'
+            })
+        
+        # Check for duplicate code
+        if Combination.objects.filter(code__iexact=code).exists():
+            return JsonResponse({
+                'success': False,
+                'message': f'A combination with code "{code}" already exists.'
+            })
+        
+        # Check for duplicate name
+        if Combination.objects.filter(name__iexact=name).exists():
+            return JsonResponse({
+                'success': False,
+                'message': f'A combination with name "{name}" already exists.'
+            })
+        
+        # Get subjects from form
+        subject_ids = request.POST.getlist('subjects[]')
+        subject_roles = request.POST.getlist('subject_roles[]')
+        
+        # Validate subjects requirements
+        if not subject_ids:
+            return JsonResponse({
+                'success': False,
+                'message': 'At least one subject is required for a combination.'
+            })
+        
+        # Count core subjects
+        core_subjects_count = 0
+        for i, subject_id in enumerate(subject_ids):
+            if i < len(subject_roles) and subject_roles[i] == 'CORE':
+                core_subjects_count += 1
+        
+        # Validate core subjects requirements
+        if core_subjects_count < 2:
+            return JsonResponse({
+                'success': False,
+                'message': 'A combination must have at least 2 core subjects.'
+            })
+        
+        if core_subjects_count > 3:
+            return JsonResponse({
+                'success': False,
+                'message': 'A combination cannot have more than 3 core subjects.'
+            })
+        
+        # Validate total subjects (2-3 subjects total for combination name)
+        if len(subject_ids) < 2:
+            return JsonResponse({
+                'success': False,
+                'message': 'A combination must have at least 2 subjects.'
+            })
+        
+        if len(subject_ids) > 6:
+            return JsonResponse({
+                'success': False,
+                'message': 'A combination cannot have more than 6 subjects.'
+            })
+        
+        # Get optional fields
+        is_active = request.POST.get('is_active') == 'on' or request.POST.get('is_active') == 'true'
+        
+        with transaction.atomic():
+            # Create the combination
+            combination = Combination.objects.create(
+                educational_level=a_level,
+                name=name,
+                code=code,
+                is_active=is_active
+            )
+            
+            if subject_ids:
+                # Validate each subject
+                for i, subject_id in enumerate(subject_ids):
+                    try:
+                        subject = Subject.objects.get(
+                            id=subject_id,
+                            educational_level=a_level,
+                            is_active=True
+                        )
+                        
+                        role = subject_roles[i] if i < len(subject_roles) else 'CORE'
+                        
+                        # Validate role
+                        if role not in ['CORE', 'SUB']:
+                            role = 'CORE'
+                        
+                        # Create combination subject
+                        CombinationSubject.objects.create(
+                            combination=combination,
+                            subject=subject,
+                            role=role
+                        )
+                        
+                    except Subject.DoesNotExist:
+                        continue
+            
+            return JsonResponse({
+                'success': True,
+                'message': f'Combination "{name}" created successfully.',
+                'combination': {
+                    'id': combination.id,
+                    'name': combination.name,
+                    'code': combination.code,
+                    'is_active': combination.is_active,
+                    'subject_count': combination.subjects.count()
+                }
+            })
+            
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'Error creating combination: {str(e)}'
+        })
+
+
+def update_combination(request):
+    """Update an existing combination"""
+    try:
+        combination_id = request.POST.get('id')
+        if not combination_id:
+            return JsonResponse({
+                'success': False,
+                'message': 'Combination ID is required.'
+            })
+        
+        combination = get_object_or_404(Combination, id=combination_id)
+        
+        # Get and validate required fields
+        name = request.POST.get('name', '').strip()
+        code = request.POST.get('code', '').strip().upper()
+        
+        if not name or not code:
+            return JsonResponse({
+                'success': False,
+                'message': 'Name and code are required.'
+            })
+        
+        # Validate name and code length
+        if len(name) > 50:
+            return JsonResponse({
+                'success': False,
+                'message': 'Name cannot exceed 50 characters.'
+            })
+        
+        if len(code) > 10:
+            return JsonResponse({
+                'success': False,
+                'message': 'Code cannot exceed 10 characters.'
+            })
+        
+        # Check for duplicate code (excluding current)
+        if Combination.objects.filter(code__iexact=code).exclude(id=combination.id).exists():
+            return JsonResponse({
+                'success': False,
+                'message': f'A combination with code "{code}" already exists.'
+            })
+        
+        # Check for duplicate name (excluding current)
+        if Combination.objects.filter(name__iexact=name).exclude(id=combination.id).exists():
+            return JsonResponse({
+                'success': False,
+                'message': f'A combination with name "{name}" already exists.'
+            })
+        
+        # Get optional fields
+        is_active = request.POST.get('is_active') == 'on' or request.POST.get('is_active') == 'true'
+        
+        with transaction.atomic():
+            # Update the combination
+            combination.name = name
+            combination.code = code
+            combination.is_active = is_active
+            combination.save()
+            
+            return JsonResponse({
+                'success': True,
+                'message': f'Combination "{name}" updated successfully.',
+                'combination': {
+                    'id': combination.id,
+                    'name': combination.name,
+                    'code': combination.code,
+                    'is_active': combination.is_active
+                }
+            })
+            
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'Error updating combination: {str(e)}'
+        })
+
+
+def toggle_combination_status(request):
+    """Toggle combination active status"""
+    try:
+        combination_id = request.POST.get('id')
+        if not combination_id:
+            return JsonResponse({
+                'success': False,
+                'message': 'Combination ID is required.'
+            })
+        
+        combination = get_object_or_404(Combination, id=combination_id)
+        
+        # Toggle the status
+        combination.is_active = not combination.is_active
+        combination.save()
+        
+        status_text = "activated" if combination.is_active else "deactivated"
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'Combination "{combination.name}" {status_text} successfully.',
+            'is_active': combination.is_active
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'Error toggling combination status: {str(e)}'
+        })
+
+
+def delete_combination(request):
+    """Delete a combination"""
+    try:
+        combination_id = request.POST.get('id')
+        if not combination_id:
+            return JsonResponse({
+                'success': False,
+                'message': 'Combination ID is required.'
+            })
+        
+        combination = get_object_or_404(Combination, id=combination_id)
+        combination_name = combination.name
+        
+        # Check if combination has any associated students
+        # (Add this check if you have a relationship with students)
+        if combination.student_set.exists():
+            return JsonResponse({
+                'success': False,
+                'message': f'Cannot delete combination "{combination_name}". It has associated students.'
+                })
+            
+        combination.delete()
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'Combination "{combination_name}" deleted successfully.'
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'Error deleting combination: {str(e)}'
+        })
+
+
+
+# Update the add_subject_to_combination function
+def add_subject_to_combination(request):
+    """Add a subject to a combination"""
+    try:
+        combination_id = request.POST.get('combination_id')
+        subject_id = request.POST.get('subject_id')
+        role = request.POST.get('role', 'CORE')
+        
+        if not combination_id or not subject_id:
+            return JsonResponse({
+                'success': False,
+                'message': 'Combination ID and Subject ID are required.'
+            })
+        
+        combination = get_object_or_404(Combination, id=combination_id)
+        
+        # Get current subjects count
+        current_subjects = CombinationSubject.objects.filter(combination=combination)
+        core_subjects_count = current_subjects.filter(role='CORE').count()
+        total_subjects_count = current_subjects.count()
+        
+        # Validate core subjects limit
+        if role == 'CORE' and core_subjects_count >= 3:
+            return JsonResponse({
+                'success': False,
+                'message': 'Cannot add more than 3 core subjects to a combination.'
+            })
+        
+        # Validate total subjects limit
+        if total_subjects_count >= 6:
+            return JsonResponse({
+                'success': False,
+                'message': 'Cannot add more than 6 subjects to a combination.'
+            })
+        
+        # Get A-Level educational level
+        a_level = combination.educational_level
+        
+        # Get subject and validate it belongs to A-Level
+        subject = get_object_or_404(
+            Subject,
+            id=subject_id,
+            educational_level=a_level,
+            is_active=True
+        )
+        
+        # Validate role
+        if role not in ['CORE', 'SUB']:
+            role = 'CORE'
+        
+        # Check if subject is already in combination
+        if CombinationSubject.objects.filter(
+            combination=combination,
+            subject=subject
+        ).exists():
+            return JsonResponse({
+                'success': False,
+                'message': f'Subject "{subject.name}" is already in this combination.'
+            })
+        
+        # Create combination subject
+        combination_subject = CombinationSubject.objects.create(
+            combination=combination,
+            subject=subject,
+            role=role
+        )
+        
+        # Update combination name to reflect subjects
+        update_combination_name(combination)
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'Subject "{subject.name}" added to combination successfully.',
+            'combination_subject': {
+                'id': combination_subject.id,
+                'subject_id': subject.id,
+                'subject_name': subject.name,
+                'subject_code': subject.code,
+                'role': role,
+                'role_display': combination_subject.get_role_display()
+            }
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'Error adding subject to combination: {str(e)}'
+        })
+
+
+
+# Update the remove_subject_from_combination function
+def remove_subject_from_combination(request):
+    """Remove a subject from a combination"""
+    try:
+        combination_subject_id = request.POST.get('combination_subject_id')
+        
+        if not combination_subject_id:
+            return JsonResponse({
+                'success': False,
+                'message': 'Combination Subject ID is required.'
+            })
+        
+        combination_subject = get_object_or_404(CombinationSubject, id=combination_subject_id)
+        combination = combination_subject.combination
+        
+        # Check if this is a core subject
+        if combination_subject.role == 'CORE':
+            # Count remaining core subjects
+            remaining_core = CombinationSubject.objects.filter(
+                combination=combination,
+                role='CORE'
+            ).exclude(id=combination_subject_id).count()
+            
+            # Validate minimum core subjects
+            if remaining_core < 2:
+                return JsonResponse({
+                    'success': False,
+                    'message': 'Cannot remove core subject. A combination must have at least 2 core subjects.'
+                })
+        
+        subject_name = combination_subject.subject.name
+        combination_name = combination.name
+        
+        combination_subject.delete()
+        
+        # Update combination name to reflect subjects
+        update_combination_name(combination)
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'Subject "{subject_name}" removed from combination "{combination_name}" successfully.'
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'Error removing subject from combination: {str(e)}'
+        })
+
+
+
+# Update the update_subject_role function
+def update_subject_role(request):
+    """Update subject role in a combination"""
+    try:
+        combination_subject_id = request.POST.get('combination_subject_id')
+        role = request.POST.get('role', 'CORE')
+        
+        if not combination_subject_id:
+            return JsonResponse({
+                'success': False,
+                'message': 'Combination Subject ID is required.'
+            })
+        
+        # Validate role
+        if role not in ['CORE', 'SUB']:
+            return JsonResponse({
+                'success': False,
+                'message': 'Invalid role specified.'
+            })
+        
+        combination_subject = get_object_or_404(CombinationSubject, id=combination_subject_id)
+        combination = combination_subject.combination
+        
+        # Check if changing from CORE to SUB
+        if combination_subject.role == 'CORE' and role == 'SUB':
+            # Count remaining core subjects
+            remaining_core = CombinationSubject.objects.filter(
+                combination=combination,
+                role='CORE'
+            ).exclude(id=combination_subject_id).count()
+            
+            # Validate minimum core subjects
+            if remaining_core < 2:
+                return JsonResponse({
+                    'success': False,
+                    'message': 'Cannot change role from Core to Subsidiary. A combination must have at least 2 core subjects.'
+                })
+        
+        # Check if changing from SUB to CORE
+        if combination_subject.role == 'SUB' and role == 'CORE':
+            # Count current core subjects
+            current_core = CombinationSubject.objects.filter(
+                combination=combination,
+                role='CORE'
+            ).count()
+            
+            # Validate maximum core subjects
+            if current_core >= 3:
+                return JsonResponse({
+                    'success': False,
+                    'message': 'Cannot add more than 3 core subjects to a combination.'
+                })
+        
+        old_role = combination_subject.role
+        combination_subject.role = role
+        combination_subject.save()
+        
+        # Update combination name to reflect subjects
+        update_combination_name(combination)
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'Subject role updated from {old_role} to {role} successfully.',
+            'role': role,
+            'role_display': combination_subject.get_role_display()
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'Error updating subject role: {str(e)}'
+        })
+    
+
+# Add this new helper function
+def update_combination_name(combination):
+    """Update combination name based on subjects"""
+    subjects = CombinationSubject.objects.filter(
+        combination=combination
+    ).select_related('subject').order_by('-role', 'subject__name')  # Core first, then subsidiary
+    
+    if subjects.exists():
+        # Get subject names
+        subject_names = [cs.subject.name for cs in subjects]
+        
+        # Create combination name (e.g., "Physics, Chemistry, Mathematics")
+        combination_name = ', '.join(subject_names)
+        
+        # Truncate if too long
+        if len(combination_name) > 50:
+            combination_name = combination_name[:47] + '...'
+        
+        # Update combination name
+        combination.name = combination_name
+        combination.save()
+
+# Helper functions for GET requests
+def get_combination_details(request):
+    """Get combination details for editing"""
+    try:
+        combination_id = request.GET.get('combination_id')
+        
+        if not combination_id:
+            return JsonResponse({
+                'success': False,
+                'message': 'Combination ID is required.'
+            })
+        
+        combination = get_object_or_404(
+            Combination.objects.select_related('educational_level'),
+            id=combination_id
+        )
+        
+        # Get combination subjects
+        subjects = CombinationSubject.objects.filter(
+            combination=combination
+        ).select_related('subject').order_by('subject__name')
+        
+        subjects_data = []
+        for cs in subjects:
+            subjects_data.append({
+                'id': cs.id,
+                'subject_id': cs.subject.id,
+                'subject_name': cs.subject.name,
+                'subject_code': cs.subject.code,
+                'role': cs.role,
+                'role_display': cs.get_role_display()
+            })
+        
+        return JsonResponse({
+            'success': True,
+            'combination': {
+                'id': combination.id,
+                'name': combination.name,
+                'code': combination.code,
+                'is_active': combination.is_active,
+                'educational_level': {
+                    'id': combination.educational_level.id,
+                    'name': combination.educational_level.name
+                }
+            },
+            'subjects': subjects_data
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'Error getting combination details: {str(e)}'
+        })
+
+
+def get_combination_subjects(request):
+    """Get subjects for a specific combination"""
+    try:
+        combination_id = request.GET.get('combination_id')
+        
+        if not combination_id:
+            return JsonResponse({
+                'success': False,
+                'message': 'Combination ID is required.'
+            })
+        
+        combination = get_object_or_404(Combination, id=combination_id)
+        
+        subjects = CombinationSubject.objects.filter(
+            combination=combination
+        ).select_related('subject').order_by('subject__name')
+        
+        subjects_data = []
+        for cs in subjects:
+            subjects_data.append({
+                'id': cs.id,
+                'subject_id': cs.subject.id,
+                'subject_name': cs.subject.name,
+                'subject_code': cs.subject.code,
+                'role': cs.role,
+                'role_display': cs.get_role_display(),
+                'is_compulsory': cs.subject.is_compulsory,
+                'is_active': cs.subject.is_active
+            })
+        
+        return JsonResponse({
+            'success': True,
+            'subjects': subjects_data,
+            'count': len(subjects_data)
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'Error getting combination subjects: {str(e)}'
+        })
+
+
+def get_available_subjects(request):
+    """Get subjects available for adding to a combination"""
+    try:
+        combination_id = request.GET.get('combination_id')
+        
+        if not combination_id:
+            return JsonResponse({
+                'success': False,
+                'message': 'Combination ID is required.'
+            })
+        
+        combination = get_object_or_404(Combination, id=combination_id)
+        
+        # Get all A-Level subjects
+        a_level_subjects = Subject.objects.filter(
+            educational_level=combination.educational_level,
+            is_active=True
+        ).exclude(
+            id__in=CombinationSubject.objects.filter(
+                combination=combination
+            ).values_list('subject_id', flat=True)
+        ).order_by('name')
+        
+        subjects_data = []
+        for subject in a_level_subjects:
+            subjects_data.append({
+                'id': subject.id,
+                'name': subject.name,
+                'code': subject.code,
+                'is_compulsory': subject.is_compulsory,
+                'description': subject.description
+            })
+        
+        return JsonResponse({
+            'success': True,
+            'subjects': subjects_data,
+            'count': len(subjects_data)
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'Error getting available subjects: {str(e)}'
+        })
+
+
+# accounts/views/admin_views.py
+@login_required
+def assign_student_combination(request, student_id):
+    """
+    View for assigning students to combinations
+    """
+    # Get student
+    student = get_object_or_404(Student, id=student_id)
+    
+    # Check if student is in A-Level
+    if not student.class_level or student.class_level.educational_level.code != 'A_LEVEL':
+        messages.error(request, 'Combination assignment is only available for A-Level students.')
+        return redirect('admin_student_detail', id=student_id)
+    
+    # Get A-Level educational level
+    a_level = EducationalLevel.objects.filter(code='A_LEVEL').first()
+    if not a_level:
+        messages.error(request, 'A-Level educational level not found.')
+        return redirect('admin_student_detail', id=student_id)
+    
+    # Get all active combinations for A-Level
+    combinations = Combination.objects.filter(
+        educational_level=a_level,
+        is_active=True
+    ).prefetch_related(
+        'subjects',
+        'combinationsubject_set__subject'
+    ).order_by('code')
+    
+    # Get combination subjects data for display
+    combination_subjects_data = {}
+    for combination in combinations:
+        subjects = CombinationSubject.objects.filter(
+            combination=combination
+        ).select_related('subject')
+        
+        core_subjects = subjects.filter(role='CORE').values_list('subject__name', flat=True)
+        subsidiary_subjects = subjects.filter(role='SUB').values_list('subject__name', flat=True)
+        
+        combination_subjects_data[combination.id] = {
+            'core': list(core_subjects),
+            'subsidiary': list(subsidiary_subjects),
+            'total_subjects': subjects.count()
+        }
+    
+    # Get statistics
+    active_combinations_count = combinations.filter(is_active=True).count()
+    total_combinations_count = combinations.count()
+    students_in_same_class = Student.objects.filter(
+        class_level=student.class_level,
+        status='active'
+    ).count()
+    
+    context = {
+        'student': student,
+        'combinations': combinations,
+        'combination_subjects_data': combination_subjects_data,
+        'active_combinations_count': active_combinations_count,
+        'total_combinations_count': total_combinations_count,
+        'students_in_same_class': students_in_same_class,
+        'page_title': f'Assign Combination - {student.full_name}',
+    }
+    
+    return render(request, 'admin/students/assign_combination.html', context)
+
+@login_required
+@require_POST
+def assign_student_combination_ajax(request, student_id):
+    """
+    AJAX endpoint for assigning/removing combinations
+    """
+    student = get_object_or_404(Student, id=student_id)
+    action = request.POST.get('action', '').lower()
+
+    try:
+        if action == 'assign':
+            combination_id = request.POST.get('combination_id')
+
+            if not combination_id:
+                return JsonResponse({
+                    'success': False,
+                    'message': 'Combination ID is required.'
+                })
+
+            combination = get_object_or_404(
+                Combination,
+                id=combination_id,
+                is_active=True
+            )
+
+            # Check if combination belongs to A-Level
+            if combination.educational_level.code != 'A_LEVEL':
+                return JsonResponse({
+                    'success': False,
+                    'message': 'Invalid combination selected.'
+                })
+
+            # Assign combination to student
+            student.combination = combination
+            student.save()
+
+            # Log the action
+            SystemLog.objects.create(
+                user=request.user,
+                log_type='update',
+                description=f'Assigned combination {combination.code} to student {student.full_name}',
+                ip_address=request.META.get('REMOTE_ADDR')
+            )
+
+            return JsonResponse({
+                'success': True,
+                'message': f'Successfully assigned {student.full_name} to {combination.code}.',
+                'combination': {
+                    'id': combination.id,
+                    'code': combination.code,
+                    'name': combination.name
+                }
+            })
+
+        elif action == 'remove':
+            if not student.combination:
+                return JsonResponse({
+                    'success': False,
+                    'message': 'Student has no combination assigned.'
+                })
+
+            removed_combination = student.combination
+            student.combination = None
+            student.save()
+
+            # Log the action
+            SystemLog.objects.create(
+                user=request.user,
+                log_type='update',
+                description=f'Removed combination assignment from student {student.full_name}',
+                ip_address=request.META.get('REMOTE_ADDR')
+            )
+
+            return JsonResponse({
+                'success': True,
+                'message': f'Successfully removed combination assignment from {student.full_name}.',
+                'removed_combination': {
+                    'id': removed_combination.id,
+                    'code': removed_combination.code
+                }
+            })
+
+        else:
+            return JsonResponse({
+                'success': False,
+                'message': 'Invalid action specified.'
+            })
+
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'Error: {str(e)}'
+        })
+
+
+@login_required
+def student_combinations_list(request):
+    """
+    View for managing student combinations assignments
+    """
+    # Get A-Level educational level
+    a_level = EducationalLevel.objects.filter(code='A_LEVEL').first()
+    
+    # Get all A-Level students
+    a_level_students = Student.objects.filter(
+        class_level__educational_level=a_level,
+        is_active=True
+    ).select_related(
+        'class_level', 'stream_class', 'combination'
+    ).prefetch_related(
+        'optional_subjects',
+        'combination__combinationsubject_set__subject'
+    ).order_by('class_level__order', 'first_name')
+    
+    # Get active combinations
+    active_combinations = Combination.objects.filter(
+        educational_level=a_level,
+        is_active=True
+    ).prefetch_related('combinationsubject_set__subject').annotate(
+        core_count=Count('combinationsubject', filter=Q(combinationsubject__role='CORE')),
+        subsidiary_count=Count('combinationsubject', filter=Q(combinationsubject__role='SUB'))
+    )
+    
+    # Get statistics
+    total_students = a_level_students.count()
+    assigned_students = a_level_students.filter(combination__isnull=False).count()
+    unassigned_students = total_students - assigned_students
+    
+    # Calculate percentage
+    assigned_percentage = round((assigned_students / total_students * 100) if total_students > 0 else 0, 1)
+    
+    # Prepare combination data for template
+    for combination in active_combinations:
+        combination.subjects_info = json.dumps(list(
+            combination.combinationsubject_set.values('subject__name', 'subject__code', 'role')
+        ))
+    
+    # Get eligible students (A-Level without combination)
+    eligible_students = a_level_students.filter(combination__isnull=True)
+    
+    context = {
+        'students': a_level_students,
+        'active_combinations': active_combinations,
+        'eligible_students': eligible_students,
+        'total_students': total_students,
+        'assigned_count': assigned_students,
+        'unassigned_count': unassigned_students,
+        'assigned_percentage': assigned_percentage,
+        'a_level_students': total_students,
+        'page_title': 'Student Combinations Management',
+    }
+    
+    return render(request, 'admin/students/student_combinations_list.html', context)
+
+
+@login_required
+def assign_student_combination(request):
+    """
+    Handle AJAX operations for assigning combinations to students
+    """
+    if request.method == 'POST' and request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        action = request.POST.get('action', '').lower()
+        
+        try:
+            if action == 'assign':
+                return assign_single_combination(request)
+            elif action == 'change':
+                return change_student_combination(request)
+            elif action == 'bulk_assign':
+                return bulk_assign_combinations(request)
+            elif action == 'remove':
+                return remove_combination(request)
+            elif action == 'bulk_remove':
+                return bulk_remove_combinations(request)
+            else:
+                return JsonResponse({
+                    'success': False,
+                    'message': 'Invalid action specified.'
+                })
+                
+        except ValidationError as e:
+            return JsonResponse({
+                'success': False,
+                'message': str(e)
+            })
+        except Exception as e:
+            return JsonResponse({
+                'success': False,
+                'message': f'An error occurred: {str(e)}'
+            })
+    
+    return JsonResponse({
+        'success': False,
+        'message': 'Invalid request method.'
+    })
+
+
+def change_student_combination(request):
+    """Change a student's existing combination to a new one"""
+    student_id = request.POST.get('student_id')
+    new_combination_id = request.POST.get('new_combination_id')
+    current_combination_id = request.POST.get('current_combination_id')
+    
+    if not student_id or not new_combination_id:
+        return JsonResponse({
+            'success': False,
+            'message': 'Student ID and New Combination ID are required.'
+        })
+    
+    try:
+        student = Student.objects.get(id=student_id, is_active=True)
+        new_combination = Combination.objects.get(id=new_combination_id, is_active=True)
+        
+        # Check if student is A-Level
+        a_level = EducationalLevel.objects.filter(code='A_LEVEL').first()
+        if not student.class_level or student.class_level.educational_level != a_level:
+            return JsonResponse({
+                'success': False,
+                'message': 'Only A-Level students can have combinations.'
+            })
+        
+        # Check if student has a current combination
+        if not student.combination:
+            return JsonResponse({
+                'success': False,
+                'message': f'Student {student.full_name} does not have a current combination to change.'
+            })
+        
+        # Verify current combination matches if provided
+        if current_combination_id and student.combination.id != int(current_combination_id):
+            return JsonResponse({
+                'success': False,
+                'message': 'Current combination mismatch. Please refresh the page.'
+            })
+        
+        # Check if new combination is the same as current
+        if student.combination.id == new_combination.id:
+            return JsonResponse({
+                'success': False,
+                'message': f'Student already has combination "{new_combination.code}".'
+            })
+        
+        # Store old combination info for the message
+        old_combination_code = student.combination.code
+        old_combination_name = student.combination.name
+        
+        # Change the combination
+        student.combination = new_combination
+        student.save()
+        
+        # Log the change
+        SystemLog.objects.create(
+            user=request.user,
+            log_type='update',
+            description=f'Changed combination for {student.full_name} from {old_combination_code} to {new_combination.code}',
+            ip_address=request.META.get('REMOTE_ADDR')
+        )
+        
+        # Get combination details for UI update
+        combination_data = {
+            'id': new_combination.id,
+            'code': new_combination.code,
+            'name': new_combination.name,
+            'student_name': student.full_name,
+            'old_combination_code': old_combination_code,
+            'old_combination_name': old_combination_name,
+            'total_subjects': new_combination.combinationsubject_set.count(),
+            'core_subjects': list(new_combination.combinationsubject_set.filter(
+                role='CORE'
+            ).values('subject__name', 'subject__code')),
+            'subsidiary_subjects': list(new_combination.combinationsubject_set.filter(
+                role='SUB'
+            ).values('subject__name', 'subject__code')),
+        }
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'Changed combination for {student.full_name} from "{old_combination_code}" to "{new_combination.code}".',
+            'combination': combination_data
+        })
+        
+    except Student.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'message': 'Student not found or is inactive.'
+        })
+    except Combination.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'message': 'Combination not found or is inactive.'
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'Error changing combination: {str(e)}'
+        })
+
+
+def assign_single_combination(request):
+    """Assign a combination to a single student"""
+    student_id = request.POST.get('student_id')
+    combination_id = request.POST.get('combination_id')
+    
+    if not student_id or not combination_id:
+        return JsonResponse({
+            'success': False,
+            'message': 'Student ID and Combination ID are required.'
+        })
+    
+    try:
+        student = Student.objects.get(id=student_id, is_active=True)
+        combination = Combination.objects.get(id=combination_id, is_active=True)
+        
+        # Check if student is A-Level
+        a_level = EducationalLevel.objects.filter(code='A_LEVEL').first()
+        if not student.class_level or student.class_level.educational_level != a_level:
+            return JsonResponse({
+                'success': False,
+                'message': 'Only A-Level students can be assigned combinations.'
+            })
+        
+        # Check if student already has a combination
+        if student.combination:
+            return JsonResponse({
+                'success': False,
+                'message': f'Student {student.full_name} already has combination "{student.combination.code}". Use "Change" instead.'
+            })
+        
+        # Assign combination
+        student.combination = combination
+        student.save()
+        
+        # Log the assignment
+        SystemLog.objects.create(
+            user=request.user,
+            log_type='create',
+            description=f'Assigned combination {combination.code} to student {student.full_name}',
+            ip_address=request.META.get('REMOTE_ADDR')
+        )
+        
+        # Get combination details for UI update
+        combination_data = {
+            'id': combination.id,
+            'code': combination.code,
+            'name': combination.name,
+            'student_name': student.full_name,
+            'total_subjects': combination.combinationsubject_set.count(),
+            'core_subjects': list(combination.combinationsubject_set.filter(
+                role='CORE'
+            ).values('subject__name', 'subject__code')),
+            'subsidiary_subjects': list(combination.combinationsubject_set.filter(
+                role='SUB'
+            ).values('subject__name', 'subject__code')),
+        }
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'Combination "{combination.code}" assigned to {student.full_name} successfully.',
+            'combination': combination_data
+        })
+        
+    except Student.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'message': 'Student not found or is inactive.'
+        })
+    except Combination.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'message': 'Combination not found or is inactive.'
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'Error assigning combination: {str(e)}'
+        })
+
+
+def bulk_assign_combinations(request):
+    """Assign the same combination to multiple students"""
+    student_ids = request.POST.getlist('student_ids[]')
+    combination_id = request.POST.get('combination_id')
+    
+    if not student_ids or not combination_id:
+        return JsonResponse({
+            'success': False,
+            'message': 'No students selected or combination not specified.'
+        })
+    
+    try:
+        combination = Combination.objects.get(id=combination_id, is_active=True)
+        a_level = EducationalLevel.objects.filter(code='A_LEVEL').first()
+        
+        assigned_count = 0
+        failed_students = []
+        
+        for student_id in student_ids:
+            try:
+                student = Student.objects.get(id=student_id, is_active=True)
+                
+                # Check if student is A-Level
+                if not student.class_level or student.class_level.educational_level != a_level:
+                    failed_students.append(f"{student.full_name} (Not A-Level)")
+                    continue
+                
+                # Check if already has a combination
+                if student.combination:
+                    failed_students.append(f"{student.full_name} (Already has combination)")
+                    continue
+                
+                # Assign combination
+                student.combination = combination
+                student.save()
+                assigned_count += 1
+                
+                # Log individual assignment
+                SystemLog.objects.create(
+                    user=request.user,
+                    log_type='create',
+                    description=f'Bulk assigned combination {combination.code} to student {student.full_name}',
+                    ip_address=request.META.get('REMOTE_ADDR')
+                )
+                
+            except Student.DoesNotExist:
+                failed_students.append(f"ID {student_id} (Not found)")
+                continue
+        
+        message = f'Successfully assigned combination "{combination.code}" to {assigned_count} student(s).'
+        if failed_students:
+            message += f' Failed: {len(failed_students)} student(s).'
+        
+        return JsonResponse({
+            'success': True,
+            'message': message,
+            'assigned_count': assigned_count,
+            'failed_count': len(failed_students)
+        })
+        
+    except Combination.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'message': 'Combination not found or is inactive.'
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'Error bulk assigning combinations: {str(e)}'
+        })
+
+
+def remove_combination(request):
+    """Remove combination from a student"""
+    student_id = request.POST.get('student_id')
+    
+    if not student_id:
+        return JsonResponse({
+            'success': False,
+            'message': 'Student ID is required.'
+        })
+    
+    try:
+        student = Student.objects.get(id=student_id, is_active=True)
+        
+        if not student.combination:
+            return JsonResponse({
+                'success': False,
+                'message': 'Student does not have a combination assigned.'
+            })
+        
+        combination_code = student.combination.code
+        student.combination = None
+        student.save()
+        
+        # Log the removal
+        SystemLog.objects.create(
+            user=request.user,
+            log_type='delete',
+            description=f'Removed combination {combination_code} from student {student.full_name}',
+            ip_address=request.META.get('REMOTE_ADDR')
+        )
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'Combination "{combination_code}" removed from {student.full_name} successfully.'
+        })
+        
+    except Student.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'message': 'Student not found or is inactive.'
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'Error removing combination: {str(e)}'
+        })
+
+
+def bulk_remove_combinations(request):
+    """Remove combinations from multiple students"""
+    student_ids = request.POST.getlist('student_ids[]')
+    
+    if not student_ids:
+        return JsonResponse({
+            'success': False,
+            'message': 'No students selected.'
+        })
+    
+    try:
+        removed_count = 0
+        failed_students = []
+        
+        for student_id in student_ids:
+            try:
+                student = Student.objects.get(id=student_id, is_active=True)
+                
+                if not student.combination:
+                    failed_students.append(f"{student.full_name} (No combination)")
+                    continue
+                
+                combination_code = student.combination.code
+                student.combination = None
+                student.save()
+                removed_count += 1
+                
+                # Log individual removal
+                SystemLog.objects.create(
+                    user=request.user,
+                    log_type='delete',
+                    description=f'Bulk removed combination {combination_code} from student {student.full_name}',
+                    ip_address=request.META.get('REMOTE_ADDR')
+                )
+                
+            except Student.DoesNotExist:
+                failed_students.append(f"ID {student_id} (Not found)")
+                continue
+        
+        message = f'Successfully removed combinations from {removed_count} student(s).'
+        if failed_students:
+            message += f' Failed: {len(failed_students)} student(s).'
+        
+        return JsonResponse({
+            'success': True,
+            'message': message,
+            'removed_count': removed_count,
+            'failed_count': len(failed_students)
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'Error bulk removing combinations: {str(e)}'
+        })
+
+
+@login_required
+def get_combination_details_ajax(request):
+    """Get combination details for AJAX requests"""
+    combination_id = request.GET.get('combination_id')
+    
+    if not combination_id:
+        return JsonResponse({
+            'success': False,
+            'message': 'Combination ID is required.'
+        })
+    
+    try:
+        combination = Combination.objects.get(id=combination_id)
+        
+        # Get subjects
+        subjects = combination.combinationsubject_set.select_related('subject').all()
+        
+        # Get students in this combination
+        students = Student.objects.filter(
+            combination=combination,
+            is_active=True
+        ).select_related('class_level', 'stream_class')
+        
+        data = {
+            'success': True,
+            'combination': {
+                'id': combination.id,
+                'code': combination.code,
+                'name': combination.name,
+                'is_active': combination.is_active,
+                'core_count': subjects.filter(role='CORE').count(),
+                'subsidiary_count': subjects.filter(role='SUB').count(),
+                'student_count': students.count(),
+                'subjects': list(subjects.values(
+                    'subject__id', 'subject__name', 'subject__code', 'role'
+                )),
+                'students': list(students.values(
+                    'id', 'full_name', 'registration_number',
+                    'class_level__name', 'stream_class__stream_letter',
+                    'is_active'
+                )[:10])  # Limit to 10 students for preview
+            }
+        }
+        
+        return JsonResponse(data)
+        
+    except Combination.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'message': 'Combination not found.'
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'Error getting combination details: {str(e)}'
+        })
+
+
+@login_required
+def combination_students(request, combination_id):
+    """
+    View students who are assigned to a specific combination
+    """
+    # Get the combination
+    combination = get_object_or_404(
+        Combination.objects.select_related('educational_level'),
+        id=combination_id
+    )
+    
+    # Get students assigned to this combination
+    students = Student.objects.filter(
+        combination=combination,
+        is_active=True
+    ).select_related(
+        'class_level', 'stream_class'
+    ).prefetch_related(
+        'parents', 'optional_subjects'
+    ).order_by('class_level__order', 'first_name', 'last_name')
+    
+    # Get combination subjects
+    combination_subjects = CombinationSubject.objects.filter(
+        combination=combination
+    ).select_related('subject').order_by('-role', 'subject__name')  # Core first
+    
+    # Get statistics
+    total_students = students.count()
+    male_students = students.filter(gender='male').count()
+    female_students = students.filter(gender='female').count()
+    
+    # Calculate percentages
+    male_percentage = (male_students / total_students * 100) if total_students > 0 else 0
+    female_percentage = (female_students / total_students * 100) if total_students > 0 else 0
+    
+    # Group by class
+    class_distribution = students.values(
+        'class_level__name'
+    ).annotate(
+        count=Count('id')
+    ).order_by('-count')
+
+    for item in class_distribution:
+        item['percentage'] = (item['count'] / total_students * 100) if total_students > 0 else 0
+
+    # Get streams distribution
+    stream_distribution = students.values(
+        'stream_class__stream_letter'
+    ).annotate(
+        count=Count('id')
+    ).order_by('stream_class__stream_letter')
+    
+    # Get recent assignments - use updated_at field instead
+    # Filter students who were updated in the last 30 days (likely when combination was assigned)
+    recent_assignments = students.filter(
+        updated_at__gte=timezone.now() - timedelta(days=30)
+    ).order_by('-updated_at')[:10]
+
+    context = {
+        'combination': combination,
+        'students': students,
+        'combination_subjects': combination_subjects,
+        'total_students': total_students,
+        'male_students': male_students,
+        'female_students': female_students,
+        'class_distribution': class_distribution,
+        'stream_distribution': stream_distribution,
+        'recent_assignments': recent_assignments,
+        'male_percentage': round(male_percentage, 1),
+        'female_percentage': round(female_percentage, 1),
+        'page_title': f'Students in {combination.code} - {combination.name}',
+    }
+    
+    return render(request, 'admin/academic/combination_students.html', context)
+
+
+@login_required
+def combination_pdf_report(request, combination_id):
+    """
+    Generate and download PDF report for a combination
+    """
+    try:
+        # Get the combination
+        combination = get_object_or_404(
+            Combination.objects.select_related('educational_level'),
+            id=combination_id
+        )
+        
+        # Get students assigned to this combination
+        students = Student.objects.filter(
+            combination=combination,
+            is_active=True
+        ).select_related(
+            'class_level', 'stream_class'
+        ).prefetch_related(
+            'parents', 'optional_subjects'
+        ).order_by('class_level__order', 'first_name', 'last_name')
+        
+        # Get combination subjects
+        combination_subjects = CombinationSubject.objects.filter(
+            combination=combination
+        ).select_related('subject').order_by('-role', 'subject__name')
+        
+        # Get statistics
+        total_students = students.count()
+        male_students = students.filter(gender='male').count()
+        female_students = students.filter(gender='female').count()
+        
+        # Calculate percentages
+        male_percentage = (male_students / total_students * 100) if total_students > 0 else 0
+        female_percentage = (female_students / total_students * 100) if total_students > 0 else 0
+        
+        # Group by class
+        class_distribution = students.values(
+            'class_level__name'
+        ).annotate(
+            count=Count('id')
+        ).order_by('-count')
+        
+        # Prepare context
+        context = {
+            'combination': combination,
+            'students': students,
+            'combination_subjects': combination_subjects,
+            'total_students': total_students,
+            'male_students': male_students,
+            'female_students': female_students,
+            'class_distribution': class_distribution,
+            'male_percentage': round(male_percentage, 1),
+            'female_percentage': round(female_percentage, 1),
+            'generated_date': timezone.now(),
+            'request': request,
+        }
+        
+        # Render HTML template
+        html_string = render_to_string('admin/academic/combination_pdf_report.html', context)
+        
+        # Create PDF
+        font_config = FontConfiguration()
+        html = HTML(string=html_string, base_url=request.build_absolute_uri())
+        
+        # Generate PDF
+        pdf_file = html.write_pdf(font_config=font_config)
+        
+        # Create response
+        response = HttpResponse(pdf_file, content_type='application/pdf')
+        filename = f'combination_{combination.code}_report_{timezone.now().strftime("%Y%m%d_%H%M%S")}.pdf'
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        
+        return response
+        
+    except Exception as e:
+        messages.error(request, f'Error generating PDF report: {str(e)}')
+        return redirect('admin_combination_students', combination_id=combination_id)    

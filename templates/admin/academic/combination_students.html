@@ -1,0 +1,630 @@
+{% extends 'admin/base.html' %}
+{% load static %}
+{% block title %} Students in {{ combination.code }} - {{ combination.name }} {% endblock title %}
+
+{% block breadcrumb %}
+    <div class="d-flex justify-content-between align-items-center">
+        <div>
+            <a href="{% url 'admin_combinations_list' %}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Back to Combinations
+            </a>
+        </div>
+        <div>
+            <a href="{% url 'admin_combination_pdf_report' combination_id=combination.id %}" 
+               class="btn btn-danger" target="_blank">
+                <i class="fas fa-file-pdf"></i> Download PDF Report
+            </a>
+        </div>
+    </div>
+{% endblock breadcrumb %}
+
+{% block extra_css %}
+<style>
+    .table th {
+        font-weight: 600;
+        border-bottom-width: 2px;
+    }
+    .table td {
+        vertical-align: middle;
+    }
+    .student-photo {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        object-fit: cover;
+        border: 2px solid #dee2e6;
+    }
+    .combination-badge {
+        background-color: #6c757d;
+        color: white;
+        padding: 3px 8px;
+        border-radius: 4px;
+        font-size: 0.8em;
+        display: inline-block;
+        margin: 2px;
+    }
+    .assigned-badge {
+        background-color: #28a745;
+    }
+    .subject-chip {
+        display: inline-block;
+        background-color: #e9ecef;
+        border-radius: 15px;
+        padding: 3px 10px;
+        margin: 2px;
+        font-size: 0.85em;
+    }
+    .core-subject {
+        background-color: #d4edda;
+        color: #155724;
+    }
+    .subsidiary-subject {
+        background-color: #fff3cd;
+        color: #856404;
+    }
+    .stats-card {
+        border-radius: 10px;
+        transition: transform 0.3s ease;
+    }
+    .stats-card:hover {
+        transform: translateY(-5px);
+    }
+    .avatar-initials {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        font-size: 14px;
+        color: white;
+        text-transform: uppercase;
+    }
+    .bg-male { background-color: #007bff; }
+    .bg-female { background-color: #e83e8c; }
+    .bg-other { background-color: #6c757d; }
+    .subject-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 5px;
+        margin-top: 5px;
+    }
+    .quick-action-btn {
+        width: 28px;
+        height: 28px;
+        padding: 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        border: none;
+        transition: all 0.2s ease;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+    }
+    .quick-action-btn:hover {
+        transform: scale(1.1);
+        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    }
+    .quick-action-btn i {
+        font-size: 0.75rem;
+        color: #ffffff !important;
+    }
+    .btn-primary.quick-action-btn { background-color: #007bff; }
+    .btn-info.quick-action-btn { background-color: #17a2b8; }
+    .quick-actions {
+        display: flex;
+        gap: 4px;
+        justify-content: center;
+        align-items: center;
+    }
+</style>
+{% endblock extra_css %}
+
+{% block content %}
+<section class="content">
+    <div class="container-fluid">
+        <!-- Success/Error Toasts -->
+        <div id="success-toast" class="alert alert-success alert-dismissible fade success-toast" style="display: none;" role="alert">
+            <strong><i class="fas fa-check-circle"></i> Success!</strong> 
+            <span id="success-message"></span>
+            <button type="button" class="close" onclick="$('#success-toast').fadeOut()" data-dismiss="alert" aria-label="Close">
+                <span aria-hidden="true">&times;</span>
+            </button>
+        </div>
+
+        <div id="error-toast" class="alert alert-danger alert-dismissible fade error-toast" style="display: none;" role="alert">
+            <strong><i class="fas fa-exclamation-circle"></i> Error!</strong> 
+            <span id="error-message"></span>
+            <button type="button" class="close" onclick="$('#error-toast').fadeOut()" data-dismiss="alert" aria-label="Close">
+                <span aria-hidden="true">&times;</span>
+            </button>
+        </div>
+
+        <!-- Header Section -->
+        <div class="row mb-4">
+            <div class="col-lg-12">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-primary text-white">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h5 class="card-title mb-0">
+                                    <i class="fas fa-user-graduate"></i> 
+                                    Students in {{ combination.code }} - {{ combination.name }}
+                                </h5>
+                                <small class="opacity-75">A-Level Subject Combination</small>
+                            </div>
+                            <div class="d-flex align-items-center">
+                                <a href="{% url 'admin_combination_pdf_report' combination_id=combination.id %}" 
+                                   class="btn btn-light btn-sm mr-2" target="_blank" title="Download PDF Report">
+                                    <i class="fas fa-file-pdf text-danger"></i> PDF Report
+                                </a>
+                                <span class="badge badge-light">
+                                    <i class="fas fa-users"></i> {{ total_students }} Student(s)
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <!-- Combination Info -->
+                        <div class="row">
+                            <div class="col-md-8">
+                                <div class="mb-3">
+                                    <h6>Combination Subjects</h6>
+                                    <div class="subject-list">
+                                        {% for cs in combination_subjects %}
+                                            <span class="subject-chip {% if cs.role == 'CORE' %}core-subject{% else %}subsidiary-subject{% endif %}" 
+                                                  title="{% if cs.role == 'CORE' %}Core Subject{% else %}Subsidiary Subject{% endif %}">
+                                                <i class="fas {% if cs.role == 'CORE' %}fa-star{% else %}fa-circle{% endif %}"></i>
+                                                {{ cs.subject.name }} ({{ cs.subject.code }})
+                                            </span>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                                <div>
+                                    <h6>Description</h6>
+                                    <p class="mb-0">{{ combination.description|default:"No description provided." }}</p>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="card border-0 bg-light">
+                                    <div class="card-body">
+                                        <h6 class="card-title">Quick Stats</h6>
+                                        <ul class="list-unstyled mb-0">
+                                            <li class="mb-2">
+                                                <i class="fas fa-male text-primary mr-2"></i>
+                                                <strong>Male:</strong> {{ male_students }}
+                                            </li>
+                                            <li class="mb-2">
+                                                <i class="fas fa-female text-pink mr-2"></i>
+                                                <strong>Female:</strong> {{ female_students }}
+                                            </li>
+                                            <li class="mb-2">
+                                                <i class="fas fa-layer-group text-warning mr-2"></i>
+                                                <strong>Total Subjects:</strong> {{ combination_subjects|length }}
+                                            </li>
+                                            <li>
+                                                <i class="fas fa-check-circle text-success mr-2"></i>
+                                                <strong>Status:</strong> 
+                                                {% if combination.is_active %}
+                                                    <span class="badge badge-success">Active</span>
+                                                {% else %}
+                                                    <span class="badge badge-secondary">Inactive</span>
+                                                {% endif %}
+                                            </li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Statistics Cards -->
+        <div class="row mb-4">
+            <div class="col-xl-3 col-md-6 mb-4">
+                <div class="card stats-card shadow h-100 py-2 border-left-primary">
+                    <div class="card-body">
+                        <div class="row no-gutters align-items-center">
+                            <div class="col mr-2">
+                                <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                                    Total Students
+                                </div>
+                                <div class="h5 mb-0 font-weight-bold text-gray-800">{{ total_students }}</div>
+                            </div>
+                            <div class="col-auto">
+                                <i class="fas fa-users fa-2x text-gray-300"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-xl-3 col-md-6 mb-4">
+                <div class="card stats-card shadow h-100 py-2 border-left-info">
+                    <div class="card-body">
+                        <div class="row no-gutters align-items-center">
+                            <div class="col mr-2">
+                                <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
+                                    Class Distribution
+                                </div>
+                                <div class="h5 mb-0 font-weight-bold text-gray-800">{{ class_distribution|length }}</div>
+                                <div class="mt-2 mb-0 text-muted text-xs">
+                                    <span>Classes</span>
+                                </div>
+                            </div>
+                            <div class="col-auto">
+                                <i class="fas fa-school fa-2x text-gray-300"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-xl-3 col-md-6 mb-4">
+                <div class="card stats-card shadow h-100 py-2 border-left-success">
+                    <div class="card-body">
+                        <div class="row no-gutters align-items-center">
+                            <div class="col mr-2">
+                                <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
+                                    Male Students
+                                </div>
+                                <div class="h5 mb-0 font-weight-bold text-gray-800">{{ male_students }}</div>
+                                <div class="mt-2 mb-0 text-muted text-xs">
+                                    <span>{{ male_percentage|default:"0" }}% of total</span>
+                                </div>
+                            </div>
+                            <div class="col-auto">
+                                <i class="fas fa-male fa-2x text-gray-300"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-xl-3 col-md-6 mb-4">
+                <div class="card stats-card shadow h-100 py-2 border-left-warning">
+                    <div class="card-body">
+                        <div class="row no-gutters align-items-center">
+                            <div class="col mr-2">
+                                <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
+                                    Female Students
+                                </div>
+                                <div class="h5 mb-0 font-weight-bold text-gray-800">{{ female_students }}</div>
+                                <div class="mt-2 mb-0 text-muted text-xs">
+                                    <span>{{ female_percentage|default:"0" }}% of total</span>
+                                </div>
+                            </div>
+                            <div class="col-auto">
+                                <i class="fas fa-female fa-2x text-gray-300"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="row">
+            <div class="col-lg-12">
+                <div class="card shadow-lg">
+                    <div class="card-header bg-secondary text-white d-flex justify-content-between align-items-center">
+                        <h6 class="header-title mb-0">
+                            <i class="fas fa-list"></i> Student List
+                        </h6>
+                        <div class="d-flex align-items-center">
+                            <span class="badge badge-light mr-2">
+                                <i class="fas fa-filter"></i> 
+                                Showing {{ students|length }} student(s)
+                            </span>
+                            <div class="form-inline">
+                                <input type="text" class="form-control form-control-sm" id="search-students" placeholder="Search students...">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        {% if students %}
+                            <div class="table-responsive">
+                                <table class="table table-hover text-nowrap table-responsive-sm table-bordered table-striped table-sm display" id="students-table">
+                                    <thead class="bg-light">
+                                        <tr>
+                                            <th>Student</th>
+                                            <th>Registration</th>
+                                            <th>Class</th>
+                                            <th>Stream</th>
+                                            <th>Gender</th>
+                                            <th>Assigned Date</th>
+                                            <th>Status</th>
+                                            <th class="text-center">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for student in students %}
+                                        <tr>
+                                            <td>
+                                                <div class="d-flex align-items-center">
+                                                    {% if student.profile_pic %}
+                                                        <img src="{{ student.profile_pic.url }}" alt="{{ student.full_name }}" class="student-photo mr-2">
+                                                    {% else %}
+                                                        <div class="avatar-initials mr-2 bg-{{ student.gender|default:'other' }}">
+                                                            {{ student.first_name|first }}{{ student.last_name|first }}
+                                                        </div>
+                                                    {% endif %}
+                                                    <div>
+                                                        <strong>{{ student.full_name }}</strong>
+                                                        <div class="text-muted small">
+                                                            {% if student.age %}
+                                                                • {{ student.age }} years
+                                                            {% endif %}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <code>{{ student.registration_number }}</code>
+                                                {% if student.examination_number %}
+                                                    <div class="text-muted small">Exam: {{ student.examination_number }}</div>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                {% if student.class_level %}
+                                                    <span class="badge badge-info">{{ student.class_level.name }}</span>
+                                                {% else %}
+                                                    <span class="text-muted">Not assigned</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                {% if student.stream_class %}
+                                                    <span class="badge badge-secondary">{{ student.stream_class.stream_letter }}</span>
+                                                {% else %}
+                                                    <span class="text-muted">No stream</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                <span class="badge {% if student.gender == 'male' %}badge-primary{% else %}badge-pink{% endif %}">
+                                                    <i class="fas fa-{% if student.gender == 'male' %}mars{% else %}venus{% endif %}"></i>
+                                                    {{ student.get_gender_display }}
+                                                </span>
+                                            </td>
+                                            <td>
+                                                {% if student.updated_at  %}
+                                                    {{ student.updated_at |date:"Y-m-d" }}
+                                                    <div class="text-muted small">{{ student.updated_at |timesince }} ago</div>
+                                                {% else %}
+                                                    <span class="text-muted">Unknown</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                {% if student.is_active %}
+                                                    <span class="badge badge-success">
+                                                        <i class="fas fa-check-circle"></i> Active
+                                                    </span>
+                                                {% else %}
+                                                    <span class="badge badge-secondary">
+                                                        <i class="fas fa-times-circle"></i> Inactive
+                                                    </span>
+                                                {% endif %}
+                                            </td>
+                                            <td class="text-center">
+                                                <div class="quick-actions">
+                                                    <!-- View Student Details -->
+                                                    <a href="{% url 'admin_student_detail' student.id %}" class="btn btn-sm btn-info quick-action-btn" title="View Student">
+                                                        <i class="fas fa-eye"></i>
+                                                    </a>
+                                                    
+                                                    <!-- View Academic Record -->
+                                                    <a href="#" class="btn btn-sm btn-primary quick-action-btn" title="View Academic Record">
+                                                        <i class="fas fa-chart-line"></i>
+                                                    </a>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        {% else %}
+                            <div class="text-center py-5">
+                                <i class="fas fa-user-graduate fa-3x mb-3 text-muted"></i>
+                                <h5 class="text-muted">No students assigned to this combination</h5>
+                                <p class="text-muted mb-4">This combination has not been assigned to any students yet.</p>
+                                <a href="{% url 'admin_student_combinations_list' %}" class="btn btn-primary">
+                                    <i class="fas fa-link"></i> Assign Students
+                                </a>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Class Distribution -->
+        {% if class_distribution %}
+        <div class="row mt-4">
+            <div class="col-lg-6">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-light">
+                        <h6 class="card-title mb-0">
+                            <i class="fas fa-chart-bar"></i> Class Distribution
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-sm">
+                                <thead>
+                                    <tr>
+                                        <th>Class</th>
+                                        <th>Student Count</th>
+                                        <th>Percentage</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for item in class_distribution %}
+                                    <tr>
+                                        <td>{{ item.class_level__name|default:"Unknown" }}</td>
+                                        <td>{{ item.count }}</td>
+                                        <td>
+                                            <div class="progress" style="height: 20px;">
+                                                <div class="progress-bar bg-info" role="progressbar" 
+                                                     style="width: {{ item.percentage|default:0 }}%;" 
+                                                     aria-valuenow="{{ item.count }}" 
+                                                     aria-valuemin="0" 
+                                                     aria-valuemax="{{ total_students }}">
+                                                    {{ item.percentage|default:0|floatformat:1 }}%
+                                                </div>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-lg-6">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-light">
+                        <h6 class="card-title mb-0">
+                            <i class="fas fa-history"></i> Recent Assignments
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        {% if recent_assignments %}
+                            <div class="list-group list-group-flush">
+                                {% for student in recent_assignments %}
+                                <div class="list-group-item d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <strong>{{ student.full_name }}</strong>
+                                        <div class="text-muted small">
+                                            {{ student.class_level.name|default:"No Class" }}
+                                            {% if student.stream_class %}{{ student.stream_class.stream_letter }}{% endif %}
+                                        </div>
+                                    </div>
+                                    <span class="badge badge-light">
+                                        {{ student.updated_at |date:"M d" }}
+                                    </span>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        {% else %}
+                            <div class="text-center py-3 text-muted">
+                                <i class="fas fa-clock fa-2x mb-2"></i>
+                                <p>No recent assignments</p>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</section>
+{% endblock content %}
+
+{% block extra_js %}
+<script>
+    $(document).ready(function() {
+        // Initialize DataTable
+        $('#students-table').DataTable({
+            "dom": "<'row'<'col-sm-12 col-md-6'l><'col-sm-12 col-md-6'f>>" +
+                   "<'row'<'col-sm-12'tr>>" +
+                   "<'row'<'col-sm-12 col-md-5'i><'col-sm-12 col-md-7'p>>",
+            "lengthMenu": [[10, 25, 50, -1], [10, 25, 50, "All"]],
+            "pageLength": 25,
+            "responsive": true,
+            "autoWidth": false,
+            "ordering": true,
+            "order": [[5, 'desc']], // Sort by assigned date by default
+            "columnDefs": [
+                { 
+                    "targets": 7, // Actions column
+                    "orderable": false,
+                    "searchable": false,
+                    "className": "dt-center"
+                }
+            ],
+            "language": {
+                "emptyTable": "<div class='text-center py-4'><i class='fas fa-user-graduate fa-2x mb-2'></i><br>No students found.</div>",
+                "search": "_INPUT_",
+                "searchPlaceholder": "Search students...",
+                "lengthMenu": "_MENU_ students per page",
+                "info": "Showing _START_ to _END_ of _TOTAL_ students",
+                "infoEmpty": "Showing 0 to 0 of 0 students",
+                "infoFiltered": "(filtered from _MAX_ total students)",
+                "paginate": {
+                    "first": "First",
+                    "last": "Last",
+                    "next": "Next",
+                    "previous": "Previous"
+                }
+            }
+        });
+        
+        // Custom search input
+        $('#search-students').on('keyup', function() {
+            $('#students-table').DataTable().search(this.value).draw();
+        });
+        
+        // Calculate percentages for display
+        function calculatePercentages() {
+            const totalStudents = {{ total_students }};
+            const maleStudents = {{ male_students }};
+            const femaleStudents = {{ female_students }};
+            
+            if (totalStudents > 0) {
+                const malePercentage = ((maleStudents / totalStudents) * 100).toFixed(1);
+                const femalePercentage = ((femaleStudents / totalStudents) * 100).toFixed(1);
+                
+                // Update display if you have elements to show these percentages
+                $('.male-percentage').text(malePercentage + '%');
+                $('.female-percentage').text(femalePercentage + '%');
+            }
+        }
+        
+        // Initialize
+        calculatePercentages();
+        
+        // Toast handling
+        function showToast(message, type = 'success') {
+            const toastId = type === 'success' ? '#success-toast' : '#error-toast';
+            const messageId = type === 'success' ? '#success-message' : '#error-message';
+            
+            $(messageId).text(message);
+            $(toastId).fadeIn().addClass('show');
+            
+            setTimeout(() => {
+                $(toastId).fadeOut().removeClass('show');
+            }, type === 'success' ? 3000 : 5000);
+        }
+        
+        // Check for URL parameters to show messages
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.has('message')) {
+            const message = urlParams.get('message');
+            const type = urlParams.get('type') || 'success';
+            showToast(message, type);
+        }
+        
+        // PDF download functionality
+        $('#download-pdf-btn').on('click', function(e) {
+            e.preventDefault();
+            const btn = $(this);
+            const originalText = btn.html();
+            
+            btn.html('<i class="fas fa-spinner fa-spin"></i> Generating PDF...');
+            btn.prop('disabled', true);
+            
+            window.open(btn.attr('href'), '_blank');
+            
+            setTimeout(() => {
+                btn.html(originalText);
+                btn.prop('disabled', false);
+            }, 2000);
+        });
+    });
+</script>
+{% endblock extra_js %}

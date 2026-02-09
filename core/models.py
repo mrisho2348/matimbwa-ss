@@ -209,3 +209,38 @@ class StreamClass(models.Model):
     @property
     def student_count(self):
         return self.students.filter(status='active').count()
+    
+
+class Combination(models.Model):
+    educational_level = models.ForeignKey(
+        EducationalLevel,
+        on_delete=models.CASCADE,
+        limit_choices_to={'code': 'A_LEVEL'}
+    )
+
+    name = models.CharField(max_length=50)   # PCM, PCB
+    code = models.CharField(max_length=10, unique=True)
+
+    subjects = models.ManyToManyField(
+        Subject,
+        through='CombinationSubject'
+    )
+
+    is_active = models.BooleanField(default=True)
+
+    def __str__(self):
+        return self.code
+
+
+class CombinationSubject(models.Model):
+    SUBJECT_ROLE_CHOICES = [
+        ('CORE', 'Core Subject'),
+        ('SUB', 'Subsidiary Subject'),
+    ]
+
+    combination = models.ForeignKey(Combination, on_delete=models.CASCADE)
+    subject = models.ForeignKey(Subject, on_delete=models.CASCADE)
+    role = models.CharField(max_length=5, choices=SUBJECT_ROLE_CHOICES)
+
+    class Meta:
+        unique_together = ('combination', 'subject')

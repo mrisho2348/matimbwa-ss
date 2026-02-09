@@ -2,7 +2,7 @@ from django.db import models
 from django.core.validators import RegexValidator
 from django.utils import timezone
 from accounts.models import GENDER_CHOICES, CustomUser, Staffs
-from core.models import AcademicYear, ClassLevel, StreamClass, Subject
+from core.models import AcademicYear, ClassLevel, Combination, StreamClass, Subject
 
 class PreviousSchool(models.Model):
     SCHOOL_LEVEL_CHOICES = [
@@ -59,6 +59,15 @@ class Student(models.Model):
         blank=True, 
         related_name='students'
     )
+
+    combination = models.ForeignKey(
+        Combination,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='students'
+    )
+    
     class_level = models.ForeignKey(ClassLevel, on_delete=models.SET_NULL, null=True, blank=True, related_name='students')
     stream_class = models.ForeignKey(StreamClass, on_delete=models.SET_NULL, null=True, blank=True, related_name='students')
     

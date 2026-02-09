@@ -1,0 +1,1320 @@
+{% extends 'admin/base.html' %}
+{% load static %}
+{% load custom_filters %}
+{% block title %} Subject Combinations Management {% endblock title %}
+
+{% block breadcrumb %}
+    <button type="button" class="btn btn-primary" data-toggle="modal" data-target="#addCombinationModal">
+        <i class="fas fa-plus"></i> Add Combination
+    </button>
+{% endblock breadcrumb %}
+
+{% block extra_css %}
+<style>
+    .table th {
+        font-weight: 600;
+        border-bottom-width: 2px;
+    }
+    .table td {
+        vertical-align: middle;
+    }
+    .badge {
+        font-size: 0.85em;
+        padding: 0.4em 0.8em;
+    }
+    .combination-badge {
+        background-color: #6c757d;
+        color: white;
+        padding: 3px 8px;
+        border-radius: 4px;
+        font-size: 0.8em;
+    }
+    .subject-chip {
+        display: inline-block;
+        background-color: #e9ecef;
+        border-radius: 15px;
+        padding: 3px 10px;
+        margin: 2px;
+        font-size: 0.85em;
+    }
+    .core-subject {
+        background-color: #d4edda;
+        color: #155724;
+    }
+    .subsidiary-subject {
+        background-color: #fff3cd;
+        color: #856404;
+    }
+    .success-toast, .error-toast {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 1056;
+        min-width: 300px;
+    }
+    .action-btn-sm {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.75rem;
+        border-radius: 0.2rem;
+    }
+    /* Quick actions container */
+    .quick-actions {
+        display: flex;
+        gap: 4px;
+        justify-content: center;
+        align-items: center;
+    }
+    .quick-action-btn {
+        width: 28px;
+        height: 28px;
+        padding: 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        border: none;
+        transition: all 0.2s ease;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+    }
+    .quick-action-btn:hover {
+        transform: scale(1.1);
+        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    }
+    .quick-action-btn i {
+        font-size: 0.75rem;
+        color: #ffffff !important;
+    }
+    .btn-success.quick-action-btn { background-color: #28a745; }
+    .btn-primary.quick-action-btn { background-color: #007bff; }
+    .btn-danger.quick-action-btn { background-color: #dc3545; }
+    .btn-info.quick-action-btn { background-color: #17a2b8; }
+    .btn-warning.quick-action-btn { background-color: #ffc107; }
+    .btn-warning.quick-action-btn i { color: #212529 !important; }
+    /* Name preview styling */
+    .name-preview {
+        background-color: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 5px;
+        padding: 10px 15px;
+        margin-bottom: 15px;
+        font-weight: 500;
+    }
+    .name-preview-label {
+        font-size: 0.9em;
+        color: #6c757d;
+        display: block;
+        margin-bottom: 5px;
+    }
+    .name-preview-value {
+        color: #495057;
+        font-size: 1.1em;
+    }
+    .name-preview-empty {
+        color: #6c757d;
+        font-style: italic;
+    }
+</style>
+{% endblock extra_css %}
+
+{% block content %}
+<section class="content">
+    <div class="container-fluid"> 
+        <div id="success-toast" class="alert alert-success alert-dismissible fade success-toast" style="display: none;" role="alert">
+            <strong><i class="fas fa-check-circle"></i> Success!</strong> 
+            <span id="success-message"></span>
+            <button type="button" class="close" onclick="$('#success-toast').fadeOut()" data-dismiss="alert" aria-label="Close">
+                <span aria-hidden="true">&times;</span>
+            </button>
+        </div>
+
+        <div id="error-toast" class="alert alert-danger alert-dismissible fade error-toast" style="display: none;" role="alert">
+            <strong><i class="fas fa-exclamation-circle"></i> Error!</strong> 
+            <span id="error-message"></span>
+            <button type="button" class="close" onclick="$('#error-toast').fadeOut()" data-dismiss="alert" aria-label="Close">
+                <span aria-hidden="true">&times;</span>
+            </button>
+        </div>
+
+        <div class="row">
+            <div class="col-lg-12">
+                <div class="card shadow-lg">
+                    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                        <h6 class="header-title mb-0 text-uppercase">
+                            <i class="fas fa-layer-group"></i> A-Level Subject Combinations
+                        </h6>
+                        <div class="d-flex align-items-center">
+                            <span class="badge badge-success mr-2">
+                                <i class="fas fa-check-circle"></i> Active: <span id="active-count">{{ active_combinations }}</span>
+                            </span>
+                            <span class="badge badge-light">
+                                Total: <span id="total-count">{{ total_combinations }}</span>
+                            </span>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle"></i> 
+                            <strong>A-Level Combinations:</strong> Manage subject combinations for A-Level students. Each combination consists of Core and Subsidiary subjects. Combination name is automatically generated from selected core subjects.
+                        </div>
+                        
+                        <div class="table-responsive">
+                            <table class="table table-hover text-nowrap table-responsive-sm table-bordered table-striped table-sm display" id="combinations-table">
+                                <thead class="bg-light">
+                                    <tr>
+                                        <th>Code</th>
+                                        <th>Name</th>
+                                        <th>Subjects</th>
+                                        <th>Status</th>
+                                        <th class="text-center">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for combination in combinations %}
+                                    <tr id="row-{{ combination.id }}">
+                                        <td>
+                                            <strong><code>{{ combination.code }}</code></strong>
+                                        </td>
+                                        <td>
+                                            <strong>{{ combination.name }}</strong>
+                                        </td>
+                                        <td>
+                                            {% with subjects=combination_subjects_data|get_item:combination.id %}
+                                                {% if subjects %}
+                                                    {% for subject in subjects.core %}
+                                                        <span class="subject-chip core-subject" title="Core Subject">
+                                                            <i class="fas fa-star"></i> {{ subject }}
+                                                        </span>
+                                                    {% endfor %}
+                                                    {% for subject in subjects.subsidiary %}
+                                                        <span class="subject-chip subsidiary-subject" title="Subsidiary Subject">
+                                                            <i class="fas fa-circle"></i> {{ subject }}
+                                                        </span>
+                                                    {% endfor %}
+                                                    <small class="text-muted d-block mt-1">
+                                                        Total: {{ subjects.total_subjects }} subjects
+                                                    </small>
+                                                {% else %}
+                                                    <span class="text-muted">No subjects assigned</span>
+                                                {% endif %}
+                                            {% endwith %}
+                                        </td>
+                                        <td>
+                                            {% if combination.is_active %}
+                                                <span class="badge badge-success" id="status-badge-{{ combination.id }}">
+                                                    <i class="fas fa-check-circle"></i> Active
+                                                </span>
+                                            {% else %}
+                                                <span class="badge badge-secondary" id="status-badge-{{ combination.id }}">
+                                                    <i class="fas fa-times-circle"></i> Inactive
+                                                </span>
+                                            {% endif %}
+                                        </td>
+                                        <td class="text-center">
+                                            <div class="quick-actions">
+                                                <!-- Manage Subjects Button -->
+                                                <button class="btn btn-sm btn-info quick-action-btn manage-subjects-btn" 
+                                                        data-id="{{ combination.id }}"
+                                                        data-name="{{ combination.name }}"
+                                                        title="Manage Subjects">
+                                                    <i class="fas fa-book"></i>
+                                                </button>
+                                                 <!-- View Students Button (NEW) -->
+                                                <a href="{% url 'admin_combination_students' combination.id %}" 
+                                                class="btn btn-sm btn-primary quick-action-btn" 
+                                                title="View Students with this Combination">
+                                                    <i class="fas fa-user-graduate"></i>
+                                                </a>
+                                                <!-- Quick Status Toggle -->
+                                                {% if combination.is_active %}
+                                                <button class="btn btn-sm btn-warning quick-action-btn toggle-status-btn" 
+                                                        data-id="{{ combination.id }}"
+                                                        data-name="{{ combination.name }}"
+                                                        data-current-status="active"
+                                                        title="Deactivate Combination">
+                                                    <i class="fas fa-toggle-off"></i>
+                                                </button>
+                                                {% else %}
+                                                <button class="btn btn-sm btn-success quick-action-btn toggle-status-btn" 
+                                                        data-id="{{ combination.id }}"
+                                                        data-name="{{ combination.name }}"
+                                                        data-current-status="inactive"
+                                                        title="Activate Combination">
+                                                    <i class="fas fa-toggle-on"></i>
+                                                </button>
+                                                {% endif %}
+                                                
+                                           
+                                                
+                                                <!-- Delete Button -->
+                                                <button class="btn btn-sm btn-danger quick-action-btn delete-btn" 
+                                                        data-id="{{ combination.id }}"
+                                                        data-name="{{ combination.name }}"
+                                                        title="Delete Combination">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Add Combination Modal -->
+<div class="modal fade" id="addCombinationModal" tabindex="-1" role="dialog" aria-labelledby="addModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="addModalLabel">
+                    <i class="fas fa-plus-circle"></i> Add New Combination
+                </h5>
+                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <form id="add-form">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i> 
+                        This combination will be created for <strong>A-Level</strong> students only. Combination name will be generated automatically from selected core subjects.
+                    </div>
+                    
+                    <!-- Auto-generated Name Preview -->
+                    <div class="name-preview">
+                        <span class="name-preview-label">Combination Name Preview:</span>
+                        <span class="name-preview-value" id="name-preview">
+                            <span class="name-preview-empty">Will be generated from core subjects</span>
+                        </span>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-12">
+                            <div class="form-group">
+                                <label for="code">Combination Code <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="code" name="code" required 
+                                       placeholder="e.g., PCM, PCB, BCM" maxlength="10" style="text-transform: uppercase;">
+                                <small class="form-text text-muted">Unique code for this combination (max 10 characters)</small>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Subjects Section -->
+                    <div class="row">
+                        <div class="col-md-12">
+                            <div class="card">
+                                <div class="card-header bg-light">
+                                    <h6 class="card-title mb-0">
+                                        <i class="fas fa-book"></i> Subjects (Optional - Can add later)
+                                    </h6>
+                                </div>
+                                <div class="card-body">
+                                    <div class="alert alert-warning">
+                                        <i class="fas fa-lightbulb"></i> 
+                                        <strong>Tip:</strong> Combination name will be generated from the core subjects you select. For example: "Mathematics Physics Chemistry" for PCM combination.
+                                    </div>
+                                    
+                                    <div id="subjects-container">
+                                        <!-- Subjects will be added here dynamically -->
+                                    </div>
+                                    
+                                    <div class="row mt-3">
+                                        <div class="col-md-8">
+                                            <select class="form-control select2" id="subject-select" style="width: 100%;">
+                                                <option value="">Select a subject to add</option>
+                                                {% for subject in a_level_subjects %}
+                                                    <option value="{{ subject.id }}" 
+                                                            data-name="{{ subject.name }}"
+                                                            data-code="{{ subject.code }}"
+                                                            data-is-compulsory="{{ subject.is_compulsory|yesno:'true,false' }}">
+                                                        {{ subject.name }} ({{ subject.code }}) 
+                                                        {% if subject.is_compulsory %}
+                                                            <span class="badge badge-success">Compulsory</span>
+                                                        {% else %}
+                                                            <span class="badge badge-secondary">Optional</span>
+                                                        {% endif %}
+                                                    </option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <select class="form-control" id="subject-role">
+                                                <option value="CORE">Core Subject</option>
+                                                <option value="SUB">Subsidiary Subject</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    
+                                    <button type="button" class="btn btn-sm btn-outline-primary mt-2" id="add-subject-btn">
+                                        <i class="fas fa-plus"></i> Add Subject
+                                    </button>
+                                    
+                                    <!-- Hidden field to store generated name -->
+                                    <input type="hidden" id="generated-name" name="name">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row mt-3">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label>Status</label>
+                                <div class="custom-control custom-switch mt-2">
+                                    <input type="checkbox" class="custom-control-input" id="is_active" name="is_active" checked>
+                                    <label class="custom-control-label" for="is_active">
+                                        <span id="active-label">Active</span>
+                                    </label>
+                                    <small class="form-text text-muted d-block">Toggle to activate/deactivate</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal" id="cancel-add-btn">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="save-btn">
+                        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="display: none;"></span>
+                        Save Combination
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Combination Modal -->
+<div class="modal fade" id="editCombinationModal" tabindex="-1" role="dialog" aria-labelledby="editModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-warning text-dark">
+                <h5 class="modal-title" id="editModalLabel">
+                    <i class="fas fa-edit"></i> Edit Combination
+                </h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <form id="edit-form">
+                {% csrf_token %}
+                <input type="hidden" id="edit-id" name="id">
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-12">
+                            <div class="form-group">
+                                <label for="edit-code">Combination Code <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="edit-code" name="code" required 
+                                       placeholder="e.g., PCM, PCB" maxlength="10" style="text-transform: uppercase;">
+                                <small class="form-text text-muted">Unique code for this combination</small>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label>Status</label>
+                                <div class="custom-control custom-switch mt-2">
+                                    <input type="checkbox" class="custom-control-input" id="edit-is_active" name="is_active">
+                                    <label class="custom-control-label" for="edit-is_active">
+                                        <span id="edit-active-label">Inactive</span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal" id="cancel-edit-btn">Cancel</button>
+                    <button type="submit" class="btn btn-warning" id="update-btn">
+                        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="display: none;"></span>
+                        Update Combination
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Manage Subjects Modal -->
+<div class="modal fade" id="manageSubjectsModal" tabindex="-1" role="dialog" aria-labelledby="manageSubjectsLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-info text-white">
+                <h5 class="modal-title" id="manageSubjectsLabel">
+                    <i class="fas fa-book"></i> Manage Subjects for: <span id="combination-name"></span>
+                </h5>
+                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="current-combination-id">
+                
+                <!-- Current Subjects -->
+                <div class="card">
+                    <div class="card-header bg-light">
+                        <h6 class="card-title mb-0">
+                            <i class="fas fa-list"></i> Current Subjects
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover text-nowrap table-responsive-sm table-bordered table-striped table-sm display" id="current-subjects-table">
+                                <thead>
+                                    <tr>
+                                        <th>Subject</th>
+                                        <th>Code</th>
+                                        <th>Type</th>
+                                        <th>Role</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="current-subjects-body">
+                                    <!-- Will be populated by JavaScript -->
+                                </tbody>
+                            </table>
+                        </div>
+                        <div id="no-subjects-message" class="text-center py-4">
+                            <i class="fas fa-inbox fa-2x mb-2 text-muted"></i>
+                            <p class="text-muted">No subjects assigned to this combination</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Add New Subject -->
+                <div class="card mt-3">
+                    <div class="card-header bg-light">
+                        <h6 class="card-title mb-0">
+                            <i class="fas fa-plus"></i> Add New Subject
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-8">
+                                <select class="form-control select2" id="new-subject-select" style="width: 100%;">
+                                    <option value="">Select a subject to add</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <select class="form-control" id="new-subject-role">
+                                    <option value="CORE">Core Subject</option>
+                                    <option value="SUB">Subsidiary Subject</option>
+                                </select>
+                            </div>
+                        </div>
+                        <button type="button" class="btn btn-primary mt-3" id="add-new-subject-btn">
+                            <i class="fas fa-plus"></i> Add Subject to Combination
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Combination Modal -->
+<div class="modal fade" id="deleteCombinationModal" tabindex="-1" role="dialog" aria-labelledby="deleteModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="deleteModalLabel">
+                    <i class="fas fa-exclamation-triangle"></i> Confirm Deletion
+                </h5>
+                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete the combination <strong id="delete-combination-name"></strong>?</p>
+                <p class="text-danger"><small>This action cannot be undone. Any students assigned to this combination will need to be reassigned.</small></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal" id="cancel-delete-btn">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirm-delete-btn">
+                    <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="display: none;"></span>
+                    Delete
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+<script>
+    $(document).ready(function() {
+        // Global variables
+        let combinationToDelete = null;
+        let currentCombinationId = null;
+        let addedSubjects = [];
+        
+        // Initialize DataTable
+        var table = $('#combinations-table').DataTable({
+            "dom": "<'row'<'col-sm-12 col-md-6'l><'col-sm-12 col-md-6'f>>" +
+                   "<'row'<'col-sm-12'tr>>" +
+                   "<'row'<'col-sm-12 col-md-5'i><'col-sm-12 col-md-7'p>>",
+            "lengthMenu": [[10, 25, 50, -1], [10, 25, 50, "All"]],
+            "pageLength": 10,
+            "responsive": true,
+            "autoWidth": false,
+            "ordering": true,
+            "order": [[0, 'asc']], // Sort by combination code
+            
+            "columnDefs": [
+                { 
+                    "targets": 4, // Actions column
+                    "orderable": false,
+                    "searchable": false
+                }
+            ],
+            
+            "language": {
+                "emptyTable": "<div class='text-center py-4'><i class='fas fa-inbox fa-2x mb-2'></i><br>No combinations found. Click \"Add Combination\" to create one.</div>",
+                "search": "_INPUT_",
+                "searchPlaceholder": "Search combinations...",
+                "lengthMenu": "_MENU_ combinations per page",
+                "info": "Showing _START_ to _END_ of _TOTAL_ combinations",
+                "infoEmpty": "Showing 0 to 0 of 0 combinations",
+                "infoFiltered": "(filtered from _MAX_ total combinations)",
+                "paginate": {
+                    "first": "First",
+                    "last": "Last",
+                    "next": "Next",
+                    "previous": "Previous"
+                }
+            }
+        });
+        
+        // Initialize Select2
+        function initializeSelect2() {
+            $('.select2').select2({
+                theme: 'bootstrap4',
+                dropdownParent: $('.modal:visible'),
+                width: '100%',
+                placeholder: 'Select an option',
+                allowClear: true
+            });
+        }
+        
+        // Initialize on page load
+        initializeSelect2();
+        
+        // Reinitialize Select2 when modals are shown
+        $('#addCombinationModal').on('shown.bs.modal', function() {
+            $('#subject-select').select2({
+                theme: 'bootstrap4',
+                dropdownParent: $('#addCombinationModal'),
+                width: '100%'
+            });
+        });
+        
+        $('#manageSubjectsModal').on('shown.bs.modal', function() {
+            $('#new-subject-select').select2({
+                theme: 'bootstrap4',
+                dropdownParent: $('#manageSubjectsModal'),
+                width: '100%'
+            });
+        });
+        // Handle modal close/cancel buttons
+        $(document).on('click', '[data-dismiss="modal"]', function(e) {
+            e.preventDefault();
+            $(this).closest('.modal').modal('hide');
+        });
+        // Destroy Select2 when modals are hidden
+        $('#addCombinationModal').on('hidden.bs.modal', function() {
+            $('#subject-select').select2('destroy');
+            $('#add-form')[0].reset();
+            addedSubjects = [];
+            $('#subjects-container').empty();
+            $('#active-label').text('Active');
+            $('#name-preview').html('<span class="name-preview-empty">Will be generated from core subjects</span>');
+            $('#generated-name').val('');
+        });
+        
+        $('#manageSubjectsModal').on('hidden.bs.modal', function() {
+            $('#new-subject-select').select2('destroy');
+            currentCombinationId = null;
+        });
+        
+        // Toggle switch label updates
+        $('#is_active').on('change', function() {
+            $('#active-label').text($(this).is(':checked') ? 'Active' : 'Inactive');
+        });
+        
+        $('#edit-is_active').on('change', function() {
+            $('#edit-active-label').text($(this).is(':checked') ? 'Active' : 'Inactive');
+        });
+        
+        // CSRF token for AJAX requests
+        function getCSRFToken() {
+            return $('input[name="csrfmiddlewaretoken"]').val();
+        }
+        
+        // Show toast message
+        function showToast(message, type = 'success') {
+            const toastId = type === 'success' ? '#success-toast' : '#error-toast';
+            const messageId = type === 'success' ? '#success-message' : '#error-message';
+            
+            $(messageId).text(message);
+            $(toastId).addClass('show').fadeIn();
+            
+            setTimeout(function() {
+                $(toastId).fadeOut(function() {
+                    $(this).removeClass('show');
+                });
+            }, type === 'success' ? 3000 : 5000);
+        }
+        
+        // Function to reload page after delay
+        function reloadPageAfterDelay(message, type = 'success') {
+            showToast(message, type);
+            var delay = type === 'success' ? 2000 : 3000;
+            setTimeout(function() {
+                location.reload();
+            }, delay);
+        }
+        
+        // Function to update UI without reload
+        function updateCombinationUI(combinationId, data) {
+            const statusBadge = $('#status-badge-' + combinationId);
+            const statusBtn = $('.toggle-status-btn[data-id="' + combinationId + '"]');
+            
+            if (data.hasOwnProperty('is_active')) {
+                if (data.is_active) {
+                    statusBadge.removeClass('badge-secondary').addClass('badge-success')
+                        .html('<i class="fas fa-check-circle"></i> Active');
+                    statusBtn.removeClass('btn-success').addClass('btn-warning')
+                        .attr('title', 'Deactivate Combination')
+                        .html('<i class="fas fa-toggle-off"></i>')
+                        .attr('data-current-status', 'active');
+                } else {
+                    statusBadge.removeClass('badge-success').addClass('badge-secondary')
+                        .html('<i class="fas fa-times-circle"></i> Inactive');
+                    statusBtn.removeClass('btn-warning').addClass('btn-success')
+                        .attr('title', 'Activate Combination')
+                        .html('<i class="fas fa-toggle-on"></i>')
+                        .attr('data-current-status', 'inactive');
+                }
+                
+                // Update active count
+                var currentActive = parseInt($('#active-count').text());
+                if (data.is_active) {
+                    $('#active-count').text(currentActive + 1);
+                } else {
+                    $('#active-count').text(currentActive - 1);
+                }
+            }
+        }
+        
+        // Helper function to handle button loading state
+        function setButtonLoading(btn, isLoading) {
+            const spinner = btn.find('.spinner-border');
+            if (isLoading) {
+                btn.data('original-text', btn.html());
+                btn.prop('disabled', true);
+                spinner.show();
+                btn.html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>');
+            } else {
+                btn.prop('disabled', false);
+                spinner.hide();
+                btn.html(btn.data('original-text'));
+            }
+        }
+        
+        // Function to update name preview based on core subjects
+        function updateNamePreview() {
+            const coreSubjects = [];
+            
+            // Collect all core subject names
+            $('#subjects-container .subject-chip[data-role="CORE"]').each(function() {
+                const subjectText = $(this).text().trim();
+                // Extract subject name (remove icon and role text)
+                const subjectName = subjectText.replace(/^[^a-zA-Z]+/, '').replace(/\s*\(Core Subject\)\s*$/, '');
+                if (subjectName) {
+                    coreSubjects.push(subjectName);
+                }
+            });
+            
+            // Update preview
+            const previewElement = $('#name-preview');
+            if (coreSubjects.length > 0) {
+                const generatedName = coreSubjects.join(' ');
+                previewElement.removeClass('name-preview-empty').text(generatedName);
+                $('#generated-name').val(generatedName);
+            } else {
+                previewElement.html('<span class="name-preview-empty">Will be generated from core subjects</span>');
+                $('#generated-name').val('');
+            }
+        }
+        
+        // =============== ADD SUBJECT TO FORM (for create modal) ===============
+        $('#add-subject-btn').on('click', function() {
+            const subjectSelect = $('#subject-select');
+            const roleSelect = $('#subject-role');
+            const subjectId = subjectSelect.val();
+            const subjectOption = subjectSelect.find('option:selected');
+            const subjectName = subjectOption.data('name');
+            const subjectCode = subjectOption.data('code');
+            const subjectText = subjectOption.text().trim();
+            const role = roleSelect.val();
+            const roleText = roleSelect.find('option:selected').text();
+            
+            if (!subjectId) {
+                showToast('Please select a subject first.', 'danger');
+                return;
+            }
+            
+            // Check if subject is already added
+            if (addedSubjects.includes(subjectId)) {
+                showToast('This subject is already added to the combination.', 'danger');
+                return;
+            }
+            
+            // Add to array
+            addedSubjects.push(subjectId);
+            
+            // Create subject chip
+            const chipClass = role === 'CORE' ? 'core-subject' : 'subsidiary-subject';
+            const chipIcon = role === 'CORE' ? '<i class="fas fa-star"></i>' : '<i class="fas fa-circle"></i>';
+            const chipHtml = `
+                <div class="subject-chip ${chipClass} mb-2 d-inline-flex align-items-center" data-subject-id="${subjectId}" data-role="${role}" data-subject-name="${subjectName}">
+                    ${chipIcon} ${subjectName} (${roleText})
+                    <button type="button" class="btn btn-sm btn-link text-danger ml-2 remove-subject-btn" style="padding: 0; font-size: 0.8em;">
+                        <i class="fas fa-times"></i>
+                    </button>
+                    <input type="hidden" name="subjects[]" value="${subjectId}">
+                    <input type="hidden" name="subject_roles[]" value="${role}">
+                </div>
+            `;
+            
+            $('#subjects-container').append(chipHtml);
+            
+            // Update name preview if this is a core subject
+            if (role === 'CORE') {
+                updateNamePreview();
+            }
+            
+            // Reset selects
+            subjectSelect.val('').trigger('change');
+            roleSelect.val('CORE');
+        });
+        
+        // Remove subject from form
+        $(document).on('click', '.remove-subject-btn', function() {
+            const chip = $(this).closest('.subject-chip');
+            const subjectId = chip.data('subject-id');
+            const subjectRole = chip.data('role');
+            
+            // Remove from array
+            const index = addedSubjects.indexOf(subjectId);
+            if (index > -1) {
+                addedSubjects.splice(index, 1);
+            }
+            
+            chip.remove();
+            
+            // Update name preview if this was a core subject
+            if (subjectRole === 'CORE') {
+                updateNamePreview();
+            }
+        });
+        
+        // =============== CREATE COMBINATION ===============
+        $('#add-form').on('submit', function(e) {
+            e.preventDefault();
+            
+            // Validate that we have a name (generated from core subjects)
+            const generatedName = $('#generated-name').val();
+            if (!generatedName) {
+                showToast('Please add at least one core subject to generate combination name.', 'danger');
+                return;
+            }
+            
+            const saveBtn = $('#save-btn');
+            setButtonLoading(saveBtn, true);
+            
+            const formData = new FormData(this);
+            formData.append('action', 'create');
+            
+            // Ensure name field is included
+            if (!formData.has('name')) {
+                formData.append('name', generatedName);
+            }
+            
+            $.ajax({
+                url: '{% url "admin_combinations_crud" %}',
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCSRFToken(),
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function(data) {
+                    if (data.success) {
+                        $('#addCombinationModal').modal('hide');
+                        reloadPageAfterDelay(data.message, 'success');
+                    } else {
+                        showToast(data.message, 'danger');
+                        setButtonLoading(saveBtn, false);
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error:', error);
+                    showToast('An error occurred while saving. Please try again.', 'danger');
+                    setButtonLoading(saveBtn, false);
+                }
+            });
+        });
+        
+        // =============== EDIT COMBINATION ===============
+        // Setup modal
+        $(document).on('click', '.edit-btn', function() {
+            const btn = $(this);
+            
+            $('#edit-id').val(btn.data('id'));
+            $('#edit-code').val(btn.data('code'));
+            $('#edit-is_active').prop('checked', btn.data('is-active') === 'true');
+            $('#edit-active-label').text(btn.data('is-active') === 'true' ? 'Active' : 'Inactive');
+            
+            $('#editCombinationModal').modal('show');
+        });
+        
+        // Submit form
+        $('#edit-form').on('submit', function(e) {
+            e.preventDefault();
+            
+            const updateBtn = $('#update-btn');
+            setButtonLoading(updateBtn, true);
+            
+            const formData = new FormData(this);
+            formData.append('action', 'update');
+            
+            $.ajax({
+                url: '{% url "admin_combinations_crud" %}',
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCSRFToken(),
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function(data) {
+                    if (data.success) {
+                        $('#editCombinationModal').modal('hide');
+                        reloadPageAfterDelay(data.message, 'success');
+                    } else {
+                        showToast(data.message, 'danger');
+                        setButtonLoading(updateBtn, false);
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error:', error);
+                    showToast('An error occurred while updating. Please try again.', 'danger');
+                    setButtonLoading(updateBtn, false);
+                }
+            });
+        });
+        
+        // =============== TOGGLE COMBINATION STATUS ===============
+        $(document).on('click', '.toggle-status-btn', function() {
+            const btn = $(this);
+            const combinationId = btn.data('id');
+            const combinationName = btn.data('name');
+            const currentStatus = btn.data('current-status');
+            const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
+            const actionText = currentStatus === 'active' ? 'deactivate' : 'activate';
+            
+            if (confirm(`Are you sure you want to ${actionText} "${combinationName}"?`)) {
+                setButtonLoading(btn, true);
+                
+                $.ajax({
+                    url: '{% url "admin_combinations_crud" %}',
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': getCSRFToken(),
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    data: {
+                        'action': 'toggle_status',
+                        'id': combinationId,
+                        'csrfmiddlewaretoken': getCSRFToken()
+                    },
+                    success: function(data) {
+                        if (data.success) {
+                            updateCombinationUI(combinationId, { is_active: data.is_active });
+                            showToast(data.message, 'success');
+                        } else {
+                            showToast(data.message, 'danger');
+                        }
+                        setButtonLoading(btn, false);
+                    },
+                    error: function(xhr, status, error) {
+                        console.error('Error:', error);
+                        showToast('An error occurred while updating status. Please try again.', 'danger');
+                        setButtonLoading(btn, false);
+                    }
+                });
+            }
+        });
+        
+        // =============== DELETE COMBINATION ===============
+        // Setup modal
+        $(document).on('click', '.delete-btn', function() {
+            combinationToDelete = {
+                id: $(this).data('id'),
+                name: $(this).data('name')
+            };
+            
+            $('#delete-combination-name').text($(this).data('name'));
+            $('#deleteCombinationModal').modal('show');
+        });
+        
+        // Confirm deletion
+        $('#confirm-delete-btn').on('click', function() {
+            if (!combinationToDelete) return;
+            
+            const deleteBtn = $(this);
+            setButtonLoading(deleteBtn, true);
+            
+            $.ajax({
+                url: '{% url "admin_combinations_crud" %}',
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCSRFToken(),
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                data: {
+                    'action': 'delete',
+                    'id': combinationToDelete.id,
+                    'csrfmiddlewaretoken': getCSRFToken()
+                },
+                success: function(data) {
+                    if (data.success) {
+                        $('#deleteCombinationModal').modal('hide');
+                        reloadPageAfterDelay(data.message, 'success');
+                    } else {
+                        showToast(data.message, 'danger');
+                        setButtonLoading(deleteBtn, false);
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error:', error);
+                    showToast('An error occurred while deleting. Please try again.', 'danger');
+                    setButtonLoading(deleteBtn, false);
+                }
+            });
+        });
+        
+        // =============== MANAGE SUBJECTS ===============
+        // Open manage subjects modal
+        $(document).on('click', '.manage-subjects-btn', function() {
+            currentCombinationId = $(this).data('id');
+            const combinationName = $(this).data('name');
+            
+            $('#combination-name').text(combinationName);
+            $('#current-combination-id').val(currentCombinationId);
+            
+            // Load current subjects
+            loadCurrentSubjects();
+            
+            // Load available subjects
+            loadAvailableSubjects();
+            
+            $('#manageSubjectsModal').modal('show');
+        });
+        
+        // Load current subjects for the combination
+        function loadCurrentSubjects() {
+            $.ajax({
+                url: '{% url "admin_combinations_crud" %}',
+                method: 'GET',
+                data: {
+                    'action': 'get_combination_subjects',
+                    'combination_id': currentCombinationId
+                },
+                success: function(data) {
+                    if (data.success) {
+                        const tbody = $('#current-subjects-body');
+                        tbody.empty();
+                        
+                        if (data.subjects.length === 0) {
+                            $('#no-subjects-message').show();
+                            return;
+                        }
+                        
+                        $('#no-subjects-message').hide();
+                        
+                        data.subjects.forEach(function(subject) {
+                            const roleClass = subject.role === 'CORE' ? 'badge-success' : 'badge-warning';
+                            const typeClass = subject.is_compulsory ? 'badge-info' : 'badge-secondary';
+                            
+                            const row = `
+                                <tr id="subject-row-${subject.id}">
+                                    <td>${subject.subject_name}</td>
+                                    <td><code>${subject.subject_code}</code></td>
+                                    <td>
+                                        <span class="badge ${typeClass}">
+                                            ${subject.is_compulsory ? 'Compulsory' : 'Optional'}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <select class="form-control form-control-sm subject-role-select" 
+                                                data-subject-id="${subject.id}"
+                                                style="width: auto; min-width: 120px;">
+                                            <option value="CORE" ${subject.role === 'CORE' ? 'selected' : ''}>Core</option>
+                                            <option value="SUB" ${subject.role === 'SUB' ? 'selected' : ''}>Subsidiary</option>
+                                        </select>
+                                    </td>
+                                    <td>
+                                        <button class="btn btn-sm btn-danger remove-subject-combo-btn" 
+                                                data-subject-id="${subject.id}"
+                                                data-subject-name="${subject.subject_name}">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                            `;
+                            
+                            tbody.append(row);
+                        });
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error loading subjects:', error);
+                    showToast('Error loading subjects. Please try again.', 'danger');
+                }
+            });
+        }
+        
+        // Load available subjects for adding
+        function loadAvailableSubjects() {
+            $.ajax({
+                url: '{% url "admin_combinations_crud" %}',
+                method: 'GET',
+                data: {
+                    'action': 'get_available_subjects',
+                    'combination_id': currentCombinationId
+                },
+                success: function(data) {
+                    if (data.success) {
+                        const select = $('#new-subject-select');
+                        select.empty();
+                        select.append('<option value="">Select a subject to add</option>');
+                        
+                        data.subjects.forEach(function(subject) {
+                            const compulsoryBadge = subject.is_compulsory 
+                                ? '<span class="badge badge-success">Compulsory</span>'
+                                : '<span class="badge badge-secondary">Optional</span>';
+                            
+                            select.append(`
+                                <option value="${subject.id}">
+                                    ${subject.name} (${subject.code}) ${compulsoryBadge}
+                                </option>
+                            `);
+                        });
+                        
+                        select.trigger('change');
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error loading available subjects:', error);
+                }
+            });
+        }
+        
+        // Add new subject to combination
+        $('#add-new-subject-btn').on('click', function() {
+            const subjectId = $('#new-subject-select').val();
+            const role = $('#new-subject-role').val();
+            
+            if (!subjectId) {
+                showToast('Please select a subject first.', 'danger');
+                return;
+            }
+            
+            const addBtn = $(this);
+            setButtonLoading(addBtn, true);
+            
+            $.ajax({
+                url: '{% url "admin_combinations_crud" %}',
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCSRFToken(),
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                data: {
+                    'action': 'add_subject',
+                    'combination_id': currentCombinationId,
+                    'subject_id': subjectId,
+                    'role': role,
+                    'csrfmiddlewaretoken': getCSRFToken()
+                },
+                success: function(data) {
+                    if (data.success) {
+                        // Reload subjects lists
+                        loadCurrentSubjects();
+                        loadAvailableSubjects();
+                        
+                        // Reset form
+                        $('#new-subject-select').val('').trigger('change');
+                        $('#new-subject-role').val('CORE');
+                        
+                        showToast(data.message, 'success');
+                    } else {
+                        showToast(data.message, 'danger');
+                    }
+                    setButtonLoading(addBtn, false);
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error:', error);
+                    showToast('An error occurred while adding subject. Please try again.', 'danger');
+                    setButtonLoading(addBtn, false);
+                }
+            });
+        });
+        
+        // Update subject role
+        $(document).on('change', '.subject-role-select', function() {
+            const combinationSubjectId = $(this).data('subject-id');
+            const newRole = $(this).val();
+            
+            $.ajax({
+                url: '{% url "admin_combinations_crud" %}',
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCSRFToken(),
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                data: {
+                    'action': 'update_subject_role',
+                    'combination_subject_id': combinationSubjectId,
+                    'role': newRole,
+                    'csrfmiddlewaretoken': getCSRFToken()
+                },
+                success: function(data) {
+                    if (data.success) {
+                        showToast(data.message, 'success');
+                    } else {
+                        showToast(data.message, 'danger');
+                        // Reload to reset to previous state
+                        loadCurrentSubjects();
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error:', error);
+                    showToast('Error updating subject role. Please try again.', 'danger');
+                    loadCurrentSubjects();
+                }
+            });
+        });
+        
+        // Remove subject from combination
+        $(document).on('click', '.remove-subject-combo-btn', function() {
+            const combinationSubjectId = $(this).data('subject-id');
+            const subjectName = $(this).data('subject-name');
+            
+            if (confirm(`Are you sure you want to remove "${subjectName}" from this combination?`)) {
+                const btn = $(this);
+                btn.prop('disabled', true);
+                
+                $.ajax({
+                    url: '{% url "admin_combinations_crud" %}',
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': getCSRFToken(),
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    data: {
+                        'action': 'remove_subject',
+                        'combination_subject_id': combinationSubjectId,
+                        'csrfmiddlewaretoken': getCSRFToken()
+                    },
+                    success: function(data) {
+                        if (data.success) {
+                            // Reload subjects lists
+                            loadCurrentSubjects();
+                            loadAvailableSubjects();
+                            showToast(data.message, 'success');
+                        } else {
+                            showToast(data.message, 'danger');
+                            btn.prop('disabled', false);
+                        }
+                    },
+                    error: function(xhr, status, error) {
+                        console.error('Error:', error);
+                        showToast('Error removing subject. Please try again.', 'danger');
+                        btn.prop('disabled', false);
+                    }
+                });
+            }
+        });
+        
+        // Form validation
+        $('#add-form, #edit-form').on('submit', function(e) {
+            const isAddForm = $(this).attr('id') === 'add-form';
+            const codeInput = isAddForm ? '#code' : '#edit-code';
+            
+            const code = $(codeInput).val().trim();
+            
+            // Validate code format (alphanumeric with optional underscores/hyphens)
+            if (!/^[A-Za-z0-9_-]+$/.test(code)) {
+                e.preventDefault();
+                showToast('Combination code can only contain letters, numbers, hyphens, and underscores.', 'danger');
+                $(codeInput).addClass('is-invalid');
+                return false;
+            }
+            
+            // For add form, validate that we have at least one core subject
+            if (isAddForm) {
+                const hasCoreSubjects = $('#subjects-container .subject-chip[data-role="CORE"]').length > 0;
+                if (!hasCoreSubjects) {
+                    e.preventDefault();
+                    showToast('Please add at least one core subject to generate combination name.', 'danger');
+                    return false;
+                }
+            }
+            
+            return true;
+        });
+        
+        // Remove validation classes on input
+        $('#code, #edit-code').on('input', function() {
+            $(this).removeClass('is-invalid');
+        });
+        
+        // Cancel buttons
+        $('#cancel-add-btn, #cancel-edit-btn, #cancel-delete-btn').on('click', function(e) {
+            e.preventDefault();
+            $(this).closest('.modal').modal('hide');
+        });
+        
+        // Clear form and reset button state on modal close
+        $('#addCombinationModal').on('hidden.bs.modal', function() {
+            $('#add-form')[0].reset();
+            setButtonLoading($('#save-btn'), false);
+        });
+        
+        $('#editCombinationModal').on('hidden.bs.modal', function() {
+            setButtonLoading($('#update-btn'), false);
+        });
+        
+        $('#deleteCombinationModal').on('hidden.bs.modal', function() {
+            combinationToDelete = null;
+            setButtonLoading($('#confirm-delete-btn'), false);
+        });
+    });
+</script>
+{% endblock extra_js %}

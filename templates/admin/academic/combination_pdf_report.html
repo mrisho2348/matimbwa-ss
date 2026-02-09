@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Combination Report - {{ combination.code }}</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 2cm;
+            @top-center {
+                content: "Combination Students Report";
+                font-size: 12px;
+                color: #666;
+            }
+            @bottom-center {
+                content: "Page " counter(page) " of " counter(pages);
+                font-size: 10px;
+                color: #666;
+            }
+        }
+        
+        body {
+            font-family: 'Helvetica', 'Arial', sans-serif;
+            font-size: 12px;
+            line-height: 1.4;
+            color: #333;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #3498db;
+        }
+        
+        .header h1 {
+            color: #2c3e50;
+            margin: 0;
+            font-size: 24px;
+        }
+        
+        .header .subtitle {
+            color: #7f8c8d;
+            font-size: 14px;
+            margin-top: 5px;
+        }
+        
+        .info-box {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .stats-container {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+        
+        .stat-box {
+            flex: 1;
+            text-align: center;
+            padding: 10px;
+            background-color: #f8f9fa;
+            border-radius: 4px;
+            margin: 0 5px;
+        }
+        
+        .stat-number {
+            font-size: 24px;
+            font-weight: bold;
+            color: #3498db;
+            display: block;
+        }
+        
+        .stat-label {
+            font-size: 11px;
+            color: #6c757d;
+            text-transform: uppercase;
+        }
+        
+        .table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+        
+        .table th {
+            background-color: #3498db;
+            color: white;
+            font-weight: bold;
+            padding: 8px;
+            text-align: left;
+            border: 1px solid #dee2e6;
+            font-size: 11px;
+        }
+        
+        .table td {
+            padding: 6px;
+            border: 1px solid #dee2e6;
+            font-size: 11px;
+        }
+        
+        .table tr:nth-child(even) {
+            background-color: #f8f9fa;
+        }
+        
+        .subject-chip {
+            display: inline-block;
+            background-color: #e9ecef;
+            border-radius: 3px;
+            padding: 2px 6px;
+            margin: 1px;
+            font-size: 10px;
+        }
+        
+        .core-subject {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        
+        .subsidiary-subject {
+            background-color: #fff3cd;
+            color: #856404;
+        }
+        
+        .badge {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 10px;
+            font-weight: normal;
+        }
+        
+        .badge-info {
+            background-color: #17a2b8;
+            color: white;
+        }
+        
+        .badge-secondary {
+            background-color: #6c757d;
+            color: white;
+        }
+        
+        .badge-success {
+            background-color: #28a745;
+            color: white;
+        }
+        
+        .badge-secondary {
+            background-color: #6c757d;
+            color: white;
+        }
+        
+        .footer {
+            margin-top: 30px;
+            padding-top: 10px;
+            border-top: 1px solid #dee2e6;
+            font-size: 10px;
+            color: #6c757d;
+            text-align: center;
+        }
+        
+        .page-break {
+            page-break-before: always;
+        }
+        
+        .signature-section {
+            margin-top: 30px;
+            text-align: right;
+            font-size: 11px;
+        }
+        
+        .logo {
+            text-align: center;
+            margin-bottom: 10px;
+        }
+        
+        .logo h2 {
+            color: #2c3e50;
+            margin: 0;
+            font-size: 20px;
+        }
+        
+        .combination-details {
+            margin-bottom: 15px;
+        }
+        
+        .combination-details h3 {
+            color: #2c3e50;
+            font-size: 16px;
+            margin: 0 0 10px 0;
+        }
+        
+        .combination-subjects {
+            margin-bottom: 15px;
+        }
+        
+        .combination-subjects h4 {
+            color: #2c3e50;
+            font-size: 14px;
+            margin: 0 0 8px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="logo">
+        <h2>SCHOOL MANAGEMENT SYSTEM</h2>
+        <div class="subtitle">Combination Students Report</div>
+    </div>
+    
+    <div class="header">
+        <h1>{{ combination.code }} - {{ combination.name }}</h1>
+        <div class="subtitle">A-Level Subject Combination Report</div>
+    </div>
+    
+    <div class="info-box">
+        <div class="combination-details">
+            <h3>Combination Details</h3>
+            <p><strong>Code:</strong> {{ combination.code }}</p>
+            <p><strong>Name:</strong> {{ combination.name }}</p>
+            <p><strong>Status:</strong> {% if combination.is_active %}Active{% else %}Inactive{% endif %}</p>
+            {% if combination.description %}
+            <p><strong>Description:</strong> {{ combination.description }}</p>
+            {% endif %}
+        </div>
+        
+        <div class="combination-subjects">
+            <h4>Combination Subjects</h4>
+            {% for cs in combination_subjects %}
+                <span class="subject-chip {% if cs.role == 'CORE' %}core-subject{% else %}subsidiary-subject{% endif %}">
+                    {{ cs.subject.name }} ({{ cs.subject.code }}) - {{ cs.get_role_display }}
+                </span>
+            {% endfor %}
+        </div>
+    </div>
+    
+    <div class="stats-container">
+        <div class="stat-box">
+            <span class="stat-number">{{ total_students }}</span>
+            <span class="stat-label">Total Students</span>
+        </div>
+        <div class="stat-box">
+            <span class="stat-number">{{ male_students }}</span>
+            <span class="stat-label">Male Students</span>
+        </div>
+        <div class="stat-box">
+            <span class="stat-number">{{ female_students }}</span>
+            <span class="stat-label">Female Students</span>
+        </div>
+        <div class="stat-box">
+            <span class="stat-number">{{ combination_subjects|length }}</span>
+            <span class="stat-label">Total Subjects</span>
+        </div>
+    </div>
+    
+    <div class="student-list">
+        <h3>Student List ({{ total_students }} students)</h3>
+        
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Student Name</th>
+                    <th>Registration No</th>
+                    <th>Class</th>
+                    <th>Stream</th>
+                    <th>Gender</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for student in students %}
+                <tr>
+                    <td>{{ forloop.counter }}</td>
+                    <td>{{ student.full_name }}</td>
+                    <td>{{ student.registration_number }}</td>
+                    <td>
+                        {% if student.class_level %}
+                            <span class="badge badge-info">{{ student.class_level.name }}</span>
+                        {% else %}
+                            N/A
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if student.stream_class %}
+                            <span class="badge badge-secondary">{{ student.stream_class.stream_letter }}</span>
+                        {% else %}
+                            N/A
+                        {% endif %}
+                    </td>
+                    <td>{{ student.get_gender_display }}</td>
+                    <td>
+                        {% if student.is_active %}
+                            <span class="badge badge-success">Active</span>
+                        {% else %}
+                            <span class="badge badge-secondary">Inactive</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    
+    {% if class_distribution %}
+    <div class="page-break"></div>
+    
+    <div class="class-distribution">
+        <h3>Class Distribution</h3>
+        
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Class</th>
+                    <th>Student Count</th>
+                    <th>Percentage</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in class_distribution %}
+                <tr>
+                    <td>{{ item.class_level__name|default:"Unknown" }}</td>
+                    <td>{{ item.count }}</td>
+                    <td>
+                        {{ item.count|floatformat:0 }} ({% widthratio item.count total_students 100 %}%)
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+    
+    <div class="signature-section">
+        <p>_________________________</p>
+        <p><strong>Generated By:</strong> {{ request.user.get_full_name }}</p>
+        <p><strong>Date:</strong> {{ generated_date|date:"F j, Y" }}</p>
+        <p><strong>Time:</strong> {{ generated_date|date:"h:i A" }}</p>
+    </div>
+    
+    <div class="footer">
+        <p>This report was automatically generated by the School Management System</p>
+        <p>Report ID: COM-{{ combination.id }}-{{ generated_date|date:"YmdHis" }}</p>
+    </div>
+</body>
+</html>
