@@ -218,7 +218,7 @@ class StudentResult(models.Model):
         ordering = ['-marks_obtained']
 
     def __str__(self):
-        return f"{self.student.full_name} | {self.exam_paper} | {self.marks_obtained or 'ABS'}"
+        return f"{self.student.full_name} | {self.exam_session} | {self.marks_obtained or 'ABS'}"
 
 
 # ============== STUDENT EXAM METRICS ==============
@@ -238,8 +238,8 @@ class StudentExamMetrics(models.Model):
     total_marks = models.DecimalField(max_digits=8, decimal_places=2, default=0)
     average_marks = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
     average_percentage = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
-    average_grade = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
-    average_remark = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+    average_grade = models.CharField(max_length=2, blank=True)
+    average_remark = models.CharField(max_length=15,blank=True)
     total_grade_points = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
     division = models.ForeignKey(DivisionScale, null=True, blank=True, on_delete=models.SET_NULL)
 

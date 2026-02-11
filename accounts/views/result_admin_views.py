@@ -5,6 +5,8 @@ import math
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 from io import BytesIO
+import os
+from django.conf import settings
 from openpyxl.styles import PatternFill, Font, Border, Side, Alignment
 import openpyxl
 import pandas as pd
@@ -2510,7 +2512,7 @@ def save_student_results(request):
 
                 if grade_scale:
                     result.grade = grade_scale.grade
-                    result.grade_point = grade_scale.points
+                    result.grade_point = Decimal(str(grade_scale.points))
                 else:
                     result.grade = None
                     result.grade_point = None
@@ -4212,3 +4214,893 @@ def download_session_summary(request, exam_session_id):
         
     except Exception as e:
         return HttpResponse(f"Error generating summary: {str(e)}", status=500)
+
+
+# Add this view function
+@login_required
+def student_sessions_list(request, student_id):
+    """Display all exam sessions for a specific student where they have results"""
+    try:
+        student = get_object_or_404(
+            Student.objects.select_related(
+                'class_level',
+                'class_level__educational_level',
+                'stream_class'
+            ),
+            id=student_id,
+            is_active=True
+        )
+
+        sessions_with_results = ExamSession.objects.filter(
+            results__student=student
+        ).distinct()
+
+        exam_sessions = sessions_with_results.select_related(
+            'exam_type',
+            'academic_year',
+            'term',
+            'class_level',
+            'class_level__educational_level',
+            'stream_class'
+        ).annotate(
+            total_subjects=Count('results', filter=Q(results__student=student)),
+            average_marks=Avg('results__marks_obtained', filter=Q(results__student=student)),
+            average_percentage=Avg('results__percentage', filter=Q(results__student=student)),
+            total_marks=Sum('results__marks_obtained', filter=Q(results__student=student))
+        ).order_by('-exam_date', '-created_at')
+
+        session_metrics = {}
+        for session in exam_sessions:
+            metrics = StudentExamMetrics.objects.filter(
+                student=student,
+                exam_session=session
+            ).first()
+
+            positions = StudentExamPosition.objects.filter(
+                student=student,
+                exam_session=session
+            ).first()
+
+            session_metrics[session.id] = {
+                'metrics': metrics,
+                'positions': positions
+            }
+
+        current_class_info = {
+            'class_level': student.class_level.name if student.class_level else 'Not Assigned',
+            'stream': student.stream_class.stream_letter if student.stream_class else 'N/A',
+            'registration_number': student.registration_number or f'S{student.id:04d}',
+            'academic_year': student.academic_year.name if student.academic_year else 'N/A'
+        }
+
+        context = {
+            'student': student,
+            'exam_sessions': exam_sessions,
+            'session_metrics': session_metrics,
+            'current_class_info': current_class_info,
+            'total_sessions': exam_sessions.count(),
+            'page_title': f'{student.full_name} - Exam Sessions',
+            'breadcrumb_title': 'Student Exam History',
+        }
+
+        return render(request, 'admin/results/student_sessions_list.html', context)
+
+    except Exception as e:
+        messages.error(request, f"Error loading student sessions: {str(e)}")
+        return redirect('admin_students_list')
+
+
+
+@login_required
+def student_session_results(request, student_id, exam_session_id):
+    """Display detailed results for a student in a specific exam session"""
+    try:
+        student = get_object_or_404(
+            Student.objects.select_related(
+                'class_level',
+                'class_level__educational_level',
+                'stream_class'
+            ),
+            id=student_id,
+            is_active=True
+        )
+
+        exam_session = get_object_or_404(
+            ExamSession.objects.select_related(
+                'exam_type',
+                'academic_year',
+                'term',
+                'class_level',
+                'class_level__educational_level',
+                'stream_class'
+            ),
+            id=exam_session_id
+        )
+
+        if not StudentResult.objects.filter(
+            exam_session=exam_session,
+            student=student
+        ).exists():
+            messages.warning(request, "No results found for this student in the selected exam session.")
+            return redirect('student_sessions_list', student_id=student_id)
+
+        subjects = Subject.objects.filter(
+            educational_level=exam_session.class_level.educational_level,
+            is_active=True
+        ).order_by('code')
+
+        results = StudentResult.objects.filter(
+            exam_session=exam_session,
+            student=student
+        ).select_related('subject')
+
+        results_dict = {result.subject_id: result for result in results}
+
+        subject_results = []
+        total_marks = 0
+        total_grade_points = 0
+        subjects_with_marks = 0
+
+        for subject in subjects:
+            result = results_dict.get(subject.id)
+
+            if result and result.marks_obtained is not None:
+                marks = float(result.marks_obtained)
+                percentage = float(result.percentage) if result.percentage else 0
+                grade_point = float(result.grade_point) if result.grade_point else 0
+
+                total_marks += marks
+                total_grade_points += grade_point
+                subjects_with_marks += 1
+
+                subject_results.append({
+                    'subject': subject,
+                    'result': result,
+                    'marks': marks,
+                    'percentage': percentage,
+                    'grade': result.grade,
+                    'grade_point': grade_point,
+                    'position': result.position_in_paper,
+                    'has_result': True
+                })
+            else:
+                subject_results.append({
+                    'subject': subject,
+                    'result': None,
+                    'marks': None,
+                    'percentage': None,
+                    'grade': '-',
+                    'grade_point': None,
+                    'position': None,
+                    'has_result': False
+                })
+
+        metrics = StudentExamMetrics.objects.filter(
+            student=student,
+            exam_session=exam_session
+        ).select_related('division').first()
+
+        positions = StudentExamPosition.objects.filter(
+            student=student,
+            exam_session=exam_session
+        ).first()
+
+        overall_stats = {
+            'total_subjects': len(subjects),
+            'subjects_with_marks': subjects_with_marks,
+            'completion_rate': (subjects_with_marks / len(subjects) * 100) if subjects else 0,
+            'total_marks': total_marks,
+            'total_grade_points': total_grade_points,
+            'average_marks': total_marks / subjects_with_marks if subjects_with_marks else 0,
+            'average_grade_points': total_grade_points / subjects_with_marks if subjects_with_marks else 0,
+        }
+
+        if exam_session.stream_class:
+            class_students_count = Student.objects.filter(
+                class_level=exam_session.class_level,
+                stream_class=exam_session.stream_class,
+                is_active=True
+            ).count()
+        else:
+            class_students_count = Student.objects.filter(
+                class_level=exam_session.class_level,
+                is_active=True
+            ).count()
+
+        class_ranking = (
+            f"{positions.class_position} of {class_students_count}"
+            if positions and positions.class_position
+            else "Not ranked"
+        )
+
+        context = {
+            'student': student,
+            'exam_session': exam_session,
+            'subject_results': subject_results,
+            'metrics': metrics,
+            'positions': positions,
+            'overall_stats': overall_stats,
+            'class_ranking': class_ranking,
+            'class_students_count': class_students_count,
+            'page_title': f'{student.full_name} - {exam_session.name}',
+            'breadcrumb_title': 'Student Results Detail',
+        }
+
+        return render(request, 'admin/results/student_session_results.html', context)
+
+    except Exception as e:
+        messages.error(request, f"Error loading student results: {str(e)}")
+        return redirect('student_sessions_list', student_id=student_id)
+
+
+
+
+@login_required
+def download_student_pdf_report(request, student_id, exam_session_id):
+    """Generate and download PDF report for student exam results"""
+    try:
+        # Get student
+        student = get_object_or_404(
+            Student.objects.select_related(
+                'class_level',
+                'class_level__educational_level',
+                'stream_class'
+            ),
+            id=student_id,
+            is_active=True
+        )
+
+        # Get exam session
+        exam_session = get_object_or_404(
+            ExamSession.objects.select_related(
+                'exam_type',
+                'academic_year',
+                'term',
+                'class_level',
+                'class_level__educational_level',
+                'stream_class'
+            ),
+            id=exam_session_id
+        )
+
+        # Subjects
+        subjects = Subject.objects.filter(
+            educational_level=exam_session.class_level.educational_level,
+            is_active=True
+        ).order_by('code')
+
+        # Results
+        results = StudentResult.objects.filter(
+            exam_session=exam_session,
+            student=student
+        ).select_related('subject')
+
+        results_dict = {result.subject_id: result for result in results}
+
+        subject_results = []
+        total_marks = 0
+        total_grade_points = 0
+        subjects_with_marks = 0
+
+        for subject in subjects:
+            result = results_dict.get(subject.id)
+
+            if result and result.marks_obtained is not None:
+                marks = float(result.marks_obtained)
+                percentage = float(result.percentage) if result.percentage else 0
+                grade_point = float(result.grade_point) if result.grade_point else 0
+
+                total_marks += marks
+                total_grade_points += grade_point
+                subjects_with_marks += 1
+
+                subject_results.append({
+                    'subject': subject,
+                    'result': result,
+                    'marks': marks,
+                    'percentage': percentage,
+                    'grade': result.grade,
+                    'grade_point': grade_point,
+                    'position': result.position_in_paper,
+                    'has_result': True
+                })
+            else:
+                subject_results.append({
+                    'subject': subject,
+                    'result': None,
+                    'marks': None,
+                    'percentage': None,
+                    'grade': '-',
+                    'grade_point': None,
+                    'position': None,
+                    'has_result': False
+                })
+
+        # Metrics
+        metrics = StudentExamMetrics.objects.filter(
+            student=student,
+            exam_session=exam_session
+        ).select_related('division').first()
+
+        # Positions
+        positions = StudentExamPosition.objects.filter(
+            student=student,
+            exam_session=exam_session
+        ).first()
+
+        overall_stats = {
+            'total_subjects': len(subjects),
+            'subjects_with_marks': subjects_with_marks,
+            'completion_rate': (subjects_with_marks / len(subjects) * 100) if subjects else 0,
+            'total_marks': total_marks,
+            'total_grade_points': total_grade_points,
+            'average_marks': total_marks / subjects_with_marks if subjects_with_marks else 0,
+            'average_grade_points': total_grade_points / subjects_with_marks if subjects_with_marks else 0,
+        }
+
+        # Class count
+        if exam_session.stream_class:
+            class_students_count = Student.objects.filter(
+                class_level=exam_session.class_level,
+                stream_class=exam_session.stream_class,
+                is_active=True
+            ).count()
+        else:
+            class_students_count = Student.objects.filter(
+                class_level=exam_session.class_level,
+                is_active=True
+            ).count()
+
+        class_ranking = (
+            f"{positions.class_position} of {class_students_count}"
+            if positions and positions.class_position
+            else "Not ranked"
+        )
+
+        context = {
+            'student': student,
+            'exam_session': exam_session,
+            'subject_results': subject_results,
+            'metrics': metrics,
+            'positions': positions,
+            'overall_stats': overall_stats,
+            'class_ranking': class_ranking,
+            'class_students_count': class_students_count,
+            'generated_date': timezone.now(),
+            'generated_by': request.user.get_full_name() or request.user.username,
+            'school_name': 'Your School Name',
+            'school_logo': os.path.join(settings.MEDIA_ROOT, 'school_logo.png'),
+        }
+
+        html_string = render_to_string(
+            'admin/results/student_pdf_report.html',
+            context
+        )
+
+        html = HTML(
+            string=html_string,
+            base_url=request.build_absolute_uri()
+        )
+
+        pdf_file = html.write_pdf()
+
+        filename = (
+            f"Results_{student.registration_number}_"
+            f"{exam_session.name}_{timezone.now().strftime('%Y%m%d')}.pdf"
+        )
+
+        response = HttpResponse(pdf_file, content_type='application/pdf')
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+
+        return response
+
+    except Exception as e:
+        messages.error(request, f"Error generating PDF report: {str(e)}")
+        return redirect(
+            'student_session_results',
+            student_id=student_id,
+            exam_session_id=exam_session_id
+        )
+
+
+@login_required
+def exam_sessions_list_view(request):
+    """Display exam sessions management page with DataTable"""
+    # Get all exam sessions with related data
+    exam_sessions = ExamSession.objects.select_related(
+        'exam_type',
+        'academic_year',
+        'term',
+        'class_level',
+        'class_level__educational_level',
+        'stream_class'
+    ).all()
+    
+    # Get filter parameters from request
+    academic_year_filter = request.GET.get('academic_year', '')
+    term_filter = request.GET.get('term', '')
+    class_level_filter = request.GET.get('class_level', '')
+    stream_filter = request.GET.get('stream', '')
+    
+    # Apply filters if provided
+    if academic_year_filter:
+        exam_sessions = exam_sessions.filter(academic_year_id=academic_year_filter)
+    
+    if term_filter:
+        exam_sessions = exam_sessions.filter(term_id=term_filter)
+    
+    if class_level_filter:
+        exam_sessions = exam_sessions.filter(class_level_id=class_level_filter)
+    
+    if stream_filter:
+        exam_sessions = exam_sessions.filter(stream_class_id=stream_filter)
+    
+    # Get data for filters
+    academic_years = AcademicYear.objects.all().order_by('-start_date')
+    class_levels = ClassLevel.objects.filter(is_active=True).select_related('educational_level').order_by('order')
+    
+    # Only show terms if academic year is selected
+    terms = Term.objects.none()
+    if academic_year_filter:
+        terms = Term.objects.filter(academic_year_id=academic_year_filter).order_by('term_number')
+    
+    # Only show streams if class level is selected
+    streams = StreamClass.objects.none()
+    if class_level_filter:
+        streams = StreamClass.objects.filter(
+            class_level_id=class_level_filter,
+            is_active=True
+        ).order_by('stream_letter')
+    
+    # Calculate statistics
+    total_sessions = exam_sessions.count()
+    draft_sessions = exam_sessions.filter(status='draft').count()
+    submitted_sessions = exam_sessions.filter(status='submitted').count()
+    verified_sessions = exam_sessions.filter(status='verified').count()
+    published_sessions = exam_sessions.filter(status='published').count()
+    
+    context = {
+        'exam_sessions': exam_sessions,
+        'academic_years': academic_years,
+        'terms': terms,
+        'class_levels': class_levels,
+        'streams': streams,
+        
+        # Statistics for cards
+        'total_sessions': total_sessions,
+        'draft_sessions': draft_sessions,
+        'submitted_sessions': submitted_sessions,
+        'verified_sessions': verified_sessions,
+        'published_sessions': published_sessions,
+        
+        'page_title': 'Exam Sessions Management',
+        'breadcrumb_title': 'Exam Sessions',
+    }
+    
+    return render(request, 'admin/results/exam_sessions_list_view.html', context)
+
+
+@login_required
+def exam_session_report_view(request, exam_session_id):
+    """View exam session report"""
+    exam_session = get_object_or_404(
+        ExamSession.objects.select_related(
+            'exam_type',
+            'academic_year',
+            'term',
+            'class_level',
+            'stream_class'
+        ),
+        id=exam_session_id
+    )
+    
+    context = {
+        'exam_session': exam_session,
+        'page_title': f'Report - {exam_session.name}',
+    }
+    
+    return render(request, 'admin/results/exam_session_report.html', context)
+
+
+@login_required
+def exam_session_analysis_view(request, exam_session_id):
+    """Enhanced exam session analysis with divisions, gender, rankings and filters"""
+    exam_session = get_object_or_404(
+        ExamSession.objects.select_related(
+            'exam_type',
+            'academic_year',
+            'term',
+            'class_level',
+            'class_level__educational_level',
+            'stream_class'
+        ),
+        id=exam_session_id
+    )
+    
+    # Get all metrics for this exam session
+    metrics = StudentExamMetrics.objects.filter(
+        exam_session=exam_session
+    ).select_related('student', 'division').order_by('-average_marks')
+    
+    # Get positions
+    positions = StudentExamPosition.objects.filter(
+        exam_session=exam_session
+    ).select_related('student')
+    
+    # Combine data
+    student_data = []
+    for metric in metrics:
+        position = positions.filter(student=metric.student).first()
+        
+        student_data.append({
+            'id': metric.student.id,
+            'registration_number': metric.student.registration_number or f"S{metric.student.id:04d}",
+            'full_name': metric.student.full_name,
+            'gender': metric.student.get_gender_display(),
+            'total_marks': metric.total_marks,
+            'average_marks': metric.average_marks,
+            'average_percentage': metric.average_percentage,
+            'average_grade': metric.average_grade,
+            'total_grade_points': metric.total_grade_points,
+            'division': metric.division.division if metric.division else None,
+            'division_display': metric.division.get_division_display() if metric.division else 'Not Assigned',
+            'class_position': position.class_position if position else None,
+            'stream_position': position.stream_position if position else None,
+            'rank': position.class_position if position else None,
+        })
+    
+    # Get filter parameters
+    division_filter = request.GET.get('division', '')
+    gender_filter = request.GET.get('gender', '')
+    rank_filter = request.GET.get('rank_filter', '')
+    top_n = request.GET.get('top_n', '10')
+    bottom_n = request.GET.get('bottom_n', '10')
+    
+    # Apply filters
+    if division_filter:
+        student_data = [s for s in student_data if s['division'] == division_filter]
+    
+    if gender_filter:
+        student_data = [s for s in student_data if s['gender'].lower() == gender_filter.lower()]
+    
+    # Apply rank filters
+    if rank_filter == 'top':
+        try:
+            n = int(top_n)
+            student_data = sorted(student_data, key=lambda x: x['rank'] if x['rank'] else float('inf'))[:n]
+        except ValueError:
+            pass
+    elif rank_filter == 'bottom':
+        try:
+            n = int(bottom_n)
+            # Sort by rank descending (higher numbers first for bottom)
+            sorted_data = sorted(student_data, 
+                               key=lambda x: x['rank'] if x['rank'] else float('-inf'),
+                               reverse=True)
+            student_data = sorted_data[:n]
+        except ValueError:
+            pass
+    
+    # Calculate statistics
+    total_students = len(student_data)
+    students_with_division = len([s for s in student_data if s['division']])
+    
+    # Division distribution
+    division_distribution = {}
+    for student in student_data:
+        if student['division']:
+            division_distribution[student['division_display']] = division_distribution.get(
+                student['division_display'], 0) + 1
+    
+    # Gender distribution
+    gender_distribution = {}
+    for student in student_data:
+        gender = student['gender']
+        gender_distribution[gender] = gender_distribution.get(gender, 0) + 1
+    
+    # Average marks by gender
+    gender_averages = {}
+    gender_counts = {}
+    for student in student_data:
+        gender = student['gender']
+        if student['average_marks']:
+            if gender not in gender_averages:
+                gender_averages[gender] = 0
+                gender_counts[gender] = 0
+            gender_averages[gender] += float(student['average_marks'])
+            gender_counts[gender] += 1
+    
+    for gender in gender_averages:
+        if gender_counts[gender] > 0:
+            gender_averages[gender] = round(gender_averages[gender] / gender_counts[gender], 2)
+    
+    # Average marks by division
+    division_averages = {}
+    division_counts = {}
+    for student in student_data:
+        division = student['division_display']
+        if division and student['average_marks']:
+            if division not in division_averages:
+                division_averages[division] = 0
+                division_counts[division] = 0
+            division_averages[division] += float(student['average_marks'])
+            division_counts[division] += 1
+    
+    for division in division_averages:
+        if division_counts[division] > 0:
+            division_averages[division] = round(division_averages[division] / division_counts[division], 2)
+    
+    # Top performers (always show top 10)
+    top_performers = sorted(
+        [s for s in student_data if s['rank']], 
+        key=lambda x: x['rank']
+    )[:10]
+    
+    # Bottom performers (always show bottom 10)
+    bottom_performers = sorted(
+        [s for s in student_data if s['rank']], 
+        key=lambda x: x['rank'],
+        reverse=True
+    )[:10]
+    
+    # Get unique divisions and genders for filter dropdowns
+    unique_divisions = sorted(set([s['division_display'] for s in student_data if s['division_display']]))
+    unique_genders = sorted(set([s['gender'] for s in student_data if s['gender']]))
+    
+    context = {
+        'exam_session': exam_session,
+        'student_data': student_data,
+        'total_students': total_students,
+        'students_with_division': students_with_division,
+        
+        # Distributions
+        'division_distribution': division_distribution,
+        'gender_distribution': gender_distribution,
+        
+        # Averages
+        'gender_averages': gender_averages,
+        'division_averages': division_averages,
+        
+        # Top/Bottom performers
+        'top_performers': top_performers,
+        'bottom_performers': bottom_performers,
+        
+        # Filter options
+        'unique_divisions': unique_divisions,
+        'unique_genders': unique_genders,
+        
+        # Current filter values
+        'division_filter': division_filter,
+        'gender_filter': gender_filter,
+        'rank_filter': rank_filter,
+        'top_n': top_n,
+        'bottom_n': bottom_n,
+        
+        # Rank filter options
+        'rank_filter_options': [
+            ('', 'All Students'),
+            ('top', 'Top N Students'),
+            ('bottom', 'Bottom N Students'),
+        ],
+        
+        'page_title': f'Analysis - {exam_session.name}',
+    }
+    
+    return render(request, 'admin/results/exam_session_analysis.html', context)
+
+
+@login_required
+def exam_session_analysis_pdf(request, exam_session_id):
+    """Generate PDF report for exam session analysis with sections"""
+    try:
+        # Get exam session
+        exam_session = get_object_or_404(
+            ExamSession.objects.select_related(
+                'exam_type',
+                'academic_year',
+                'term',
+                'class_level',
+                'class_level__educational_level',
+                'stream_class'
+            ),
+            id=exam_session_id
+        )
+        
+        # Get section parameter
+        section = request.GET.get('section', 'full')
+        
+        # Get all metrics for this exam session
+        metrics = StudentExamMetrics.objects.filter(
+            exam_session=exam_session
+        ).select_related('student', 'division').order_by('-average_marks')
+        
+        # Get positions
+        positions = StudentExamPosition.objects.filter(
+            exam_session=exam_session
+        ).select_related('student')
+        
+        # Combine data
+        student_data = []
+        all_student_data = []  # Keep all data for comparison
+        for metric in metrics:
+            position = positions.filter(student=metric.student).first()
+            
+            student_info = {
+                'id': metric.student.id,
+                'registration_number': metric.student.registration_number or f"S{metric.student.id:04d}",
+                'full_name': metric.student.full_name,
+                'gender': metric.student.get_gender_display(),
+                'total_marks': metric.total_marks,
+                'average_marks': metric.average_marks,
+                'average_percentage': metric.average_percentage,
+                'average_grade': metric.average_grade,
+                'total_grade_points': metric.total_grade_points,
+                'division': metric.division.division if metric.division else None,
+                'division_display': metric.division.get_division_display() if metric.division else 'Not Assigned',
+                'class_position': position.class_position if position else None,
+                'stream_position': position.stream_position if position else None,
+                'rank': position.class_position if position else None,
+            }
+            
+            all_student_data.append(student_info)
+            student_data.append(student_info)
+        
+        # Calculate statistics
+        total_students = len(student_data)
+        students_with_division = len([s for s in student_data if s['division']])
+        
+        # Division distribution
+        division_distribution = {}
+        for student in student_data:
+            if student['division_display']:
+                division_distribution[student['division_display']] = division_distribution.get(
+                    student['division_display'], 0) + 1
+        
+        # Gender distribution
+        gender_distribution = {}
+        for student in student_data:
+            gender = student['gender']
+            gender_distribution[gender] = gender_distribution.get(gender, 0) + 1
+        
+        # Average marks by gender
+        gender_averages = {}
+        gender_counts = {}
+        for student in student_data:
+            gender = student['gender']
+            if student['average_marks']:
+                if gender not in gender_averages:
+                    gender_averages[gender] = 0
+                    gender_counts[gender] = 0
+                gender_averages[gender] += float(student['average_marks'])
+                gender_counts[gender] += 1
+        
+        for gender in gender_averages:
+            if gender_counts[gender] > 0:
+                gender_averages[gender] = round(gender_averages[gender] / gender_counts[gender], 2)
+        
+        # Average marks by division
+        division_averages = {}
+        division_counts = {}
+        for student in student_data:
+            division = student['division_display']
+            if division and student['average_marks']:
+                if division not in division_averages:
+                    division_averages[division] = 0
+                    division_counts[division] = 0
+                division_averages[division] += float(student['average_marks'])
+                division_counts[division] += 1
+        
+        for division in division_averages:
+            if division_counts[division] > 0:
+                division_averages[division] = round(division_averages[division] / division_counts[division], 2)
+        
+        # Top performers (always top 10 from all data)
+        top_performers = sorted(
+            [s for s in all_student_data if s['rank']], 
+            key=lambda x: x['rank']
+        )[:10]
+        
+        # Bottom performers (always bottom 10 from all data)
+        bottom_performers = sorted(
+            [s for s in all_student_data if s['rank']], 
+            key=lambda x: x['rank'],
+            reverse=True
+        )[:10]
+        
+        # Filter student data based on section
+        if section == 'top_performers':
+            student_data = top_performers
+        elif section == 'bottom_performers':
+            student_data = bottom_performers
+        elif section == 'detailed_list':
+            # Keep all student data
+            pass
+        elif section == 'divisions_only':
+            # Show only students with divisions
+            student_data = [s for s in student_data if s['division']]
+        elif section == 'genders_only':
+            # Show all student data (gender analysis)
+            pass
+        
+        # Context for template
+        context = {
+            'exam_session': exam_session,
+            'student_data': student_data,
+            'all_student_data': all_student_data,  # For comparison
+            'total_students': len(all_student_data),
+            'students_with_division': students_with_division,
+            
+            # Distributions
+            'division_distribution': division_distribution,
+            'gender_distribution': gender_distribution,
+            
+            # Averages
+            'gender_averages': gender_averages,
+            'division_averages': division_averages,
+            
+            # Top/Bottom performers
+            'top_performers': top_performers,
+            'bottom_performers': bottom_performers,
+            
+            # Section info
+            'section': section,
+            'section_title': {
+                'full': 'Full Analysis Report',
+                'overview': 'Overview Report',
+                'divisions': 'Division Analysis',
+                'genders': 'Gender Analysis',
+                'rankings': 'Rankings Analysis',
+                'top_performers': 'Top Performers Report',
+                'bottom_performers': 'Bottom Performers Report',
+                'divisions_only': 'Division Analysis Report',
+                'genders_only': 'Gender Analysis Report',
+                'detailed_list': 'Detailed Student List',
+            }.get(section, 'Analysis Report'),
+            
+            # Generation info
+            'generated_date': timezone.now(),
+            'generated_by': request.user.get_full_name() or request.user.username,
+            'school_name': getattr(settings, 'SCHOOL_NAME', 'School Management System'),
+            'school_address': getattr(settings, 'SCHOOL_ADDRESS', ''),
+            
+            # For print/PDF
+            'is_pdf': True,
+        }
+        
+        # Determine which template to use
+        if section == 'full':
+            template_name = 'admin/results/analysis_pdf_full.html'
+        elif section in ['overview', 'divisions', 'genders', 'rankings']:
+            template_name = 'admin/results/analysis_pdf_section.html'
+        elif section in ['top_performers', 'bottom_performers']:
+            template_name = 'admin/results/analysis_pdf_performers.html'
+        elif section in ['divisions_only', 'genders_only']:
+            template_name = 'admin/results/analysis_pdf_distribution.html'
+        elif section == 'detailed_list':
+            template_name = 'admin/results/analysis_pdf_detailed.html'
+        else:
+            template_name = 'admin/results/analysis_pdf_section.html'
+        
+        # Render HTML
+        html_string = render_to_string(template_name, context)
+        
+        # Generate PDF
+        html = HTML(
+            string=html_string,
+            base_url=request.build_absolute_uri()
+        )
+        
+        pdf_file = html.write_pdf()
+        
+        # Create filename
+        filename = f"Analysis_{exam_session.name.replace(' ', '_')}_{section}_{timezone.now().strftime('%Y%m%d')}.pdf"
+        filename = filename.replace('/', '_')
+        
+        response = HttpResponse(pdf_file, content_type='application/pdf')
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        
+        return response
+        
+    except Exception as e:
+        messages.error(request, f"Error generating PDF report: {str(e)}")
+        return redirect('exam_session_analysis_view', exam_session_id=exam_session_id)    

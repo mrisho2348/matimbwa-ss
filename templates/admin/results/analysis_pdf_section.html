@@ -1,0 +1,941 @@
+{% load analysis_filters %}
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>{{ section_title }} - {{ exam_session.name }}</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 1.5cm;
+            @bottom-center {
+                content: "Page " counter(page) " of " counter(pages);
+                font-size: 9px;
+                color: #666;
+            }
+        }
+        
+        body {
+            font-family: 'Helvetica', 'Arial', sans-serif;
+            font-size: 10px;
+            line-height: 1.4;
+            color: #333;
+            margin: 0;
+            padding: 0;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #2c3e50;
+        }
+        
+        .school-name {
+            font-size: 16px;
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 3px;
+        }
+        
+        .school-address {
+            font-size: 9px;
+            color: #666;
+            margin-bottom: 8px;
+        }
+        
+        .report-title {
+            font-size: 14px;
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .session-info {
+            font-size: 11px;
+            margin-bottom: 3px;
+            color: #555;
+        }
+        
+        .section-details {
+            font-size: 10px;
+            color: #777;
+            margin-bottom: 15px;
+            padding: 5px 10px;
+            background-color: #f8f9fa;
+            border-radius: 4px;
+            border-left: 3px solid #3498db;
+        }
+        
+        .date-info {
+            font-size: 9px;
+            color: #666;
+            margin-bottom: 15px;
+            text-align: right;
+            border-top: 1px solid #eee;
+            padding-top: 5px;
+        }
+        
+        .section {
+            margin-bottom: 20px;
+            page-break-inside: avoid;
+        }
+        
+        .section-title {
+            font-size: 12px;
+            font-weight: bold;
+            background: linear-gradient(to right, #f8f9fa, #e9ecef);
+            padding: 8px 12px;
+            border-left: 4px solid #3498db;
+            margin-bottom: 12px;
+            border-radius: 4px 0 0 4px;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        
+        .stat-card {
+            background-color: #f8f9fa;
+            border-radius: 6px;
+            padding: 10px;
+            border: 1px solid #dee2e6;
+            text-align: center;
+        }
+        
+        .stat-label {
+            font-size: 9px;
+            color: #6c757d;
+            margin-bottom: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .stat-value {
+            font-size: 14px;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        
+        .stat-subtext {
+            font-size: 8px;
+            color: #888;
+            margin-top: 3px;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 15px;
+            font-size: 9px;
+        }
+        
+        th {
+            background-color: #2c3e50;
+            color: white;
+            border: 1px solid #1a252f;
+            padding: 8px;
+            text-align: left;
+            font-weight: bold;
+            font-size: 9px;
+        }
+        
+        td {
+            border: 1px solid #dee2e6;
+            padding: 6px 8px;
+            vertical-align: middle;
+        }
+        
+        tr:nth-child(even) {
+            background-color: #f8f9fa;
+        }
+        
+        tr:hover {
+            background-color: #e9ecef;
+        }
+        
+        .highlight-row {
+            background-color: #fff3cd !important;
+        }
+        
+        .division-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 8px;
+            font-weight: bold;
+            min-width: 50px;
+            text-align: center;
+        }
+        
+        .division-I { background-color: #28a745; color: white; }
+        .division-II { background-color: #17a2b8; color: white; }
+        .division-III { background-color: #ffc107; color: #212529; }
+        .division-IV { background-color: #fd7e14; color: white; }
+        .division-0 { background-color: #dc3545; color: white; }
+        .division-none { background-color: #6c757d; color: white; }
+        
+        .gender-icon {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            text-align: center;
+            line-height: 20px;
+            font-size: 8px;
+            margin-right: 5px;
+        }
+        
+        .gender-male { background-color: #d1ecf1; color: #0c5460; }
+        .gender-female { background-color: #f8d7da; color: #721c24; }
+        .gender-other { background-color: #e2e3e5; color: #383d41; }
+        
+        .rank-badge {
+            display: inline-block;
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            text-align: center;
+            line-height: 22px;
+            font-weight: bold;
+            font-size: 9px;
+        }
+        
+        .rank-1 { background-color: #ffd700; color: #000; }
+        .rank-2 { background-color: #c0c0c0; color: #000; }
+        .rank-3 { background-color: #cd7f32; color: #000; }
+        .rank-other { background-color: #e9ecef; color: #495057; }
+        
+        .percentage-badge {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 10px;
+            font-size: 8px;
+            font-weight: bold;
+        }
+        
+        .percentage-excellent { background-color: #28a745; color: white; }
+        .percentage-good { background-color: #17a2b8; color: white; }
+        .percentage-average { background-color: #ffc107; color: #212529; }
+        .percentage-poor { background-color: #fd7e14; color: white; }
+        .percentage-fail { background-color: #dc3545; color: white; }
+        
+        .grade-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            background-color: #6c757d;
+            color: white;
+            font-size: 8px;
+            font-weight: bold;
+        }
+        
+        .text-center { text-align: center; }
+        .text-right { text-align: right; }
+        .text-bold { font-weight: bold; }
+        .text-muted { color: #6c757d; }
+        
+        .chart-container {
+            margin: 15px 0;
+            padding: 10px;
+            background-color: #f8f9fa;
+            border-radius: 6px;
+            border: 1px solid #dee2e6;
+        }
+        
+        .chart-title {
+            font-size: 10px;
+            font-weight: bold;
+            margin-bottom: 8px;
+            color: #495057;
+        }
+        
+        .distribution-bar {
+            display: flex;
+            align-items: center;
+            margin-bottom: 6px;
+        }
+        
+        .distribution-label {
+            width: 100px;
+            font-size: 9px;
+            font-weight: 500;
+        }
+        
+        .distribution-bar-inner {
+            flex: 1;
+            height: 20px;
+            background-color: #e9ecef;
+            border-radius: 3px;
+            overflow: hidden;
+            position: relative;
+        }
+        
+        .distribution-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #3498db, #2980b9);
+            border-radius: 3px;
+        }
+        
+        .distribution-count {
+            position: absolute;
+            right: 5px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 8px;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        
+        .footer {
+            margin-top: 25px;
+            padding-top: 8px;
+            border-top: 1px solid #dee2e6;
+            font-size: 8px;
+            color: #6c757d;
+            text-align: center;
+        }
+        
+        .page-break {
+            page-break-before: always;
+        }
+        
+        /* Section-specific styles */
+        {% if section == 'overview' %}
+        .overview-grid {
+            grid-template-columns: repeat(4, 1fr);
+        }
+        {% endif %}
+        
+        {% if section == 'divisions' %}
+        .division-grid {
+            grid-template-columns: repeat(3, 1fr);
+        }
+        {% endif %}
+        
+        {% if section == 'genders' %}
+        .gender-grid {
+            grid-template-columns: repeat(3, 1fr);
+        }
+        {% endif %}
+        
+        {% if section == 'rankings' %}
+        .ranking-grid {
+            grid-template-columns: repeat(2, 1fr);
+        }
+        {% endif %}
+    </style>
+</head>
+<body>
+    <!-- Header Section -->
+    <div class="header">
+        <div class="school-name">{{ school_name }}</div>
+        {% if school_address %}
+        <div class="school-address">{{ school_address }}</div>
+        {% endif %}
+        <div class="report-title">{{ section_title }}</div>
+        <div class="session-info">{{ exam_session.name }}</div>
+        <div class="session-info">
+            Class: {{ exam_session.class_level.name }}
+            {% if exam_session.stream_class %} | Stream: {{ exam_session.stream_class.stream_letter }}{% endif %}
+        </div>
+        <div class="session-info">
+            {{ exam_session.academic_year.name }} | Term: {{ exam_session.term.get_term_number_display }}
+        </div>
+        <div class="section-details">
+            Exam Date: {{ exam_session.exam_date|date:"F d, Y" }} | 
+            Exam Type: {{ exam_session.exam_type.name }} | 
+            Status: {{ exam_session.get_status_display }}
+        </div>
+    </div>
+    
+    <!-- Generated Info -->
+    <div class="date-info">
+        Generated on: {{ generated_date|date:"F d, Y H:i" }} | By: {{ generated_by }}
+    </div>
+    
+    <!-- Overview Section -->
+    {% if section == 'overview' %}
+    <div class="section">
+        <div class="section-title">📊 Overview Statistics</div>
+        
+        <div class="stats-grid overview-grid">
+            <div class="stat-card">
+                <div class="stat-label">Total Students</div>
+                <div class="stat-value">{{ total_students }}</div>
+                <div class="stat-subtext">in this exam session</div>
+            </div>
+            
+            <div class="stat-card">
+                <div class="stat-label">With Division</div>
+                <div class="stat-value">{{ students_with_division }}</div>
+                <div class="stat-subtext">
+                    {% widthratio students_with_division total_students 100 %}% of students
+                </div>
+            </div>
+            
+            <div class="stat-card">
+                <div class="stat-label">Unique Divisions</div>
+                <div class="stat-value">{{ division_distribution|length }}</div>
+                <div class="stat-subtext">
+                    {% for division, count in division_distribution.items %}
+                        {% if forloop.first %}{{ division }}{% endif %}
+                    {% endfor %} most common
+                </div>
+            </div>
+            
+            <div class="stat-card">
+                <div class="stat-label">Gender Groups</div>
+                <div class="stat-value">{{ gender_distribution|length }}</div>
+                <div class="stat-subtext">
+                    {% for gender, count in gender_distribution.items %}
+                        {% if forloop.first %}{{ gender }}{% endif %}
+                    {% endfor %} largest group
+                </div>
+            </div>
+        </div>
+        
+        <!-- Quick Stats Table -->
+        <table>
+            <thead>
+                <tr>
+                    <th>Metric</th>
+                    <th class="text-center">Value</th>
+                    <th class="text-center">Details</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Students Ranked</td>
+                    <td class="text-center">{{ all_student_data|length }}</td>
+                    <td class="text-center">All students have ranking</td>
+                </tr>
+                <tr>
+                    <td>Top Performer Average</td>
+                    <td class="text-center">
+                        {% if top_performers %}
+                            {{ top_performers.0.average_marks|floatformat:2 }}
+                        {% else %}
+                            -
+                        {% endif %}
+                    </td>
+                    <td class="text-center">
+                        {% if top_performers %}
+                            {{ top_performers.0.full_name }} (Rank 1)
+                        {% endif %}
+                    </td>
+                </tr>
+                <tr>
+                    <td>Bottom Performer Average</td>
+                    <td class="text-center">
+                        {% if bottom_performers %}
+                            {{ bottom_performers.0.average_marks|floatformat:2 }}
+                        {% else %}
+                            -
+                        {% endif %}
+                    </td>
+                    <td class="text-center">
+                        {% if bottom_performers %}
+                            {{ bottom_performers.0.full_name }} (Rank {{ bottom_performers.0.rank }})
+                        {% endif %}
+                    </td>
+                </tr>
+                <tr>
+                    <td>Class Average Marks</td>
+                    <td class="text-center">
+                        {% with total=0 count=0 %}
+                            {% for student in all_student_data %}
+                                {% if student.average_marks %}
+                                    {{ total|add:student.average_marks }}
+                                    {{ count|add:1 }}
+                                {% endif %}
+                            {% endfor %}
+                            {% if count > 0 %}
+                                {{ total|div:count|floatformat:2 }}
+                            {% else %}
+                                -
+                            {% endif %}
+                        {% endwith %}
+                    </td>
+                    <td class="text-center">Based on {{ students_with_division }} students</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+    
+    <!-- Division Analysis Section -->
+    {% if section == 'divisions' %}
+    <div class="section">
+        <div class="section-title">🏆 Division Analysis</div>
+        
+        <div class="stats-grid division-grid">
+            <div class="stat-card">
+                <div class="stat-label">Total Divisions</div>
+                <div class="stat-value">{{ division_distribution|length }}</div>
+                <div class="stat-subtext">Unique division categories</div>
+            </div>
+            
+            <div class="stat-card">
+                <div class="stat-label">Students with Division</div>
+                <div class="stat-value">{{ students_with_division }}</div>
+                <div class="stat-subtext">{{ total_students }} total students</div>
+            </div>
+            
+            <div class="stat-card">
+                <div class="stat-label">Most Common Division</div>
+                <div class="stat-value">
+                    {% for division, count in division_distribution.items %}
+                        {% if forloop.first %}{{ division }}{% endif %}
+                    {% endfor %}
+                </div>
+                <div class="stat-subtext">
+                    {% for division, count in division_distribution.items %}
+                        {% if forloop.first %}{{ count }} students{% endif %}
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        
+        <!-- Division Distribution Chart -->
+        <div class="chart-container">
+            <div class="chart-title">Division Distribution</div>
+            {% for division, count in division_distribution.items %}
+            <div class="distribution-bar">
+                <div class="distribution-label">
+                    <span class="division-badge division-{{ division|slice:'-1:' }}">
+                        {{ division }}
+                    </span>
+                </div>
+                <div class="distribution-bar-inner">
+                    <div class="distribution-fill" style="width: {% widthratio count total_students 100 %}%;"></div>
+                    <div class="distribution-count">{{ count }} students ({% widthratio count total_students 100 %}%)</div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        
+        <!-- Division Performance Table -->
+        <table>
+            <thead>
+                <tr>
+                    <th>Division</th>
+                    <th class="text-center">Students</th>
+                    <th class="text-center">Percentage</th>
+                    <th class="text-center">Average Marks</th>
+                    <th class="text-center">Top Performer</th>
+                    <th class="text-center">Avg. Grade Points</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for division, count in division_distribution.items %}
+                <tr>
+                    <td>
+                        <span class="division-badge division-{{ division|slice:'-1:' }}">
+                            {{ division }}
+                        </span>
+                    </td>
+                    <td class="text-center">{{ count }}</td>
+                    <td class="text-center">{% widthratio count total_students 100 %}%</td>
+                    <td class="text-center text-bold">
+                        {% if division_averages and division in division_averages %}
+                            {{ division_averages|get_item:division|floatformat:2 }}
+                        {% else %}
+                            -
+                        {% endif %}
+                    </td>
+                    <td class="text-center">
+                        {% with top_student=all_student_data|dictsort:"average_marks"|last %}
+                            {% if top_student.division_display == division %}
+                                {{ top_student.full_name|truncatechars:15 }}
+                                ({{ top_student.average_marks|floatformat:1 }})
+                            {% else %}
+                                -
+                            {% endif %}
+                        {% endwith %}
+                    </td>
+                    <td class="text-center">
+                        {% with total_points=0 count=0 %}
+                            {% for student in all_student_data %}
+                                {% if student.division_display == division and student.total_grade_points %}
+                                    {{ total_points|add:student.total_grade_points }}
+                                    {{ count|add:1 }}
+                                {% endif %}
+                            {% endfor %}
+                            {% if count > 0 %}
+                                {{ total_points|div:count|floatformat:1 }}
+                            {% else %}
+                                -
+                            {% endif %}
+                        {% endwith %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+    
+    <!-- Gender Analysis Section -->
+    {% if section == 'genders' %}
+    <div class="section">
+        <div class="section-title">👥 Gender Analysis</div>
+        
+        <div class="stats-grid gender-grid">
+            <div class="stat-card">
+                <div class="stat-label">Gender Groups</div>
+                <div class="stat-value">{{ gender_distribution|length }}</div>
+                <div class="stat-subtext">Distinct gender categories</div>
+            </div>
+            
+            <div class="stat-card">
+                <div class="stat-label">Largest Group</div>
+                <div class="stat-value">
+                    {% with max_gender=gender_distribution|dictsort:"value"|last %}
+                        {{ max_gender.0 }}
+                    {% endwith %}
+                </div>
+                <div class="stat-subtext">
+                    {% with max_gender=gender_distribution|dictsort:"value"|last %}
+                        {{ max_gender.1 }} students
+                    {% endwith %}
+                </div>
+            </div>
+            
+            <div class="stat-card">
+                <div class="stat-label">Gender Balance</div>
+                <div class="stat-value">
+                    {% if gender_distribution.Male and gender_distribution.Female %}
+                        {% widthratio gender_distribution.Male gender_distribution.Female 100 %}%
+                    {% else %}
+                        N/A
+                    {% endif %}
+                </div>
+                <div class="stat-subtext">Male to Female ratio</div>
+            </div>
+        </div>
+        
+        <!-- Gender Distribution Chart -->
+        <div class="chart-container">
+            <div class="chart-title">Gender Distribution</div>
+            {% for gender, count in gender_distribution.items %}
+            <div class="distribution-bar">
+                <div class="distribution-label">
+                    <span class="gender-icon gender-{{ gender|lower }}">
+                        {{ gender|slice:':1' }}
+                    </span>
+                    {{ gender }}
+                </div>
+                <div class="distribution-bar-inner">
+                    <div class="distribution-fill" style="width: {% widthratio count total_students 100 %}%;"></div>
+                    <div class="distribution-count">{{ count }} students ({% widthratio count total_students 100 %}%)</div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        
+        <!-- Gender Performance Table -->
+        <table>
+            <thead>
+                <tr>
+                    <th>Gender</th>
+                    <th class="text-center">Students</th>
+                    <th class="text-center">Percentage</th>
+                    <th class="text-center">Average Marks</th>
+                    <th class="text-center">Best Division</th>
+                    <th class="text-center">Top Rank</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for gender, count in gender_distribution.items %}
+                <tr>
+                    <td>
+                        <span class="gender-icon gender-{{ gender|lower }}">
+                            {{ gender|slice:':1' }}
+                        </span>
+                        {{ gender }}
+                    </td>
+                    <td class="text-center">{{ count }}</td>
+                    <td class="text-center">{% widthratio count total_students 100 %}%</td>
+                    <td class="text-center text-bold">
+                        {% if gender_averages and gender in gender_averages %}
+                            {{ gender_averages|get_item:gender|floatformat:2 }}
+                        {% else %}
+                            -
+                        {% endif %}
+                    </td>
+                    <td class="text-center">
+                        {% with gender_students=all_student_data|filter_by:"gender"|filter_value:gender %}
+                            {% with division_counts={} %}
+                                {% for student in gender_students %}
+                                    {% if student.division_display %}
+                                        {% with key=student.division_display %}
+                                            {% increment division_counts.key %}
+                                        {% endwith %}
+                                    {% endif %}
+                                {% endfor %}
+                                {% with top_division=division_counts|dictsort:"value"|last %}
+                                    {% if top_division %}
+                                        {{ top_division.0 }}
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                {% endwith %}
+                            {% endwith %}
+                        {% endwith %}
+                    </td>
+                    <td class="text-center">
+                        {% with gender_students=all_student_data|filter_by:"gender"|filter_value:gender %}
+                            {% with top_rank=gender_students|dictsort:"rank"|first %}
+                                {% if top_rank %}
+                                    {{ top_rank.rank }} ({{ top_rank.full_name|truncatechars:15 }})
+                                {% else %}
+                                    -
+                                {% endif %}
+                            {% endwith %}
+                        {% endwith %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        
+        <!-- Gender vs Division Cross Analysis -->
+        <div class="section-title" style="margin-top: 20px;">📈 Gender vs Division Analysis</div>
+        <table>
+            <thead>
+                <tr>
+                    <th>Gender</th>
+                    {% for division in division_distribution.keys %}
+                    <th class="text-center">{{ division }}</th>
+                    {% endfor %}
+                    <th class="text-center">Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for gender in gender_distribution.keys %}
+                <tr>
+                    <td>{{ gender }}</td>
+                    {% for division in division_distribution.keys %}
+                    <td class="text-center">
+                        {% with count=all_student_data|filter_by:"gender"|filter_value:gender|filter_by:"division_display"|filter_value:division|length %}
+                            {% if count > 0 %}
+                                {{ count }}
+                            {% else %}
+                                -
+                            {% endif %}
+                        {% endwith %}
+                    </td>
+                    {% endfor %}
+                    <td class="text-center text-bold">{{ gender_distribution|get_item:gender }}</td>
+                </tr>
+                {% endfor %}
+                <tr class="highlight-row">
+                    <td class="text-bold">Total</td>
+                    {% for division, count in division_distribution.items %}
+                    <td class="text-center text-bold">{{ count }}</td>
+                    {% endfor %}
+                    <td class="text-center text-bold">{{ total_students }}</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+    
+    <!-- Rankings Analysis Section -->
+    {% if section == 'rankings' %}
+    <div class="section">
+        <div class="section-title">🏅 Rankings Analysis</div>
+        
+        <div class="stats-grid ranking-grid">
+            <div class="stat-card">
+                <div class="stat-label">Ranked Students</div>
+                <div class="stat-value">{{ all_student_data|length }}</div>
+                <div class="stat-subtext">All students are ranked</div>
+            </div>
+            
+            <div class="stat-card">
+                <div class="stat-label">Rank Range</div>
+                <div class="stat-value">
+                    1 - {{ all_student_data|last.rank|default:all_student_data|length }}
+                </div>
+                <div class="stat-subtext">Rank positions covered</div>
+            </div>
+        </div>
+        
+        <!-- Top 5 Performers -->
+        <div style="margin-bottom: 20px;">
+            <div class="chart-title">🎖 Top 5 Performers</div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Rank</th>
+                        <th>Student</th>
+                        <th class="text-center">Division</th>
+                        <th class="text-center">Average Marks</th>
+                        <th class="text-center">Average %</th>
+                        <th class="text-center">Total Marks</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for student in all_student_data|slice:":5" %}
+                    <tr {% if forloop.first %}class="highlight-row"{% endif %}>
+                        <td>
+                            <span class="rank-badge 
+                                {% if student.rank == 1 %}rank-1
+                                {% elif student.rank == 2 %}rank-2
+                                {% elif student.rank == 3 %}rank-3
+                                {% else %}rank-other{% endif %}">
+                                {{ student.rank }}
+                            </span>
+                        </td>
+                        <td>
+                            <div class="text-bold">{{ student.registration_number }}</div>
+                            <div class="text-muted">{{ student.full_name }}</div>
+                        </td>
+                        <td class="text-center">
+                            {% if student.division_display %}
+                                <span class="division-badge division-{{ student.division }}">
+                                    {{ student.division_display }}
+                                </span>
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                        <td class="text-center text-bold">{{ student.average_marks|floatformat:2 }}</td>
+                        <td class="text-center">
+                            <span class="percentage-badge 
+                                {% if student.average_percentage >= 80 %}percentage-excellent
+                                {% elif student.average_percentage >= 60 %}percentage-good
+                                {% elif student.average_percentage >= 40 %}percentage-average
+                                {% elif student.average_percentage >= 20 %}percentage-poor
+                                {% else %}percentage-fail{% endif %}">
+                                {{ student.average_percentage|floatformat:1 }}%
+                            </span>
+                        </td>
+                        <td class="text-center">{{ student.total_marks|floatformat:2|default:"-" }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- Rank Distribution by Division -->
+        <div class="section-title">📊 Rank Distribution by Division</div>
+        <table>
+            <thead>
+                <tr>
+                    <th>Rank Range</th>
+                    {% for division in division_distribution.keys %}
+                    <th class="text-center">{{ division }}</th>
+                    {% endfor %}
+                    <th class="text-center">Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for range_start in "1,11,21,31,41"|split:"," %}
+                    {% with range_end=range_start|add:9 %}
+                    <tr>
+                        <td>{{ range_start }} - {{ range_end }}</td>
+                        {% for division in division_distribution.keys %}
+                        <td class="text-center">
+                            {% with count=all_student_data|filter_by:"division_display"|filter_value:division|filter_rank_range:range_start:range_end|length %}
+                                {% if count > 0 %}
+                                    {{ count }}
+                                {% else %}
+                                    -
+                                {% endif %}
+                            {% endwith %}
+                        </td>
+                        {% endfor %}
+                        <td class="text-center text-bold">
+                            {% with count=all_student_data|filter_rank_range:range_start:range_end|length %}
+                                {{ count }}
+                            {% endwith %}
+                        </td>
+                    </tr>
+                    {% endwith %}
+                {% endfor %}
+                <tr class="highlight-row">
+                    <td class="text-bold">Total</td>
+                    {% for division, count in division_distribution.items %}
+                    <td class="text-center text-bold">{{ count }}</td>
+                    {% endfor %}
+                    <td class="text-center text-bold">{{ total_students }}</td>
+                </tr>
+            </tbody>
+        </table>
+        
+        <!-- Complete Ranking List -->
+        <div class="page-break"></div>
+        <div class="section-title">📋 Complete Ranking List</div>
+        <table>
+            <thead>
+                <tr>
+                    <th>Rank</th>
+                    <th>Reg. No.</th>
+                    <th>Student Name</th>
+                    <th class="text-center">Gender</th>
+                    <th class="text-center">Division</th>
+                    <th class="text-center">Avg. Marks</th>
+                    <th class="text-center">Avg. %</th>
+                    <th class="text-center">Grade Points</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for student in all_student_data %}
+                <tr {% if student.rank <= 5 %}class="highlight-row"{% endif %}>
+                    <td>
+                        <span class="rank-badge 
+                            {% if student.rank == 1 %}rank-1
+                            {% elif student.rank == 2 %}rank-2
+                            {% elif student.rank == 3 %}rank-3
+                            {% else %}rank-other{% endif %}">
+                            {{ student.rank }}
+                        </span>
+                    </td>
+                    <td>{{ student.registration_number }}</td>
+                    <td>{{ student.full_name|truncatechars:20 }}</td>
+                    <td class="text-center">
+                        <span class="gender-icon gender-{{ student.gender|lower }}">
+                            {{ student.gender|slice:':1' }}
+                        </span>
+                    </td>
+                    <td class="text-center">
+                        {% if student.division_display %}
+                            <span class="division-badge division-{{ student.division }}">
+                                {{ student.division_display|slice:':1' }}
+                            </span>
+                        {% else %}
+                            -
+                        {% endif %}
+                    </td>
+                    <td class="text-center">{{ student.average_marks|floatformat:2|default:"-" }}</td>
+                    <td class="text-center">
+                        {% if student.average_percentage %}
+                            {{ student.average_percentage|floatformat:1 }}%
+                        {% else %}
+                            -
+                        {% endif %}
+                    </td>
+                    <td class="text-center">{{ student.total_grade_points|floatformat:1|default:"-" }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+    
+    <!-- Footer -->
+    <div class="footer">
+        <div>Report ID: {{ exam_session.id }}-{{ section }}-{{ generated_date|date:'YmdHis' }}</div>
+        <div>Generated by School Management System | {{ school_name }}</div>
+        <div>Confidential - For internal use only</div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,722 @@
+{% extends 'admin/base.html' %}
+{% load static %}
+{% load custom_filters %}
+{% block title %} Exam Sessions Management {% endblock title %}
+
+{% block breadcrumb %}
+    <h5 class="mb-0">
+        <i class="fas fa-clipboard-list"></i> Exam Sessions
+    </h5>
+{% endblock breadcrumb %}
+
+{% block extra_css %}
+<style>
+    .table th {
+        font-weight: 600;
+        border-bottom-width: 2px;
+    }
+    .table td {
+        vertical-align: middle;
+    }
+    .badge {
+        font-size: 0.85em;
+        padding: 0.4em 0.8em;
+    }
+    .status-badge {
+        border-radius: 12px;
+        padding: 4px 12px;
+        font-weight: 500;
+    }
+    .status-draft {
+        background-color: #6c757d;
+        color: white;
+    }
+    .status-submitted {
+        background-color: #ffc107;
+        color: #212529;
+    }
+    .status-verified {
+        background-color: #17a2b8;
+        color: white;
+    }
+    .status-published {
+        background-color: #28a745;
+        color: white;
+    }
+    .exam-date-cell {
+        min-width: 100px;
+    }
+    .stream-info {
+        font-size: 0.9em;
+        color: #6c757d;
+    }
+    .quick-actions {
+        display: flex;
+        gap: 8px;
+        justify-content: center;
+        align-items: center;
+    }
+    .action-btn {
+        width: 32px;
+        height: 32px;
+        padding: 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 6px;
+        border: none;
+        transition: all 0.2s ease;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+        text-decoration: none;
+    }
+    .action-btn i {
+        font-size: 0.85rem;
+        color: #ffffff !important;
+    }
+    .action-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 3px 8px rgba(0,0,0,0.2);
+        filter: brightness(1.1);
+        text-decoration: none;
+    }
+    .btn-report {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+    .btn-report:hover {
+        background: linear-gradient(135deg, #5a67d8 0%, #6b46c1 100%);
+    }
+    .btn-analysis {
+        background: linear-gradient(135deg, #4CAF50 0%, #2E7D32 100%);
+    }
+    .btn-analysis:hover {
+        background: linear-gradient(135deg, #43A047 0%, #1B5E20 100%);
+    }
+    .filter-panel {
+        background-color: #f8f9fa;
+        border-radius: 8px;
+        padding: 15px;
+        margin-bottom: 20px;
+        border: 1px solid #dee2e6;
+        position: relative;
+        z-index: 1 !important;
+    }
+    .filter-header {
+        font-weight: 600;
+        color: #495057;
+        margin-bottom: 10px;
+        padding-bottom: 8px;
+        border-bottom: 2px solid #dee2e6;
+    }
+    .stat-card {
+        border-radius: 8px;
+        padding: 15px;
+        margin-bottom: 15px;
+        transition: transform 0.2s;
+    }
+    .stat-card:hover {
+        transform: translateY(-2px);
+    }
+    .stat-card h5 {
+        font-size: 0.9rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        margin-bottom: 8px;
+        color: #6c757d;
+    }
+    .stat-card h3 {
+        font-weight: 700;
+        margin-bottom: 5px;
+    }
+    .stat-card .stat-icon {
+        font-size: 2rem;
+        opacity: 0.8;
+    }
+    .success-toast, .error-toast {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 99999 !important;
+        min-width: 300px;
+    }
+    .select2-container {
+        z-index: 999999 !important;
+    }
+    .select2-dropdown {
+        z-index: 999999 !important;
+    }
+    #filter-academic-year + .select2-container,
+    #filter-term + .select2-container,
+    #filter-class-level + .select2-container,
+    #filter-stream + .select2-container {
+        z-index: 2 !important;
+    }
+    .dataTables_filter {
+        float: right !important;
+        margin-bottom: 15px;
+    }
+    .dataTables_filter input {
+        margin-left: 10px !important;
+    }
+</style>
+{% endblock extra_css %}
+
+{% block content %}
+<section class="content">
+    <div class="container-fluid"> 
+        <!-- Toast Messages -->
+        <div id="success-toast" class="alert alert-success alert-dismissible fade success-toast" style="display: none;" role="alert">
+            <strong><i class="fas fa-check-circle"></i> Success!</strong> 
+            <span id="success-message"></span>
+            <button type="button" class="close" onclick="$('#success-toast').fadeOut()" data-dismiss="alert" aria-label="Close">
+                <span aria-hidden="true">&times;</span>
+            </button>
+        </div>
+
+        <div id="error-toast" class="alert alert-danger alert-dismissible fade error-toast" style="display: none;" role="alert">
+            <strong><i class="fas fa-exclamation-circle"></i> Error!</strong> 
+            <span id="error-message"></span>
+            <button type="button" class="close" onclick="$('#error-toast').fadeOut()" data-dismiss="alert" aria-label="Close">
+                <span aria-hidden="true">&times;</span>
+            </button>
+        </div>
+
+        <!-- Statistics Cards -->
+        <div class="row mb-4">
+            <div class="col-lg-3 col-md-6">
+                <div class="stat-card bg-primary text-white">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h5>Total Sessions</h5>
+                            <h3 id="total-sessions">0</h3>
+                        </div>
+                        <div class="stat-icon">
+                            <i class="fas fa-clipboard-list"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-3 col-md-6">
+                <div class="stat-card bg-warning text-dark">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h5>Draft</h5>
+                            <h3 id="draft-sessions">0</h3>
+                        </div>
+                        <div class="stat-icon">
+                            <i class="fas fa-edit"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-3 col-md-6">
+                <div class="stat-card bg-info text-white">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h5>Verified</h5>
+                            <h3 id="verified-sessions">0</h3>
+                        </div>
+                        <div class="stat-icon">
+                            <i class="fas fa-check-circle"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-3 col-md-6">
+                <div class="stat-card bg-success text-white">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h5>Published</h5>
+                            <h3 id="published-sessions">0</h3>
+                        </div>
+                        <div class="stat-icon">
+                            <i class="fas fa-globe"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Filter Panel -->
+        <div class="filter-panel">
+            <div class="row">
+                <div class="col-md-12">
+                    <div class="filter-header">
+                        <i class="fas fa-filter"></i> Filter Exam Sessions
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="form-group">
+                        <label for="filter-academic-year">Academic Year</label>
+                        <select class="form-control select2bs4" id="filter-academic-year" style="width: 100%;">
+                            <option value="">All Academic Years</option>
+                            {% for year in academic_years %}
+                                <option value="{{ year.id }}">{{ year.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="form-group">
+                        <label for="filter-term">Term</label>
+                        <select class="form-control select2bs4" id="filter-term" style="width: 100%;" disabled>
+                            <option value="">All Terms</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="form-group">
+                        <label for="filter-class-level">Class Level</label>
+                        <select class="form-control select2bs4" id="filter-class-level" style="width: 100%;">
+                            <option value="">All Classes</option>
+                            {% for class_level in class_levels %}
+                                <option value="{{ class_level.id }}">{{ class_level.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="form-group">
+                        <label for="filter-stream">Stream (Optional)</label>
+                        <select class="form-control select2bs4" id="filter-stream" style="width: 100%;" disabled>
+                            <option value="">All Streams</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="form-group" style="margin-top: 28px;">
+                        <button type="button" class="btn btn-secondary btn-block" id="reset-filters">
+                            <i class="fas fa-redo"></i> Reset
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Table -->
+        <div class="row">
+            <div class="col-lg-12">
+                <div class="card shadow-lg">
+                    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                        <h6 class="header-title mb-0 text-uppercase">
+                            <i class="fas fa-clipboard-list"></i> Exam Sessions Management
+                        </h6>
+                        <div class="d-flex align-items-center">
+                            <span class="badge badge-light mr-2">
+                                Showing: <span id="showing-count">0</span> sessions
+                            </span>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover text-nowrap table-responsive-sm table-bordered table-striped table-sm display" id="exam-sessions-table">
+                                <thead class="bg-light">
+                                    <tr>
+                                        <th>Exam Session Name</th>
+                                        <th>Type</th>
+                                        <th>Academic Year</th>
+                                        <th>Term</th>
+                                        <th>Class & Stream</th>
+                                        <th>Exam Date</th>
+                                        <th>Status</th>
+                                        <th>Created</th>
+                                        <th class="text-center">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <!-- Data will be populated by DataTable via AJAX -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock content %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // Initialize variables
+    let today = new Date().toISOString().split('T')[0];
+    let table = null;
+
+    // CSRF token for AJAX requests
+    function getCSRFToken() {
+        return $('input[name="csrfmiddlewaretoken"]').val();
+    }
+
+    // Show toast message
+    function showToast(message, type = 'success') {
+        const toastId = type === 'success' ? '#success-toast' : '#error-toast';
+        const messageId = type === 'success' ? '#success-message' : '#error-message';
+        
+        $(messageId).text(message);
+        $(toastId).addClass('show').fadeIn();
+        
+        setTimeout(function() {
+            $(toastId).fadeOut(function() {
+                $(this).removeClass('show');
+            });
+        }, type === 'success' ? 3000 : 5000);
+    }
+
+    // Update statistics
+    function updateStatistics() {
+        if (!table) return;
+        
+        const data = table.rows({ search: 'applied' }).data();
+        let total = 0, draft = 0, submitted = 0, verified = 0, published = 0;
+        
+        data.each(function(value, index) {
+            total++;
+            const status = value[6]; // Status column index
+            if (status === 'draft') draft++;
+            else if (status === 'submitted') submitted++;
+            else if (status === 'verified') verified++;
+            else if (status === 'published') published++;
+        });
+        
+        $('#total-sessions').text(total);
+        $('#draft-sessions').text(draft);
+        $('#verified-sessions').text(verified);
+        $('#published-sessions').text(published);
+        $('#showing-count').text(total);
+    }
+
+    // Initialize Select2 for filter fields
+    function initializeFilterSelect2(selector) {
+        $(selector).select2({
+            theme: 'bootstrap4',
+            width: '100%',
+            placeholder: 'Select an option',
+            allowClear: true,
+            dropdownParent: $('body')
+        });
+    }
+
+    // Initialize filter select2
+    initializeFilterSelect2('#filter-academic-year');
+    initializeFilterSelect2('#filter-class-level');
+    
+    $('#filter-term').select2({
+        theme: 'bootstrap4',
+        width: '100%',
+        placeholder: 'All Terms',
+        allowClear: true,
+        dropdownParent: $('body'),
+        disabled: true
+    });
+    
+    $('#filter-stream').select2({
+        theme: 'bootstrap4',
+        width: '100%',
+        placeholder: 'All Streams',
+        allowClear: true,
+        dropdownParent: $('body'),
+        disabled: true
+    });
+
+    // Function to load terms for academic year (for filter)
+    function loadFilterTerms(academicYearId, targetSelect) {
+        if (!academicYearId) {
+            targetSelect.empty();
+            targetSelect.append('<option value="">All Terms</option>');
+            targetSelect.prop('disabled', true).trigger('change');
+            return;
+        }
+
+        $.ajax({
+            url: '{% url "admin_get_terms_for_academic_year" %}',
+            method: 'GET',
+            data: { 'academic_year_id': academicYearId },
+            success: function(data) {
+                if (data.success) {
+                    targetSelect.empty();
+                    targetSelect.append('<option value="">All Terms</option>');
+                    $.each(data.terms, function(index, term) {
+                        targetSelect.append(
+                            $('<option>', {
+                                value: term.id,
+                                text: term.text
+                            })
+                        );
+                    });
+                    targetSelect.prop('disabled', false).trigger('change');
+                } else {
+                    console.error('Error loading terms:', data.message);
+                    showToast('Failed to load terms.', 'danger');
+                }
+            },
+            error: function(xhr, status, error) {
+                console.error('AJAX Error:', error);
+                showToast('Error loading terms.', 'danger');
+            }
+        });
+    }
+
+    // Function to load streams for class level (for filter)
+    function loadFilterStreams(classLevelId, targetSelect) {
+        if (!classLevelId) {
+            targetSelect.empty();
+            targetSelect.append('<option value="">All Streams</option>');
+            targetSelect.prop('disabled', true).trigger('change');
+            return;
+        }
+
+        $.ajax({
+            url: '{% url "admin_get_streams_for_exam_session" %}',
+            method: 'GET',
+            data: { 'class_level_id': classLevelId },
+            success: function(data) {
+                if (data.success) {
+                    targetSelect.empty();
+                    targetSelect.append('<option value="">All Streams</option>');
+                    $.each(data.streams, function(index, stream) {
+                        targetSelect.append(
+                            $('<option>', {
+                                value: stream.id,
+                                text: stream.text
+                            })
+                        );
+                    });
+                    targetSelect.prop('disabled', false).trigger('change');
+                } else {
+                    console.error('Error loading streams:', data.message);
+                    showToast('Failed to load streams.', 'danger');
+                }
+            },
+            error: function(xhr, status, error) {
+                console.error('AJAX Error:', error);
+                showToast('Error loading streams.', 'danger');
+            }
+        });
+    }
+
+    // Initialize DataTable with AJAX
+    function initializeDataTable() {
+        table = $('#exam-sessions-table').DataTable({
+            "processing": true,
+            "serverSide": true,
+            "ajax": {
+                "url": "{% url 'admin_exam_sessions_data' %}",
+                "type": "GET",
+                "data": function(d) {
+                    // Add custom filter parameters
+                    d.academic_year = $('#filter-academic-year').val();
+                    d.term = $('#filter-term').val();
+                    d.class_level = $('#filter-class-level').val();
+                    d.stream = $('#filter-stream').val();
+                }
+            },
+            "columns": [
+                { 
+                    "data": "name",
+                    "render": function(data, type, row) {
+                        return '<strong>' + data + '</strong><br><small class="text-muted">' + row.exam_type_name + '</small>';
+                    }
+                },
+                { 
+                    "data": "exam_type_name",
+                    "render": function(data) {
+                        return '<span class="badge badge-info">' + data + '</span>';
+                    }
+                },
+                { "data": "academic_year_name" },
+                { "data": "term_display" },
+                { 
+                    "data": null,
+                    "render": function(data, type, row) {
+                        let html = '<strong>' + row.class_level_name + '</strong><br>';
+                        if (row.stream_class_stream_letter) {
+                            html += '<small class="stream-info"><i class="fas fa-stream"></i> ' + row.stream_class_stream_letter + '</small>';
+                        } else {
+                            html += '<small class="stream-info"><i class="fas fa-layer-group"></i> All Streams</small>';
+                        }
+                        return html;
+                    }
+                },
+                { 
+                    "data": "exam_date_formatted",
+                    "render": function(data, type, row) {
+                        let html = data + '<br>';
+                        if (row.exam_date_status === 'past') {
+                            html += '<small class="text-muted"><i class="fas fa-check text-success"></i> Past</small>';
+                        } else if (row.exam_date_status === 'today') {
+                            html += '<small class="text-muted"><i class="fas fa-clock text-warning"></i> Today</small>';
+                        } else {
+                            html += '<small class="text-muted"><i class="fas fa-calendar text-info"></i> Future</small>';
+                        }
+                        return html;
+                    }
+                },
+                { 
+                    "data": "status_display",
+                    "render": function(data, type, row) {
+                        let statusClass = '';
+                        let icon = '';
+                        
+                        switch(row.status) {
+                            case 'draft':
+                                statusClass = 'status-draft';
+                                icon = 'fas fa-edit';
+                                break;
+                            case 'submitted':
+                                statusClass = 'status-submitted';
+                                icon = 'fas fa-paper-plane';
+                                break;
+                            case 'verified':
+                                statusClass = 'status-verified';
+                                icon = 'fas fa-check-circle';
+                                break;
+                            case 'published':
+                                statusClass = 'status-published';
+                                icon = 'fas fa-globe';
+                                break;
+                        }
+                        
+                        return '<span class="status-badge ' + statusClass + '"><i class="' + icon + '"></i> ' + data + '</span>';
+                    }
+                },
+                { 
+                    "data": "created_at_formatted",
+                    "render": function(data, type, row) {
+                        return data + '<br><small class="text-muted">' + row.created_at_relative + ' ago</small>';
+                    }
+                },
+                { 
+                    "data": null,
+                    "render": function(data, type, row) {
+                        let html = '<div class="quick-actions">';
+                        
+                        // Report Button - always enabled
+                        html += '<a href="{% url "exam_session_report_view" 0 %}'.replace('0', row.id) + 
+                               '" class="action-btn btn-report" title="View Report">' +
+                               '<i class="fas fa-file-alt"></i>' +
+                               '</a>';
+                        
+                        // Analysis Button - always enabled
+                        html += '<a href="{% url "exam_session_analysis_view" 0 %}'.replace('0', row.id) + 
+                               '" class="action-btn btn-analysis" title="View Analysis">' +
+                               '<i class="fas fa-chart-bar"></i>' +
+                               '</a>';
+                        
+                        html += '</div>';
+                        return html;
+                    },
+                    "orderable": false,
+                    "searchable": false
+                }
+            ],
+            "order": [[5, 'desc']], // Sort by exam date descending
+            "pageLength": 10,
+            "responsive": true,
+            "autoWidth": false,
+            "destroy": true,
+            "retrieve": true,
+            "language": {
+                "emptyTable": "<div class='text-center py-4'><i class='fas fa-inbox fa-2x mb-2'></i><br>No exam sessions found.</div>",
+                "search": "_INPUT_",
+                "searchPlaceholder": "Search exam sessions...",
+                "lengthMenu": "_MENU_ sessions per page",
+                "info": "Showing _START_ to _END_ of _TOTAL_ sessions",
+                "infoEmpty": "Showing 0 to 0 of 0 sessions",
+                "infoFiltered": "(filtered from _MAX_ total sessions)",
+                "paginate": {
+                    "first": "First",
+                    "last": "Last",
+                    "next": "Next",
+                    "previous": "Previous"
+                }
+            },
+            "drawCallback": function(settings) {
+                updateStatistics();
+                // Add tooltips to action buttons
+                $('.action-btn[title]').tooltip({
+                    placement: 'top',
+                    trigger: 'hover'
+                });
+            }
+        });
+    }
+
+    // Initialize DataTable
+    initializeDataTable();
+
+    // Filter functionality
+    $('#filter-academic-year').on('change', function() {
+        const academicYearId = $(this).val();
+        const termSelect = $('#filter-term');
+        
+        if (academicYearId) {
+            loadFilterTerms(academicYearId, termSelect);
+        } else {
+            termSelect.empty();
+            termSelect.append('<option value="">All Terms</option>');
+            termSelect.prop('disabled', true).trigger('change');
+            $('#filter-stream').empty();
+            $('#filter-stream').append('<option value="">All Streams</option>');
+            $('#filter-stream').prop('disabled', true).trigger('change');
+        }
+        
+        // Trigger DataTable reload with new filters
+        table.ajax.reload();
+    });
+
+    $('#filter-class-level').on('change', function() {
+        const classLevelId = $(this).val();
+        const streamSelect = $('#filter-stream');
+        
+        if (classLevelId) {
+            loadFilterStreams(classLevelId, streamSelect);
+        } else {
+            streamSelect.empty();
+            streamSelect.append('<option value="">All Streams</option>');
+            streamSelect.prop('disabled', true).trigger('change');
+        }
+        
+        table.ajax.reload();
+    });
+
+    $('#filter-term, #filter-stream').on('change', function() {
+        table.ajax.reload();
+    });
+
+    $('#reset-filters').on('click', function() {
+        $('#filter-academic-year, #filter-class-level, #filter-term, #filter-stream').val('').trigger('change');
+        $('#filter-term, #filter-stream').prop('disabled', true).trigger('change');
+        $('#filter-term').empty().append('<option value="">All Terms</option>');
+        $('#filter-stream').empty().append('<option value="">All Streams</option>');
+        table.ajax.reload();
+    });
+
+    // Keyboard shortcuts for better UX
+    $(document).keydown(function(e) {
+        // Ctrl + F to focus search
+        if (e.ctrlKey && e.keyCode === 70) {
+            e.preventDefault();
+            $('.dataTables_filter input').focus();
+        }
+        
+        // Escape to clear search
+        if (e.keyCode === 27) {
+            $('.dataTables_filter input').val('').keyup();
+        }
+    });
+
+    // Add row click handler for better UX
+    $('#exam-sessions-table tbody').on('click', 'tr', function() {
+        $(this).toggleClass('table-active');
+    });
+
+    // Double-click row to view report
+    $('#exam-sessions-table tbody').on('dblclick', 'tr', function() {
+        var data = table.row(this).data();
+        if (data) {
+            window.location.href = '{% url "exam_session_report_view" 0 %}'.replace('0', data.id);
+        }
+    });
+});
+</script>
+{% endblock extra_js %}

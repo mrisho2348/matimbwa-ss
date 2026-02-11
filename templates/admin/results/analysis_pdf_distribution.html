@@ -1,0 +1,1138 @@
+{% load analysis_filters %}
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>{{ section_title }} - {{ exam_session.name }}</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 1.5cm;
+            @bottom-center {
+                content: "Page " counter(page) " of " counter(pages);
+                font-size: 9px;
+                color: #666;
+            }
+        }
+        
+        body {
+            font-family: 'Helvetica', 'Arial', sans-serif;
+            font-size: 10px;
+            line-height: 1.4;
+            color: #333;
+            margin: 0;
+            padding: 0;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid {% if section == 'divisions_only' %}#007bff{% else %}#6f42c1{% endif %};
+        }
+        
+        .school-name {
+            font-size: 16px;
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 3px;
+        }
+        
+        .school-address {
+            font-size: 9px;
+            color: #666;
+            margin-bottom: 8px;
+        }
+        
+        .report-title {
+            font-size: 14px;
+            font-weight: bold;
+            color: {% if section == 'divisions_only' %}#007bff{% else %}#6f42c1{% endif %};
+            margin-bottom: 5px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .section-icon {
+            font-size: 20px;
+            margin-right: 5px;
+            vertical-align: middle;
+        }
+        
+        .session-info {
+            font-size: 11px;
+            margin-bottom: 3px;
+            color: #555;
+        }
+        
+        .section-details {
+            font-size: 10px;
+            color: #777;
+            margin-bottom: 15px;
+            padding: 5px 10px;
+            background-color: #f8f9fa;
+            border-radius: 4px;
+            border-left: 3px solid {% if section == 'divisions_only' %}#007bff{% else %}#6f42c1{% endif %};
+        }
+        
+        .date-info {
+            font-size: 9px;
+            color: #666;
+            margin-bottom: 15px;
+            text-align: right;
+            border-top: 1px solid #eee;
+            padding-top: 5px;
+        }
+        
+        .distribution-section {
+            margin-bottom: 25px;
+            page-break-inside: avoid;
+        }
+        
+        .section-title {
+            font-size: 12px;
+            font-weight: bold;
+            background: linear-gradient(to right, {% if section == 'divisions_only' %}#e7f3ff{% else %}#f0e6ff{% endif %}, #e9ecef);
+            padding: 8px 12px;
+            border-left: 4px solid {% if section == 'divisions_only' %}#007bff{% else %}#6f42c1{% endif %};
+            margin-bottom: 12px;
+            border-radius: 4px 0 0 4px;
+        }
+        
+        .summary-stats {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .summary-card {
+            background-color: white;
+            border-radius: 6px;
+            padding: 12px;
+            border: 1px solid #dee2e6;
+            text-align: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        
+        .summary-label {
+            font-size: 9px;
+            color: #6c757d;
+            margin-bottom: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .summary-value {
+            font-size: 16px;
+            font-weight: bold;
+            color: {% if section == 'divisions_only' %}#007bff{% else %}#6f42c1{% endif %};
+            margin-bottom: 3px;
+        }
+        
+        .summary-subtext {
+            font-size: 8px;
+            color: #888;
+            margin-top: 3px;
+        }
+        
+        .chart-container {
+            margin: 20px 0;
+            padding: 15px;
+            background-color: white;
+            border-radius: 8px;
+            border: 1px solid #dee2e6;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        
+        .chart-title {
+            font-size: 11px;
+            font-weight: bold;
+            margin-bottom: 15px;
+            color: #495057;
+            text-align: center;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #dee2e6;
+        }
+        
+        .distribution-chart {
+            height: 200px;
+            display: flex;
+            align-items: flex-end;
+            justify-content: space-between;
+            padding: 0 20px;
+            margin-bottom: 15px;
+        }
+        
+        .chart-bar {
+            flex: 1;
+            margin: 0 5px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            height: 180px;
+        }
+        
+        .bar-container {
+            width: 100%;
+            height: 150px;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+            position: relative;
+        }
+        
+        .bar-fill {
+            border-radius: 4px 4px 0 0;
+            min-height: 20px;
+            position: relative;
+            transition: height 0.3s ease;
+            background: linear-gradient(to top, 
+                {% if section == 'divisions_only' %}#007bff{% else %}#6f42c1{% endif %}, 
+                {% if section == 'divisions_only' %}#0056b3{% else %}#563d7c{% endif %});
+        }
+        
+        .bar-value {
+            position: absolute;
+            top: -20px;
+            left: 0;
+            right: 0;
+            font-size: 9px;
+            font-weight: bold;
+            color: #2c3e50;
+            text-align: center;
+        }
+        
+        .bar-label {
+            position: absolute;
+            bottom: -25px;
+            left: 0;
+            right: 0;
+            font-size: 8px;
+            color: #666;
+            text-align: center;
+            transform: rotate(-45deg);
+            transform-origin: left top;
+            white-space: nowrap;
+        }
+        
+        .bar-percentage {
+            position: absolute;
+            top: -35px;
+            left: 0;
+            right: 0;
+            font-size: 8px;
+            color: #007bff;
+            text-align: center;
+            font-weight: bold;
+        }
+        
+        .pie-chart-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 200px;
+            margin: 20px 0;
+        }
+        
+        .pie-chart {
+            width: 180px;
+            height: 180px;
+            border-radius: 50%;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        
+        .pie-segment {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            clip-path: polygon(50% 50%, 50% 0%, 100% 0%, 100% 100%, 0% 100%, 0% 0%);
+            transform-origin: 50% 50%;
+        }
+        
+        .pie-label {
+            position: absolute;
+            font-size: 8px;
+            font-weight: bold;
+            color: white;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+        }
+        
+        .distribution-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+            font-size: 9px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        .distribution-table th {
+            background: linear-gradient(to right, 
+                {% if section == 'divisions_only' %}#007bff{% else %}#6f42c1{% endif %}, 
+                {% if section == 'divisions_only' %}#0056b3{% else %}#563d7c{% endif %});
+            color: white;
+            border: 1px solid {% if section == 'divisions_only' %}#0056b3{% else %}#4a3a6a{% endif %};
+            padding: 10px;
+            text-align: left;
+            font-weight: bold;
+            font-size: 9px;
+            position: sticky;
+            top: 0;
+        }
+        
+        .distribution-table td {
+            border: 1px solid #dee2e6;
+            padding: 8px 10px;
+            vertical-align: middle;
+        }
+        
+        .distribution-table tr:nth-child(even) {
+            background-color: #f8f9fa;
+        }
+        
+        .distribution-table tr:hover {
+            background-color: #e9ecef;
+        }
+        
+        .category-cell {
+            width: 150px;
+        }
+        
+        .count-cell {
+            text-align: center;
+            width: 80px;
+        }
+        
+        .percentage-cell {
+            text-align: center;
+            width: 100px;
+        }
+        
+        .average-cell {
+            text-align: center;
+            width: 90px;
+        }
+        
+        .trend-cell {
+            text-align: center;
+            width: 80px;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background-color: #e9ecef;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 5px 0;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, 
+                {% if section == 'divisions_only' %}#28a745{% else %}#17a2b8{% endif %}, 
+                {% if section == 'divisions_only' %}#20c997{% else %}#007bff{% endif %});
+            border-radius: 10px;
+            transition: width 0.3s ease;
+        }
+        
+        .category-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 9px;
+            font-weight: bold;
+            min-width: 60px;
+            text-align: center;
+        }
+        
+        .division-badge {
+            background-color: #007bff;
+            color: white;
+        }
+        
+        .division-I { background-color: #28a745; color: white; }
+        .division-II { background-color: #17a2b8; color: white; }
+        .division-III { background-color: #ffc107; color: #212529; }
+        .division-IV { background-color: #fd7e14; color: white; }
+        .division-0 { background-color: #dc3545; color: white; }
+        
+        .gender-badge {
+            background-color: #6f42c1;
+            color: white;
+        }
+        
+        .gender-male { background-color: #007bff; color: white; }
+        .gender-female { background-color: #e83e8c; color: white; }
+        .gender-other { background-color: #6c757d; color: white; }
+        
+        .trend-indicator {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 8px;
+            font-weight: bold;
+        }
+        
+        .trend-up { background-color: #28a745; color: white; }
+        .trend-down { background-color: #dc3545; color: white; }
+        .trend-stable { background-color: #ffc107; color: #212529; }
+        
+        .analysis-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .analysis-card {
+            background-color: white;
+            border-radius: 8px;
+            padding: 15px;
+            border: 1px solid #dee2e6;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        
+        .analysis-title {
+            font-size: 10px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #495057;
+            padding-bottom: 5px;
+            border-bottom: 1px solid #dee2e6;
+        }
+        
+        .analysis-list {
+            list-style-type: none;
+            padding: 0;
+            margin: 0;
+        }
+        
+        .analysis-list li {
+            margin-bottom: 8px;
+            padding-left: 15px;
+            position: relative;
+            font-size: 9px;
+        }
+        
+        .analysis-list li:before {
+            content: "•";
+            position: absolute;
+            left: 0;
+            color: {% if section == 'divisions_only' %}#007bff{% else %}#6f42c1{% endif %};
+            font-weight: bold;
+        }
+        
+        .comparison-section {
+            margin-top: 25px;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            border: 1px solid #dee2e6;
+        }
+        
+        .comparison-title {
+            font-size: 11px;
+            font-weight: bold;
+            margin-bottom: 15px;
+            color: #495057;
+            text-align: center;
+        }
+        
+        .comparison-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+        }
+        
+        .comparison-item {
+            text-align: center;
+        }
+        
+        .comparison-label {
+            font-size: 9px;
+            color: #6c757d;
+            margin-bottom: 5px;
+        }
+        
+        .comparison-value {
+            font-size: 14px;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        
+        .comparison-diff {
+            font-size: 10px;
+            margin-top: 3px;
+        }
+        
+        .diff-positive { color: #28a745; }
+        .diff-negative { color: #dc3545; }
+        
+        .footer {
+            margin-top: 30px;
+            padding-top: 10px;
+            border-top: 1px solid #dee2e6;
+            font-size: 8px;
+            color: #6c757d;
+            text-align: center;
+        }
+        
+        .page-break {
+            page-break-before: always;
+        }
+        
+        .text-center { text-align: center; }
+        .text-right { text-align: right; }
+        .text-bold { font-weight: bold; }
+        .text-muted { color: #6c757d; }
+        
+        /* Division specific styles */
+        {% if section == 'divisions_only' %}
+        .category-color-0 { background-color: #dc3545; }
+        .category-color-1 { background-color: #fd7e14; }
+        .category-color-2 { background-color: #ffc107; }
+        .category-color-3 { background-color: #17a2b8; }
+        .category-color-4 { background-color: #28a745; }
+        {% else %}
+        .category-color-0 { background-color: #007bff; }
+        .category-color-1 { background-color: #e83e8c; }
+        .category-color-2 { background-color: #6c757d; }
+        .category-color-3 { background-color: #6f42c1; }
+        .category-color-4 { background-color: #20c997; }
+        {% endif %}
+    </style>
+</head>
+<body>
+    <!-- Header Section -->
+    <div class="header">
+        <div class="school-name">{{ school_name }}</div>
+        {% if school_address %}
+        <div class="school-address">{{ school_address }}</div>
+        {% endif %}
+        <div class="report-title">
+            {% if section == 'divisions_only' %}
+                <span class="section-icon">📊</span> Division Distribution Analysis
+            {% else %}
+                <span class="section-icon">👥</span> Gender Distribution Analysis
+            {% endif %}
+        </div>
+        <div class="session-info">{{ exam_session.name }}</div>
+        <div class="session-info">
+            Class: {{ exam_session.class_level.name }}
+            {% if exam_session.stream_class %} | Stream: {{ exam_session.stream_class.stream_letter }}{% endif %}
+        </div>
+        <div class="section-details">
+            Exam Date: {{ exam_session.exam_date|date:"F d, Y" }} | 
+            Total Students: {{ total_students }} |
+            {% if section == 'divisions_only' %}
+                Students with Division: {{ students_with_division }} |
+                Unique Divisions: {{ division_distribution|length }}
+            {% else %}
+                Gender Groups: {{ gender_distribution|length }}
+            {% endif %}
+        </div>
+    </div>
+    
+    <!-- Generated Info -->
+    <div class="date-info">
+        Generated on: {{ generated_date|date:"F d, Y H:i" }} | By: {{ generated_by }}
+    </div>
+    
+    <!-- Summary Statistics -->
+    <div class="summary-stats">
+        <div class="summary-card">
+            <div class="summary-label">Total Students</div>
+            <div class="summary-value">{{ total_students }}</div>
+            <div class="summary-subtext">in this exam session</div>
+        </div>
+        
+        {% if section == 'divisions_only' %}
+        <div class="summary-card">
+            <div class="summary-label">Students with Division</div>
+            <div class="summary-value">{{ students_with_division }}</div>
+            <div class="summary-subtext">
+                {% widthratio students_with_division total_students 100 %}% coverage
+            </div>
+        </div>
+        
+        <div class="summary-card">
+            <div class="summary-label">Unique Divisions</div>
+            <div class="summary-value">{{ division_distribution|length }}</div>
+            <div class="summary-subtext">
+                {% for division, count in division_distribution.items %}
+                    {% if forloop.first %}{{ division }}{% endif %}
+                {% endfor %} most common
+            </div>
+        </div>
+        
+        <div class="summary-card">
+            <div class="summary-label">Highest Avg Marks</div>
+            <div class="summary-value">
+                {% with max_division=division_averages|dictsort:"value"|last %}
+                    {% if max_division %}
+                        {{ max_division.1|floatformat:1 }}
+                    {% else %}
+                        -
+                    {% endif %}
+                {% endwith %}
+            </div>
+            <div class="summary-subtext">
+                {% with max_division=division_averages|dictsort:"value"|last %}
+                    {% if max_division %}
+                        {{ max_division.0 }}
+                    {% endif %}
+                {% endwith %}
+            </div>
+        </div>
+        {% else %}
+        <div class="summary-card">
+            <div class="summary-label">Gender Groups</div>
+            <div class="summary-value">{{ gender_distribution|length }}</div>
+            <div class="summary-subtext">distinct categories</div>
+        </div>
+        
+        <div class="summary-card">
+            <div class="summary-label">Largest Group</div>
+            <div class="summary-value">
+                {% with max_gender=gender_distribution|dictsort:"value"|last %}
+                    {{ max_gender.0|slice:':1' }}
+                {% endwith %}
+            </div>
+            <div class="summary-subtext">
+                {% with max_gender=gender_distribution|dictsort:"value"|last %}
+                    {{ max_gender.1 }} students
+                {% endwith %}
+            </div>
+        </div>
+        
+        <div class="summary-card">
+            <div class="summary-label">Gender Balance</div>
+            <div class="summary-value">
+                {% if gender_distribution.Male and gender_distribution.Female %}
+                    {% widthratio gender_distribution.Male gender_distribution.Female 100 %}%
+                {% else %}
+                    N/A
+                {% endif %}
+            </div>
+            <div class="summary-subtext">Male to Female ratio</div>
+        </div>
+        
+        <div class="summary-card">
+            <div class="summary-label">Highest Avg Marks</div>
+            <div class="summary-value">
+                {% with max_gender=gender_averages|dictsort:"value"|last %}
+                    {% if max_gender %}
+                        {{ max_gender.1|floatformat:1 }}
+                    {% else %}
+                        -
+                    {% endif %}
+                {% endwith %}
+            </div>
+            <div class="summary-subtext">
+                {% with max_gender=gender_averages|dictsort:"value"|last %}
+                    {% if max_gender %}
+                        {{ max_gender.0 }}
+                    {% endif %}
+                {% endwith %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    
+    <!-- Distribution Chart -->
+    <div class="chart-container">
+        <div class="chart-title">
+            {% if section == 'divisions_only' %}
+                📈 Division Distribution - Student Count
+            {% else %}
+                👥 Gender Distribution - Student Count
+            {% endif %}
+        </div>
+        
+        <div class="distribution-chart">
+            {% if section == 'divisions_only' %}
+                {% for division, count in division_distribution.items %}
+                <div class="chart-bar">
+                    <div class="bar-container">
+                        <div class="bar-fill category-color-{{ forloop.counter0 }}" 
+                             style="height: {% widthratio count total_students 150 %}px;">
+                            <div class="bar-value">{{ count }}</div>
+                            <div class="bar-percentage">
+                                {% widthratio count total_students 100 %}%
+                            </div>
+                        </div>
+                        <div class="bar-label">{{ division|slice:':10' }}</div>
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                {% for gender, count in gender_distribution.items %}
+                <div class="chart-bar">
+                    <div class="bar-container">
+                        <div class="bar-fill category-color-{{ forloop.counter0 }}" 
+                             style="height: {% widthratio count total_students 150 %}px;">
+                            <div class="bar-value">{{ count }}</div>
+                            <div class="bar-percentage">
+                                {% widthratio count total_students 100 %}%
+                            </div>
+                        </div>
+                        <div class="bar-label">{{ gender|slice:':10' }}</div>
+                    </div>
+                </div>
+                {% endfor %}
+            {% endif %}
+        </div>
+    </div>
+    
+    <!-- Pie Chart -->
+    <div class="chart-container">
+        <div class="chart-title">
+            {% if section == 'divisions_only' %}
+                🥧 Division Distribution - Percentage View
+            {% else %}
+                🥧 Gender Distribution - Percentage View
+            {% endif %}
+        </div>
+        
+        <div class="pie-chart-container">
+            <div class="pie-chart">
+                {% if section == 'divisions_only' %}
+                    {% with total=0 %}
+                        {% for division, count in division_distribution.items %}
+                            {{ total|add:count }}
+                        {% endfor %}
+                        {% with previous_degrees=0 %}
+                            {% for division, count in division_distribution.items %}
+                                {% with percentage=count|div:total|mul:100 degrees=percentage|mul:3.6 %}
+                                    <div class="pie-segment category-color-{{ forloop.counter0 }}"
+                                         style="transform: rotate({{ previous_degrees }}deg);
+                                                clip-path: polygon(50% 50%, 
+                                                                   {% with cos_prev=previous_degrees|cos %}{{ 50|add:cos_prev|mul:50 }}%{% endwith %} 
+                                                                   {% with sin_prev=previous_degrees|sin %}{{ 50|sub:sin_prev|mul:50 }}%{% endwith %},
+                                                                   {% with cos_next=previous_degrees|add:degrees|cos %}{{ 50|add:cos_next|mul:50 }}%{% endwith %} 
+                                                                   {% with sin_next=previous_degrees|add:degrees|sin %}{{ 50|sub:sin_next|mul:50 }}%{% endwith %});">
+                                        <div class="pie-label" 
+                                             style="top: {% with mid_angle=previous_degrees|add:degrees|div:2 %}{{ 50|sub:mid_angle|sin|mul:30|add:35 }}%{% endwith %}; 
+                                                    left: {% with mid_angle=previous_degrees|add:degrees|div:2 %}{{ 50|add:mid_angle|cos|mul:30|add:35 }}%{% endwith %};">
+                                            {{ division|slice:':1' }}
+                                        </div>
+                                    </div>
+                                    {{ previous_degrees|add:degrees }}
+                                {% endwith %}
+                            {% endfor %}
+                        {% endwith %}
+                    {% endwith %}
+                {% else %}
+                    {% with total=0 %}
+                        {% for gender, count in gender_distribution.items %}
+                            {{ total|add:count }}
+                        {% endfor %}
+                        {% with previous_degrees=0 %}
+                            {% for gender, count in gender_distribution.items %}
+                                {% with percentage=count|div:total|mul:100 degrees=percentage|mul:3.6 %}
+                                    <div class="pie-segment category-color-{{ forloop.counter0 }}"
+                                         style="transform: rotate({{ previous_degrees }}deg);
+                                                clip-path: polygon(50% 50%, 
+                                                                   {% with cos_prev=previous_degrees|cos %}{{ 50|add:cos_prev|mul:50 }}%{% endwith %} 
+                                                                   {% with sin_prev=previous_degrees|sin %}{{ 50|sub:sin_prev|mul:50 }}%{% endwith %},
+                                                                   {% with cos_next=previous_degrees|add:degrees|cos %}{{ 50|add:cos_next|mul:50 }}%{% endwith %} 
+                                                                   {% with sin_next=previous_degrees|add:degrees|sin %}{{ 50|sub:sin_next|mul:50 }}%{% endwith %});">
+                                        <div class="pie-label" 
+                                             style="top: {% with mid_angle=previous_degrees|add:degrees|div:2 %}{{ 50|sub:mid_angle|sin|mul:30|add:35 }}%{% endwith %}; 
+                                                    left: {% with mid_angle=previous_degrees|add:degrees|div:2 %}{{ 50|add:mid_angle|cos|mul:30|add:35 }}%{% endwith %};">
+                                            {{ gender|slice:':1' }}
+                                        </div>
+                                    </div>
+                                    {{ previous_degrees|add:degrees }}
+                                {% endwith %}
+                            {% endfor %}
+                        {% endwith %}
+                    {% endwith %}
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- Legend -->
+        <div style="display: flex; justify-content: center; flex-wrap: wrap; gap: 10px; margin-top: 15px;">
+            {% if section == 'divisions_only' %}
+                {% for division, count in division_distribution.items %}
+                <div style="display: flex; align-items: center; margin: 0 5px;">
+                    <div style="width: 12px; height: 12px; background-color: var(--category-color-{{ forloop.counter0 }}); 
+                                border-radius: 2px; margin-right: 5px;"></div>
+                    <span style="font-size: 8px;">{{ division }} ({{ count }})</span>
+                </div>
+                {% endfor %}
+            {% else %}
+                {% for gender, count in gender_distribution.items %}
+                <div style="display: flex; align-items: center; margin: 0 5px;">
+                    <div style="width: 12px; height: 12px; background-color: var(--category-color-{{ forloop.counter0 }}); 
+                                border-radius: 2px; margin-right: 5px;"></div>
+                    <span style="font-size: 8px;">{{ gender }} ({{ count }})</span>
+                </div>
+                {% endfor %}
+            {% endif %}
+        </div>
+    </div>
+    
+    <!-- Detailed Distribution Table -->
+    <div class="distribution-section">
+        <div class="section-title">
+            {% if section == 'divisions_only' %}
+                📋 Division Distribution - Detailed Analysis
+            {% else %}
+                📋 Gender Distribution - Detailed Analysis
+            {% endif %}
+        </div>
+        
+        <table class="distribution-table">
+            <thead>
+                <tr>
+                    <th class="category-cell">
+                        {% if section == 'divisions_only' %}Division{% else %}Gender{% endif %}
+                    </th>
+                    <th class="count-cell">Students</th>
+                    <th class="percentage-cell">Percentage</th>
+                    <th class="average-cell">Average Marks</th>
+                    <th class="trend-cell">Performance</th>
+                    <th>Distribution</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if section == 'divisions_only' %}
+                    {% for division, count in division_distribution.items %}
+                    <tr>
+                        <td class="category-cell">
+                            <span class="category-badge division-badge division-{{ division|slice:'-1:' }}">
+                                {{ division }}
+                            </span>
+                        </td>
+                        <td class="count-cell">{{ count }}</td>
+                        <td class="percentage-cell">
+                            <strong>{% widthratio count total_students 100 %}%</strong><br>
+                            <small class="text-muted">{{ count }}/{{ total_students }}</small>
+                        </td>
+                        <td class="average-cell">
+                            {% if division_averages and division in division_averages %}
+                                <strong>{{ division_averages|get_item:division|floatformat:2 }}</strong><br>
+                                <small class="text-muted">out of {{ exam_session.exam_type.max_score }}</small>
+                            {% else %}
+                                <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td class="trend-cell">
+                            {% if division_averages and division in division_averages %}
+                                {% with avg=division_averages|get_item:division %}
+                                    {% if avg >= 70 %}
+                                        <span class="trend-indicator trend-up">Excellent</span>
+                                    {% elif avg >= 50 %}
+                                        <span class="trend-indicator trend-stable">Good</span>
+                                    {% else %}
+                                        <span class="trend-indicator trend-down">Needs Work</span>
+                                    {% endif %}
+                                {% endwith %}
+                            {% else %}
+                                <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="progress-bar">
+                                <div class="progress-fill" style="width: {% widthratio count total_students 100 %}%;"></div>
+                            </div>
+                            <div class="text-center" style="font-size: 8px;">
+                                {% widthratio count total_students 100 %}% of class
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                {% else %}
+                    {% for gender, count in gender_distribution.items %}
+                    <tr>
+                        <td class="category-cell">
+                            <span class="category-badge gender-badge gender-{{ gender|lower }}">
+                                {{ gender }}
+                            </span>
+                        </td>
+                        <td class="count-cell">{{ count }}</td>
+                        <td class="percentage-cell">
+                            <strong>{% widthratio count total_students 100 %}%</strong><br>
+                            <small class="text-muted">{{ count }}/{{ total_students }}</small>
+                        </td>
+                        <td class="average-cell">
+                            {% if gender_averages and gender in gender_averages %}
+                                <strong>{{ gender_averages|get_item:gender|floatformat:2 }}</strong><br>
+                                <small class="text-muted">out of {{ exam_session.exam_type.max_score }}</small>
+                            {% else %}
+                                <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td class="trend-cell">
+                            {% if gender_averages and gender in gender_averages %}
+                                {% with avg=gender_averages|get_item:gender %}
+                                    {% if avg >= 70 %}
+                                        <span class="trend-indicator trend-up">Excellent</span>
+                                    {% elif avg >= 50 %}
+                                        <span class="trend-indicator trend-stable">Good</span>
+                                    {% else %}
+                                        <span class="trend-indicator trend-down">Needs Work</span>
+                                    {% endif %}
+                                {% endwith %}
+                            {% else %}
+                                <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="progress-bar">
+                                <div class="progress-fill" style="width: {% widthratio count total_students 100 %}%;"></div>
+                            </div>
+                            <div class="text-center" style="font-size: 8px;">
+                                {% widthratio count total_students 100 %}% of class
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+    
+    <!-- Analysis Section -->
+    <div class="analysis-grid">
+        <div class="analysis-card">
+            <div class="analysis-title">
+                {% if section == 'divisions_only' %}
+                    📊 Key Insights - Division Analysis
+                {% else %}
+                    📊 Key Insights - Gender Analysis
+                {% endif %}
+            </div>
+            <ul class="analysis-list">
+                {% if section == 'divisions_only' %}
+                    <li>
+                        <strong>Most Common Division:</strong> 
+                        {% with max_division=division_distribution|dictsort:"value"|last %}
+                            {{ max_division.0 }} ({{ max_division.1 }} students)
+                        {% endwith %}
+                    </li>
+                    <li>
+                        <strong>Least Common Division:</strong> 
+                        {% with min_division=division_distribution|dictsort:"value"|first %}
+                            {{ min_division.0 }} ({{ min_division.1 }} students)
+                        {% endwith %}
+                    </li>
+                    <li>
+                        <strong>Highest Performing Division:</strong> 
+                        {% with max_avg=division_averages|dictsort:"value"|last %}
+                            {% if max_avg %}
+                                {{ max_avg.0 }} ({{ max_avg.1|floatformat:2 }} avg)
+                            {% else %}
+                                Not available
+                            {% endif %}
+                        {% endwith %}
+                    </li>
+                    <li>
+                        <strong>Division Coverage:</strong> 
+                        {{ students_with_division }} out of {{ total_students }} students have division assigned
+                    </li>
+                {% else %}
+                    <li>
+                        <strong>Largest Gender Group:</strong> 
+                        {% with max_gender=gender_distribution|dictsort:"value"|last %}
+                            {{ max_gender.0 }} ({{ max_gender.1 }} students)
+                        {% endwith %}
+                    </li>
+                    <li>
+                        <strong>Smallest Gender Group:</strong> 
+                        {% with min_gender=gender_distribution|dictsort:"value"|first %}
+                            {{ min_gender.0 }} ({{ min_gender.1 }} students)
+                        {% endwith %}
+                    </li>
+                    <li>
+                        <strong>Highest Performing Gender:</strong> 
+                        {% with max_avg=gender_averages|dictsort:"value"|last %}
+                            {% if max_avg %}
+                                {{ max_avg.0 }} ({{ max_avg.1|floatformat:2 }} avg)
+                            {% else %}
+                                Not available
+                            {% endif %}
+                        {% endwith %}
+                    </li>
+                    <li>
+                        <strong>Gender Balance Index:</strong> 
+                        {% if gender_distribution.Male and gender_distribution.Female %}
+                            {% widthratio gender_distribution.Male gender_distribution.Female 100 %}% 
+                            ({{ gender_distribution.Male }}M:{{ gender_distribution.Female }}F)
+                        {% else %}
+                            Not applicable
+                        {% endif %}
+                    </li>
+                {% endif %}
+            </ul>
+        </div>
+        
+        <div class="analysis-card">
+            <div class="analysis-title">
+                {% if section == 'divisions_only' %}
+                    🎯 Recommendations - Division Based
+                {% else %}
+                    🎯 Recommendations - Gender Based
+                {% endif %}
+            </div>
+            <ul class="analysis-list">
+                {% if section == 'divisions_only' %}
+                    <li>Focus on improving performance in lower divisions</li>
+                    <li>Provide targeted support for Division III and IV students</li>
+                    <li>Encourage peer learning between higher and lower divisions</li>
+                    <li>Set division-specific academic goals and targets</li>
+                    <li>Monitor division migration between exam sessions</li>
+                {% else %}
+                    <li>Address any gender-based performance gaps identified</li>
+                    <li>Ensure equal participation in all academic activities</li>
+                    <li>Provide gender-sensitive teaching approaches where needed</li>
+                    <li>Monitor gender distribution in top/bottom performers</li>
+                    <li>Promote inclusive classroom environment</li>
+                {% endif %}
+            </ul>
+        </div>
+    </div>
+    
+    <!-- Comparison Section -->
+    <div class="comparison-section">
+        <div class="comparison-title">
+            {% if section == 'divisions_only' %}
+                ⚖️ Division Performance Comparison
+            {% else %}
+                ⚖️ Gender Performance Comparison
+            {% endif %}
+        </div>
+        
+        <div class="comparison-grid">
+            <div class="comparison-item">
+                <div class="comparison-label">Highest Average</div>
+                <div class="comparison-value">
+                    {% if section == 'divisions_only' %}
+                        {% with max_avg=division_averages|dictsort:"value"|last %}
+                            {% if max_avg %}
+                                {{ max_avg.1|floatformat:2 }}
+                            {% else %}
+                                -
+                            {% endif %}
+                        {% endwith %}
+                    {% else %}
+                        {% with max_avg=gender_averages|dictsort:"value"|last %}
+                            {% if max_avg %}
+                                {{ max_avg.1|floatformat:2 }}
+                            {% else %}
+                                -
+                            {% endif %}
+                        {% endwith %}
+                    {% endif %}
+                </div>
+            </div>
+            
+            <div class="comparison-item">
+                <div class="comparison-label">Lowest Average</div>
+                <div class="comparison-value">
+                    {% if section == 'divisions_only' %}
+                        {% with min_avg=division_averages|dictsort:"value"|first %}
+                            {% if min_avg %}
+                                {{ min_avg.1|floatformat:2 }}
+                            {% else %}
+                                -
+                            {% endif %}
+                        {% endwith %}
+                    {% else %}
+                        {% with min_avg=gender_averages|dictsort:"value"|first %}
+                            {% if min_avg %}
+                                {{ min_avg.1|floatformat:2 }}
+                            {% else %}
+                                -
+                            {% endif %}
+                        {% endwith %}
+                    {% endif %}
+                </div>
+            </div>
+            
+            <div class="comparison-item">
+                <div class="comparison-label">Performance Gap</div>
+                <div class="comparison-value">
+                    {% if section == 'divisions_only' %}
+                        {% with max_avg=division_averages|dictsort:"value"|last min_avg=division_averages|dictsort:"value"|first %}
+                            {% if max_avg and min_avg %}
+                                {{ max_avg.1|sub:min_avg.1|floatformat:2 }}
+                            {% else %}
+                                -
+                            {% endif %}
+                        {% endwith %}
+                    {% else %}
+                        {% with max_avg=gender_averages|dictsort:"value"|last min_avg=gender_averages|dictsort:"value"|first %}
+                            {% if max_avg and min_avg %}
+                                {{ max_avg.1|sub:min_avg.1|floatformat:2 }}
+                            {% else %}
+                                -
+                            {% endif %}
+                        {% endwith %}
+                    {% endif %}
+                </div>
+                <div class="comparison-diff">
+                    {% if section == 'divisions_only' %}
+                        {% with max_avg=division_averages|dictsort:"value"|last min_avg=division_averages|dictsort:"value"|first %}
+                            {% if max_avg and min_avg %}
+                                {% with diff=max_avg.1|sub:min_avg.1 %}
+                                    {% if diff > 10 %}
+                                        <span class="diff-negative">Large gap - needs attention</span>
+                                    {% elif diff > 5 %}
+                                        <span class="diff-negative">Moderate gap</span>
+                                    {% else %}
+                                        <span class="diff-positive">Acceptable gap</span>
+                                    {% endif %}
+                                {% endwith %}
+                            {% endif %}
+                        {% endwith %}
+                    {% endif %}
+                </div>
+            </div>
+            
+            <div class="comparison-item">
+                <div class="comparison-label">Class Average</div>
+                <div class="comparison-value">
+                    {% with total_avg=0 count=0 %}
+                        {% if section == 'divisions_only' %}
+                            {% for avg in division_averages.values %}
+                                {{ total_avg|add:avg }}
+                                {{ count|add:1 }}
+                            {% endfor %}
+                        {% else %}
+                            {% for avg in gender_averages.values %}
+                                {{ total_avg|add:avg }}
+                                {{ count|add:1 }}
+                            {% endfor %}
+                        {% endif %}
+                        {% if count > 0 %}
+                            {{ total_avg|div:count|floatformat:2 }}
+                        {% else %}
+                            -
+                        {% endif %}
+                    {% endwith %}
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Footer -->
+    <div class="footer">
+        <div>
+            {% if section == 'divisions_only' %}
+                📊 Division Distribution Analysis | {{ exam_session.name }} | {{ exam_session.class_level.name }}
+            {% else %}
+                👥 Gender Distribution Analysis | {{ exam_session.name }} | {{ exam_session.class_level.name }}
+            {% endif %}
+        </div>
+        <div>Report ID: {{ exam_session.id }}-{{ section }}-{{ generated_date|date:'YmdHis' }}</div>
+        <div>{{ school_name }} | Generated: {{ generated_date|date:'F d, Y H:i' }} | By: {{ generated_by }}</div>
+        <div>Confidential - For academic analysis purposes only</div>
+    </div>
+</body>
+</html>

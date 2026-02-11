@@ -748,7 +748,7 @@
                                             {% endif %}
                                         </td>
                                         <td class="calculated-cell" id="division-{{ student_data.student_id }}">
-                                            {{ student_data.division|default:"-" }}
+                                            {{ student_data.division.division|default:"-" }}
                                         </td>
                                         
                                         {% for subject in subjects %}

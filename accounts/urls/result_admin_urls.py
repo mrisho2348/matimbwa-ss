@@ -39,4 +39,14 @@ urlpatterns = [
     path('exam-sessions/<int:exam_session_id>/download-excel-report/', download_session_excel_report, name='download_session_excel_report'),
     path('exam-sessions/<int:exam_session_id>/download-summary/', download_session_summary, name='download_session_summary'),
 
+    # Student-specific result URLs
+    path('student/<int:student_id>/sessions/', student_sessions_list, name='student_sessions_list'),
+    path('exam-sessions/', exam_sessions_list_view, name='admin_exam_sessions_list_view'),
+     path('student/<int:student_id>/session/<int:exam_session_id>/download-pdf/', download_student_pdf_report, name='download_student_pdf_report'),
+    path('student/<int:student_id>/session/<int:exam_session_id>/results/', student_session_results, name='student_session_results'),
+      # Note: You need to create these report views or update the URLs in the template
+    path('exam-sessions/<int:exam_session_id>/report/', exam_session_report_view, name='exam_session_report_view'),
+    path('exam-sessions/<int:exam_session_id>/analysis/', exam_session_analysis_view, name='exam_session_analysis_view'),
+    path('exam-sessions-pdf/<int:exam_session_id>/analysis-pdf/', exam_session_analysis_pdf, name='exam_session_analysis_pdf'),
+
 ]

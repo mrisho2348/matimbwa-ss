@@ -521,8 +521,13 @@
                                                 <a class="dropdown-item" href="{% url 'admin_student_edit' student.id %}">
                                                     <i class="fas fa-edit me-2"></i> Edit
                                                 </a>
-                                                <a class="dropdown-item" href="{% url 'admin_assign_student_combination' student.id %}">
-                                                    <i class="fas fa-graduation-cap me-2"></i> Assign Comb
+                                                {% if student.combination is not None %}
+                                                    <a class="dropdown-item" href="{% url 'admin_assign_student_combination' student.id %}">
+                                                        <i class="fas fa-graduation-cap me-2"></i> Assign Comb
+                                                    </a>
+                                                {% endif%}                                                
+                                                <a class="dropdown-item" href="{% url 'student_sessions_list' student.id  %}">
+                                                    <i class="fas fa-money-bill-wave me-2"></i> Result
                                                 </a>
                                                 <a class="dropdown-item" href="#">
                                                     <i class="fas fa-money-bill-wave me-2"></i> Financial

@@ -149,4 +149,15 @@ def add_days(value, days):
         return value        
 
 
-        
+@register.filter
+def ordinal(value):
+    """Convert integer to ordinal (1st, 2nd, 3rd, etc.)"""
+    try:
+        value = int(value)
+        if 10 <= value % 100 <= 20:
+            suffix = 'th'
+        else:
+            suffix = {1: 'st', 2: 'nd', 3: 'rd'}.get(value % 10, 'th')
+        return f"{value}{suffix}"
+    except (ValueError, TypeError):
+        return value        
