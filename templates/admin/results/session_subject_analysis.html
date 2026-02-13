@@ -1,0 +1,1458 @@
+{% extends 'admin/base.html' %}
+{% load static %}
+{% load custom_filters %}
+{% block title %} Subject Performance Analysis - {{ exam_session.name }} {% endblock title %}
+
+{% block breadcrumb %}
+    <h5 class="mb-0">
+        <i class="fas fa-chart-line"></i> Subject Performance Analysis
+    </h5>
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'admin_exam_sessions_list_view' %}">Exam Sessions</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'manage_results' exam_session.id %}">{{ exam_session.name }}</a></li>
+            <li class="breadcrumb-item active" aria-current="page">Subject Analysis</li>
+        </ol>
+    </nav>
+{% endblock breadcrumb %}
+
+{% block extra_css %}
+<style>
+    /* Statistics Cards */
+    .stat-card {
+        border-radius: 8px;
+        padding: 15px;
+        margin-bottom: 15px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        transition: transform 0.2s;
+        position: relative;
+    }
+    .stat-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    }
+    .stat-card h5 {
+        font-size: 0.9rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        margin-bottom: 8px;
+        color: #6c757d;
+    }
+    .stat-card h3 {
+        font-weight: 700;
+        margin-bottom: 5px;
+    }
+    .stat-card .stat-icon {
+        font-size: 2rem;
+        opacity: 0.8;
+    }
+    .stat-card .pdf-download-btn {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        opacity: 0.7;
+        transition: opacity 0.2s;
+        z-index: 1;
+    }
+    .stat-card:hover .pdf-download-btn {
+        opacity: 1;
+    }
+    
+    /* Subject Selector */
+    .subject-selector {
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        padding: 15px 20px;
+        border-radius: 10px;
+        margin-bottom: 20px;
+        color: white;
+    }
+    .subject-selector label {
+        font-weight: 600;
+        font-size: 1rem;
+        margin-bottom: 5px;
+        color: rgba(255,255,255,0.9);
+    }
+    .subject-selector select {
+        border: none;
+        border-radius: 20px;
+        padding: 10px 20px;
+        font-weight: 500;
+        background: white;
+        color: #333;
+        cursor: pointer;
+    }
+    .subject-selector select:focus {
+        box-shadow: 0 0 0 3px rgba(255,255,255,0.3);
+        outline: none;
+    }
+    
+    /* Subject Cards */
+    .subject-card {
+        background: white;
+        border-radius: 8px;
+        padding: 12px;
+        margin-bottom: 10px;
+        border-left: 4px solid transparent;
+        transition: all 0.2s;
+        cursor: pointer;
+    }
+    .subject-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+    .subject-card.active {
+        border-left-color: #007bff;
+        background: #f0f7ff;
+    }
+    .subject-card .subject-name {
+        font-weight: 600;
+        margin-bottom: 5px;
+    }
+    .subject-card .subject-stats {
+        font-size: 0.8rem;
+        color: #6c757d;
+    }
+    .subject-card .badge-subject {
+        background: #e9ecef;
+        padding: 3px 8px;
+        border-radius: 12px;
+        font-size: 0.75rem;
+    }
+    
+    /* Filter Panel */
+    .filter-panel {
+        background-color: #f8f9fa;
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 25px;
+        border: 1px solid #dee2e6;
+    }
+    .filter-header {
+        font-weight: 600;
+        color: #495057;
+        margin-bottom: 15px;
+        padding-bottom: 10px;
+        border-bottom: 2px solid #dee2e6;
+    }
+    
+    /* Analysis Sections */
+    .analysis-section {
+        background: white;
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 25px;
+        border: 1px solid #dee2e6;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        position: relative;
+    }
+    .analysis-section .pdf-download-btn {
+        position: absolute;
+        top: 15px;
+        right: 15px;
+        opacity: 0.7;
+        transition: opacity 0.2s;
+        z-index: 1;
+    }
+    .analysis-section:hover .pdf-download-btn {
+        opacity: 1;
+    }
+    .section-title {
+        font-weight: 600;
+        color: #495057;
+        margin-bottom: 20px;
+        padding-bottom: 10px;
+        border-bottom: 2px solid #e9ecef;
+        padding-right: 40px;
+    }
+    
+    /* Badges and Indicators */
+    .distribution-badge {
+        padding: 5px 12px;
+        border-radius: 20px;
+        font-weight: 500;
+        margin-right: 8px;
+        margin-bottom: 8px;
+        display: inline-block;
+    }
+    
+    .grade-badge {
+        display: inline-block;
+        padding: 4px 10px;
+        border-radius: 12px;
+        font-weight: 500;
+        font-size: 0.85em;
+        color: white;
+    }
+    .grade-A { background-color: #28a745; color: white; }
+    .grade-B { background-color: #17a2b8; color: white; }
+    .grade-C { background-color: #ffc107; color: #212529; }
+    .grade-D { background-color: #fd7e14; color: white; }
+    .grade-E { background-color: #6c757d; color: white; }
+    .grade-F { background-color: #dc3545; color: white; }
+    .grade-S { background-color: #6610f2; color: white; }
+    
+    .rank-badge {
+        display: inline-block;
+        width: 30px;
+        height: 30px;
+        line-height: 30px;
+        text-align: center;
+        border-radius: 50%;
+        font-weight: bold;
+        font-size: 0.9em;
+    }
+    .rank-1 { background-color: #ffd700; color: #000; }
+    .rank-2 { background-color: #c0c0c0; color: #000; }
+    .rank-3 { background-color: #cd7f32; color: #000; }
+    .rank-4-10 { background-color: #e9ecef; color: #495057; }
+    
+    .gender-icon {
+        width: 24px;
+        height: 24px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        margin-right: 8px;
+    }
+    .gender-male { background-color: #d1ecf1; color: #0c5460; }
+    .gender-female { background-color: #f8d7da; color: #721c24; }
+    .gender-other { background-color: #e2e3e5; color: #383d41; }
+    
+    .gender-badge {
+        display: inline-block;
+        padding: 4px 10px;
+        border-radius: 12px;
+        font-size: 0.85em;
+        font-weight: 500;
+        color: white;
+    }
+    .gender-male-badge { background-color: #007bff; }
+    .gender-female-badge { background-color: #e83e8c; }
+    .gender-other-badge { background-color: #6c757d; }
+    
+    /* Matrix Table Styles */
+    .matrix-section {
+        margin-top: 20px;
+        margin-bottom: 30px;
+    }
+    
+    .matrix-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.9rem;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        border-radius: 8px;
+        overflow: hidden;
+    }
+    
+    .matrix-table th {
+        background: linear-gradient(135deg, #495057, #343a40);
+        color: white;
+        padding: 12px 8px;
+        text-align: center;
+        font-weight: 600;
+        font-size: 0.85rem;
+    }
+    
+    .matrix-table td {
+        padding: 10px 6px;
+        border: 1px solid #dee2e6;
+        text-align: center;
+        vertical-align: middle;
+    }
+    
+    .matrix-table tr:nth-child(even) {
+        background-color: #f8f9fa;
+    }
+    
+    .matrix-table tr:hover {
+        background-color: #e9ecef;
+    }
+    
+    .matrix-table td:first-child {
+        font-weight: 600;
+        background: linear-gradient(to right, #f8f9fa, #e9ecef);
+        text-align: left;
+        padding-left: 12px;
+    }
+    
+    .total-row {
+        background: linear-gradient(135deg, #e9ecef, #dee2e6) !important;
+        font-weight: bold;
+        border-top: 2px solid #495057;
+    }
+    
+    .total-row td {
+        font-weight: 700;
+    }
+    
+    .gender-total {
+        background-color: #cce5ff !important;
+        font-weight: 700;
+        border-left: 2px solid #004085;
+    }
+    
+    .grand-total {
+        background: linear-gradient(135deg, #ffd54f, #ffb300) !important;
+        font-weight: 700;
+        color: #212529;
+    }
+    
+    .zero-value {
+        color: #6c757d;
+        font-style: italic;
+    }
+    
+    .matrix-caption {
+        margin-top: 8px;
+        font-size: 0.8rem;
+        color: #6c757d;
+        text-align: center;
+        font-style: italic;
+        padding: 8px;
+        background-color: #f8f9fa;
+        border-radius: 4px;
+    }
+    
+    /* Subject Comparison Table */
+    .comparison-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.9rem;
+    }
+    
+    .comparison-table th {
+        background: linear-gradient(135deg, #17a2b8, #138496);
+        color: white;
+        padding: 12px;
+        text-align: center;
+    }
+    
+    .comparison-table td {
+        padding: 10px;
+        border: 1px solid #dee2e6;
+    }
+    
+    .comparison-table tr:hover {
+        background-color: #f8f9fa;
+    }
+    
+    .best-performer {
+        background-color: #d4edda !important;
+        font-weight: 600;
+    }
+    
+    .weakest-performer {
+        background-color: #f8d7da !important;
+        font-weight: 600;
+    }
+    
+    /* Table Styles */
+    .table td, .table th {
+        vertical-align: middle;
+    }
+    
+    /* No Data Placeholder */
+    .no-data {
+        text-align: center;
+        padding: 40px 20px;
+        color: #6c757d;
+    }
+    .no-data i {
+        font-size: 3rem;
+        margin-bottom: 15px;
+        opacity: 0.5;
+    }
+    
+    /* Form Styles */
+    .form-group-sm label {
+        font-weight: 500;
+        font-size: 0.9em;
+        margin-bottom: 5px;
+    }
+    
+    /* Print Styles */
+    @media print {
+        .filter-panel, .download-btn, .no-print, .pdf-download-btn, .subject-selector, .subject-cards {
+            display: none !important;
+        }
+        .analysis-section {
+            break-inside: avoid;
+            page-break-inside: avoid;
+        }
+        .matrix-table {
+            break-inside: avoid;
+        }
+    }
+    
+    /* Performance Indicator */
+    .performance-indicator {
+        width: 100%;
+        height: 8px;
+        background-color: #e9ecef;
+        border-radius: 4px;
+        margin-top: 5px;
+    }
+    
+    .performance-bar {
+        height: 8px;
+        border-radius: 4px;
+        background: linear-gradient(90deg, #28a745, #20c997);
+    }
+    
+    /* Score Circle */
+    .score-circle {
+        display: inline-block;
+        width: 40px;
+        height: 40px;
+        line-height: 40px;
+        text-align: center;
+        border-radius: 50%;
+        font-weight: bold;
+        font-size: 0.9rem;
+    }
+    .score-high { background-color: #28a745; color: white; }
+    .score-medium { background-color: #ffc107; color: #212529; }
+    .score-low { background-color: #dc3545; color: white; }
+    
+    /* Loading Spinner */
+    .loading-spinner {
+        display: none;
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        z-index: 9999;
+    }
+    .loading-spinner.active {
+        display: block;
+    }
+    .spinner-overlay {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.5);
+        z-index: 9998;
+    }
+    .spinner-overlay.active {
+        display: block;
+    }
+</style>
+{% endblock extra_css %}
+
+{% block content %}
+<!-- Loading Spinner -->
+<div class="spinner-overlay" id="spinner-overlay"></div>
+<div class="loading-spinner text-center" id="loading-spinner">
+    <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status">
+        <span class="sr-only">Loading...</span>
+    </div>
+    <p class="mt-2 text-white">Loading subject data...</p>
+</div>
+
+<section class="content">
+    <div class="container-fluid">
+        <!-- Session Info Header -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card shadow-sm">
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-8">
+                                <h4 class="mb-1">Subject Performance Analysis</h4>
+                                <p class="text-muted mb-1">
+                                    <i class="fas fa-calendar-alt"></i> {{ exam_session.exam_date|date:"F d, Y" }} | 
+                                    <i class="fas fa-graduation-cap"></i> {{ exam_session.class_level.name }}
+                                    {% if exam_session.stream_class %}
+                                        <span class="badge badge-info ml-2">{{ exam_session.stream_class.stream_letter }}</span>
+                                    {% endif %}
+                                </p>
+                                <p class="text-muted mb-0">
+                                    <i class="fas fa-school"></i> {{ exam_session.academic_year.name }} - 
+                                    <i class="fas fa-layer-group"></i> {{ exam_session.term.get_term_number_display }} |
+                                    <span class="badge badge-{{ exam_session.status }}">{{ exam_session.get_status_display }}</span>
+                                    <span class="badge badge-dark ml-2">{{ exam_session.class_level.educational_level.name }}</span>
+                                </p>
+                            </div>
+                            <div class="col-md-4 text-right">
+                                <a href="{% url 'manage_results' exam_session.id %}" class="btn btn-outline-secondary">
+                                    <i class="fas fa-arrow-left"></i> Back to Results
+                                </a>
+                                <button onclick="window.print()" class="btn btn-outline-primary no-print">
+                                    <i class="fas fa-print"></i> Print
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {% if no_subjects %}
+        <!-- No Subjects Warning -->
+        <div class="row">
+            <div class="col-12">
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-triangle"></i> 
+                    No active subjects found for {{ exam_session.class_level.educational_level.name }} level.
+                    <a href="{% url 'admin_subjects_list' %}" class="alert-link">Add subjects</a> to view analysis.
+                </div>
+            </div>
+        </div>
+        {% else %}
+
+        <!-- Subject Selector - Enhanced Dropdown -->
+        <div class="row">
+            <div class="col-12">
+                <div class="subject-selector no-print">
+                    <div class="row align-items-center">
+                        <div class="col-md-2">
+                            <label for="subject-select"><i class="fas fa-book-open mr-2"></i>Select Subject:</label>
+                        </div>
+                        <div class="col-md-6">
+                            <select class="form-control" id="subject-select" name="subject_id" onchange="changeSubject(this.value)">
+                                {% for subject in all_subjects %}
+                                    <option value="{{ subject.id }}" {% if selected_subject.id == subject.id %}selected{% endif %}>
+                                        {{ subject.name }} ({{ subject.code }}) - 
+                                        {% with stats=subject_stats|get_item:subject.id %}
+                                            {% if stats.students_with_marks > 0 %}
+                                                Avg: {{ stats.average_marks|floatformat:1 }} | 
+                                                Pass: {{ stats.pass_rate|floatformat:1 }}%
+                                            {% else %}
+                                                No marks entered
+                                            {% endif %}
+                                        {% endwith %}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-4 text-right">
+                            <span class="badge badge-light mr-2">
+                                <i class="fas fa-chart-simple"></i> 
+                                {{ subject_ranking.position|default:"N/A" }}/{{ subject_ranking.total_subjects }} Rank
+                            </span>
+                            <a href="{% url 'session_subject_analysis_pdf' exam_session.id %}?subject_id={{ selected_subject.id }}&section=full&gender={{ gender_filter|urlencode }}&grade_filter={{ grade_filter|urlencode }}&rank_filter={{ rank_filter|urlencode }}&top_n={{ top_n }}&bottom_n={{ bottom_n }}" 
+                               class="btn btn-sm btn-danger" target="_blank">
+                                <i class="fas fa-file-pdf"></i> Full Report
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Subject Cards -->
+        <div class="row no-print mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header bg-light">
+                        <h6 class="mb-0"><i class="fas fa-th"></i> Quick Subject Access</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            {% for subject in all_subjects|slice:":6" %}
+                            <div class="col-md-2 col-sm-4">
+                                <div class="subject-card {% if selected_subject.id == subject.id %}active{% endif %}" 
+                                     onclick="window.location.href='?subject_id={{ subject.id }}'">
+                                    <div class="subject-name">{{ subject.name }}</div>
+                                    <div class="subject-stats">
+                                        {% with stats=subject_stats|get_item:subject.id %}
+                                            {% if stats.students_with_marks > 0 %}
+                                                <span class="badge-subject">
+                                                    <i class="fas fa-star"></i> {{ stats.average_marks|floatformat:1 }}
+                                                </span>
+                                                <span class="badge-subject ml-1">
+                                                    <i class="fas fa-flag"></i> {{ stats.pass_rate|floatformat:0 }}%
+                                                </span>
+                                            {% else %}
+                                                <span class="text-muted">No data</span>
+                                            {% endif %}
+                                        {% endwith %}
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Current Subject Header -->
+        <div class="row mb-3">
+            <div class="col-12">
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle"></i> 
+                    <strong>Currently Analyzing:</strong> {{ selected_subject.name }} ({{ selected_subject.code }})
+                    {% if selected_subject.is_compulsory %}
+                        <span class="badge badge-primary ml-2">Compulsory</span>
+                    {% endif %}
+                    <span class="badge badge-secondary ml-2">{{ selected_subject.educational_level.name }}</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Key Statistics Cards -->
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="stat-card bg-primary text-white">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h5 class="text-white-50">Total Students</h5>
+                            <h3>{{ total_students }}</h3>
+                            <small>{{ students_with_marks }} with marks | {{ students_without_marks }} without</small>
+                        </div>
+                        <div class="stat-icon">
+                            <i class="fas fa-users"></i>
+                        </div>
+                    </div>
+                    <a href="{% url 'session_subject_analysis_pdf' exam_session.id %}?subject_id={{ selected_subject.id }}&section=overview&gender={{ gender_filter|urlencode }}&grade_filter={{ grade_filter|urlencode }}&rank_filter={{ rank_filter|urlencode }}&top_n={{ top_n }}&bottom_n={{ bottom_n }}" 
+                       class="btn btn-sm btn-light pdf-download-btn no-print" target="_blank" title="Download Overview PDF">
+                        <i class="fas fa-file-pdf"></i>
+                    </a>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stat-card bg-success text-white">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h5 class="text-white-50">Average Marks</h5>
+                            <h3>{{ statistics.average_marks|floatformat:2 }}</h3>
+                            <small>Max: {{ statistics.highest_marks|floatformat:1 }} | Min: {{ statistics.lowest_marks|floatformat:1 }}</small>
+                        </div>
+                        <div class="stat-icon">
+                            <i class="fas fa-chart-line"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stat-card bg-info text-white">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h5 class="text-white-50">Completion Rate</h5>
+                            <h3>{{ statistics.percentage_completed|floatformat:1 }}%</h3>
+                            <small>{{ students_with_marks }} / {{ total_students }} students</small>
+                        </div>
+                        <div class="stat-icon">
+                            <i class="fas fa-check-circle"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stat-card bg-warning text-dark">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h5 class="text-dark-50">Subject Ranking</h5>
+                            <h3>
+                                {% if subject_ranking.position %}
+                                    {{ subject_ranking.position }}/{{ subject_ranking.total_subjects }}
+                                {% else %}
+                                    N/A
+                                {% endif %}
+                            </h3>
+                            <small>Among {{ subject_ranking.total_subjects }} subjects</small>
+                        </div>
+                        <div class="stat-icon">
+                            <i class="fas fa-trophy"></i>
+                        </div>
+                    </div>
+                    <a href="{% url 'session_subject_analysis_pdf' exam_session.id %}?subject_id={{ selected_subject.id }}&section=comparison&gender={{ gender_filter|urlencode }}&grade_filter={{ grade_filter|urlencode }}" 
+                       class="btn btn-sm btn-light pdf-download-btn no-print" target="_blank" title="Download Subject Comparison PDF">
+                        <i class="fas fa-file-pdf"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Filter Panel -->
+        <div class="filter-panel no-print">
+            <div class="filter-header">
+                <i class="fas fa-filter"></i> Filter Analysis Data for {{ selected_subject.name }}
+            </div>
+            <form method="get" id="analysis-filters">
+                <input type="hidden" name="subject_id" value="{{ selected_subject.id }}">
+                <div class="row">
+                    <!-- Grade Filter -->
+                    <div class="col-md-3">
+                        <div class="form-group form-group-sm">
+                            <label for="grade_filter">Grade</label>
+                            <select class="form-control" id="grade_filter" name="grade_filter">
+                                <option value="">All Grades</option>
+                                {% for grade, count in grade_distribution_all.items %}
+                                    <option value="{{ grade }}" {% if grade_filter == grade %}selected{% endif %}>
+                                        Grade {{ grade }} ({{ count }} students)
+                                    </option>
+                                {% endfor %}
+                                <option value="No Grade" {% if grade_filter == 'No Grade' %}selected{% endif %}>No Grade ({{ students_without_marks }} students)</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <!-- Gender Filter -->
+                    <div class="col-md-3">
+                        <div class="form-group form-group-sm">
+                            <label for="gender">Gender</label>
+                            <select class="form-control" id="gender" name="gender">
+                                <option value="">All Genders</option>
+                                {% for gender, stats in gender_statistics.items %}
+                                    <option value="{{ gender }}" {% if gender_filter == gender %}selected{% endif %}>
+                                        {{ gender }} ({{ stats.total }} students)
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <!-- Rank Filter -->
+                    <div class="col-md-3">
+                        <div class="form-group form-group-sm">
+                            <label for="rank_filter">Rank Filter</label>
+                            <select class="form-control" id="rank_filter" name="rank_filter">
+                                <option value="">All Students</option>
+                                <option value="top" {% if rank_filter == 'top' %}selected{% endif %}>Top N Students</option>
+                                <option value="bottom" {% if rank_filter == 'bottom' %}selected{% endif %}>Bottom N Students</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <!-- N Filter Inputs -->
+                    <div class="col-md-3">
+                        <div class="form-group form-group-sm" id="top_n_container" {% if rank_filter != 'top' %}style="display: none;"{% endif %}>
+                            <label for="top_n">Top N Students</label>
+                            <input type="number" class="form-control" id="top_n" name="top_n" 
+                                   value="{{ top_n }}" min="1" max="{{ total_students }}">
+                        </div>
+                        <div class="form-group form-group-sm" id="bottom_n_container" {% if rank_filter != 'bottom' %}style="display: none;"{% endif %}>
+                            <label for="bottom_n">Bottom N Students</label>
+                            <input type="number" class="form-control" id="bottom_n" name="bottom_n" 
+                                   value="{{ bottom_n }}" min="1" max="{{ total_students }}">
+                        </div>
+                    </div>
+                </div>
+                <div class="row mt-3">
+                    <div class="col-md-12">
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-filter"></i> Apply Filters
+                                </button>
+                                <a href="?subject_id={{ selected_subject.id }}" class="btn btn-outline-secondary">
+                                    <i class="fas fa-redo"></i> Reset
+                                </a>
+                            </div>
+                            <div>
+                                <span class="badge badge-info">
+                                    Showing {{ student_data|length }} of {{ total_students }} students
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <!-- Current Active Filters Display -->
+        {% if grade_filter or gender_filter or rank_filter %}
+        <div class="row mb-3">
+            <div class="col-12">
+                <div class="alert alert-info no-print">
+                    <i class="fas fa-filter"></i> <strong>Active Filters:</strong>
+                    {% if grade_filter %} Grade: <span class="badge badge-primary">{{ grade_filter }}</span> {% endif %}
+                    {% if gender_filter %} Gender: <span class="badge badge-primary">{{ gender_filter }}</span> {% endif %}
+                    {% if rank_filter == 'top' %} Rank: <span class="badge badge-primary">Top {{ top_n }} Students</span> {% endif %}
+                    {% if rank_filter == 'bottom' %} Rank: <span class="badge badge-primary">Bottom {{ bottom_n }} Students</span> {% endif %}
+                    <a href="?subject_id={{ selected_subject.id }}" class="float-right text-danger">
+                        <i class="fas fa-times-circle"></i> Clear All Filters
+                    </a>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- 1. GRADE × GENDER CROSS-ANALYSIS MATRIX -->
+        <div class="matrix-section">
+            <div class="analysis-section">
+                <a href="{% url 'session_subject_analysis_pdf' exam_session.id %}?subject_id={{ selected_subject.id }}&section=matrix&gender={{ gender_filter|urlencode }}&grade_filter={{ grade_filter|urlencode }}" 
+                   class="btn btn-sm btn-danger pdf-download-btn no-print" target="_blank" title="Download Grade × Gender Matrix PDF">
+                    <i class="fas fa-file-pdf"></i> PDF
+                </a>
+                <h5 class="section-title">
+                    <i class="fas fa-table"></i> Grade × Gender Cross-Analysis Matrix
+                    <small class="text-muted">({{ selected_subject.name }} - All Students)</small>
+                </h5>
+                
+                <div class="table-responsive">
+                    <table class="matrix-table table table-hover text-nowrap table-responsive-sm table-bordered table-striped table-sm result-table">
+                        <thead>
+                            <tr>
+                                <th>Gender \ Grade</th>
+                                {% for grade in matrix_grades %}
+                                    <th>
+                                        <span class="grade-badge grade-{{ grade }}">
+                                            {{ grade }}
+                                        </span>
+                                    </th>
+                                {% endfor %}
+                                <th>Total (Gender)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for gender, row in grade_gender_matrix.items %}
+                                <tr>
+                                    <td>
+                                        <span class="gender-badge gender-{{ gender|lower }}-badge">
+                                            <i class="fas fa-{% if gender == 'Male' %}mars{% elif gender == 'Female' %}venus{% else %}genderless{% endif %} mr-1"></i>
+                                            {{ gender }}
+                                        </span>
+                                    </td>
+                                    {% for grade in matrix_grades %}
+                                        <td>
+                                            {% with count=row|get_item:grade %}
+                                                {% if count > 0 %}
+                                                    <span class="text-bold">{{ count }}</span>
+                                                {% else %}
+                                                    <span class="zero-value">-</span>
+                                                {% endif %}
+                                            {% endwith %}
+                                        </td>
+                                    {% endfor %}
+                                    <td class="gender-total">
+                                        <strong>{{ gender_totals|get_item:gender|default:0 }}</strong>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+
+                            <tr class="total-row">
+                                <td>
+                                    <span style="background-color: #495057; color: white; padding: 5px 12px; border-radius: 20px;">
+                                        <strong>TOTAL</strong>
+                                    </span>
+                                </td>
+                                {% for grade in matrix_grades %}
+                                    <td>
+                                        {% with total=grade_totals|get_item:grade|default:0 %}
+                                            {% if total > 0 %}
+                                                <span style="background-color: #ffd54f; color: #212529; padding: 4px 10px; border-radius: 20px; font-weight: 700;">
+                                                    {{ total }}
+                                                </span>
+                                            {% else %}
+                                                <span class="zero-value">{{ total }}</span>
+                                            {% endif %}
+                                        {% endwith %}
+                                    </td>
+                                {% endfor %}
+                                <td class="grand-total">
+                                    <span style="background-color: #ffb300; color: #212529; padding: 4px 12px; border-radius: 20px; font-weight: 700;">
+                                        {{ grand_total }}
+                                    </span>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="matrix-caption">
+                    <i class="fas fa-info-circle"></i> 
+                    <strong>Subject:</strong> {{ selected_subject.name }} | 
+                    <strong>Total students with marks:</strong> {{ grand_total }} | 
+                    <strong>Pass rate:</strong> {{ statistics.pass_rate|floatformat:1 }}% (marks ≥ 40)
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. TOP PERFORMERS & BOTTOM PERFORMERS -->
+        <div class="row">
+            <div class="col-lg-6">
+                <div class="analysis-section">
+                    <a href="{% url 'session_subject_analysis_pdf' exam_session.id %}?subject_id={{ selected_subject.id }}&section=top_performers&gender={{ gender_filter|urlencode }}&grade_filter={{ grade_filter|urlencode }}" 
+                       class="btn btn-sm btn-danger pdf-download-btn no-print" target="_blank" title="Download Top Performers PDF">
+                        <i class="fas fa-file-pdf"></i> PDF
+                    </a>
+                    <h5 class="section-title">
+                        <i class="fas fa-trophy text-warning"></i> Top {{ top_performers|length }} Performers
+                        <small class="text-muted">({{ selected_subject.name }})</small>
+                    </h5>
+                    {% if top_performers %}
+                        <div class="table-responsive">
+                            <table class="table table-hover text-nowrap table-responsive-sm table-bordered table-striped table-sm result-table">
+                                <thead class="bg-light">
+                                    <tr>
+                                        <th>Rank</th>
+                                        <th>Student</th>
+                                        <th class="text-center">Gender</th>
+                                        <th class="text-center">Marks</th>
+                                        <th class="text-center">Percentage</th>
+                                        <th class="text-center">Grade</th>
+                                        <th class="text-center">Points</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for student in top_performers %}
+                                    <tr>
+                                        <td>
+                                            <span class="rank-badge 
+                                                {% if student.position == 1 %}rank-1
+                                                {% elif student.position == 2 %}rank-2
+                                                {% elif student.position == 3 %}rank-3
+                                                {% else %}rank-4-10{% endif %}">
+                                                {{ student.position }}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <strong>{{ student.registration_number }}</strong><br>
+                                            <small class="text-muted">{{ student.full_name|truncatechars:20 }}</small>
+                                        </td>
+                                        <td class="text-center">
+                                            <span class="gender-icon gender-{{ student.gender|lower }}">
+                                                <i class="fas fa-{% if student.gender == 'Male' %}mars{% elif student.gender == 'Female' %}venus{% else %}genderless{% endif %}"></i>
+                                            </span>
+                                            <span class="d-block small">{{ student.gender }}</span>
+                                        </td>
+                                        <td class="text-center">
+                                            <span class="score-circle score-high">
+                                                {{ student.marks|floatformat:1 }}
+                                            </span>
+                                        </td>
+                                        <td class="text-center">
+                                            <strong>{{ student.percentage|floatformat:1 }}%</strong>
+                                            <div class="performance-indicator">
+                                                <div class="performance-bar" style="width: {{ student.percentage|floatformat:0 }}%;"></div>
+                                            </div>
+                                        </td>
+                                        <td class="text-center">
+                                            {% if student.grade %}
+                                                <span class="grade-badge grade-{{ student.grade }}">
+                                                    {{ student.grade }}
+                                                </span>
+                                            {% else %}
+                                                <span class="badge badge-secondary">-</span>
+                                            {% endif %}
+                                        </td>
+                                        <td class="text-center">
+                                            <strong>{{ student.grade_point|floatformat:1|default:"-" }}</strong>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="no-data">
+                            <i class="fas fa-trophy"></i>
+                            <p>No top performers data available</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <div class="col-lg-6">
+                <div class="analysis-section">
+                    <a href="{% url 'session_subject_analysis_pdf' exam_session.id %}?subject_id={{ selected_subject.id }}&section=bottom_performers&gender={{ gender_filter|urlencode }}&grade_filter={{ grade_filter|urlencode }}" 
+                       class="btn btn-sm btn-danger pdf-download-btn no-print" target="_blank" title="Download Bottom Performers PDF">
+                        <i class="fas fa-file-pdf"></i> PDF
+                    </a>
+                    <h5 class="section-title">
+                        <i class="fas fa-exclamation-triangle text-danger"></i> Bottom {{ bottom_performers|length }} Performers
+                        <small class="text-muted">({{ selected_subject.name }})</small>
+                    </h5>
+                    {% if bottom_performers %}
+                        <div class="table-responsive">
+                            <table class="table table-hover text-nowrap table-responsive-sm table-bordered table-striped table-sm result-table">
+                                <thead class="bg-light">
+                                    <tr>
+                                        <th>Rank</th>
+                                        <th>Student</th>
+                                        <th class="text-center">Gender</th>
+                                        <th class="text-center">Marks</th>
+                                        <th class="text-center">Percentage</th>
+                                        <th class="text-center">Grade</th>
+                                        <th class="text-center">Points</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for student in bottom_performers %}
+                                    <tr>
+                                        <td>
+                                            <span class="rank-badge rank-4-10">
+                                                {{ student.position }}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <strong>{{ student.registration_number }}</strong><br>
+                                            <small class="text-muted">{{ student.full_name|truncatechars:20 }}</small>
+                                        </td>
+                                        <td class="text-center">
+                                            <span class="gender-icon gender-{{ student.gender|lower }}">
+                                                <i class="fas fa-{% if student.gender == 'Male' %}mars{% elif student.gender == 'Female' %}venus{% else %}genderless{% endif %}"></i>
+                                            </span>
+                                            <span class="d-block small">{{ student.gender }}</span>
+                                        </td>
+                                        <td class="text-center">
+                                            <span class="score-circle score-low">
+                                                {{ student.marks|floatformat:1 }}
+                                            </span>
+                                        </td>
+                                        <td class="text-center">
+                                            <strong>{{ student.percentage|floatformat:1 }}%</strong>
+                                            <div class="performance-indicator">
+                                                <div class="performance-bar" style="width: {{ student.percentage|floatformat:0 }}%;"></div>
+                                            </div>
+                                        </td>
+                                        <td class="text-center">
+                                            {% if student.grade %}
+                                                <span class="grade-badge grade-{{ student.grade }}">
+                                                    {{ student.grade }}
+                                                </span>
+                                            {% else %}
+                                                <span class="badge badge-secondary">-</span>
+                                            {% endif %}
+                                        </td>
+                                        <td class="text-center">
+                                            <strong>{{ student.grade_point|floatformat:1|default:"-" }}</strong>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="no-data">
+                            <i class="fas fa-exclamation-triangle"></i>
+                            <p>No bottom performers data available</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. SUBJECT COMPARISON PERFORMANCE -->
+        <div class="row">
+            <div class="col-12">
+                <div class="analysis-section">
+                    <a href="{% url 'session_subject_analysis_pdf' exam_session.id %}?subject_id={{ selected_subject.id }}&section=comparison&gender={{ gender_filter|urlencode }}" 
+                       class="btn btn-sm btn-danger pdf-download-btn no-print" target="_blank" title="Download Subject Comparison PDF">
+                        <i class="fas fa-file-pdf"></i> PDF
+                    </a>
+                    <h5 class="section-title">
+                        <i class="fas fa-chart-bar"></i> Subject Comparison Performance
+                        <small class="text-muted">({{ exam_session.name }})</small>
+                    </h5>
+                    
+                    <div class="table-responsive">
+                        <table class="comparison-table table table-hover text-nowrap table-responsive-sm table-bordered table-striped table-sm result-table">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Subject</th>
+                                    <th class="text-center">Code</th>
+                                    <th class="text-center">Students</th>
+                                    <th class="text-center">Average Marks</th>
+                                    <th class="text-center">Highest Marks</th>
+                                    <th class="text-center">Lowest Marks</th>
+                                    <th class="text-center">Pass Rate</th>
+                                    <th class="text-center">Grade A</th>
+                                    <th class="text-center">Grade F</th>
+                                    <th class="text-center">Performance</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for subject_data in subject_comparison %}
+                                <tr class="{% if subject_data.subject_id == selected_subject.id %}table-primary{% endif %}">
+                                    <td class="text-center font-weight-bold">{{ forloop.counter }}</td>
+                                    <td>
+                                        <strong>{{ subject_data.subject_name }}</strong>
+                                        {% if subject_data.subject_id == selected_subject.id %}
+                                            <span class="badge badge-primary ml-2">Current</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-center">{{ subject_data.subject_code }}</td>
+                                    <td class="text-center">{{ subject_data.students_count }}</td>
+                                    <td class="text-center">
+                                        <strong>{{ subject_data.average_marks|floatformat:2 }}</strong>
+                                    </td>
+                                    <td class="text-center">{{ subject_data.highest_marks|floatformat:1 }}</td>
+                                    <td class="text-center">{{ subject_data.lowest_marks|floatformat:1 }}</td>
+                                    <td class="text-center">
+                                        <span class="badge {% if subject_data.pass_rate >= 75 %}badge-success{% elif subject_data.pass_rate >= 50 %}badge-warning{% else %}badge-danger{% endif %}">
+                                            {{ subject_data.pass_rate|floatformat:1 }}%
+                                        </span>
+                                    </td>
+                                    <td class="text-center">{{ subject_data.grade_a_count }}</td>
+                                    <td class="text-center">{{ subject_data.grade_f_count }}</td>
+                                    <td class="text-center">
+                                        {% if subject_data.ranking_position %}
+                                            <span class="badge badge-info">{{ subject_data.ranking_position }}/{{ subject_comparison|length }}</span>
+                                        {% endif %}
+                                        <div class="performance-indicator mt-1">
+                                            <div class="performance-bar" style="width: {{ subject_data.average_percentage|floatformat:0 }}%;"></div>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <div class="row mt-3">
+                        <div class="col-md-6">
+                            <div class="card bg-light">
+                                <div class="card-body">
+                                    <h6><i class="fas fa-star text-warning"></i> Best Performing Subjects</h6>
+                                    <div class="d-flex flex-wrap">
+                                        {% for subject_data in subject_comparison|slice:":3" %}
+                                            <span class="distribution-badge" style="background-color: #d4edda;">
+                                                <strong>{{ forloop.counter }}.</strong> {{ subject_data.subject_name }} 
+                                                ({{ subject_data.average_marks|floatformat:1 }})
+                                            </span>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card bg-light">
+                                <div class="card-body">
+                                    <h6><i class="fas fa-exclamation-circle text-danger"></i> Subjects Needing Improvement</h6>
+                                    <div class="d-flex flex-wrap">
+                                        {% for subject_data in subject_comparison|dictsortreversed:"average_marks"|slice:"-3:" %}
+                                            <span class="distribution-badge" style="background-color: #f8d7da;">
+                                                <strong>{{ forloop.counter }}.</strong> {{ subject_data.subject_name }} 
+                                                ({{ subject_data.average_marks|floatformat:1 }})
+                                            </span>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 4. DETAILED STUDENT ANALYSIS (FILTERED) -->
+        <div class="row">
+            <div class="col-12">
+                <div class="analysis-section">
+                    <a href="{% url 'session_subject_analysis_pdf' exam_session.id %}?subject_id={{ selected_subject.id }}&section=detailed&gender={{ gender_filter|urlencode }}&grade_filter={{ grade_filter|urlencode }}&rank_filter={{ rank_filter|urlencode }}&top_n={{ top_n }}&bottom_n={{ bottom_n }}" 
+                       class="btn btn-sm btn-danger pdf-download-btn no-print" target="_blank" title="Download Detailed Analysis PDF">
+                        <i class="fas fa-file-pdf"></i> PDF
+                    </a>
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h5 class="section-title mb-0">
+                            <i class="fas fa-list"></i> Detailed Student Analysis - {{ selected_subject.name }}
+                            <span class="badge badge-light ml-2">{{ student_data|length }} students (filtered)</span>
+                            <small class="text-muted ml-2">Total with marks: {{ students_with_marks }} students</small>
+                        </h5>
+                    </div>
+                    
+                    <div class="table-responsive">
+                        <table class="table table-hover text-nowrap table-responsive-sm table-bordered table-striped table-sm result-table" id="subject-analysis-table">
+                            <thead class="thead-light">
+                                <tr>
+                                    <th>#</th>
+                                    <th>Student</th>
+                                    <th class="text-center">Gender</th>
+                                    <th class="text-center">Position</th>
+                                    <th class="text-center">Marks</th>
+                                    <th class="text-center">Percentage</th>
+                                    <th class="text-center">Grade</th>
+                                    <th class="text-center">Points</th>
+                                    <th class="text-center">Performance</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for student in filtered_student_data %}
+                                <tr>
+                                    <td>{{ forloop.counter }}</td>
+                                    <td>
+                                        <strong>{{ student.registration_number }}</strong><br>
+                                        <small class="text-muted">{{ student.full_name|truncatechars:25 }}</small>
+                                    </td>
+                                    <td class="text-center">
+                                        <span class="gender-icon gender-{{ student.gender|lower }}">
+                                            <i class="fas fa-{% if student.gender == 'Male' %}mars{% elif student.gender == 'Female' %}venus{% else %}genderless{% endif %}"></i>
+                                        </span>
+                                        <span class="d-block small">{{ student.gender }}</span>
+                                    </td>
+                                    <td class="text-center">
+                                        {% if student.position %}
+                                            <span class="badge badge-info">{{ student.position }}</span>
+                                        {% else %}
+                                            <span class="badge badge-secondary">NR</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-center">
+                                        <span class="score-circle 
+                                            {% if student.marks >= 70 %}score-high
+                                            {% elif student.marks >= 40 %}score-medium
+                                            {% else %}score-low{% endif %}">
+                                            {{ student.marks|floatformat:1 }}
+                                        </span>
+                                    </td>
+                                    <td class="text-center">
+                                        <strong>{{ student.percentage|floatformat:1 }}%</strong>
+                                    </td>
+                                    <td class="text-center">
+                                        {% if student.grade %}
+                                            <span class="grade-badge grade-{{ student.grade }}">
+                                                {{ student.grade }}
+                                            </span>
+                                        {% else %}
+                                            <span class="badge badge-secondary">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-center">
+                                        <strong>{{ student.grade_point|floatformat:1|default:"-" }}</strong>
+                                    </td>
+                                    <td class="text-center" style="width: 150px;">
+                                        <div class="performance-indicator">
+                                            <div class="performance-bar" style="width: {{ student.percentage|floatformat:0 }}%;"></div>
+                                        </div>
+                                        <small class="text-muted">{{ student.percentage|floatformat:0 }}%</small>
+                                    </td>
+                                </tr>                               
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 5. GRADE DISTRIBUTION SUMMARY -->
+        <div class="row">
+            <div class="col-12">
+                <div class="analysis-section">
+                    <a href="{% url 'session_subject_analysis_pdf' exam_session.id %}?subject_id={{ selected_subject.id }}&section=grades&gender={{ gender_filter|urlencode }}" 
+                       class="btn btn-sm btn-danger pdf-download-btn no-print" target="_blank" title="Download Grade Distribution PDF">
+                        <i class="fas fa-file-pdf"></i> PDF
+                    </a>
+                    <h5 class="section-title">
+                        <i class="fas fa-chart-pie"></i> Grade Distribution Summary
+                        <small class="text-muted">{{ selected_subject.name }}</small>
+                    </h5>
+                    
+                    <div class="row">
+                        <div class="col-md-8">
+                            <div class="table-responsive">
+                                <table class="table table-hover text-nowrap table-responsive-sm table-bordered table-striped table-sm result-table">
+                                    <thead class="bg-light">
+                                        <tr>
+                                            <th>Grade</th>
+                                            <th>Description</th>
+                                            <th class="text-center">Marks Range</th>
+                                            <th class="text-center">Count</th>
+                                            <th class="text-center">Percentage</th>
+                                            <th class="text-center">Male</th>
+                                            <th class="text-center">Female</th>
+                                            <th class="text-center">Other</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for grade_data in grade_distribution_list %}
+                                        <tr>
+                                            <td class="text-center">
+                                                <span class="grade-badge grade-{{ grade_data.grade }}">
+                                                    {{ grade_data.grade }}
+                                                </span>
+                                            </td>
+                                            <td>{{ grade_data.description }}</td>
+                                            <td class="text-center">{{ grade_data.range }}</td>
+                                            <td class="text-center"><strong>{{ grade_data.count }}</strong></td>
+                                            <td class="text-center">{{ grade_data.percentage|floatformat:1 }}%</td>
+                                            <td class="text-center">{{ grade_data.male_count }}</td>
+                                            <td class="text-center">{{ grade_data.female_count }}</td>
+                                            <td class="text-center">{{ grade_data.other_count }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                    <tfoot class="bg-light font-weight-bold">
+                                        <tr>
+                                            <td colspan="3" class="text-right">TOTAL:</td>
+                                            <td class="text-center">{{ students_with_marks }}</td>
+                                            <td class="text-center">100%</td>
+                                            <td class="text-center">{{ gender_statistics.Male.with_marks|default:"0" }}</td>
+                                            <td class="text-center">{{ gender_statistics.Female.with_marks|default:"0" }}</td>
+                                            <td class="text-center">{{ gender_statistics.Other.with_marks|default:"0" }}</td>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card bg-light">
+                                <div class="card-body">
+                                    <h6><i class="fas fa-info-circle"></i> Performance Summary</h6>
+                                    <hr>
+                                    <div class="mb-2">
+                                        <strong>Pass Rate:</strong> 
+                                        <span class="badge {% if statistics.pass_rate >= 75 %}badge-success{% elif statistics.pass_rate >= 50 %}badge-warning{% else %}badge-danger{% endif %} float-right">
+                                            {{ statistics.pass_rate|floatformat:1 }}%
+                                        </span>
+                                    </div>
+                                    <div class="mb-2">
+                                        <strong>Mean Score:</strong> 
+                                        <span class="float-right">{{ statistics.average_marks|floatformat:2 }}</span>
+                                    </div>
+                                    <div class="mb-2">
+                                        <strong>Median Score:</strong> 
+                                        <span class="float-right">{{ statistics.median_marks|floatformat:2 }}</span>
+                                    </div>
+                                    <div class="mb-2">
+                                        <strong>Standard Deviation:</strong> 
+                                        <span class="float-right">{{ statistics.std_deviation|floatformat:2 }}</span>
+                                    </div>
+                                    <div class="mb-2">
+                                        <strong>Grade A Count:</strong> 
+                                        <span class="float-right">{{ grade_totals.A|default:"0" }}</span>
+                                    </div>
+                                    <div class="mb-2">
+                                        <strong>Grade F Count:</strong> 
+                                        <span class="float-right">{{ grade_totals.F|default:"0" }}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</section>
+{% endblock content %}
+
+{% block extra_js %}
+<script>
+// Function to change subject via dropdown
+function changeSubject(subjectId) {
+    if (subjectId) {
+        // Show loading spinner
+        document.getElementById('loading-spinner').classList.add('active');
+        document.getElementById('spinner-overlay').classList.add('active');
+        
+        // Get current filter values
+        const gradeFilter = document.getElementById('grade_filter')?.value || '';
+        const genderFilter = document.getElementById('gender')?.value || '';
+        const rankFilter = document.getElementById('rank_filter')?.value || '';
+        const topN = document.getElementById('top_n')?.value || '10';
+        const bottomN = document.getElementById('bottom_n')?.value || '10';
+        
+        // Build URL with filters
+        let url = `?subject_id=${subjectId}`;
+        if (gradeFilter) url += `&grade_filter=${encodeURIComponent(gradeFilter)}`;
+        if (genderFilter) url += `&gender=${encodeURIComponent(genderFilter)}`;
+        if (rankFilter) url += `&rank_filter=${encodeURIComponent(rankFilter)}`;
+        if (rankFilter === 'top' && topN) url += `&top_n=${topN}`;
+        if (rankFilter === 'bottom' && bottomN) url += `&bottom_n=${bottomN}`;
+        
+        window.location.href = url;
+    }
+}
+
+$(document).ready(function() {
+    // Show/hide top_n/bottom_n inputs based on rank filter
+    $('#rank_filter').change(function() {
+        var value = $(this).val();
+        if (value === 'top') {
+            $('#top_n_container').show();
+            $('#bottom_n_container').hide();
+        } else if (value === 'bottom') {
+            $('#top_n_container').hide();
+            $('#bottom_n_container').show();
+        } else {
+            $('#top_n_container').hide();
+            $('#bottom_n_container').hide();
+        }
+    });
+
+    // Initialize DataTable for detailed student analysis
+    if ($('#subject-analysis-table').length) {
+        $('#subject-analysis-table').DataTable({
+            "pageLength": 25,
+            "lengthMenu": [[10, 25, 50, 100, -1], [10, 25, 50, 100, "All"]],
+            "order": [[3, 'asc']], // Sort by position by default
+            "language": {
+                "search": "_INPUT_",
+                "searchPlaceholder": "Search students...",
+                "lengthMenu": "_MENU_ records per page",
+                "info": "Showing _START_ to _END_ of _TOTAL_ students",
+                "infoEmpty": "Showing 0 to 0 of 0 students",
+                "infoFiltered": "(filtered from _MAX_ total students)",
+                "zeroRecords": "No matching students found"
+            },
+            "dom": '<"row"<"col-md-6"l><"col-md-6"f>>rt<"row"<"col-md-6"i><"col-md-6"p>>',
+            "responsive": true,
+            "columnDefs": [
+                { "orderable": false, "targets": [0] }
+            ]
+        });
+    }
+
+    // Initialize tooltips
+    $('[data-toggle="tooltip"]').tooltip();
+    
+    // Keyboard shortcuts
+    $(document).keydown(function(e) {
+        // Ctrl + F to focus search
+        if (e.ctrlKey && e.keyCode === 70) {
+            e.preventDefault();
+            $('.dataTables_filter input').focus();
+        }
+        // Escape to clear search
+        if (e.keyCode === 27) {
+            $('.dataTables_filter input').val('').keyup();
+        }
+    });
+    
+    // Auto-submit filters when dropdowns change (with debounce)
+    let filterTimeout;
+    $('#grade_filter, #gender').change(function() {
+        clearTimeout(filterTimeout);
+        filterTimeout = setTimeout(function() {
+            $('#analysis-filters').submit();
+        }, 300);
+    });
+    
+    // Handle rank filter change separately
+    $('#rank_filter').change(function() {
+        var value = $(this).val();
+        if (value === 'top' || value === 'bottom') {
+            // Don't auto-submit, wait for n value
+            return;
+        }
+        $('#analysis-filters').submit();
+    });
+    
+    // Submit form when top_n or bottom_n loses focus
+    $('#top_n, #bottom_n').blur(function() {
+        var value = $(this).val();
+        if (value && parseInt(value) > 0) {
+            $('#analysis-filters').submit();
+        }
+    });
+    
+    // Submit form when pressing Enter in top_n/bottom_n
+    $('#top_n, #bottom_n').keypress(function(e) {
+        if (e.which === 13) {
+            e.preventDefault();
+            var value = $(this).val();
+            if (value && parseInt(value) > 0) {
+                $('#analysis-filters').submit();
+            }
+        }
+    });
+    
+    // Hide loading spinner on page load complete
+    window.addEventListener('load', function() {
+        document.getElementById('loading-spinner').classList.remove('active');
+        document.getElementById('spinner-overlay').classList.remove('active');
+    });
+});
+</script>
+{% endblock extra_js %}

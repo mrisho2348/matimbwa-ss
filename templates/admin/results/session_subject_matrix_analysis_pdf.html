@@ -1,0 +1,485 @@
+{% load results_extras %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Subject Matrix Analysis - {{ selected_subject.name }}</title>
+    <style>
+        /* ================= PAGE SETUP ================= */
+        @page {
+            size: A4 landscape;
+            margin: 1.5cm;
+
+            @top-center {
+                content: "{{ school_name }}";
+                font-size: 9pt;
+                font-weight: bold;
+            }
+
+            @bottom-center {
+                content: "Page " counter(page) " of " counter(pages);
+                font-size: 8pt;
+            }
+        }
+
+        body {
+            font-family: "Times New Roman", serif;
+            font-size: 10pt;
+            line-height: 1.4;
+            color: #111;
+        }
+
+        /* ================= REPORT HEADER ================= */
+        .report-header {
+            text-align: center;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #000;
+        }
+
+        .report-header h1 {
+            font-size: 18pt;
+            margin: 0;
+            font-weight: bold;
+        }
+
+        .report-header h2 {
+            font-size: 14pt;
+            margin: 6px 0;
+            font-weight: bold;
+        }
+
+        .school-detail {
+            font-size: 9pt;
+            margin-top: 3px;
+        }
+
+        .meta-detail {
+            font-size: 8pt;
+            margin-top: 5px;
+        }
+
+        /* ================= SECTION HEAD ================= */
+        .section-head {
+            margin-top: 20px;
+            font-size: 13pt;
+            font-weight: bold;
+            border-bottom: 2px solid #000;
+            padding-bottom: 4px;
+        }
+
+        /* ================= FILTER PANEL ================= */
+        .filter-panel {
+            background: #f0f4f8;
+            border: 1px solid #b0c4d9;
+            padding: 0.2cm 0.4cm;
+            margin: 0.3cm 0 0.5cm 0;
+            font-size: 8pt;
+        }
+        .filter-panel strong {
+            color: #1e3c5a;
+        }
+        .filter-badge {
+            display: inline;
+            background: #dbe7f3;
+            padding: 0.03cm 0.2cm;
+            border: 1px solid #7f9fbb;
+            border-radius: 0.2cm;
+            margin-right: 0.2cm;
+            white-space: nowrap;
+        }
+
+        /* ================= STATS TABLE ================= */
+        .stats-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 0.4cm 0;
+        }
+        .stats-table td {
+            background: #ffffff;
+            border: 1px solid #bacbda;
+            padding: 0.15cm 0.25cm;
+            width: 25%;
+        }
+        .stat-title {
+            font-size: 8pt;
+            color: #2b5170;
+            text-transform: uppercase;
+        }
+        .stat-number {
+            font-size: 14pt;
+            font-weight: bold;
+            color: #142b41;
+        }
+        .stat-trend {
+            font-size: 7pt;
+            color: #1f704b;
+            margin-top: 0.05cm;
+        }
+
+        /* ================= DATA TABLES ================= */
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+            page-break-inside: auto;
+        }
+
+        .data-table th,
+        .data-table td {
+            border: 1px solid #000;
+            padding: 4px;
+            font-size: 9pt;
+        }
+
+        .data-table th {
+            background: #e6e6e6;
+            text-align: center;
+            font-weight: bold;
+        }
+
+        .data-table tr {
+            page-break-inside: avoid;
+        }
+
+        .alternate {
+            background-color: #f2f2f2;
+        }
+
+        /* ================= MATRIX TABLE ================= */
+        .matrix-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 9pt;
+        }
+        .matrix-table th {
+            background: #495057;
+            color: white;
+            padding: 8px 4px;
+            text-align: center;
+        }
+        .matrix-table td {
+            padding: 6px 3px;
+            border: 1px solid #dee2e6;
+            text-align: center;
+        }
+        .matrix-table td:first-child {
+            font-weight: bold;
+            background: #f8f9fa;
+        }
+        .total-row {
+            background: #dee2e6 !important;
+            font-weight: bold;
+        }
+        .gender-total {
+            background-color: #cce5ff !important;
+            font-weight: bold;
+        }
+        .grand-total {
+            background: #ffd54f !important;
+            font-weight: bold;
+        }
+        .zero-value {
+            color: #6c757d;
+            font-style: italic;
+        }
+
+        /* ================= BADGES ================= */
+        .grade-badge {
+            display: inline-block;
+            padding: 0.05cm 0.2cm;
+            border-radius: 0.15cm;
+            font-weight: bold;
+            font-size: 8pt;
+            text-align: center;
+            min-width: 0.6cm;
+        }
+        .grade-A { background: #1e7b4c; color: white; }
+        .grade-B { background: #1f6194; color: white; }
+        .grade-C { background: #ca8828; color: white; }
+        .grade-D { background: #b65f26; color: white; }
+        .grade-E { background: #6f8190; color: white; }
+        .grade-F { background: #aa3f2e; color: white; }
+        .grade-none { background: #dddddd; color: #2c3e50; }
+
+        .gender-badge {
+            display: inline-block;
+            padding: 0.03cm 0.15cm;
+            border-radius: 0.1cm;
+            font-size: 8pt;
+            color: white;
+        }
+        .gender-male-badge { background: #007bff; }
+        .gender-female-badge { background: #e83e8c; }
+        .gender-other-badge { background: #6c757d; }
+
+        .score-circle {
+            display: inline-block;
+            width: 0.7cm;
+            height: 0.7cm;
+            line-height: 0.7cm;
+            border-radius: 50%;
+            font-weight: bold;
+            font-size: 8pt;
+        }
+        .score-high { background: #28a745; color: white; }
+        .score-medium { background: #ffc107; color: black; }
+        .score-low { background: #dc3545; color: white; }
+
+        .rank-badge {
+            display: inline-block;
+            width: 0.6cm;
+            height: 0.6cm;
+            line-height: 0.6cm;
+            border-radius: 50%;
+            font-weight: bold;
+            font-size: 8pt;
+        }
+        .rank-1 { background: #ffd700; color: black; }
+        .rank-2 { background: #c0c0c0; color: black; }
+        .rank-3 { background: #cd7f32; color: white; }
+        .rank-other { background: #e9ecef; color: #495057; }
+
+        /* ================= TEXT UTILITIES ================= */
+        .text-center { text-align: center; }
+        .text-right { text-align: right; }
+        .text-danger { color: #b30000; }
+        .text-muted { color: #666; }
+        .font-bold { font-weight: bold; }
+
+        /* ================= PAGE CONTROL ================= */
+        .page-break-before {
+            page-break-before: always;
+        }
+        .keep-together {
+            page-break-inside: avoid;
+        }
+
+        /* ================= FOOTER ================= */
+        .report-footer {
+            margin-top: 30px;
+            font-size: 7pt;
+            text-align: center;
+            border-top: 1px solid #000;
+            padding-top: 3px;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- HEADER -->
+    <div class="report-header">
+        <h1>{{ school_name }}</h1>
+        <div class="school-detail">{{ school_address }}</div>
+        <h2>Subject Matrix Analysis Report</h2>
+        <div class="school-detail">
+            {{ exam_session.name }} | {{ exam_session.exam_type.name }} | 
+            Term {{ exam_session.term.get_term_number_display }} {{ exam_session.academic_year.name }}
+        </div>
+        <div class="school-detail">
+            {{ exam_session.class_level.name }}{% if exam_session.stream_class %} - {{ exam_session.stream_class.stream_letter }}{% endif %}
+        </div>
+        <div class="meta-detail">
+            Generated: {{ generated_date|date:"d M Y H:i" }} | By: {{ generated_by }} |
+            Subject: {{ selected_subject.name }} ({{ selected_subject.code }})
+        </div>
+    </div>
+
+    <!-- FILTER INFO -->
+    {% if has_filters %}
+    <div class="filter-panel">
+        <strong>Active Filters:</strong>
+        {% if grade_filter %}<span class="filter-badge">Grade: {{ grade_filter }}</span>{% endif %}
+        {% if marks_min %}<span class="filter-badge">Min Marks: {{ marks_min }}</span>{% endif %}
+        {% if marks_max %}<span class="filter-badge">Max Marks: {{ marks_max }}</span>{% endif %}
+        {% if gender_filter %}<span class="filter-badge">Gender: {{ gender_filter }}</span>{% endif %}
+        {% if rank_filter == 'top' %}<span class="filter-badge">Top {{ top_n }} Students</span>{% endif %}
+        {% if rank_filter == 'bottom' %}<span class="filter-badge">Bottom {{ bottom_n }} Students</span>{% endif %}
+    </div>
+    {% endif %}
+
+    <!-- QUICK STATISTICS -->
+    <div class="keep-together">
+        <div class="section-head">Subject Statistics</div>
+        <table class="stats-table">
+            <tr>
+                <td>
+                    <div class="stat-title">Total Students</div>
+                    <div class="stat-number">{{ total_students }}</div>
+                    <div class="stat-trend">Enrolled in class</div>
+                </td>
+                <td>
+                    <div class="stat-title">With Marks</div>
+                    <div class="stat-number">{{ students_with_marks }}</div>
+                    <div class="stat-trend">{{ students_with_marks|floatformat:0 }}% completion</div>
+                </td>
+                <td>
+                    <div class="stat-title">Average Marks</div>
+                    <div class="stat-number">{{ statistics.average_marks|floatformat:2 }}</div>
+                    <div class="stat-trend">Filtered view</div>
+                </td>
+                <td>
+                    <div class="stat-title">Pass Rate</div>
+                    <div class="stat-number">{{ statistics.pass_rate|floatformat:1 }}%</div>
+                    <div class="stat-trend">Marks ≥ 40</div>
+                </td>
+            </tr>
+        </table>
+    </div>
+
+    <!-- 1. GRADE × GENDER CROSS-ANALYSIS MATRIX -->
+    <div class="keep-together">
+        <div class="section-head">Grade × Gender Cross-Analysis Matrix</div>
+        <p><strong>Subject:</strong> {{ selected_subject.name }} (All Students) | <strong>Total with marks:</strong> {{ grand_total }}</p>
+        
+        <table class="matrix-table">
+            <thead>
+                <tr>
+                    <th>Gender \ Grade</th>
+                    {% for grade in matrix_grades %}
+                        <th>
+                            <span class="grade-badge grade-{{ grade }}">
+                                {{ grade }}
+                            </span>
+                        </th>
+                    {% endfor %}
+                    <th>Total (Gender)</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for gender, row in grade_gender_matrix.items %}
+                    <tr>
+                        <td>
+                            <span class="gender-badge gender-{{ gender|lower }}-badge">
+                                {{ gender }}
+                            </span>
+                        </td>
+                        {% for grade in matrix_grades %}
+                            <td>
+                                {% with count=row|get_item:grade %}
+                                    {% if count > 0 %}
+                                        <span class="font-bold">{{ count }}</span>
+                                    {% else %}
+                                        <span class="zero-value">-</span>
+                                    {% endif %}
+                                {% endwith %}
+                            </td>
+                        {% endfor %}
+                        <td class="gender-total">
+                            <strong>{{ gender_totals|get_item:gender|default:0 }}</strong>
+                        </td>
+                    </tr>
+                {% endfor %}
+
+                <tr class="total-row">
+                    <td><strong>TOTAL</strong></td>
+                    {% for grade in matrix_grades %}
+                        <td>
+                            {% with total=grade_totals|get_item:grade|default:0 %}
+                                {% if total > 0 %}
+                                    <strong>{{ total }}</strong>
+                                {% else %}
+                                    <span class="zero-value">{{ total }}</span>
+                                {% endif %}
+                            {% endwith %}
+                        </td>
+                    {% endfor %}
+                    <td class="grand-total">
+                        <strong>{{ grand_total }}</strong>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+        
+        <p class="text-muted" style="font-size: 8pt; margin-top: 5px;">
+            <i>Note: Values represent number of students in each grade-gender category.</i>
+        </p>
+    </div>
+
+    <!-- 2. DETAILED STUDENT ANALYSIS (FILTERED) -->
+    <div class="keep-together page-break-before">
+        <div class="section-head">Detailed Student Analysis</div>
+        <p>
+            <strong>Subject:</strong> {{ selected_subject.name }} | 
+            <strong>Showing:</strong> {{ filtered_student_data|length }} of {{ students_with_marks }} students with marks
+            {% if has_filters %}(filtered){% endif %}
+        </p>
+        
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Registration No.</th>
+                    <th>Student Name</th>
+                    <th class="text-center">Gender</th>
+                    <th class="text-center">Position</th>
+                    <th class="text-center">Marks</th>
+                    <th class="text-center">Percentage</th>
+                    <th class="text-center">Grade</th>
+                    <th class="text-center">Points</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for student in filtered_student_data %}
+                <tr class="{% cycle '' 'alternate' %}">
+                    <td class="text-center">{{ forloop.counter }}</td>
+                    <td>{{ student.registration_number }}</td>
+                    <td>{{ student.full_name|truncatechars:25 }}</td>
+                    <td class="text-center">{{ student.gender }}</td>
+                    <td class="text-center">
+                        {% if student.position %}
+                            <span class="rank-badge 
+                                {% if student.position == 1 %}rank-1
+                                {% elif student.position == 2 %}rank-2
+                                {% elif student.position == 3 %}rank-3
+                                {% else %}rank-other{% endif %}">
+                                {{ student.position }}
+                            </span>
+                        {% else %}
+                            <span class="text-muted">-</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-center">
+                        <span class="score-circle 
+                            {% if student.marks >= 70 %}score-high
+                            {% elif student.marks >= 40 %}score-medium
+                            {% else %}score-low{% endif %}">
+                            {{ student.marks|floatformat:1 }}
+                        </span>
+                    </td>
+                    <td class="text-center">{{ student.percentage|floatformat:1 }}%</td>
+                    <td class="text-center">
+                        {% if student.grade %}
+                            <span class="grade-badge grade-{{ student.grade }}">
+                                {{ student.grade }}
+                            </span>
+                        {% else %}
+                            <span class="text-muted">-</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-center">{{ student.grade_point|floatformat:1|default:"-" }}</td>
+                </tr>                               
+                {% empty %}
+                <tr>
+                    <td colspan="9" class="text-center text-muted">No students match the selected filters.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        
+        {% if filtered_student_data|length > 25 %}
+        <p class="text-muted" style="font-size: 8pt; text-align: right;">
+            <i>Showing first 25 of {{ filtered_student_data|length }} students</i>
+        </p>
+        {% endif %}
+    </div>
+
+    <!-- FOOTER -->
+    <div class="report-footer">
+        Computer-generated report • {{ school_name }} • {% if has_filters %}Filters applied • {% endif %}
+        Report ID: {{ generated_date|date:"YmdHis" }}/{{ selected_subject.code }}
+    </div>
+
+</body>
+</html>

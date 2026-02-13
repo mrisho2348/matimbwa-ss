@@ -48,5 +48,24 @@ urlpatterns = [
     path('exam-sessions/<int:exam_session_id>/report/', exam_session_report_view, name='exam_session_report_view'),
     path('exam-sessions/<int:exam_session_id>/analysis/', exam_session_analysis_view, name='exam_session_analysis_view'),
     path('exam-sessions-pdf/<int:exam_session_id>/analysis-pdf/', exam_session_analysis_pdf, name='exam_session_analysis_pdf'),
+     # Subject Analysis within Session - No subject_id in URL
+    path('session-subject-analysis/<int:exam_session_id>/', session_subject_analysis_view, name='session_subject_analysis_view'),
+    
+    # Subject Analysis PDF Download
+    path('session-subject-analysis-pdf/<int:exam_session_id>/', session_subject_analysis_pdf, name='session_subject_analysis_pdf'),
+    
+    # AJAX endpoint to get subject performance data
+    path('ajax/subject-performance/<int:exam_session_id>/<int:subject_id>/', ajax_subject_performance, name='ajax_subject_performance'),
+    
+    # AJAX endpoint to get subject comparison data
+    path('ajax/subject-comparison/<int:exam_session_id>/', ajax_subject_comparison, name='ajax_subject_comparison'),
+    
+    # AJAX endpoint to get subject list
+    path('ajax/subject-list/<int:exam_session_id>/', ajax_subject_list, name='ajax_subject_list'),
+
+      # Subject Matrix Analysis URLs
+    path('exam-session/<int:exam_session_id>/subject-matrix-analysis/',  session_subject_matrix_analysis, name='session_subject_matrix_analysis'),
+    
+    path('exam-session/<int:exam_session_id>/subject-matrix-analysis/pdf/',  session_subject_matrix_analysis_pdf,  name='session_subject_matrix_analysis_pdf'),
 
 ]

@@ -48,6 +48,7 @@
         border-radius: 20px;
         font-size: 0.8rem;
         font-weight: 600;
+        display: inline-block;
     }
     
     .grade-A { background-color: #28a745; color: white; }
@@ -57,6 +58,23 @@
     .grade-E { background-color: #6f42c1; color: white; }
     .grade-F { background-color: #dc3545; color: white; }
     .grade-S { background-color: #6c757d; color: white; }
+    
+    .position-badge {
+        display: inline-block;
+        width: 30px;
+        height: 30px;
+        line-height: 30px;
+        border-radius: 50%;
+        font-weight: bold;
+        font-size: 0.9rem;
+        text-align: center;
+    }
+    
+    .position-1 { background-color: #ffd700; color: #212529; }  /* Gold */
+    .position-2 { background-color: #c0c0c0; color: #212529; }  /* Silver */
+    .position-3 { background-color: #cd7f32; color: white; }    /* Bronze */
+    .position-4-10 { background-color: #e9ecef; color: #495057; }
+    .position-other { background-color: #f8f9fa; color: #6c757d; border: 1px solid #dee2e6; }
     
     .performance-stat {
         text-align: center;
@@ -214,8 +232,18 @@
         font-weight: bold;
     }
     
+    .results-table .position-cell {
+        text-align: center;
+    }
+    
     .results-table .highlight-row {
         background-color: #fff3cd !important;
+    }
+    
+    .subject-position-info {
+        font-size: 0.8rem;
+        color: #6c757d;
+        margin-top: 2px;
     }
     
     /* Print-specific styles */
@@ -239,6 +267,12 @@
         .results-table th,
         .results-table td {
             border: 1px solid #000 !important;
+        }
+        
+        .position-badge {
+            border: 1px solid #000 !important;
+            background: white !important;
+            color: black !important;
         }
     }
 </style>
@@ -372,7 +406,7 @@
                         <div class="stat-label">Average Grade</div>
                     </div>
                     <div class="performance-stat">
-                        <div class="stat-value">{{ metrics.division.division|default:"-" }}-{{ metrics.total_grade_points|default:"-" }}</div>
+                        <div class="stat-value">{{ metrics.division.division|default:"-" }}{% if metrics.total_grade_points %} ({{ metrics.total_grade_points|floatformat:1 }} pts){% endif %}</div>
                         <div class="stat-label">Division</div>
                     </div>
                     {% else %}
@@ -386,7 +420,7 @@
             
             <div class="col-lg-4">
                 <div class="performance-card">
-                    <h6 class="text-center mb-4"><i class="fas fa-trophy"></i> Ranking</h6>
+                    <h6 class="text-center mb-4"><i class="fas fa-trophy"></i> Overall Ranking</h6>
                     {% if positions and positions.class_position %}
                     <div class="text-center mb-4">
                         <div class="ranking-badge d-inline-block">
@@ -395,8 +429,9 @@
                     </div>
                     <div class="text-center">
                         <p class="mb-1">Class: {{ class_ranking }}</p>
+                        <p class="mb-0">Total Students: {{ class_students_count }}</p>
                         {% if positions.stream_position %}
-                        <p class="mb-0">Stream: {{ positions.stream_position|ordinal }} of {{ class_students_count }}</p>
+                        <p class="mb-0 mt-2">Stream: {{ positions.stream_position|ordinal }} of {{ class_students_count }}</p>
                         {% endif %}
                     </div>
                     {% else %}
@@ -409,19 +444,19 @@
             </div>
         </div>
 
-        <!-- Subject-wise Results -->
+        <!-- Subject-wise Results with Positions -->
         <div class="row">
             <div class="col-lg-12">
                 <div class="card shadow-sm">
                     <div class="card-header bg-white">
                         <h6 class="header-title mb-0">
-                            <i class="fas fa-book-open"></i> Subject-wise Results
+                            <i class="fas fa-book-open"></i> Subject-wise Results with Positions
                         </h6>
                     </div>
                     <div class="card-body">
                         {% if subject_results %}
                         <div class="table-responsive">
-                            <table class="table table-hover text-nowrap table-responsive-sm table-bordered table-striped table-sm  results-table">
+                            <table class="table table-hover text-nowrap table-responsive-sm table-bordered table-striped table-sm results-table">
                                 <thead class="thead-light">
                                     <tr>
                                         <th>#</th>
@@ -431,7 +466,7 @@
                                         <th class="text-center">Percentage</th>
                                         <th class="text-center grade-cell">Grade</th>
                                         <th class="text-center">Grade Points</th>
-                                        <th class="text-center">Position</th>
+                                        <th class="text-center">Subject Position</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -473,11 +508,21 @@
                                             <span class="text-muted">-</span>
                                             {% endif %}
                                         </td>
-                                        <td class="text-center">
+                                        <td class="text-center position-cell">
                                             {% if item.has_result and item.position %}
-                                            <span class="badge badge-info">{{ item.position|ordinal }}</span>
+                                                <span class="position-badge 
+                                                    {% if item.position == 1 %}position-1
+                                                    {% elif item.position == 2 %}position-2
+                                                    {% elif item.position == 3 %}position-3
+                                                    {% elif item.position <= 10 %}position-4-10
+                                                    {% else %}position-other{% endif %}">
+                                                    {{ item.position }}
+                                                </span>
+                                                <div class="subject-position-info">
+                                                    out of {{ item.total_students_in_subject }} student{{ item.total_students_in_subject|pluralize }}
+                                                </div>
                                             {% else %}
-                                            <span class="text-muted">-</span>
+                                                <span class="text-muted">-</span>
                                             {% endif %}
                                         </td>
                                     </tr>
@@ -498,7 +543,7 @@
                                         <td class="text-center font-weight-bold">{{ overall_stats.total_grade_points|floatformat:1 }}</td>
                                         <td class="text-center">
                                             {% if positions and positions.class_position %}
-                                            <span class="badge badge-warning">{{ positions.class_position|ordinal }}</span>
+                                            <span class="badge badge-warning">Overall: {{ positions.class_position|ordinal }}</span>
                                             {% else %}
                                             <span class="text-muted">-</span>
                                             {% endif %}
@@ -507,6 +552,26 @@
                                 </tfoot>
                             </table>
                         </div>
+                        
+                        <!-- Position Legend -->
+                        <div class="row mt-3">
+                            <div class="col-md-12">
+                                <div class="card bg-light">
+                                    <div class="card-body py-2">
+                                        <small>
+                                            <i class="fas fa-info-circle text-info"></i> 
+                                            <strong>Subject Position:</strong> Rank among {{ total_students_count }} total students in the class.
+                                            <span class="ml-3"><span class="position-badge position-1">1</span> Gold (1st)</span>
+                                            <span class="ml-2"><span class="position-badge position-2">2</span> Silver (2nd)</span>
+                                            <span class="ml-2"><span class="position-badge position-3">3</span> Bronze (3rd)</span>
+                                            <span class="ml-2"><span class="position-badge position-4-10">4</span> Top 10</span>
+                                            <span class="ml-2"><span class="position-badge position-other">15</span> Other</span>
+                                        </small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
                         {% else %}
                         <div class="text-center py-5">
                             <i class="fas fa-exclamation-circle fa-3x text-warning mb-3"></i>
@@ -530,12 +595,7 @@ $(document).ready(function() {
     // Add tooltips
     $('[data-toggle="tooltip"]').tooltip();
     
-    // Highlight grades with colors
-    $('.grade-badge').each(function() {
-        var grade = $(this).text().trim();
-        var colorClass = 'grade-' + grade;
-        $(this).addClass(colorClass);
-    });
+    // Highlight grades with colors (already handled by CSS)
     
     // Add click event for PDF download
     $('.btn-pdf').click(function(e) {
@@ -553,16 +613,16 @@ $(document).ready(function() {
     
     // Keyboard shortcuts
     $(document).keydown(function(e) {
-        // Ctrl + P for print (disabled since we removed print button)
-        // if (e.ctrlKey && e.keyCode === 80) {
-        //     e.preventDefault();
-        //     window.print();
-        // }
-        
         // Escape key to go back
         if (e.keyCode === 27) {
             window.history.back();
         }
+    });
+    
+    // Add tooltips for position badges
+    $('.position-badge').each(function() {
+        var position = $(this).text();
+        $(this).attr('title', 'Position: ' + position);
     });
 });
 </script>

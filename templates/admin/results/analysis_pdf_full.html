@@ -62,6 +62,16 @@
             border-left: 4px solid #007bff;
             margin-bottom: 15px;
         }
+        .education-level-badge {
+            display: inline-block;
+            padding: 3px 12px;
+            background-color: #6c757d;
+            color: white;
+            border-radius: 20px;
+            font-size: 10px;
+            font-weight: bold;
+            margin-left: 10px;
+        }
         table {
             width: 100%;
             border-collapse: collapse;
@@ -107,6 +117,84 @@
         .division-III { background-color: #ffc107; color: #212529; }
         .division-IV { background-color: #fd7e14; color: white; }
         .division-0 { background-color: #dc3545; color: white; }
+        .division-Not-Assigned { background-color: #6c757d; color: white; }
+        
+        .grade-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 9px;
+            font-weight: bold;
+            color: white;
+        }
+        .grade-A { background-color: #28a745; }
+        .grade-B { background-color: #17a2b8; }
+        .grade-C { background-color: #ffc107; color: #212529; }
+        .grade-D { background-color: #fd7e14; }
+        .grade-E { background-color: #6c757d; }
+        .grade-F { background-color: #dc3545; }
+        .grade-S { background-color: #6610f2; }
+        
+        .gender-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 9px;
+            font-weight: bold;
+            color: white;
+        }
+        .gender-male { background-color: #007bff; }
+        .gender-female { background-color: #e83e8c; }
+        .gender-other { background-color: #6c757d; }
+        
+        .matrix-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 15px;
+            font-size: 10px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .matrix-table th {
+            background: linear-gradient(135deg, #495057, #343a40);
+            color: white;
+            border: 1px solid #2c3e50;
+            padding: 8px;
+            text-align: center;
+        }
+        .matrix-table td {
+            border: 1px solid #dee2e6;
+            padding: 6px;
+            text-align: center;
+        }
+        .matrix-table td:first-child {
+            font-weight: bold;
+            background-color: #f8f9fa;
+        }
+        .total-row {
+            background: #e9ecef !important;
+            font-weight: bold;
+            border-top: 2px solid #495057;
+        }
+        .gender-total {
+            background-color: #cce5ff !important;
+            font-weight: bold;
+        }
+        .grand-total {
+            background: #ffd54f !important;
+            color: #212529;
+            font-weight: bold;
+        }
+        .zero-value {
+            color: #6c757d;
+            font-style: italic;
+        }
+        .matrix-caption {
+            margin-top: 8px;
+            font-size: 9px;
+            color: #6c757d;
+            text-align: center;
+            font-style: italic;
+        }
         .page-break {
             page-break-before: always;
         }
@@ -118,6 +206,23 @@
             color: #666;
             text-align: center;
         }
+        .filter-info {
+            margin-bottom: 15px;
+            padding: 8px 12px;
+            background-color: #e7f3ff;
+            border-radius: 4px;
+            border-left: 4px solid #007bff;
+            font-size: 10px;
+        }
+        .filter-tag {
+            display: inline-block;
+            padding: 2px 8px;
+            background-color: #007bff;
+            color: white;
+            border-radius: 12px;
+            font-size: 9px;
+            margin-left: 5px;
+        }
     </style>
 </head>
 <body>
@@ -126,7 +231,10 @@
         {% if school_address %}
         <div class="school-address">{{ school_address }}</div>
         {% endif %}
-        <div class="report-title">{{ section_title }}</div>
+        <div class="report-title">
+            {{ section_title }}
+            <span class="education-level-badge">{{ exam_session.class_level.educational_level.name }}</span>
+        </div>
         <div class="session-info">{{ exam_session.name }}</div>
         <div class="session-info">
             {{ exam_session.class_level.name }}
@@ -138,107 +246,48 @@
         </div>
     </div>
     
-    <!-- Overview Section -->
-    <div class="section">
-        <div class="section-title">Overview Statistics</div>
-        <div class="stat-box">
-            <div class="stat-label">Total Students</div>
-            <div class="stat-value">{{ total_students }}</div>
-        </div>
-        <div class="stat-box">
-            <div class="stat-label">Students with Division</div>
-            <div class="stat-value">{{ students_with_division }}</div>
-        </div>
-        <div class="stat-box">
-            <div class="stat-label">Unique Divisions</div>
-            <div class="stat-value">{{ division_distribution|length }}</div>
-        </div>
-        <div class="stat-box">
-            <div class="stat-label">Gender Groups</div>
-            <div class="stat-value">{{ gender_distribution|length }}</div>
-        </div>
+    <!-- Filter Information Section -->
+    {% if division_filter or grade_filter or gender_filter or rank_filter %}
+    <div class="filter-info">
+        <strong>Active Filters:</strong>
+        {% if not is_primary_nursery and division_filter %}
+        <span class="filter-tag">Division: {{ division_filter }}</span>
+        {% endif %}
+        {% if is_primary_nursery and grade_filter %}
+        <span class="filter-tag">Grade: {{ grade_filter }}</span>
+        {% endif %}
+        {% if gender_filter %}
+        <span class="filter-tag">Gender: {{ gender_filter }}</span>
+        {% endif %}
+        {% if rank_filter == 'top' %}
+        <span class="filter-tag">Top {{ top_n }} Students</span>
+        {% elif rank_filter == 'bottom' %}
+        <span class="filter-tag">Bottom {{ bottom_n }} Students</span>
+        {% endif %}
     </div>
+    {% endif %}
     
-    <!-- Division Distribution -->
+    <!-- Top Performers - CONDITIONAL -->
     <div class="section">
-        <div class="section-title">Division Distribution</div>
-        <table>
-            <thead>
-                <tr>
-                    <th>Division</th>
-                    <th>Students</th>
-                    <th>Percentage</th>
-                    <th>Average Marks</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for division, count in division_distribution.items %}
-                <tr>
-                    <td>
-                        <span class="division-badge division-{{ division|slice:'-1:' }}">
-                            {{ division }}
-                        </span>
-                    </td>
-                    <td>{{ count }}</td>
-                    <td>{% widthratio count total_students 100 %}%</td>
-                    <td>
-                        {% if division_averages and division in division_averages %}
-                            {{ division_averages|get_item:division|floatformat:2 }}
-                        {% else %}
-                            -
-                        {% endif %}
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-    
-    <!-- Gender Distribution -->
-    <div class="section">
-        <div class="section-title">Gender Distribution</div>
-        <table>
-            <thead>
-                <tr>
-                    <th>Gender</th>
-                    <th>Students</th>
-                    <th>Percentage</th>
-                    <th>Average Marks</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for gender, count in gender_distribution.items %}
-                <tr>
-                    <td>{{ gender }}</td>
-                    <td>{{ count }}</td>
-                    <td>{% widthratio count total_students 100 %}%</td>
-                    <td>
-                        {% if gender_averages and gender in gender_averages %}
-                            {{ gender_averages|get_item:gender|floatformat:2 }}
-                        {% else %}
-                            -
-                        {% endif %}
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-    
-    <div class="page-break"></div>
-    
-    <!-- Top Performers -->
-    <div class="section">
-        <div class="section-title">Top 10 Performers</div>
+        <div class="section-title">
+            {% if is_primary_nursery %}Top 10 Performers - Grade View{% else %}Top 10 Performers - Division View{% endif %}
+        </div>
         <table>
             <thead>
                 <tr>
                     <th>Rank</th>
                     <th>Registration No.</th>
                     <th>Student Name</th>
-                    <th>Division</th>
-                    <th>Avg. Marks</th>
-                    <th>Grade Points</th>
+                    <th>Gender</th>
+                    {% if not is_primary_nursery %}
+                        <th>Division</th>
+                        <th>Avg. Marks</th>
+                        <th>Grade Points</th>
+                    {% else %}
+                        <th>Grade</th>
+                        <th>Avg. Marks</th>
+                        <th>Total Marks</th>
+                    {% endif %}
                 </tr>
             </thead>
             <tbody>
@@ -246,36 +295,64 @@
                 <tr>
                     <td>{{ student.rank }}</td>
                     <td>{{ student.registration_number }}</td>
-                    <td>{{ student.full_name }}</td>
+                    <td>{{ student.full_name|truncatechars:30 }}</td>
                     <td>
-                        {% if student.division_display %}
-                            <span class="division-badge division-{{ student.division }}">
-                                {{ student.division_display }}
-                            </span>
-                        {% else %}
-                            -
-                        {% endif %}
+                        <span class="gender-badge gender-{{ student.gender|lower }}">
+                            {{ student.gender|slice:':1' }}
+                        </span>
                     </td>
-                    <td>{{ student.average_marks|floatformat:2 }}</td>
-                    <td>{{ student.total_grade_points|floatformat:1|default:"-" }}</td>
+                    {% if not is_primary_nursery %}
+                        <td>
+                            {% if student.division_display %}
+                                <span class="division-badge division-{{ student.division }}">
+                                    {{ student.division_display }}
+                                </span>
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                        <td>{{ student.average_marks|floatformat:2 }}</td>
+                        <td>{{ student.total_grade_points|floatformat:1|default:"-" }}</td>
+                    {% else %}
+                        <td>
+                            {% if student.average_grade %}
+                                <span class="grade-badge grade-{{ student.average_grade }}">
+                                    {{ student.average_grade }}
+                                </span>
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                        <td>{{ student.average_marks|floatformat:2 }}</td>
+                        <td>{{ student.total_marks|floatformat:2|default:"-" }}</td>
+                    {% endif %}
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
     </div>
     
-    <!-- Bottom Performers -->
+    <!-- Bottom Performers - CONDITIONAL -->
     <div class="section">
-        <div class="section-title">Bottom 10 Performers</div>
+        <div class="section-title">
+            {% if is_primary_nursery %}Bottom 10 Performers - Grade View{% else %}Bottom 10 Performers - Division View{% endif %}
+        </div>
         <table>
             <thead>
                 <tr>
                     <th>Rank</th>
                     <th>Registration No.</th>
                     <th>Student Name</th>
-                    <th>Division</th>
-                    <th>Avg. Marks</th>
-                    <th>Grade Points</th>
+                    <th>Gender</th>
+                    {% if not is_primary_nursery %}
+                        <th>Division</th>
+                        <th>Avg. Marks</th>
+                        <th>Grade Points</th>
+                    {% else %}
+                        <th>Grade</th>
+                        <th>Avg. Marks</th>
+                        <th>Total Marks</th>
+                    {% endif %}
                 </tr>
             </thead>
             <tbody>
@@ -283,29 +360,174 @@
                 <tr>
                     <td>{{ student.rank }}</td>
                     <td>{{ student.registration_number }}</td>
-                    <td>{{ student.full_name }}</td>
+                    <td>{{ student.full_name|truncatechars:30 }}</td>
                     <td>
-                        {% if student.division_display %}
-                            <span class="division-badge division-{{ student.division }}">
-                                {{ student.division_display }}
-                            </span>
-                        {% else %}
-                            -
-                        {% endif %}
+                        <span class="gender-badge gender-{{ student.gender|lower }}">
+                            {{ student.gender|slice:':1' }}
+                        </span>
                     </td>
-                    <td>{{ student.average_marks|floatformat:2 }}</td>
-                    <td>{{ student.total_grade_points|floatformat:1|default:"-" }}</td>
+                    {% if not is_primary_nursery %}
+                        <td>
+                            {% if student.division_display %}
+                                <span class="division-badge division-{{ student.division }}">
+                                    {{ student.division_display }}
+                                </span>
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                        <td>{{ student.average_marks|floatformat:2 }}</td>
+                        <td>{{ student.total_grade_points|floatformat:1|default:"-" }}</td>
+                    {% else %}
+                        <td>
+                            {% if student.average_grade %}
+                                <span class="grade-badge grade-{{ student.average_grade }}">
+                                    {{ student.average_grade }}
+                                </span>
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                        <td>{{ student.average_marks|floatformat:2 }}</td>
+                        <td>{{ student.total_marks|floatformat:2|default:"-" }}</td>
+                    {% endif %}
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
     </div>
     
+    <!-- Cross-Analysis Matrix - CONDITIONAL -->
+    <div class="section">
+        {% if not is_primary_nursery %}
+            <!-- Division × Gender Cross-Analysis Matrix - SECONDARY -->
+            <div class="section-title">📊 Division × Gender Cross-Analysis Matrix</div>
+            <table class="matrix-table">
+                <thead>
+                    <tr>
+                        <th>Gender \ Division</th>
+                        {% for division in division_columns %}
+                            <th>{{ division }}</th>
+                        {% endfor %}
+                        <th>Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for gender, row in division_gender_matrix.items %}
+                        {% if gender != 'Total' %}
+                        <tr>
+                            <td>
+                                <span class="gender-badge gender-{{ gender|lower }}">
+                                    {{ gender }}
+                                </span>
+                            </td>
+                            {% for division in division_columns %}
+                                <td>
+                                    {% with count=row|get_item:division %}
+                                        {% if count > 0 %}
+                                            {{ count }}
+                                        {% else %}
+                                            <span class="zero-value">-</span>
+                                        {% endif %}
+                                    {% endwith %}
+                                </td>
+                            {% endfor %}
+                            <td class="gender-total">{{ gender_totals|get_item:gender|default:0 }}</td>
+                        </tr>
+                        {% endif %}
+                    {% endfor %}
+                    <tr class="total-row">
+                        <td><strong>TOTAL</strong></td>
+                        {% for division in division_columns %}
+                            <td>
+                                {% with total=division_totals|get_item:division|default:0 %}
+                                    {% if total > 0 %}
+                                        <strong>{{ total }}</strong>
+                                    {% else %}
+                                        <span class="zero-value">{{ total }}</span>
+                                    {% endif %}
+                                {% endwith %}
+                            </td>
+                        {% endfor %}
+                        <td class="grand-total"><strong>{{ grand_total|default:0 }}</strong></td>
+                    </tr>
+                </tbody>
+            </table>
+            <div class="matrix-caption">
+                Cross-analysis showing student distribution by gender and division. 
+                <strong>Zero values (-)</strong> indicate no students. 
+                Total students with division: <strong>{{ grand_total }}</strong>
+            </div>
+        {% else %}
+            <!-- Grade × Gender Cross-Analysis Matrix - PRIMARY/NURSERY -->
+            <div class="section-title">📊 Grade × Gender Cross-Analysis Matrix</div>
+            <table class="matrix-table">
+                <thead>
+                    <tr>
+                        <th>Gender \ Grade</th>
+                        {% for grade in grade_columns %}
+                            <th>{{ grade }}</th>
+                        {% endfor %}
+                        <th>Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for gender, row in grade_gender_matrix.items %}
+                        {% if gender != 'Total' %}
+                        <tr>
+                            <td>
+                                <span class="gender-badge gender-{{ gender|lower }}">
+                                    {{ gender }}
+                                </span>
+                            </td>
+                            {% for grade in grade_columns %}
+                                <td>
+                                    {% with count=row|get_item:grade %}
+                                        {% if count > 0 %}
+                                            {{ count }}
+                                        {% else %}
+                                            <span class="zero-value">-</span>
+                                        {% endif %}
+                                    {% endwith %}
+                                </td>
+                            {% endfor %}
+                            <td class="gender-total">{{ gender_totals|get_item:gender|default:0 }}</td>
+                        </tr>
+                        {% endif %}
+                    {% endfor %}
+                    <tr class="total-row">
+                        <td><strong>TOTAL</strong></td>
+                        {% for grade in grade_columns %}
+                            <td>
+                                {% with total=grade_totals|get_item:grade|default:0 %}
+                                    {% if total > 0 %}
+                                        <strong>{{ total }}</strong>
+                                    {% else %}
+                                        <span class="zero-value">{{ total }}</span>
+                                    {% endif %}
+                                {% endwith %}
+                            </td>
+                        {% endfor %}
+                        <td class="grand-total"><strong>{{ grand_total|default:0 }}</strong></td>
+                    </tr>
+                </tbody>
+            </table>
+            <div class="matrix-caption">
+                Cross-analysis showing student distribution by gender and grade. 
+                <strong>Zero values (-)</strong> indicate no students. 
+                Total students with grade: <strong>{{ grand_total }}</strong>
+            </div>
+        {% endif %}
+    </div>
+    
     <div class="page-break"></div>
     
-    <!-- Detailed List -->
+    <!-- Detailed Student List - CONDITIONAL COLUMNS -->
     <div class="section">
-        <div class="section-title">Detailed Student Analysis ({{ student_data|length }} students)</div>
+        <div class="section-title">
+            Detailed Student Analysis ({{ student_data|length }} students) - 
+            {% if is_primary_nursery %}Grade View{% else %}Division View{% endif %}
+        </div>
         <table>
             <thead>
                 <tr>
@@ -314,11 +536,19 @@
                     <th>Student Name</th>
                     <th>Gender</th>
                     <th>Rank</th>
-                    <th>Division</th>
-                    <th>Total Marks</th>
-                    <th>Avg. Marks</th>
-                    <th>Avg. %</th>
-                    <th>Grade Points</th>
+                    {% if not is_primary_nursery %}
+                        <th>Division</th>
+                        <th>Total Marks</th>
+                        <th>Avg. Marks</th>
+                        <th>Avg. %</th>
+                        <th>Grade Points</th>
+                        <th>Grade</th>
+                    {% else %}
+                        <th>Grade</th>
+                        <th>Total Marks</th>
+                        <th>Avg. Marks</th>
+                        <th>Avg. %</th>
+                    {% endif %}
                 </tr>
             </thead>
             <tbody>
@@ -326,28 +556,63 @@
                 <tr>
                     <td>{{ forloop.counter }}</td>
                     <td>{{ student.registration_number }}</td>
-                    <td>{{ student.full_name }}</td>
-                    <td>{{ student.gender }}</td>
+                    <td>{{ student.full_name|truncatechars:30 }}</td>
+                    <td>
+                        <span class="gender-badge gender-{{ student.gender|lower }}">
+                            {{ student.gender|slice:':1' }}
+                        </span>
+                    </td>
                     <td>{{ student.rank|default:"-" }}</td>
-                    <td>
-                        {% if student.division_display %}
-                            <span class="division-badge division-{{ student.division }}">
-                                {{ student.division_display }}
-                            </span>
-                        {% else %}
-                            -
-                        {% endif %}
-                    </td>
-                    <td>{{ student.total_marks|floatformat:2|default:"-" }}</td>
-                    <td>{{ student.average_marks|floatformat:2|default:"-" }}</td>
-                    <td>
-                        {% if student.average_percentage %}
-                            {{ student.average_percentage|floatformat:1 }}%
-                        {% else %}
-                            -
-                        {% endif %}
-                    </td>
-                    <td>{{ student.total_grade_points|floatformat:1|default:"-" }}</td>
+                    
+                    {% if not is_primary_nursery %}
+                        <!-- SECONDARY: Division View -->
+                        <td>
+                            {% if student.division_display %}
+                                <span class="division-badge division-{{ student.division }}">
+                                    {{ student.division_display }}
+                                </span>
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                        <td>{{ student.total_marks|floatformat:2|default:"-" }}</td>
+                        <td>{{ student.average_marks|floatformat:2|default:"-" }}</td>
+                        <td>
+                            {% if student.average_percentage %}
+                                {{ student.average_percentage|floatformat:1 }}%
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                        <td>{{ student.total_grade_points|floatformat:1|default:"-" }}</td>
+                        <td>
+                            {% if student.average_grade %}
+                                <span class="grade-badge">{{ student.average_grade }}</span>
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                    {% else %}
+                        <!-- PRIMARY/NURSERY: Grade View -->
+                        <td>
+                            {% if student.average_grade %}
+                                <span class="grade-badge grade-{{ student.average_grade }}">
+                                    {{ student.average_grade }}
+                                </span>
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                        <td>{{ student.total_marks|floatformat:2|default:"-" }}</td>
+                        <td>{{ student.average_marks|floatformat:2|default:"-" }}</td>
+                        <td>
+                            {% if student.average_percentage %}
+                                {{ student.average_percentage|floatformat:1 }}%
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                    {% endif %}
                 </tr>
                 {% endfor %}
             </tbody>
@@ -356,7 +621,16 @@
     
     <div class="footer">
         This report was generated automatically by the School Management System.
-        Report ID: {{ exam_session.id }}-{{ generated_date|date:'YmdHis' }}
+        Report ID: {{ exam_session.id }}-{{ section }}-{{ generated_date|date:'YmdHis' }}
+        | {{ exam_session.class_level.educational_level.name }}
+        {% if division_filter or grade_filter or gender_filter or rank_filter %}
+        | Filters: 
+            {% if not is_primary_nursery and division_filter %}Div:{{ division_filter }}{% endif %}
+            {% if is_primary_nursery and grade_filter %}Grade:{{ grade_filter }}{% endif %}
+            {% if gender_filter %}{% if division_filter or grade_filter %}, {% endif %}Gen:{{ gender_filter }}{% endif %}
+            {% if rank_filter == 'top' %}{% if division_filter or grade_filter or gender_filter %}, {% endif %}Top{{ top_n }}{% endif %}
+            {% if rank_filter == 'bottom' %}{% if division_filter or grade_filter or gender_filter %}, {% endif %}Bottom{{ bottom_n }}{% endif %}
+        {% endif %}
     </div>
 </body>
 </html>

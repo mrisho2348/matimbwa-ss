@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Students List Report</title>
+    <style>
+        @page {
+            size: A4 landscape;
+            margin: 1.5cm 1cm 1.5cm 1cm;
+            
+            @top-center {
+                content: "Students List Report";
+                font-family: Arial, sans-serif;
+                font-size: 9pt;
+                color: #666;
+            }
+            
+            @bottom-center {
+                content: "Page " counter(page) " of " counter(pages);
+                font-family: Arial, sans-serif;
+                font-size: 8pt;
+                color: #666;
+            }
+        }
+        
+        body {
+            font-family: Arial, sans-serif;
+            font-size: 10pt;
+            line-height: 1.4;
+            color: #333;
+            margin: 0;
+            padding: 0;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #4F81BD;
+        }
+        
+        .header h1 {
+            font-size: 18pt;
+            color: #4F81BD;
+            margin: 0 0 5px 0;
+            font-weight: bold;
+        }
+        
+        .header .school-name {
+            font-size: 14pt;
+            color: #666;
+            margin: 0 0 10px 0;
+        }
+        
+        .header .report-info {
+            font-size: 9pt;
+            color: #666;
+            margin: 5px 0;
+        }
+        
+        .filter-section {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 10px;
+            margin-bottom: 20px;
+            font-size: 9pt;
+        }
+        
+        .filter-section h3 {
+            font-size: 10pt;
+            margin: 0 0 8px 0;
+            color: #4F81BD;
+            font-weight: bold;
+        }
+        
+        .filter-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 8px;
+        }
+        
+        .filter-item {
+            color: #666;
+        }
+        
+        .filter-item strong {
+            color: #333;
+            margin-right: 5px;
+        }
+        
+        .stats-summary {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            padding: 10px;
+            background-color: #e8f4f8;
+            border-radius: 4px;
+        }
+        
+        .stat-box {
+            text-align: center;
+            flex: 1;
+        }
+        
+        .stat-value {
+            font-size: 14pt;
+            font-weight: bold;
+            color: #4F81BD;
+        }
+        
+        .stat-label {
+            font-size: 8pt;
+            color: #666;
+            text-transform: uppercase;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+            font-size: 8pt;
+        }
+        
+        th {
+            background-color: #4F81BD;
+            color: white;
+            font-weight: bold;
+            padding: 8px 5px;
+            text-align: left;
+            border: 1px solid #3a6a9e;
+            white-space: nowrap;
+        }
+        
+        td {
+            padding: 6px 5px;
+            border: 1px solid #ddd;
+            vertical-align: top;
+        }
+        
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        
+        tr:hover {
+            background-color: #f5f5f5;
+        }
+        
+        .student-name {
+            font-weight: bold;
+            color: #333;
+        }
+        
+        .registration-no {
+            font-family: monospace;
+            font-size: 7.5pt;
+            color: #666;
+        }
+        
+        .status-badge {
+            display: inline-block;
+            padding: 3px 6px;
+            border-radius: 3px;
+            font-size: 7pt;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+        
+        .status-active {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .status-suspended {
+            background-color: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeeba;
+        }
+        
+        .status-withdrawn {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .status-completed {
+            background-color: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        
+        .status-transferred {
+            background-color: #e2e3e5;
+            color: #383d41;
+            border: 1px solid #d6d8db;
+        }
+        
+        .footer {
+            text-align: center;
+            font-size: 7pt;
+            color: #999;
+            margin-top: 20px;
+            padding-top: 10px;
+            border-top: 1px solid #ddd;
+        }
+        
+        .page-break {
+            page-break-after: always;
+        }
+        
+        /* Column widths */
+        .col-sn { width: 3%; }
+        .col-reg { width: 8%; }
+        .col-name { width: 15%; }
+        .col-gender { width: 5%; }
+        .col-class { width: 8%; }
+        .col-stream { width: 5%; }
+        .col-year { width: 8%; }
+        .col-parent { width: 15%; }
+        .col-phone { width: 10%; }
+        .col-status { width: 8%; }
+        
+        @media print {
+            .no-print {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>STUDENTS LIST REPORT</h1>
+        <div class="school-name">School Management System</div>
+        <div class="report-info">
+            Generated on: {{ generated_date|date:"F d, Y H:i:s" }} | 
+            Generated by: {{ generated_by }}
+        </div>
+    </div>
+    
+    {% if filter_info %}
+    <div class="filter-section">
+        <h3>Applied Filters</h3>
+        <div class="filter-grid">
+            {% for key, value in filter_info.items %}
+            <div class="filter-item">
+                <strong>{{ key|title }}:</strong> {{ value }}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+    
+    <div class="stats-summary">
+        <div class="stat-box">
+            <div class="stat-value">{{ total_students }}</div>
+            <div class="stat-label">Total Students</div>
+        </div>
+        <div class="stat-box">
+            <div class="stat-value">{{ active_students }}</div>
+            <div class="stat-label">Active</div>
+        </div>
+        <div class="stat-box">
+            <div class="stat-value">{{ male_students }}</div>
+            <div class="stat-label">Male</div>
+        </div>
+        <div class="stat-box">
+            <div class="stat-value">{{ female_students }}</div>
+            <div class="stat-label">Female</div>
+        </div>
+    </div>
+    
+    <table>
+        <thead>
+            <tr>
+                <th class="col-sn">S/N</th>
+                <th class="col-reg">Reg. No.</th>
+                <th class="col-name">Student Name</th>
+                <th class="col-gender">Gender</th>
+                <th class="col-class">Class</th>
+                <th class="col-stream">Stream</th>
+                <th class="">Comb.</th>
+                <th class="col-year">Academic Year</th>
+                <th class="col-parent">Parent/Guardian</th>
+                <th class="col-phone">Phone</th>
+                <th class="col-status">Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for student in students %}
+            <tr>
+                <td class="col-sn">{{ forloop.counter }}</td>
+                <td class="col-reg">
+                    <span class="registration-no">{{ student.registration_number|default:"N/A" }}</span>
+                </td>
+                <td class="col-name">
+                    <span class="student-name">{{ student.full_name }}</span>
+                </td>
+                <td class="col-gender">{{ student.get_gender_display|default:"N/A" }}</td>
+                <td class="col-class">{{ student.class_level.name|default:"N/A" }}</td>
+                <td class="col-stream">{{ student.stream_class.stream_letter|default:"-" }}</td>
+                <td>{{ student.combination.code|default:"-" }}</td>
+                <td class="col-year">{{ student.academic_year.name|default:"N/A" }}</td>
+                <td class="col-parent">
+                    {% with student.parents.first as parent %}
+                        {% if parent %}
+                            {{ parent.full_name }}<br>
+                            <small>({{ parent.relationship }})</small>
+                        {% else %}
+                            <span style="color: #999;">No parent</span>
+                        {% endif %}
+                    {% endwith %}
+                </td>
+                <td class="col-phone">
+                    {% with student.parents.first as parent %}
+                        {% if parent %}
+                            {{ parent.first_phone_number }}
+                        {% else %}
+                            -
+                        {% endif %}
+                    {% endwith %}
+                </td>
+                <td class="col-status">
+                    <span class="status-badge status-{{ student.status }}">
+                        {{ student.get_status_display }}
+                    </span>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    
+    <div class="footer">
+        This is a computer-generated report. No signature is required.<br>
+        &copy; {{ generated_date|date:"Y" }} School Management System. All rights reserved.
+    </div>
+</body>
+</html>

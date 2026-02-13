@@ -2,486 +2,352 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <meta charset="utf-8">
-    <title>{{ student.full_name }} - {{ exam_session.name }}</title>
-    <style>
-        /* PDF-specific styles */
-        @page {
-            size: A4;
-            margin: 20mm;
-            @top-center {
-                content: "{{ school_name }} - Exam Results";
-                font-size: 12pt;
-                font-weight: bold;
-            }
-            @bottom-center {
-                content: "Page " counter(page) " of " counter(pages);
-                font-size: 10pt;
-            }
-        }
-        
-        body {
-            font-family: 'DejaVu Sans', Arial, sans-serif;
-            font-size: 11pt;
-            line-height: 1.5;
-            color: #000;
-        }
-        
-        .header {
-            text-align: center;
-            margin-bottom: 20px;
-            padding-bottom: 15px;
-            border-bottom: 2px solid #000;
-        }
-        
-        .school-info {
-            margin-bottom: 10px;
-        }
-        
-        .school-name {
-            font-size: 16pt;
-            font-weight: bold;
-            margin-bottom: 5px;
-        }
-        
-        .report-title {
-            font-size: 14pt;
-            font-weight: bold;
-            margin: 15px 0;
-            text-transform: uppercase;
-        }
-        
-        .student-info {
-            margin-bottom: 20px;
-            padding: 15px;
-            border: 1px solid #000;
-            border-radius: 5px;
-            background-color: #f8f9fa;
-        }
-        
-        .info-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 10px;
-        }
-        
-        .info-item {
-            margin-bottom: 5px;
-        }
-        
-        .info-label {
-            font-weight: bold;
-            display: inline-block;
-            min-width: 120px;
-        }
-        
-        .session-info {
-            margin-bottom: 20px;
-            padding: 15px;
-            border: 1px solid #000;
-            border-radius: 5px;
-            background-color: #e9ecef;
-        }
-        
-        .performance-summary {
-            margin-bottom: 20px;
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 15px;
-        }
-        
-        .summary-card {
-            border: 1px solid #000;
-            border-radius: 5px;
-            padding: 15px;
-            text-align: center;
-        }
-        
-        .summary-title {
-            font-weight: bold;
-            margin-bottom: 10px;
-            font-size: 10pt;
-            text-transform: uppercase;
-            border-bottom: 1px solid #ccc;
-            padding-bottom: 5px;
-        }
-        
-        .summary-value {
-            font-size: 14pt;
-            font-weight: bold;
-            margin-bottom: 5px;
-        }
-        
-        .results-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-bottom: 20px;
-            page-break-inside: avoid;
-        }
-        
-        .results-table th,
-        .results-table td {
-            border: 1px solid #000;
-            padding: 8px;
-            text-align: left;
-        }
-        
-        .results-table th {
-            background-color: #f8f9fa;
-            font-weight: bold;
-            text-align: center;
-        }
-        
-        .results-table td {
-            font-size: 10pt;
-        }
-        
-        .results-table .center {
-            text-align: center;
-        }
-        
-        .grade-badge {
-            display: inline-block;
-            padding: 3px 8px;
-            border-radius: 3px;
-            font-weight: bold;
-            font-size: 9pt;
-        }
-        
-        .grade-A { background-color: #28a745; color: white; }
-        .grade-B { background-color: #17a2b8; color: white; }
-        .grade-C { background-color: #ffc107; }
-        .grade-D { background-color: #fd7e14; color: white; }
-        .grade-E { background-color: #6f42c1; color: white; }
-        .grade-F { background-color: #dc3545; color: white; }
-        
-        .table-footer {
-            background-color: #f8f9fa;
-            font-weight: bold;
-        }
-        
-        .ranking-section {
-            margin-bottom: 20px;
-            padding: 15px;
-            border: 1px solid #000;
-            border-radius: 5px;
-        }
-        
-        .ranking-badge {
-            display: inline-block;
-            padding: 10px 20px;
-            background-color: #ffc107;
-            border-radius: 25px;
-            font-weight: bold;
-            font-size: 12pt;
-            margin: 10px 0;
-        }
-        
-        .footer {
-            margin-top: 30px;
-            padding-top: 15px;
-            border-top: 1px solid #000;
-            font-size: 9pt;
-            text-align: center;
-        }
-        
-        .signature-section {
-            margin-top: 30px;
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 20px;
-        }
-        
-        .signature-box {
-            text-align: center;
-            padding-top: 50px;
-        }
-        
-        .signature-line {
-            width: 80%;
-            border-bottom: 1px solid #000;
-            margin: 0 auto;
-            padding-top: 20px;
-        }
-        
-        /* Prevent page breaks inside important sections */
-        .no-break {
-            page-break-inside: avoid;
-        }
-        
-        .page-break {
-            page-break-before: always;
-        }
-        
-        /* Watermark */
-        .watermark {
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%) rotate(-45deg);
-            font-size: 60pt;
-            color: rgba(0, 0, 0, 0.1);
-            z-index: -1;
-            white-space: nowrap;
-        }
-    </style>
+<meta charset="utf-8">
+<title>{{ student.full_name }} - {{ exam_session.name }}</title>
+
+<style>
+
+/* ================= PAGE SETUP ================= */
+@page {
+    size: A4;
+    margin: 2cm;
+
+    @top-center {
+        content: "{{ school_name }}";
+        font-size: 10pt;
+        font-weight: bold;
+    }
+
+    @bottom-center {
+        content: "Page " counter(page) " of " counter(pages);
+        font-size: 9pt;
+    }
+}
+
+body {
+    font-family: "Times New Roman", serif;
+    font-size: 11pt;
+    line-height: 1.5;
+    color: #000;
+}
+
+/* ================= WATERMARK ================= */
+.watermark {
+    position: fixed;
+    top: 45%;
+    left: 25%;
+    font-size: 50pt;
+    color: rgba(0,0,0,0.07);
+}
+
+/* ================= HEADER ================= */
+.header {
+    text-align: center;
+    margin-bottom: 20px;
+    border-bottom: 2px solid #000;
+    padding-bottom: 10px;
+}
+
+.school-name {
+    font-size: 18pt;
+    font-weight: bold;
+}
+
+.report-title {
+    font-size: 14pt;
+    font-weight: bold;
+    text-transform: uppercase;
+    margin-top: 8px;
+}
+
+/* ================= INFO BOXES ================= */
+.info-box {
+    border: 1px solid #000;
+    padding: 10px;
+    margin-bottom: 15px;
+    page-break-inside: avoid;
+}
+
+.info-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.info-table td {
+    padding: 4px 8px;
+    vertical-align: top;
+    font-size: 10pt;
+}
+
+.label {
+    font-weight: bold;
+    width: 150px;
+}
+
+/* ================= SUMMARY TABLE ================= */
+.summary-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 15px;
+    page-break-inside: avoid;
+}
+
+.summary-table td {
+    border: 1px solid #000;
+    text-align: center;
+    padding: 10px;
+}
+
+.summary-title {
+    font-size: 9pt;
+    text-transform: uppercase;
+}
+
+.summary-value {
+    font-size: 14pt;
+    font-weight: bold;
+}
+
+/* ================= RANKING SECTION ================= */
+.ranking-box {
+    border: 1px solid #000;
+    padding: 10px;
+    margin-bottom: 15px;
+    text-align: center;
+    page-break-inside: avoid;
+}
+
+.ranking-title {
+    font-weight: bold;
+    margin-bottom: 5px;
+}
+
+.ranking-value {
+    font-size: 14pt;
+    font-weight: bold;
+}
+
+/* ================= RESULTS TABLE ================= */
+.results-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 10px;
+}
+
+.results-table th,
+.results-table td {
+    border: 1px solid #000;
+    padding: 6px;
+    font-size: 10pt;
+}
+
+.results-table th {
+    background: #e6e6e6;
+    text-align: center;
+    font-weight: bold;
+}
+
+.center { text-align: center; }
+
+.grade-badge {
+    padding: 2px 6px;
+    border: 1px solid #000;
+    font-weight: bold;
+}
+
+/* ================= SIGNATURE ================= */
+.signature-table {
+    width: 100%;
+    margin-top: 40px;
+    border-collapse: collapse;
+    page-break-inside: avoid;
+}
+
+.signature-table td {
+    width: 33%;
+    text-align: center;
+    padding-top: 40px;
+}
+
+.signature-line {
+    border-top: 1px solid #000;
+    margin-top: 30px;
+}
+
+/* ================= FOOTER ================= */
+.footer {
+    margin-top: 25px;
+    border-top: 1px solid #000;
+    padding-top: 10px;
+    font-size: 9pt;
+    text-align: center;
+}
+
+</style>
 </head>
+
 <body>
-    <!-- Watermark -->
-    <div class="watermark">{{ school_name }}</div>
-    
-    <!-- Header -->
-    <div class="header">
-        <div class="school-info">
-            <div class="school-name">{{ school_name }}</div>
-            <div>Academic Results - Official Transcript</div>
-        </div>
-        <div class="report-title">Individual Student Performance Report</div>
-    </div>
-    
-    <!-- Student Information -->
-    <div class="student-info no-break">
-        <div class="info-grid">
-            <div class="info-item">
-                <span class="info-label">Student Name:</span>
-                {{ student.full_name }}
-            </div>
-            <div class="info-item">
-                <span class="info-label">Registration No:</span>
-                {{ student.registration_number }}
-            </div>
-            <div class="info-item">
-                <span class="info-label">Gender:</span>
-                {{ student.get_gender_display }}
-            </div>
-            <div class="info-item">
-                <span class="info-label">Current Class:</span>
-                {{ student.class_level.name }} {{ student.stream_class.stream_letter|default:"" }}
-            </div>
-            <div class="info-item">
-                <span class="info-label">Academic Year:</span>
-                {{ student.academic_year.name|default:"N/A" }}
-            </div>
-            <div class="info-item">
-                <span class="info-label">Status:</span>
-                {{ student.get_status_display }}
-            </div>
-        </div>
-    </div>
-    
-    <!-- Exam Session Information -->
-    <div class="session-info no-break">
-        <div class="info-grid">
-            <div class="info-item">
-                <span class="info-label">Exam Session:</span>
-                {{ exam_session.name }}
-            </div>
-            <div class="info-item">
-                <span class="info-label">Exam Date:</span>
-                {{ exam_session.exam_date|date:"F d, Y" }}
-            </div>
-            <div class="info-item">
-                <span class="info-label">Class Level:</span>
-                {{ exam_session.class_level.name }}
-                {% if exam_session.stream_class %}
-                    - {{ exam_session.stream_class.stream_letter }}
-                {% endif %}
-            </div>
-            <div class="info-item">
-                <span class="info-label">Exam Type:</span>
-                {{ exam_session.exam_type.name }}
-            </div>
-            <div class="info-item">
-                <span class="info-label">Academic Year:</span>
-                {{ exam_session.academic_year.name }}
-            </div>
-            <div class="info-item">
-                <span class="info-label">Term:</span>
-                {{ exam_session.term.get_term_number_display }}
-            </div>
-        </div>
-    </div>
-    
-    <!-- Performance Summary -->
-    <div class="performance-summary no-break">
-        <div class="summary-card">
-            <div class="summary-title">Academic Summary</div>
-            <div class="summary-value">{{ overall_stats.total_marks|floatformat:1 }}</div>
-            <div>Total Marks</div>
-        </div>
-        
-        <div class="summary-card">
-            <div class="summary-title">Average Performance</div>
-            <div class="summary-value">{{ overall_stats.average_marks|floatformat:1 }}</div>
-            <div>Average Marks</div>
-        </div>
-        
-        <div class="summary-card">
-            <div class="summary-title">Completion Rate</div>
-            <div class="summary-value">{{ overall_stats.completion_rate|floatformat:1 }}%</div>
-            <div>Subjects Completed</div>
-        </div>
-    </div>
-    
-    <!-- Grading Summary -->
-    <div class="performance-summary no-break">
-        <div class="summary-card">
-            <div class="summary-title">Average Percentage</div>
-            {% if metrics %}
-            <div class="summary-value">{{ metrics.average_percentage|floatformat:1 }}%</div>
-            {% else %}
-            <div class="summary-value">-</div>
-            {% endif %}
-            <div>Overall %</div>
-        </div>
-        
-        <div class="summary-card">
-            <div class="summary-title">Average Grade</div>
-            {% if metrics %}
-            <div class="summary-value">{{ metrics.average_grade|default:"-" }}</div>
-            {% else %}
-            <div class="summary-value">-</div>
-            {% endif %}
-            <div>Grade Point</div>
-        </div>
-        
-        <div class="summary-card">
-            <div class="summary-title">Division</div>
-            {% if metrics and metrics.division %}
-            <div class="summary-value">{{ metrics.division.division }}-{{ metrics.total_grade_points|default:"-" }}</div>
-            {% else %}
-            <div class="summary-value">-</div>
-            {% endif %}
-            <div>Overall Result</div>
-        </div>
-    </div>
-    
-    <!-- Ranking Section -->
-    {% if positions and positions.class_position %}
-    <div class="ranking-section no-break">
-        <h3 style="text-align: center; margin-bottom: 10px;">Class Ranking</h3>
-        <div style="text-align: center;">
-            <div class="ranking-badge">{{ positions.class_position|ordinal }} Position</div>
-        </div>
-        <div style="text-align: center; margin-top: 10px;">
-            <p>Class Position: {{ class_ranking }}</p>
-            {% if positions.stream_position %}
-            <p>Stream Position: {{ positions.stream_position|ordinal }} of {{ class_students_count }}</p>
-            {% endif %}
-        </div>
-    </div>
-    {% endif %}
-    
-    <!-- Results Table -->
-    <h3 style="margin-bottom: 10px; border-bottom: 1px solid #000; padding-bottom: 5px;">Subject-wise Results</h3>
-    <table class="results-table">
-        <thead>
-            <tr>
-                <th style="width: 5%;">#</th>
-                <th style="width: 30%;">Subject</th>
-                <th style="width: 10%;">Code</th>
-                <th style="width: 10%;" class="center">Marks</th>
-                <th style="width: 10%;" class="center">Percentage</th>
-                <th style="width: 10%;" class="center">Grade</th>
-                <th style="width: 10%;" class="center">Points</th>
-                <th style="width: 15%;" class="center">Position</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for item in subject_results %}
-            <tr>
-                <td class="center">{{ forloop.counter }}</td>
-                <td>{{ item.subject.name }}</td>
-                <td class="center">{{ item.subject.code }}</td>
-                <td class="center">
-                    {% if item.has_result %}
-                    {{ item.marks|floatformat:1 }}
-                    {% else %}
-                    -
-                    {% endif %}
-                </td>
-                <td class="center">
-                    {% if item.has_result and item.percentage %}
-                    {{ item.percentage|floatformat:1 }}%
-                    {% else %}
-                    -
-                    {% endif %}
-                </td>
-                <td class="center">
-                    {% if item.has_result and item.grade %}
-                    <span class="grade-badge grade-{{ item.grade }}">{{ item.grade }}</span>
-                    {% else %}
-                    -
-                    {% endif %}
-                </td>
-                <td class="center">
-                    {% if item.has_result and item.grade_point %}
-                    {{ item.grade_point|floatformat:1 }}
-                    {% else %}
-                    -
-                    {% endif %}
-                </td>
-                <td class="center">
-                    {% if item.has_result and item.position %}
-                    {{ item.position|ordinal }}
-                    {% else %}
-                    -
-                    {% endif %}
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-        <tfoot class="table-footer">
-            <tr>
-                <td colspan="3" style="text-align: right;"><strong>Totals/Averages:</strong></td>
-                <td class="center"><strong>{{ overall_stats.total_marks|floatformat:1 }}</strong></td>
-                <td class="center"><strong>{{ overall_stats.average_marks|floatformat:1 }}</strong></td>
-                <td class="center">
-                    {% if metrics and metrics.average_grade %}
-                    <span class="grade-badge grade-{{ metrics.average_grade }}">{{ metrics.average_grade }}</span>
-                    {% else %}
-                    -
-                    {% endif %}
-                </td>
-                <td class="center"><strong>{{ overall_stats.total_grade_points|floatformat:1 }}</strong></td>
-                <td class="center">
-                    {% if positions and positions.class_position %}
-                    <strong>{{ positions.class_position|ordinal }}</strong>
-                    {% else %}
-                    -
-                    {% endif %}
-                </td>
-            </tr>
-        </tfoot>
+
+<div class="watermark">{{ school_name }}</div>
+
+<!-- HEADER -->
+<div class="header">
+    <div class="school-name">{{ school_name }}</div>
+    <div>Official Academic Transcript</div>
+    <div class="report-title">Individual Student Performance Report</div>
+</div>
+
+<!-- STUDENT INFO -->
+<div class="info-box">
+    <table class="info-table">
+        <tr>
+            <td class="label">Student Name:</td>
+            <td>{{ student.full_name }}</td>
+            <td class="label">Registration No:</td>
+            <td>{{ student.registration_number }}</td>
+        </tr>
+        <tr>
+            <td class="label">Gender:</td>
+            <td>{{ student.get_gender_display }}</td>
+            <td class="label">Class:</td>
+            <td>{{ student.class_level.name }} {{ student.stream_class.stream_letter|default:"" }}</td>
+        </tr>
+        <tr>
+            <td class="label">Academic Year:</td>
+            <td>{{ exam_session.academic_year.name }}</td>
+            <td class="label">Status:</td>
+            <td>{{ student.get_status_display }}</td>
+        </tr>
     </table>
-    
-    <!-- Signature Section -->
-    <div class="signature-section no-break">
-        <div class="signature-box">
-            <div>Class Teacher</div>
-            <div class="signature-line"></div>
-            <div style="font-size: 9pt;">Name & Signature</div>
+</div>
+
+<!-- EXAM INFO -->
+<div class="info-box">
+    <table class="info-table">
+        <tr>
+            <td class="label">Exam Session:</td>
+            <td>{{ exam_session.name }}</td>
+            <td class="label">Exam Type:</td>
+            <td>{{ exam_session.exam_type.name }}</td>
+        </tr>
+        <tr>
+            <td class="label">Exam Date:</td>
+            <td>{{ exam_session.exam_date|date:"F d, Y" }}</td>
+            <td class="label">Term:</td>
+            <td>{{ exam_session.term.get_term_number_display }}</td>
+        </tr>
+    </table>
+</div>
+
+<!-- PERFORMANCE SUMMARY -->
+<table class="summary-table">
+<tr>
+    <td>
+        <div class="summary-title">Total Marks</div>
+        <div class="summary-value">{{ overall_stats.total_marks|floatformat:1 }}</div>
+    </td>
+    <td>
+        <div class="summary-title">Average Marks</div>
+        <div class="summary-value">{{ overall_stats.average_marks|floatformat:1 }}</div>
+    </td>
+    <td>
+        <div class="summary-title">Average Grade</div>
+        <div class="summary-value">{{ metrics.average_grade|default:"-" }}</div>
+    </td>
+    <td>
+        <div class="summary-title">Division</div>
+        <div class="summary-value">
+            {% if metrics and metrics.division %}
+                {{ metrics.division.division }}-{{ metrics.total_grade_points }}
+            {% else %}-{% endif %}
         </div>
-        <div class="signature-box">
-            <div>Head of Department</div>
-            <div class="signature-line"></div>
-            <div style="font-size: 9pt;">Name & Signature</div>
-        </div>
-        <div class="signature-box">
-            <div>School Principal</div>
-            <div class="signature-line"></div>
-            <div style="font-size: 9pt;">Name & Signature</div>
-        </div>
+    </td>
+</tr>
+</table>
+
+<!-- RANKING -->
+{% if positions and positions.class_position %}
+<div class="ranking-box">
+    <div class="ranking-title">Class Position</div>
+    <div class="ranking-value">
+        {{ positions.class_position|ordinal }}/{{ total_students_count|default:"-" }}
     </div>
-    
-    <!-- Footer -->
-    <div class="footer">
-        <div>Report Generated: {{ generated_date|date:"F d, Y H:i" }}</div>
-        <div>Generated by: {{ generated_by }}</div>
-        <div>This is an official document. Unauthorized reproduction is prohibited.</div>
-        <div style="margin-top: 10px; font-style: italic;">
-            "Education is the most powerful weapon which you can use to change the world." - Nelson Mandela
-        </div>
-    </div>
+</div>
+{% endif %}
+
+<!-- SUBJECT RESULTS -->
+<h3 style="margin-top:20px;">Subject-wise Performance</h3>
+
+<table class="results-table">
+<thead>
+<tr>
+    <th>#</th>
+    <th>Subject</th>
+    <th>Code</th>
+    <th>Marks</th>
+    <th>%</th>
+    <th>Grade</th>
+    <th>Points</th>
+    <th>Position</th>
+</tr>
+</thead>
+<tbody>
+{% for item in subject_results %}
+<tr>
+    <td class="center">{{ forloop.counter }}</td>
+    <td>{{ item.subject.name }}</td>
+    <td class="center">{{ item.subject.code }}</td>
+    <td class="center">{{ item.marks|floatformat:1|default:"-" }}</td>
+    <td class="center">{{ item.percentage|floatformat:1|default:"-" }}</td>
+    <td class="center">
+        {% if item.grade %}
+        <span class="grade-badge">{{ item.grade }}</span>
+        {% else %}-{% endif %}
+    </td>
+    <td class="center">{{ item.grade_point|floatformat:1|default:"-" }}</td>
+    <td class="center">{{ item.position|ordinal|default:"-" }}/{{ item.total_students_in_subject|default:"-" }}</td>
+</tr>
+{% endfor %}
+</tbody>
+
+<tfoot>
+<tr>
+    <td colspan="3" class="center"><strong>Totals / Average</strong></td>
+    <td class="center"><strong>{{ overall_stats.total_marks|floatformat:1 }}</strong></td>
+    <td class="center"><strong>{{ overall_stats.average_marks|floatformat:1 }}</strong></td>
+    <td class="center"><strong>{{ metrics.average_grade|default:"-" }}</strong></td>
+    <td class="center"><strong>{{ overall_stats.total_grade_points|floatformat:1 }}</strong></td>
+    <td class="center">
+        <strong>{{ positions.class_position|ordinal|default:"-" }}/{{ total_students_count|default:"-" }}</strong>
+    </td>
+</tr>
+</tfoot>
+</table>
+
+<!-- SIGNATURES -->
+<table class="signature-table">
+<tr>
+    <td>
+        <div class="signature-line"></div>
+        Class Teacher
+    </td>
+    <td>
+        <div class="signature-line"></div>
+        Head of Department
+    </td>
+    <td>
+        <div class="signature-line"></div>
+        School Principal
+    </td>
+</tr>
+</table>
+
+<!-- FOOTER -->
+<div class="footer">
+    Generated on {{ generated_date|date:"F d, Y H:i" }} |
+    Generated by {{ generated_by }} <br>
+    This is an official academic document.
+</div>
+
 </body>
 </html>

@@ -157,6 +157,18 @@
     .dataTables_filter input {
         margin-left: 10px !important;
     }
+
+    /* Add to your existing CSS */
+    .btn-matrix {
+        background: linear-gradient(135deg, #6f42c1, #6610f2);
+        color: white !important;
+    }
+
+    .btn-matrix:hover {
+        background: linear-gradient(135deg, #6610f2, #520dc2);
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(102, 16, 242, 0.3);
+    }
 </style>
 {% endblock extra_css %}
 
@@ -590,15 +602,21 @@ $(document).ready(function() {
                     "render": function(data, type, row) {
                         let html = '<div class="quick-actions">';
                         
-                        // Report Button - always enabled
-                        html += '<a href="{% url "exam_session_report_view" 0 %}'.replace('0', row.id) + 
-                               '" class="action-btn btn-report" title="View Report">' +
-                               '<i class="fas fa-file-alt"></i>' +
+                        // Subject Analysis Button
+                        html += '<a href="{% url "session_subject_analysis_view" 0 %}'.replace('0', row.id) + 
+                               '" class="action-btn btn-report" title="View Subject Analysis">' +
+                               '<i class="fas fa-chart-line"></i>' +
                                '</a>';
                         
-                        // Analysis Button - always enabled
+                        // Subject Matrix Analysis Button (NEW)
+                        html += '<a href="{% url "session_subject_matrix_analysis" 0 %}'.replace('0', row.id) + 
+                               '" class="action-btn btn-matrix" title="View Subject Matrix Analysis">' +
+                               '<i class="fas fa-table"></i>' +
+                               '</a>';
+                        
+                        // Exam Analysis Button
                         html += '<a href="{% url "exam_session_analysis_view" 0 %}'.replace('0', row.id) + 
-                               '" class="action-btn btn-analysis" title="View Analysis">' +
+                               '" class="action-btn btn-analysis" title="View Exam Analysis">' +
                                '<i class="fas fa-chart-bar"></i>' +
                                '</a>';
                         
@@ -710,11 +728,11 @@ $(document).ready(function() {
         $(this).toggleClass('table-active');
     });
 
-    // Double-click row to view report
+    // Double-click row to view subject matrix analysis (changed from full analysis)
     $('#exam-sessions-table tbody').on('dblclick', 'tr', function() {
         var data = table.row(this).data();
         if (data) {
-            window.location.href = '{% url "exam_session_report_view" 0 %}'.replace('0', data.id);
+            window.location.href = '{% url "session_subject_matrix_analysis" 0 %}'.replace('0', data.id);
         }
     });
 });

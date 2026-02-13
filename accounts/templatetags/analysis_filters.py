@@ -1,4 +1,4 @@
-# Create a new file: your_app/templatetags/analysis_filters.py
+# your_app/templatetags/analysis_filters.py
 from django import template
 import math
 
@@ -7,57 +7,77 @@ register = template.Library()
 @register.filter
 def get_item(dictionary, key):
     """Get item from dictionary by key"""
-    return dictionary.get(key)
+    if isinstance(dictionary, dict):
+        return dictionary.get(key)
+    return None
 
 @register.filter
 def split(value, delimiter=','):
     """Split string by delimiter"""
-    return value.split(delimiter)
+    if isinstance(value, str):
+        return value.split(delimiter)
+    return []
 
 @register.filter
 def filter_by(queryset, attribute):
     """Filter a list of dictionaries by an attribute"""
-    # This is a placeholder - in actual implementation, you'd filter the data
-    return queryset
+    if not queryset:
+        return []
+    return [item for item in queryset if item.get(attribute)]
 
 @register.filter
 def filter_value(queryset, value):
     """Filter a list of dictionaries by value"""
-    # This is a placeholder - in actual implementation, you'd filter the data
-    return [item for item in queryset if item.get('value') == value]
+    if not queryset:
+        return []
+    return [item for item in queryset if str(item.get('value', '')).lower() == str(value).lower()]
 
 @register.filter
 def filter_rank_range(queryset, start, end):
     """Filter students by rank range"""
-    start = int(start)
-    end = int(end)
-    return [student for student in queryset if start <= student.get('rank', 0) <= end]
+    try:
+        start = int(start)
+        end = int(end)
+        return [student for student in queryset if start <= int(student.get('rank', 0)) <= end]
+    except (ValueError, TypeError):
+        return queryset
 
 @register.filter
 def increment(value):
     """Increment a value (used in loops)"""
-    return int(value) + 1
+    try:
+        return int(value) + 1
+    except (ValueError, TypeError):
+        return 0
 
 @register.filter
 def dictsort(queryset, key):
     """Sort a list of dictionaries by key"""
-    if isinstance(queryset, dict):
-        return sorted(queryset.items(), key=lambda x: x[1])
-    return sorted(queryset, key=lambda x: x.get(key, 0))
+    try:
+        if isinstance(queryset, dict):
+            return sorted(queryset.items(), key=lambda x: x[1])
+        return sorted(queryset, key=lambda x: x.get(key, 0))
+    except (AttributeError, TypeError):
+        return queryset
 
 @register.simple_tag
 def get_percentage(value, total):
     """Calculate percentage"""
-    if total == 0:
+    try:
+        value = float(value)
+        total = float(total)
+        if total == 0:
+            return 0
+        return (value / total) * 100
+    except (ValueError, TypeError):
         return 0
-    return (value / total) * 100
 
 @register.filter
 def div(value, arg):
     """Divide value by argument"""
     try:
         return float(value) / float(arg)
-    except (ValueError, ZeroDivisionError):
+    except (ValueError, ZeroDivisionError, TypeError):
         return 0
     
 @register.filter
@@ -74,7 +94,7 @@ def sub(value, arg):
     try:
         return float(value) - float(arg)
     except (ValueError, TypeError):
-        return value
+        return 0
 
 @register.filter
 def add(value, arg):
@@ -82,14 +102,6 @@ def add(value, arg):
     try:
         return float(value) + float(arg)
     except (ValueError, TypeError):
-        return value
-
-@register.filter
-def div(value, arg):
-    """Divide value by argument"""
-    try:
-        return float(value) / float(arg)
-    except (ValueError, ZeroDivisionError):
         return 0
 
 @register.filter
@@ -108,7 +120,8 @@ def widthratio(value, max_value, factor):
         max_value = float(max_value)
         if max_value == 0:
             return 0
-        return (value / max_value) * float(factor)
+        ratio = (value / max_value) * float(factor)
+        return int(ratio)
     except (ValueError, TypeError, ZeroDivisionError):
         return 0
 
@@ -116,27 +129,21 @@ def widthratio(value, max_value, factor):
 def slice_string(value, arg):
     """Slice a string"""
     try:
-        start, end = map(int, arg.split(':'))
-        return value[start:end]
+        if ':' in arg:
+            start, end = map(int, arg.split(':'))
+            return value[start:end]
+        else:
+            arg = int(arg)
+            return value[:arg]
     except (ValueError, TypeError, AttributeError):
         return value
-
-@register.filter
-def dictsort(queryset, key):
-    """Sort a list of dictionaries by key"""
-    try:
-        if isinstance(queryset, dict):
-            items = list(queryset.items())
-            return sorted(items, key=lambda x: x[1])
-        return sorted(queryset, key=lambda x: x.get(key, 0))
-    except (AttributeError, TypeError):
-        return queryset
 
 @register.filter
 def truncatechars(value, arg):
     """Truncate string to specified number of characters"""
     try:
         arg = int(arg)
+        value = str(value)
         if len(value) > arg:
             return value[:arg-3] + '...'
         return value
@@ -156,9 +163,7 @@ def get_average(queryset, field):
                 count += 1
         return total / count if count > 0 else 0
     except (ValueError, TypeError, ZeroDivisionError):
-        return 0    
-    
-# Add these to your existing analysis_filters.py
+        return 0
 
 @register.filter
 def cos(degrees):
@@ -180,15 +185,6 @@ def sin(degrees):
     except (ValueError, TypeError, ImportError):
         return 0
 
-@register.filter
-def mul(value, arg):
-    """Multiply value by argument"""
-    try:
-        return float(value) * float(arg)
-    except (ValueError, TypeError):
-        return 0
-
-# CSS variable helper
 @register.simple_tag
 def css_color(index):
     """Return CSS color variable based on index"""
@@ -196,9 +192,11 @@ def css_color(index):
         '#dc3545', '#fd7e14', '#ffc107', '#17a2b8', '#28a745',
         '#007bff', '#e83e8c', '#6c757d', '#6f42c1', '#20c997'
     ]
-    return colors[index % len(colors)]    
-
-# Add these to your existing analysis_filters.py
+    try:
+        idx = int(index) % len(colors)
+        return colors[idx]
+    except (ValueError, TypeError):
+        return colors[0]
 
 @register.filter
 def get_range(value):
@@ -210,11 +208,8 @@ def get_range(value):
 
 @register.filter
 def multiply(value, arg):
-    """Multiply value by argument"""
-    try:
-        return float(value) * float(arg)
-    except (ValueError, TypeError):
-        return 0
+    """Multiply value by argument (alias for mul)"""
+    return mul(value, arg)
 
 @register.filter
 def get_percentile_rank(queryset, index):
@@ -244,3 +239,51 @@ def calculate_band(student_rank, total_students):
             return 'band-5'
     except (ValueError, TypeError, ZeroDivisionError):
         return 'band-3'
+
+@register.filter
+def slice_list(queryset, arg):
+    """Slice a list by start:end or just limit"""
+    try:
+        if ':' in arg:
+            start, end = map(int, arg.split(':'))
+            return queryset[start:end]
+        else:
+            return queryset[:int(arg)]
+    except (ValueError, TypeError, IndexError):
+        return queryset
+
+@register.filter
+def get_first(queryset):
+    """Get first item in queryset"""
+    try:
+        if queryset and len(queryset) > 0:
+            return queryset[0]
+    except (TypeError, IndexError):
+        pass
+    return None
+
+@register.filter
+def get_last(queryset):
+    """Get last item in queryset"""
+    try:
+        if queryset and len(queryset) > 0:
+            return queryset[-1]
+    except (TypeError, IndexError):
+        pass
+    return None
+
+@register.filter
+def get_at_index(queryset, index):
+    """Get item at specific index"""
+    try:
+        index = int(index)
+        if 0 <= index < len(queryset):
+            return queryset[index]
+    except (ValueError, TypeError, IndexError):
+        pass
+    return None
+
+@register.filter
+def default_if_none(value, default):
+    """Return default if value is None"""
+    return default if value is None else value

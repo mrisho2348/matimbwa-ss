@@ -11,6 +11,7 @@ from django.utils import timezone
 from django.contrib.auth.forms import PasswordChangeForm
 from django.contrib.auth import update_session_auth_hash
 from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
+import openpyxl
 from weasyprint import HTML
 from accounts.forms.admin_forms import AdminPreferencesForm, AdminProfileUpdateForm
 from accounts.forms.student_forms import ParentForm, ParentStudentForm, PreviousSchoolForm, StudentEditForm, StudentForm,StudentFilterForm
@@ -35,6 +36,8 @@ from django.core.files.storage import default_storage
 import os
 from django.views.decorators.http import require_http_methods
 from django.template.loader import render_to_string
+from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+from openpyxl.utils import get_column_letter
 
 # ============================================================================
 # DASHBOARD VIEWS
@@ -3543,12 +3546,9 @@ def update_parent_fee_responsibility(request, student_id, parent_id):
 @login_required
 def students_by_class(request):
     """
-    Enhanced view for browsing students by class with advanced filtering
+    Main view that renders the students by class template
     """
-    # Initialize form with GET data
-    form = StudentFilterForm(request.GET or None)
-    
-    # Get all active class levels with aggregated data using optimized queries
+    # Get all active class levels with aggregated data for the filter dropdown
     class_levels = ClassLevel.objects.filter(
         is_active=True
     ).select_related('educational_level').annotate(
@@ -3556,59 +3556,289 @@ def students_by_class(request):
             'students',
             filter=Q(students__is_active=True),
             distinct=True
-        ),
-        stream_count=Count(
-            'streams',
-            filter=Q(streams__is_active=True),
-            distinct=True
-        ),
-        male_count=Count(
-            'students',
-            filter=Q(students__is_active=True, students__gender='male'),
-            distinct=True
-        ),
-        female_count=Count(
-            'students',
-            filter=Q(students__is_active=True, students__gender='female'),
-            distinct=True
         )
-    ).order_by('educational_level__name', 'order')  # Changed from 'educational_level__order' to 'educational_level__name'
+    ).order_by('educational_level__name', 'order')
     
-    # Initialize queryset with optimized prefetching
-    students = Student.objects.filter(is_active=True).select_related(
-        'class_level',
-        'stream_class',
-        'class_level__educational_level'
-    ).prefetch_related(
-        'parents'
-    ).order_by('class_level__order', 'first_name')
+    # Get all academic years for filter dropdown
+    academic_years = AcademicYear.objects.all().order_by('-start_date')
     
-    # Apply filters from form
-    if form.is_valid():
-        # Class filter
-        class_level = form.cleaned_data.get('class_level')
-        if class_level:
-            students = students.filter(class_level=class_level)
+    # Get all active streams (for initial load, will be filtered by AJAX later)
+    streams = StreamClass.objects.filter(
+        is_active=True
+    ).select_related('class_level').order_by('class_level__order', 'stream_letter')
+    
+    # Prepare context for template
+    context = {
+        'class_levels': class_levels,
+        'academic_years': academic_years,
+        'streams': streams,
+        'status_choices': STATUS_CHOICES,
+        'gender_choices': GENDER_CHOICES,
+        'page_title': 'Students by Class',
+    }
+    
+    return render(request, 'admin/students/students_by_class.html', context)
+
+
+@login_required
+@require_GET
+def students_api(request):
+    """
+    API endpoint that returns JSON data for DataTables
+    Handles all filtering, searching, and pagination on the server side
+    """
+    try:
+        # Get parameters from DataTables
+        draw = int(request.GET.get('draw', 1))
+        start = int(request.GET.get('start', 0))
+        length = int(request.GET.get('length', 25))
+        search_value = request.GET.get('search[value]', '')
         
-        # Stream filter
-        stream = form.cleaned_data.get('stream')
-        if stream:
-            students = students.filter(stream_class=stream)
+        # Get filter values from custom parameters
+        class_level_id = request.GET.get('class_level', '')
+        stream_id = request.GET.get('stream', '')
+        academic_year_id = request.GET.get('academic_year', '')
+        status_filter = request.GET.get('status', '')
+        gender_filter = request.GET.get('gender', '')
         
-        # Status filter
-        status = form.cleaned_data.get('status')
-        if status:
-            students = students.filter(status=status)
+        # Base queryset with optimized selects
+        students = Student.objects.filter(is_active=True).select_related(
+            'class_level',
+            'stream_class',
+            'academic_year',
+            'combination'
+        ).prefetch_related('parents').order_by('-created_at')
         
-        # Gender filter
-        gender = form.cleaned_data.get('gender')
-        if gender:
-            students = students.filter(gender=gender)
+        # Apply filters
+        if class_level_id:
+            students = students.filter(class_level_id=class_level_id)
         
-        # Search filter
-        search_query = form.cleaned_data.get('search')
+        if stream_id:
+            students = students.filter(stream_class_id=stream_id)
+        
+        if academic_year_id:
+            students = students.filter(academic_year_id=academic_year_id)
+        
+        if status_filter:
+            students = students.filter(status=status_filter)
+        
+        if gender_filter:
+            students = students.filter(gender=gender_filter)
+        
+        # Apply search filter
+        if search_value:
+            students = students.annotate(
+                full_name_search=Concat(
+                    'first_name', Value(' '), 'middle_name', Value(' '), 'last_name',
+                    output_field=CharField()
+                )
+            ).filter(
+                Q(full_name_search__icontains=search_value) |
+                Q(registration_number__icontains=search_value) |
+                Q(examination_number__icontains=search_value) |
+                Q(parents__full_name__icontains=search_value) |
+                Q(parents__first_phone_number__icontains=search_value)
+            ).distinct()
+        
+        # Get total count before filtering
+        total_records = Student.objects.filter(is_active=True).count()
+        
+        # Get count after filtering
+        filtered_count = students.count()
+        
+        # Apply pagination
+        students = students[start:start + length]
+        
+        # Prepare data for DataTables
+        data = []
+        for idx, student in enumerate(students):
+            # Get primary parent
+            primary_parent = student.parents.first()
+            
+            # Build student data array (must match column order)
+            row_data = [
+                # Column 0: # (serial number) - will be calculated on client side
+                start + idx + 1,
+                
+                # Column 1: Student Information (JSON for complex rendering)
+                json.dumps({
+                    'id': student.id,
+                    'full_name': student.full_name,
+                    'first_name': student.first_name,
+                    'profile_pic': student.profile_pic.url if student.profile_pic else None,
+                    'registration_number': student.registration_number or 'No Reg. No.',
+                    'date_of_birth': student.date_of_birth.strftime('%d %b %Y') if student.date_of_birth else 'N/A',
+                    'gender': student.get_gender_display() if student.gender else 'N/A',
+                }),
+                
+                # Column 2: Class & Stream (JSON)
+                json.dumps({
+                    'class_level': student.class_level.name if student.class_level else 'Not Assigned',
+                    'class_level_id': student.class_level.id if student.class_level else None,
+                    'stream': student.stream_class.stream_letter if student.stream_class else 'No Stream',
+                    'stream_id': student.stream_class.id if student.stream_class else None,
+                    'combination': student.combination.code if student.combination else None,
+                }),
+                
+                # Column 3: Academic Year (JSON)
+                json.dumps({
+                    'academic_year': student.academic_year.name if student.academic_year else 'Not Set',
+                    'academic_year_id': student.academic_year.id if student.academic_year else None,
+                    'admission_year': student.admission_year,
+                }),
+                
+                # Column 4: Contact (JSON)
+                json.dumps({
+                    'parent_name': primary_parent.full_name if primary_parent else None,
+                    'parent_phone': primary_parent.first_phone_number if primary_parent else None,
+                    'parent_email': primary_parent.email if primary_parent else None,
+                    'relationship': primary_parent.relationship if primary_parent else None,
+                }),
+                
+                # Column 5: Status (JSON)
+                json.dumps({
+                    'status': student.status,
+                    'status_display': student.get_status_display(),
+                    'updated_at': student.updated_at.strftime('%d %b %Y'),
+                }),
+                
+                # Column 6: Actions (student ID)
+                student.id,
+            ]
+            data.append(row_data)
+        
+        # Return JSON response
+        return JsonResponse({
+            'draw': draw,
+            'recordsTotal': total_records,
+            'recordsFiltered': filtered_count,
+            'data': data,
+        })
+        
+    except Exception as e:
+        # Log the error
+        print(f"Error in students_api: {str(e)}")
+        return JsonResponse({
+            'draw': draw if 'draw' in locals() else 1,
+            'recordsTotal': 0,
+            'recordsFiltered': 0,
+            'data': [],
+            'error': str(e)
+        }, status=500)
+
+
+
+
+@login_required
+@require_GET
+def statistics_api(request):
+    """
+    API endpoint to get statistics based on current filters
+    """
+    try:
+        # Get filter values
+        class_level_id = request.GET.get('class_level', '')
+        stream_id = request.GET.get('stream', '')
+        academic_year_id = request.GET.get('academic_year', '')
+        status_filter = request.GET.get('status', '')
+        gender_filter = request.GET.get('gender', '')
+        search_value = request.GET.get('search', '')
+        
+        # Base queryset
+        students = Student.objects.filter(is_active=True)
+        
+        # Apply filters
+        if class_level_id:
+            students = students.filter(class_level_id=class_level_id)
+        
+        if stream_id:
+            students = students.filter(stream_class_id=stream_id)
+        
+        if academic_year_id:
+            students = students.filter(academic_year_id=academic_year_id)
+        
+        if status_filter:
+            students = students.filter(status=status_filter)
+        
+        if gender_filter:
+            students = students.filter(gender=gender_filter)
+        
+        if search_value:
+            students = students.annotate(
+                full_name_search=Concat(
+                    'first_name', Value(' '), 'middle_name', Value(' '), 'last_name',
+                    output_field=CharField()
+                )
+            ).filter(
+                Q(full_name_search__icontains=search_value) |
+                Q(registration_number__icontains=search_value) |
+                Q(examination_number__icontains=search_value) |
+                Q(parents__full_name__icontains=search_value) |
+                Q(parents__first_phone_number__icontains=search_value)
+            ).distinct()
+        
+        # Calculate statistics
+        total_students = students.count()
+        active_students = students.filter(status='active').count()
+        male_students = students.filter(gender='male').count()
+        female_students = students.filter(gender='female').count()
+        
+        return JsonResponse({
+            'success': True,
+            'statistics': {
+                'total': total_students,
+                'active': active_students,
+                'male': male_students,
+                'female': female_students,
+            }
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        })
+
+@login_required
+def export_students_excel(request):
+    """
+    Export students to Excel using openpyxl
+    Supports filtering based on current filters
+    """
+    try:
+        # Get filter parameters from request
+        class_level_id = request.GET.get('class_level', '')
+        stream_id = request.GET.get('stream', '')
+        academic_year_id = request.GET.get('academic_year', '')
+        status_filter = request.GET.get('status', '')
+        gender_filter = request.GET.get('gender', '')
+        search_query = request.GET.get('search', '')
+        
+        # Base queryset with optimized selects
+        students = Student.objects.filter(is_active=True).select_related(
+            'class_level',
+            'stream_class',
+            'academic_year',
+            'combination'
+        ).prefetch_related('parents').order_by('class_level__order', 'first_name')
+        
+        # Apply filters
+        if class_level_id:
+            students = students.filter(class_level_id=class_level_id)
+        
+        if stream_id:
+            students = students.filter(stream_class_id=stream_id)
+        
+        if academic_year_id:
+            students = students.filter(academic_year_id=academic_year_id)
+        
+        if status_filter:
+            students = students.filter(status=status_filter)
+        
+        if gender_filter:
+            students = students.filter(gender=gender_filter)
+        
         if search_query:
-            # Create a search vector for better performance
             students = students.annotate(
                 full_name_search=Concat(
                     'first_name', Value(' '), 'middle_name', Value(' '), 'last_name',
@@ -3617,103 +3847,254 @@ def students_by_class(request):
             ).filter(
                 Q(full_name_search__icontains=search_query) |
                 Q(registration_number__icontains=search_query) |
-                Q(examination_number__icontains=search_query) |
-                Q(parents__full_name__icontains=search_query) |
-                Q(parents__first_phone_number__icontains=search_query)
+                Q(parents__full_name__icontains=search_query)
             ).distinct()
         
-        # Date range filter
-        date_from = form.cleaned_data.get('date_from')
-        if date_from:
-            students = students.filter(created_at__date__gte=date_from)
+        # Create a new workbook
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "Students List"
         
-        date_to = form.cleaned_data.get('date_to')
-        if date_to:
-            students = students.filter(created_at__date__lte=date_to)
-    
-    # Get streams for selected class
-    streams = []
-    selected_class = form.cleaned_data.get('class_level') if form.is_valid() else None
-    if selected_class:
-        streams = StreamClass.objects.filter(
-            class_level=selected_class,
-            is_active=True
-        ).order_by('stream_letter')
-    
-    # Get statistics - optimized with single query where possible
-    stats_query = Student.objects.filter(is_active=True)
-    
-    # Apply same filters to statistics
-    if form.is_valid():
-        if selected_class:
-            stats_query = stats_query.filter(class_level=selected_class)
+        # Define styles
+        header_font = Font(name='Calibri', size=12, bold=True, color='FFFFFF')
+        header_fill = PatternFill(start_color='4F81BD', end_color='4F81BD', fill_type='solid')
+        header_alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
         
-        status = form.cleaned_data.get('status')
-        if status:
-            stats_query = stats_query.filter(status=status)
+        cell_font = Font(name='Calibri', size=11)
+        cell_alignment = Alignment(horizontal='left', vertical='center', wrap_text=True)
+        cell_border = Border(
+            left=Side(style='thin', color='000000'),
+            right=Side(style='thin', color='000000'),
+            top=Side(style='thin', color='000000'),
+            bottom=Side(style='thin', color='000000')
+        )
         
-        gender = form.cleaned_data.get('gender')
-        if gender:
-            stats_query = stats_query.filter(gender=gender)
-    
-    # Get statistics counts
-    total_students = stats_query.count()
-    active_students = stats_query.filter(status='active').count()
-    male_students = stats_query.filter(gender='male').count()
-    female_students = stats_query.filter(gender='female').count()
-    
-    # Count classes with students (optimized)
-    if form.is_valid() and selected_class:
-        classes_with_students = 1
-    else:
-        classes_with_students = ClassLevel.objects.filter(
-            is_active=True,
-            students__is_active=True
-        ).distinct().count()
-    
-    # Pagination
-    page_size = int(request.GET.get('page_size', 25))
-    paginator = Paginator(students, page_size)
-    page_number = request.GET.get('page', 1)
-    page_obj = paginator.get_page(page_number)
-    
-    # Get selected class and stream objects
-    selected_class_obj = selected_class
-    selected_stream_obj = form.cleaned_data.get('stream') if form.is_valid() else None
-    
-    # Prepare context
-    context = {
-        'form': form,
-        'class_levels': class_levels,
-        'students': page_obj,
-        'selected_class': selected_class.id if selected_class else '',
-        'selected_class_obj': selected_class_obj,
-        'selected_stream': selected_stream_obj.id if selected_stream_obj else '',
-        'selected_status': form.cleaned_data.get('status', '') if form.is_valid() else '',
-        'selected_gender': form.cleaned_data.get('gender', '') if form.is_valid() else '',
-        'search_query': form.cleaned_data.get('search', '') if form.is_valid() else '',
-        'date_from': form.cleaned_data.get('date_from', '') if form.is_valid() else '',
-        'date_to': form.cleaned_data.get('date_to', '') if form.is_valid() else '',
-        'page_size': str(page_size),
-        'streams': streams,
+        # Define headers
+        headers = [
+            'S/N', 'Registration No.', 'Full Name', 'Gender', 'Date of Birth',
+            'Class', 'Stream', 'Combination', 'Academic Year', 'Admission Year',
+            'Parent Name', 'Parent Phone', 'Parent Email', 'Relationship',
+            'Status', 'Address', 'Examination No.'
+        ]
         
-        # Statistics
-        'total_students': total_students,
-        'active_students': active_students,
-        'male_students': male_students,
-        'female_students': female_students,
-        'classes_with_students': classes_with_students,
+        # Write headers
+        for col_num, header in enumerate(headers, 1):
+            cell = ws.cell(row=1, column=col_num)
+            cell.value = header
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.alignment = header_alignment
+            cell.border = cell_border
         
-        # Choices for filters
-        'status_choices': STATUS_CHOICES,
-        'gender_choices': GENDER_CHOICES,
+        # Write data rows
+        for row_num, student in enumerate(students, 2):
+            primary_parent = student.parents.first()
+            
+            # Row data
+            row_data = [
+                row_num - 1,  # S/N
+                student.registration_number or 'N/A',
+                student.full_name,
+                student.get_gender_display() if student.gender else 'N/A',
+                student.date_of_birth.strftime('%d-%m-%Y') if student.date_of_birth else 'N/A',
+                student.class_level.name if student.class_level else 'Not Assigned',
+                student.stream_class.stream_letter if student.stream_class else 'No Stream',
+                student.combination.code if student.combination else 'N/A',
+                student.academic_year.name if student.academic_year else 'Not Set',
+                student.admission_year or 'N/A',
+                primary_parent.full_name if primary_parent else 'No Parent',
+                primary_parent.first_phone_number if primary_parent else 'N/A',
+                primary_parent.email if primary_parent else 'N/A',
+                primary_parent.relationship if primary_parent else 'N/A',
+                student.get_status_display(),
+                student.address or 'N/A',
+                student.examination_number or 'N/A',
+            ]
+            
+            # Write cells
+            for col_num, value in enumerate(row_data, 1):
+                cell = ws.cell(row=row_num, column=col_num)
+                cell.value = value
+                cell.font = cell_font
+                cell.alignment = cell_alignment
+                cell.border = cell_border
         
-        # Page title
-        'page_title': 'Students by Class',
-    }
+        # Auto-adjust column widths
+        for col_num in range(1, len(headers) + 1):
+            column_letter = get_column_letter(col_num)
+            max_length = 0
+            
+            # Check header length
+            if len(headers[col_num-1]) > max_length:
+                max_length = len(headers[col_num-1])
+            
+            # Check data length in this column
+            for row_num in range(2, len(students) + 2):
+                cell_value = ws.cell(row=row_num, column=col_num).value
+                if cell_value and len(str(cell_value)) > max_length:
+                    max_length = len(str(cell_value))
+            
+            # Set column width (with some padding)
+            adjusted_width = min(max_length + 5, 50)  # Max width 50
+            ws.column_dimensions[column_letter].width = adjusted_width
+        
+        # Add summary row
+        summary_row = len(students) + 3
+        ws.cell(row=summary_row, column=1, value=f"Total Students: {len(students)}")
+        ws.cell(row=summary_row, column=1).font = Font(bold=True)
+        
+        # Create the HttpResponse
+        response = HttpResponse(
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        
+        # Generate filename with filters
+        filename = 'students_list'
+        if class_level_id:
+            class_name = ClassLevel.objects.get(id=class_level_id).name
+            filename += f'_{class_name}'
+        if status_filter:
+            filename += f'_{status_filter}'
+        filename += f'_{timezone.now().strftime("%Y%m%d_%H%M%S")}.xlsx'
+        
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        
+        # Save workbook to response
+        wb.save(response)
+        
+        return response
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'Error generating Excel file: {str(e)}'
+        }, status=500)
     
-    return render(request, 'admin/students/students_by_class.html', context)
 
+
+@login_required
+def export_students_pdf(request):
+    """
+    Export students to PDF using WeasyPrint
+    Supports filtering based on current filters
+    """
+    try:
+        # Get filter parameters from request
+        class_level_id = request.GET.get('class_level', '')
+        stream_id = request.GET.get('stream', '')
+        academic_year_id = request.GET.get('academic_year', '')
+        status_filter = request.GET.get('status', '')
+        gender_filter = request.GET.get('gender', '')
+        search_query = request.GET.get('search', '')
+        
+        # Base queryset with optimized selects
+        students = Student.objects.filter(is_active=True).select_related(
+            'class_level',
+            'stream_class',
+            'academic_year',
+            'combination'
+        ).prefetch_related('parents').order_by('class_level__order', 'first_name')
+        
+        # Apply filters
+        if class_level_id:
+            students = students.filter(class_level_id=class_level_id)
+        
+        if stream_id:
+            students = students.filter(stream_class_id=stream_id)
+        
+        if academic_year_id:
+            students = students.filter(academic_year_id=academic_year_id)
+        
+        if status_filter:
+            students = students.filter(status=status_filter)
+        
+        if gender_filter:
+            students = students.filter(gender=gender_filter)
+        
+        if search_query:
+            students = students.annotate(
+                full_name_search=Concat(
+                    'first_name', Value(' '), 'middle_name', Value(' '), 'last_name',
+                    output_field=CharField()
+                )
+            ).filter(
+                Q(full_name_search__icontains=search_query) |
+                Q(registration_number__icontains=search_query) |
+                Q(parents__full_name__icontains=search_query)
+            ).distinct()
+        
+        # Get filter display names for header
+        filter_info = {}
+        if class_level_id:
+            class_level = ClassLevel.objects.get(id=class_level_id)
+            filter_info['class'] = class_level.name
+        if stream_id:
+            stream = StreamClass.objects.get(id=stream_id)
+            filter_info['stream'] = stream.stream_letter
+        if academic_year_id:
+            year = AcademicYear.objects.get(id=academic_year_id)
+            filter_info['academic_year'] = year.name
+        if status_filter:
+            filter_info['status'] = dict(STATUS_CHOICES).get(status_filter, status_filter)
+        if gender_filter:
+            filter_info['gender'] = dict(GENDER_CHOICES).get(gender_filter, gender_filter)
+        
+        # Get statistics
+        total_students = students.count()
+        male_students = students.filter(gender='male').count()
+        female_students = students.filter(gender='female').count()
+        active_students = students.filter(status='active').count()
+        
+        # Prepare context for template
+        context = {
+            'students': students,
+            'filter_info': filter_info,
+            'total_students': total_students,
+            'male_students': male_students,
+            'female_students': female_students,
+            'active_students': active_students,
+            'generated_date': timezone.now(),
+            'generated_by': request.user.get_full_name() or request.user.username,
+            'request': request,
+        }
+        
+        # Render HTML template
+        html_string = render_to_string('admin/students/students_pdf.html', context)
+        
+        # Create PDF
+        font_config = FontConfiguration()
+        html = HTML(string=html_string, base_url=request.build_absolute_uri())
+        
+        # Generate PDF
+        pdf_file = html.write_pdf(
+            font_config=font_config,
+            presentational_hints=True  # Better CSS support
+        )
+        
+        # Create response
+        response = HttpResponse(pdf_file, content_type='application/pdf')
+        
+        # Generate filename with filters
+        filename = 'students_list'
+        if class_level_id:
+            class_name = ClassLevel.objects.get(id=class_level_id).name
+            filename += f'_{class_name}'
+        if status_filter:
+            filename += f'_{status_filter}'
+        filename += f'_{timezone.now().strftime("%Y%m%d_%H%M%S")}.pdf'
+        
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        response['Content-Length'] = len(pdf_file)
+        
+        return response
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'Error generating PDF file: {str(e)}'
+        }, status=500)
+
+        
 
 # Additional helper functions for bulk operations
 @login_required

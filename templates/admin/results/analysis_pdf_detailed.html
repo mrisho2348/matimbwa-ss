@@ -75,41 +75,49 @@
             border-left: 3px solid #3498db;
         }
         
-        .summary-section {
-            display: grid;
-            grid-template-columns: repeat(5, 1fr);
-            gap: 8px;
+        /* Filter Info Styles */
+        .filter-info {
             margin-bottom: 15px;
-            page-break-inside: avoid;
-        }
-        
-        .summary-card {
-            background-color: white;
+            padding: 6px 10px;
+            background-color: #e7f3ff;
             border-radius: 4px;
-            padding: 8px;
-            border: 1px solid #dee2e6;
-            text-align: center;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-        }
-        
-        .summary-label {
+            border-left: 4px solid #007bff;
             font-size: 7px;
-            color: #6c757d;
-            margin-bottom: 3px;
-            text-transform: uppercase;
-            letter-spacing: 0.3px;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 10px;
         }
         
-        .summary-value {
-            font-size: 12px;
-            font-weight: bold;
-            color: #2c3e50;
-            margin-bottom: 2px;
-        }
-        
-        .summary-subtext {
+        .filter-tag {
+            display: inline-block;
+            padding: 3px 8px;
+            background-color: #007bff;
+            color: white;
+            border-radius: 12px;
             font-size: 6px;
-            color: #888;
+            font-weight: bold;
+            margin-right: 5px;
+        }
+        
+        .filter-clear {
+            display: inline-block;
+            padding: 3px 8px;
+            background-color: #6c757d;
+            color: white;
+            border-radius: 12px;
+            font-size: 6px;
+        }
+        
+        .filter-label {
+            font-weight: bold;
+            color: #495057;
+            margin-right: 5px;
+        }
+        
+        .filter-value {
+            font-weight: bold;
+            color: #007bff;
         }
         
         .detailed-table {
@@ -143,19 +151,14 @@
             background-color: #f8f9fa;
         }
         
-        .detailed-table tr:hover {
-            background-color: #e9ecef;
-        }
-        
-        /* Column widths */
         .rank-col { width: 30px; text-align: center; }
         .reg-col { width: 70px; }
         .name-col { width: 100px; }
         .gender-col { width: 40px; text-align: center; }
         .division-col { width: 60px; text-align: center; }
+        .grade-col { width: 40px; text-align: center; }
         .marks-col { width: 50px; text-align: center; }
         .percentage-col { width: 50px; text-align: center; }
-        .grade-col { width: 40px; text-align: center; }
         .points-col { width: 50px; text-align: center; }
         .total-col { width: 50px; text-align: center; }
         .status-col { width: 60px; text-align: center; }
@@ -209,6 +212,25 @@
         .division-III { background-color: #ffc107; color: #212529; }
         .division-IV { background-color: #fd7e14; color: white; }
         .division-0 { background-color: #dc3545; color: white; }
+        .division-Not-Assigned { background-color: #6c757d; color: white; }
+        
+        .grade-badge {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 8px;
+            font-size: 6px;
+            font-weight: bold;
+            min-width: 30px;
+            text-align: center;
+            color: white;
+        }
+        .grade-A { background-color: #28a745; }
+        .grade-B { background-color: #17a2b8; }
+        .grade-C { background-color: #ffc107; color: #212529; }
+        .grade-D { background-color: #fd7e14; }
+        .grade-E { background-color: #6c757d; }
+        .grade-F { background-color: #dc3545; }
+        .grade-S { background-color: #6610f2; }
         
         .percentage-badge {
             display: inline-block;
@@ -220,23 +242,12 @@
             text-align: center;
         }
         
-        .percentage-A { background-color: #28a745; color: white; }      /* 90-100% */
-        .percentage-B { background-color: #20c997; color: white; }      /* 80-89% */
-        .percentage-C { background-color: #17a2b8; color: white; }      /* 70-79% */
-        .percentage-D { background-color: #ffc107; color: #212529; }    /* 60-69% */
-        .percentage-E { background-color: #fd7e14; color: white; }      /* 50-59% */
-        .percentage-F { background-color: #dc3545; color: white; }      /* 0-49% */
-        
-        .grade-badge {
-            display: inline-block;
-            padding: 2px 6px;
-            border-radius: 4px;
-            background-color: #6c757d;
-            color: white;
-            font-size: 7px;
-            font-weight: bold;
-            min-width: 20px;
-        }
+        .percentage-A { background-color: #28a745; color: white; }
+        .percentage-B { background-color: #20c997; color: white; }
+        .percentage-C { background-color: #17a2b8; color: white; }
+        .percentage-D { background-color: #ffc107; color: #212529; }
+        .percentage-E { background-color: #fd7e14; color: white; }
+        .percentage-F { background-color: #dc3545; color: white; }
         
         .status-badge {
             display: inline-block;
@@ -252,54 +263,114 @@
         .status-below { background-color: #fd7e14; color: white; }
         .status-poor { background-color: #dc3545; color: white; }
         
-        .highlight-cell {
-            font-weight: bold;
-        }
-        
-        .section-break {
-            page-break-before: always;
-            margin-top: 20px;
-        }
-        
-        .analysis-section {
-            margin: 15px 0;
-            padding: 10px;
-            background-color: #f8f9fa;
-            border-radius: 5px;
-            border: 1px solid #dee2e6;
+        /* Distribution Section Styles */
+        .distribution-section {
+            margin-bottom: 20px;
             page-break-inside: avoid;
         }
         
-        .analysis-title {
-            font-size: 9px;
+        .section-title {
+            font-size: 10px;
             font-weight: bold;
-            margin-bottom: 8px;
-            color: #495057;
-            border-bottom: 1px solid #dee2e6;
-            padding-bottom: 4px;
+            background: linear-gradient(to right, #f8f9fa, #e9ecef);
+            padding: 6px 10px;
+            border-left: 4px solid #3498db;
+            margin-bottom: 12px;
+            border-radius: 4px 0 0 4px;
         }
         
-        .analysis-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 10px;
-        }
-        
-        .analysis-item {
-            margin-bottom: 6px;
-        }
-        
-        .analysis-label {
+        /* Matrix Table Styles */
+        .matrix-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 15px;
             font-size: 7px;
-            color: #6c757d;
-            margin-bottom: 2px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            border-radius: 6px;
+            overflow: hidden;
         }
         
-        .analysis-value {
-            font-size: 8px;
+        .matrix-table th {
+            background: linear-gradient(135deg, #495057, #343a40);
+            color: white;
+            border: 1px solid #2c3e50;
+            padding: 8px 6px;
+            text-align: center;
             font-weight: bold;
-            color: #2c3e50;
+            font-size: 7px;
         }
+        
+        .matrix-table td {
+            border: 1px solid #dee2e6;
+            padding: 6px 4px;
+            text-align: center;
+            vertical-align: middle;
+        }
+        
+        .matrix-table tr:nth-child(even) {
+            background-color: #f8f9fa;
+        }
+        
+        .matrix-table tr:hover {
+            background-color: #e9ecef;
+        }
+        
+        .matrix-table td:first-child {
+            font-weight: bold;
+            background: linear-gradient(to right, #f8f9fa, #e9ecef);
+            text-align: left;
+            padding-left: 8px;
+        }
+        
+        .total-row {
+            background: linear-gradient(135deg, #e9ecef, #dee2e6) !important;
+            font-weight: bold;
+            border-top: 2px solid #495057;
+        }
+        
+        .total-row td {
+            font-weight: 700;
+        }
+        
+        .gender-total {
+            background-color: #cce5ff !important;
+            font-weight: 700;
+            border-left: 2px solid #004085;
+        }
+        
+        .grand-total {
+            background: linear-gradient(135deg, #ffd54f, #ffb300) !important;
+            font-weight: 700;
+            color: #212529;
+        }
+        
+        .zero-value {
+            color: #6c757d;
+            font-style: italic;
+        }
+        
+        .matrix-caption {
+            margin-top: 5px;
+            font-size: 6px;
+            color: #6c757d;
+            text-align: center;
+            font-style: italic;
+            padding: 4px;
+            background-color: #f8f9fa;
+            border-radius: 4px;
+        }
+        
+        .gender-badge {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 10px;
+            font-size: 6px;
+            font-weight: bold;
+            color: white;
+        }
+        .gender-male { background-color: #007bff; }
+        .gender-female { background-color: #e83e8c; }
+        .gender-other { background-color: #6c757d; }
         
         .footer {
             margin-top: 15px;
@@ -318,23 +389,19 @@
         .text-right { text-align: right; }
         .text-bold { font-weight: bold; }
         .text-muted { color: #6c757d; }
-        .text-success { color: #28a745; }
-        .text-danger { color: #dc3545; }
-        .text-warning { color: #ffc107; }
         
-        /* Print optimizations */
+        .band-1 { background-color: #e8f5e9; }
+        .band-2 { background-color: #e3f2fd; }
+        .band-3 { background-color: #fff3e0; }
+        .band-4 { background-color: #ffebee; }
+        .band-5 { background-color: #f5f5f5; }
+        
         @media print {
-            .no-print { display: none; }
             .detailed-table { font-size: 7px; }
             .detailed-table th, .detailed-table td { padding: 3px; }
+            .matrix-table { font-size: 7px; }
+            .matrix-table th, .matrix-table td { padding: 4px; }
         }
-        
-        /* Performance bands */
-        .band-1 { background-color: #e8f5e9; }  /* Top 10% */
-        .band-2 { background-color: #e3f2fd; }  /* Next 20% */
-        .band-3 { background-color: #fff3e0; }  /* Middle 40% */
-        .band-4 { background-color: #ffebee; }  /* Next 20% */
-        .band-5 { background-color: #f5f5f5; }  /* Bottom 10% */
     </style>
 </head>
 <body>
@@ -349,6 +416,9 @@
         <div class="session-info">
             Class: {{ exam_session.class_level.name }}
             {% if exam_session.stream_class %} | Stream: {{ exam_session.stream_class.stream_letter }}{% endif %}
+            <span class="badge" style="background-color: #6c757d; color: white; padding: 2px 6px; border-radius: 10px; margin-left: 5px;">
+                {{ exam_session.class_level.educational_level.name }}
+            </span>
         </div>
         <div class="section-details">
             Academic Year: {{ exam_session.academic_year.name }} | 
@@ -358,188 +428,48 @@
         </div>
     </div>
     
-    <!-- Summary Statistics -->
-    <div class="summary-section">
-        <div class="summary-card">
-            <div class="summary-label">Total Students</div>
-            <div class="summary-value">{{ total_students }}</div>
-            <div class="summary-subtext">In this exam session</div>
-        </div>
+    <!-- Filter Information Section -->
+    <div class="filter-info">
+        <span style="font-weight: bold; color: #007bff;"><i class="fas fa-filter"></i> Active Filters:</span>
         
-        <div class="summary-card">
-            <div class="summary-label">Ranked</div>
-            <div class="summary-value">{{ student_data|length }}</div>
-            <div class="summary-subtext">Students with ranking</div>
-        </div>
+        {% if not is_primary_nursery and division_filter %}
+        <span class="filter-tag">
+            <i class="fas fa-tag"></i> Division: {{ division_filter }}
+        </span>
+        {% endif %}
         
-        <div class="summary-card">
-            <div class="summary-label">Class Average</div>
-            <div class="summary-value">
-                {% with total=0 count=0 %}
-                    {% for student in student_data %}
-                        {% if student.average_marks %}
-                            {{ total|add:student.average_marks }}
-                            {{ count|add:1 }}
-                        {% endif %}
-                    {% endfor %}
-                    {% if count > 0 %}
-                        {{ total|div:count|floatformat:1 }}
-                    {% else %}
-                        -
-                    {% endif %}
-                {% endwith %}
-            </div>
-            <div class="summary-subtext">Average marks</div>
-        </div>
+        {% if is_primary_nursery and grade_filter %}
+        <span class="filter-tag">
+            <i class="fas fa-star"></i> Grade: {{ grade_filter }}
+        </span>
+        {% endif %}
         
-        <div class="summary-card">
-            <div class="summary-label">Top Performer</div>
-            <div class="summary-value">
-                {% if student_data %}
-                    {{ student_data.0.average_marks|floatformat:1 }}
-                {% else %}
-                    -
-                {% endif %}
-            </div>
-            <div class="summary-subtext">
-                {% if student_data %}
-                    Rank #{{ student_data.0.rank }}
-                {% endif %}
-            </div>
-        </div>
+        {% if gender_filter %}
+        <span class="filter-tag">
+            <i class="fas fa-venus-mars"></i> Gender: {{ gender_filter }}
+        </span>
+        {% endif %}
         
-        <div class="summary-card">
-            <div class="summary-label">Pass Rate</div>
-            <div class="summary-value">
-                {% with passed=0 total=0 %}
-                    {% for student in student_data %}
-                        {% if student.average_percentage %}
-                            {{ total|add:1 }}
-                            {% if student.average_percentage >= 40 %}
-                                {{ passed|add:1 }}
-                            {% endif %}
-                        {% endif %}
-                    {% endfor %}
-                    {% if total > 0 %}
-                        {% widthratio passed total 100 %}%
-                    {% else %}
-                        -
-                    {% endif %}
-                {% endwith %}
-            </div>
-            <div class="summary-subtext">≥ 40% average</div>
-        </div>
+        {% if rank_filter == 'top' %}
+        <span class="filter-tag">
+            <i class="fas fa-arrow-up"></i> Top {{ top_n }} Students
+        </span>
+        {% elif rank_filter == 'bottom' %}
+        <span class="filter-tag">
+            <i class="fas fa-arrow-down"></i> Bottom {{ bottom_n }} Students
+        </span>
+        {% endif %}
+        
+        {% if not division_filter and not grade_filter and not gender_filter and not rank_filter %}
+        <span style="font-weight: bold; color: #6c757d;"><i class="fas fa-info-circle"></i> No filters applied</span>
+        {% endif %}
+        
+        <span style="margin-left: auto; background-color: #28a745; color: white; padding: 3px 8px; border-radius: 12px;">
+            <i class="fas fa-users"></i> Showing: {{ student_data|length }} of {{ total_students_all }} students
+        </span>
     </div>
     
-    <!-- Quick Analysis -->
-    <div class="analysis-section">
-        <div class="analysis-title">📊 Performance Overview</div>
-        <div class="analysis-grid">
-            <div class="analysis-item">
-                <div class="analysis-label">Performance Distribution</div>
-                <div class="analysis-value">
-                    {% with excellent=0 good=0 average=0 below=0 poor=0 %}
-                        {% for student in student_data %}
-                            {% if student.average_percentage %}
-                                {% if student.average_percentage >= 80 %}
-                                    {{ excellent|add:1 }}
-                                {% elif student.average_percentage >= 70 %}
-                                    {{ good|add:1 }}
-                                {% elif student.average_percentage >= 60 %}
-                                    {{ average|add:1 }}
-                                {% elif student.average_percentage >= 50 %}
-                                    {{ below|add:1 }}
-                                {% else %}
-                                    {{ poor|add:1 }}
-                                {% endif %}
-                            {% endif %}
-                        {% endfor %}
-                        E:{{ excellent }} G:{{ good }} A:{{ average }} B:{{ below }} P:{{ poor }}
-                    {% endwith %}
-                </div>
-            </div>
-            
-            <div class="analysis-item">
-                <div class="analysis-label">Division Breakdown</div>
-                <div class="analysis-value">
-                    {% with div1=0 div2=0 div3=0 div4=0 div0=0 %}
-                        {% for student in student_data %}
-                            {% if student.division %}
-                                {% if student.division == 'I' %}
-                                    {{ div1|add:1 }}
-                                {% elif student.division == 'II' %}
-                                    {{ div2|add:1 }}
-                                {% elif student.division == 'III' %}
-                                    {{ div3|add:1 }}
-                                {% elif student.division == 'IV' %}
-                                    {{ div4|add:1 }}
-                                {% else %}
-                                    {{ div0|add:1 }}
-                                {% endif %}
-                            {% endif %}
-                        {% endfor %}
-                        I:{{ div1 }} II:{{ div2 }} III:{{ div3 }} IV:{{ div4 }} U:{{ div0 }}
-                    {% endwith %}
-                </div>
-            </div>
-            
-            <div class="analysis-item">
-                <div class="analysis-label">Gender Performance</div>
-                <div class="analysis-value">
-                    {% with male_avg=0 male_count=0 female_avg=0 female_count=0 %}
-                        {% for student in student_data %}
-                            {% if student.average_marks %}
-                                {% if student.gender == 'Male' or student.gender == 'M' %}
-                                    {{ male_avg|add:student.average_marks }}
-                                    {{ male_count|add:1 }}
-                                {% elif student.gender == 'Female' or student.gender == 'F' %}
-                                    {{ female_avg|add:student.average_marks }}
-                                    {{ female_count|add:1 }}
-                                {% endif %}
-                            {% endif %}
-                        {% endfor %}
-                        M:{% if male_count > 0 %}{{ male_avg|div:male_count|floatformat:1 }}{% else %}-{% endif %} 
-                        F:{% if female_count > 0 %}{{ female_avg|div:female_count|floatformat:1 }}{% else %}-{% endif %}
-                    {% endwith %}
-                </div>
-            </div>
-            
-            <div class="analysis-item">
-                <div class="analysis-label">Grade Points Range</div>
-                <div class="analysis-value">
-                    {% with min_points=100 max_points=0 %}
-                        {% for student in student_data %}
-                            {% if student.total_grade_points %}
-                                {% if student.total_grade_points < min_points %}
-                                    {{ student.total_grade_points }}
-                                {% endif %}
-                                {% if student.total_grade_points > max_points %}
-                                    {{ student.total_grade_points }}
-                                {% endif %}
-                            {% endif %}
-                        {% endfor %}
-                        {% if max_points > 0 %}
-                            {{ min_points|floatformat:1 }} - {{ max_points|floatformat:1 }}
-                        {% else %}
-                            -
-                        {% endif %}
-                    {% endwith %}
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <!-- Performance Bands Key -->
-    <div style="margin-bottom: 10px; font-size: 7px;">
-        <strong>Performance Bands:</strong>
-        <span style="background-color: #e8f5e9; padding: 1px 4px; margin: 0 2px;">Top 10%</span>
-        <span style="background-color: #e3f2fd; padding: 1px 4px; margin: 0 2px;">Next 20%</span>
-        <span style="background-color: #fff3e0; padding: 1px 4px; margin: 0 2px;">Middle 40%</span>
-        <span style="background-color: #ffebee; padding: 1px 4px; margin: 0 2px;">Next 20%</span>
-        <span style="background-color: #f5f5f5; padding: 1px 4px; margin: 0 2px;">Bottom 10%</span>
-    </div>
-    
-    <!-- Detailed Student Table -->
+    <!-- Detailed Student Table - CONDITIONAL COLUMNS -->
     <table class="detailed-table">
         <thead>
             <tr>
@@ -547,19 +477,33 @@
                 <th class="reg-col">Reg No.</th>
                 <th class="name-col">Student Name</th>
                 <th class="gender-col">Gender</th>
-                <th class="division-col">Division</th>
+                
+                {% if not is_primary_nursery %}
+                    <th class="division-col">Division</th>
+                {% endif %}
+                
+                {% if is_primary_nursery %}
+                    <th class="grade-col">Grade</th>
+                {% endif %}
+                
                 <th class="marks-col">Avg Marks</th>
                 <th class="percentage-col">Avg %</th>
-                <th class="grade-col">Grade</th>
-                <th class="points-col">Points</th>
+                
+                {% if not is_primary_nursery %}
+                    <th class="grade-col">Grade</th>
+                    <th class="points-col">Points</th>
+                {% endif %}
+                
                 <th class="total-col">Total</th>
                 <th class="status-col">Status</th>
             </tr>
         </thead>
         <tbody>
             {% for student in student_data %}
-            {% with performance_band=student.rank|div:student_data|length|mul:100 %}
-            <tr class="band-{% if performance_band <= 10 %}1{% elif performance_band <= 30 %}2{% elif performance_band <= 70 %}3{% elif performance_band <= 90 %}4{% else %}5{% endif %}">
+            {% with student_rank=student.rank|default:0 %}
+            {% with total_students_count=student_data|length %}
+            {% with percentile=student_rank|div:total_students_count|mul:100 %}
+            <tr class="band-{% if percentile <= 10 %}1{% elif percentile <= 30 %}2{% elif percentile <= 70 %}3{% elif percentile <= 90 %}4{% else %}5{% endif %}">
                 <!-- Rank -->
                 <td class="rank-col">
                     <span class="rank-badge 
@@ -568,30 +512,31 @@
                         {% elif student.rank == 3 %}rank-3
                         {% elif student.rank <= 10 %}rank-top10
                         {% elif student.rank <= 25 %}rank-top25
-                        {% elif performance_band <= 70 %}rank-mid
+                        {% elif percentile <= 70 %}rank-mid
                         {% else %}rank-bottom{% endif %}">
-                        {{ student.rank }}
+                        {{ student.rank|default:"-" }}
                     </span>
                 </td>
                 
                 <!-- Registration Number -->
                 <td class="reg-col">
-                    <div class="text-bold">{{ student.registration_number }}</div>
+                    <div class="text-bold">{{ student.registration_number|default:"-" }}</div>
                 </td>
                 
                 <!-- Student Name -->
                 <td class="name-col">
-                    {{ student.full_name|truncatechars:20 }}
+                    {{ student.full_name|truncatechars:20|default:"-" }}
                 </td>
                 
                 <!-- Gender -->
                 <td class="gender-col">
                     <span class="gender-icon gender-{{ student.gender|slice:':1' }}">
-                        {{ student.gender|slice:':1' }}
+                        {{ student.gender|slice:':1'|default:"-" }}
                     </span>
                 </td>
                 
-                <!-- Division -->
+                <!-- Division Column - Only for Secondary -->
+                {% if not is_primary_nursery %}
                 <td class="division-col">
                     {% if student.division %}
                         <span class="division-badge division-{{ student.division }}">
@@ -601,6 +546,20 @@
                         <span class="text-muted">-</span>
                     {% endif %}
                 </td>
+                {% endif %}
+                
+                <!-- Grade Column - Only for Primary/Nursery -->
+                {% if is_primary_nursery %}
+                <td class="grade-col">
+                    {% if student.average_grade %}
+                        <span class="grade-badge grade-{{ student.average_grade }}">
+                            {{ student.average_grade }}
+                        </span>
+                    {% else %}
+                        <span class="text-muted">-</span>
+                    {% endif %}
+                </td>
+                {% endif %}
                 
                 <!-- Average Marks -->
                 <td class="marks-col highlight-cell">
@@ -628,7 +587,8 @@
                     {% endif %}
                 </td>
                 
-                <!-- Average Grade -->
+                <!-- Grade Column & Points - Only for Secondary -->
+                {% if not is_primary_nursery %}
                 <td class="grade-col">
                     {% if student.average_grade %}
                         <span class="grade-badge">{{ student.average_grade }}</span>
@@ -636,8 +596,6 @@
                         <span class="text-muted">-</span>
                     {% endif %}
                 </td>
-                
-                <!-- Grade Points -->
                 <td class="points-col">
                     {% if student.total_grade_points %}
                         {{ student.total_grade_points|floatformat:1 }}
@@ -645,6 +603,7 @@
                         <span class="text-muted">-</span>
                     {% endif %}
                 </td>
+                {% endif %}
                 
                 <!-- Total Marks -->
                 <td class="total-col">
@@ -675,9 +634,11 @@
                 </td>
             </tr>
             {% endwith %}
+            {% endwith %}
+            {% endwith %}
             {% empty %}
             <tr>
-                <td colspan="11" class="text-center text-muted" style="padding: 20px;">
+                <td colspan="{% if not is_primary_nursery %}11{% else %}9{% endif %}" class="text-center text-muted" style="padding: 20px;">
                     No student data available for this exam session
                 </td>
             </tr>
@@ -685,264 +646,152 @@
         </tbody>
     </table>
     
-    <!-- Page Break for Analysis Sections -->
-    <div class="page-break"></div>
-    
-    <!-- Detailed Analysis Section -->
-    <div class="analysis-section">
-        <div class="analysis-title">📈 Performance Analysis by Percentile</div>
-        
-        <!-- Top 10% -->
-        <div style="margin-bottom: 15px;">
-            <h4 style="font-size: 9px; color: #28a745; margin-bottom: 5px;">🏆 Top 10% ({{ student_data|length|div:10|floatformat:0 }} students)</h4>
-            <table style="width: 100%; font-size: 7px; border-collapse: collapse;">
+    <!-- Cross-Analysis Matrix - CONDITIONAL BASED ON EDUCATION LEVEL -->
+    <div class="distribution-section">
+        {% if is_primary_nursery %}
+            <!-- Grade × Gender Cross-Analysis Matrix for Primary/Nursery -->
+            <div class="section-title">📊 Grade × Gender Cross-Analysis Matrix</div>
+            
+            <!-- Matrix Note - Unfiltered -->
+            <div style="margin-bottom: 8px; font-size: 6px; color: #6c757d; text-align: right;">
+                <em><i class="fas fa-chart-bar"></i> Based on all {{ total_students_all }} students (unfiltered)</em>
+            </div>
+            
+            <table class="matrix-table">
                 <thead>
-                    <tr style="background-color: #e8f5e9;">
-                        <th style="padding: 3px; border: 1px solid #dee2e6; width: 40px;">Rank</th>
-                        <th style="padding: 3px; border: 1px solid #dee2e6;">Name</th>
-                        <th style="padding: 3px; border: 1px solid #dee2e6; width: 50px;">Avg %</th>
-                        <th style="padding: 3px; border: 1px solid #dee2e6; width: 60px;">Division</th>
-                        <th style="padding: 3px; border: 1px solid #dee2e6; width: 80px;">Grade Points</th>
+                    <tr>
+                        <th>Gender \ Grade</th>
+                        {% for grade in grade_columns %}
+                            <th>{{ grade }}</th>
+                        {% endfor %}
+                        <th>Total (Gender)</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {% for student in student_data|slice:":10" %}
-                    <tr>
-                        <td style="padding: 3px; border: 1px solid #dee2e6; text-align: center;">{{ student.rank }}</td>
-                        <td style="padding: 3px; border: 1px solid #dee2e6;">{{ student.full_name|truncatechars:15 }}</td>
-                        <td style="padding: 3px; border: 1px solid #dee2e6; text-align: center;">
-                            <strong>{{ student.average_percentage|floatformat:1 }}%</strong>
-                        </td>
-                        <td style="padding: 3px; border: 1px solid #dee2e6; text-align: center;">
-                            {% if student.division %}{{ student.division }}{% else %}-{% endif %}
-                        </td>
-                        <td style="padding: 3px; border: 1px solid #dee2e6; text-align: center;">
-                            {{ student.total_grade_points|floatformat:1|default:"-" }}
-                        </td>
-                    </tr>
+                    {% for gender, row in grade_gender_matrix.items %}
+                        {% if gender != 'Total' %}
+                        <tr>
+                            <td>
+                                <span class="gender-badge gender-{{ gender|lower }}" style="padding: 2px 6px; font-size: 6px;">
+                                    <i class="fas fa-{% if gender == 'Male' %}mars{% elif gender == 'Female' %}venus{% else %}genderless{% endif %}" style="margin-right: 2px;"></i>
+                                    {{ gender }}
+                                </span>
+                            </td>
+                            {% for grade in grade_columns %}
+                                <td>
+                                    {% with count=row|get_item:grade %}
+                                        {% if count > 0 %}
+                                            <span class="text-bold">{{ count }}</span>
+                                        {% else %}
+                                            <span class="zero-value">-</span>
+                                        {% endif %}
+                                    {% endwith %}
+                                </td>
+                            {% endfor %}
+                            <td class="text-bold gender-total">{{ gender_totals|get_item:gender|default:0 }}</td>
+                        </tr>
+                        {% endif %}
                     {% endfor %}
-                </tbody>
-            </table>
-        </div>
-        
-        <!-- Bottom 10% -->
-        <div style="margin-bottom: 15px;">
-            <h4 style="font-size: 9px; color: #dc3545; margin-bottom: 5px;">⚠️ Bottom 10% ({{ student_data|length|div:10|floatformat:0 }} students)</h4>
-            <table style="width: 100%; font-size: 7px; border-collapse: collapse;">
-                <thead>
-                    <tr style="background-color: #ffebee;">
-                        <th style="padding: 3px; border: 1px solid #dee2e6; width: 40px;">Rank</th>
-                        <th style="padding: 3px; border: 1px solid #dee2e6;">Name</th>
-                        <th style="padding: 3px; border: 1px solid #dee2e6; width: 50px;">Avg %</th>
-                        <th style="padding: 3px; border: 1px solid #dee2e6; width: 60px;">Division</th>
-                        <th style="padding: 3px; border: 1px solid #dee2e6; width: 80px;">Improvement Needed</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for student in student_data|slice:"-10:" %}
-                    <tr>
-                        <td style="padding: 3px; border: 1px solid #dee2e6; text-align: center;">{{ student.rank }}</td>
-                        <td style="padding: 3px; border: 1px solid #dee2e6;">{{ student.full_name|truncatechars:15 }}</td>
-                        <td style="padding: 3px; border: 1px solid #dee2e6; text-align: center;">
-                            <strong>{{ student.average_percentage|floatformat:1 }}%</strong>
+
+                    <tr class="total-row">
+                        <td class="text-bold">
+                            <span style="background-color: #495057; color: white; padding: 3px 8px; border-radius: 10px;">TOTAL</span>
                         </td>
-                        <td style="padding: 3px; border: 1px solid #dee2e6; text-align: center;">
-                            {% if student.division %}{{ student.division }}{% else %}-{% endif %}
-                        </td>
-                        <td style="padding: 3px; border: 1px solid #dee2e6; text-align: center;">
-                            {% if student.average_percentage %}
-                                +{{ 40|sub:student.average_percentage|floatformat:1 }}% to pass
-                            {% else %}
-                                -
-                            {% endif %}
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-        
-        <!-- Middle 40% -->
-        <div style="margin-bottom: 15px;">
-            <h4 style="font-size: 9px; color: #ffc107; margin-bottom: 5px;">📊 Middle 40% ({{ student_data|length|mul:0.4|floatformat:0 }} students)</h4>
-            <div style="font-size: 7px; line-height: 1.4;">
-                <p><strong>Average Performance:</strong> 
-                    {% with start_index=student_data|length|mul:0.3|floatformat:0 end_index=student_data|length|mul:0.7|floatformat:0 %}
-                        {% with middle_students=student_data|slice:start_index:end_index %}
-                            {% with total_marks=0 count=0 %}
-                                {% for student in middle_students %}
-                                    {% if student.average_marks %}
-                                        {{ total_marks|add:student.average_marks }}
-                                        {{ count|add:1 }}
+                        {% for grade in grade_columns %}
+                            <td class="text-bold">
+                                {% with total=grade_totals|get_item:grade|default:0 %}
+                                    {% if total > 0 %}
+                                        <span style="background-color: #ffd54f; color: #212529; padding: 2px 6px; border-radius: 10px;">{{ total }}</span>
+                                    {% else %}
+                                        <span class="zero-value">{{ total }}</span>
                                     {% endif %}
-                                {% endfor %}
-                                {% if count > 0 %}
-                                    {{ total_marks|div:count|floatformat:1 }} average marks
-                                    ({{ total_marks|div:count|div:exam_session.exam_type.max_score|mul:100|floatformat:1 }}%)
-                                {% else %}
-                                    No data available
-                                {% endif %}
-                            {% endwith %}
-                        {% endwith %}
-                    {% endwith %}
-                </p>
-                <p><strong>Key Insight:</strong> This group represents the core performance of the class and is crucial for overall class improvement.</p>
-            </div>
-        </div>
-    </div>
-    
-    <!-- Recommendations Section -->
-    <div class="analysis-section">
-        <div class="analysis-title">🎯 Recommendations & Action Items</div>
-        <div class="analysis-grid">
-            <div class="analysis-item">
-                <div class="analysis-label">For Top Performers</div>
-                <div class="analysis-value" style="font-size: 7px; line-height: 1.3;">
-                    • Mentor weaker students<br>
-                    • Advanced assignments<br>
-                    • Competition preparation<br>
-                    • Leadership roles
-                </div>
+                                {% endwith %}
+                            </td>
+                        {% endfor %}
+                        <td class="text-bold grand-total">
+                            <span style="background-color: #ffb300; color: #212529; padding: 2px 8px; border-radius: 10px;">{{ grand_total|default:0 }}</span>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+            <div class="matrix-caption">
+                <span>📌 Cross-analysis showing student distribution by gender and grade | </span>
+                <span><strong>Zero values (-)</strong> indicate no students in that category | </span>
+                <span><strong>Total students with grade assigned: {{ grand_total }}</strong></span>
             </div>
             
-            <div class="analysis-item">
-                <div class="analysis-label">For Bottom Performers</div>
-                <div class="analysis-value" style="font-size: 7px; line-height: 1.3;">
-                    • Extra classes needed<br>
-                    • Parent-teacher meetings<br>
-                    • Peer tutoring<br>
-                    • Regular progress checks
-                </div>
+        {% else %}
+            <!-- Division × Gender Cross-Analysis Matrix for Secondary -->
+            <div class="section-title">📊 Division × Gender Cross-Analysis Matrix</div>
+            
+            <!-- Matrix Note - Unfiltered -->
+            <div style="margin-bottom: 8px; font-size: 6px; color: #6c757d; text-align: right;">
+                <em><i class="fas fa-chart-bar"></i> Based on all {{ total_students_all }} students (unfiltered)</em>
             </div>
             
-            <div class="analysis-item">
-                <div class="analysis-label">Class-Level Actions</div>
-                <div class="analysis-value" style="font-size: 7px; line-height: 1.3;">
-                    • Review teaching methods<br>
-                    • Subject-wise analysis needed<br>
-                    • Set improvement targets<br>
-                    • Monitor progress monthly
-                </div>
-            </div>
-            
-            <div class="analysis-item">
-                <div class="analysis-label">Next Steps</div>
-                <div class="analysis-value" style="font-size: 7px; line-height: 1.3;">
-                    • Share results with parents<br>
-                    • Plan intervention programs<br>
-                    • Set next term targets<br>
-                    • Schedule review meetings
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <!-- Statistical Summary -->
-    <div class="analysis-section">
-        <div class="analysis-title">📐 Statistical Summary</div>
-        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; font-size: 7px;">
-            <div>
-                <strong>Mean (Average):</strong><br>
-                {% with total=0 count=0 %}
-                    {% for student in student_data %}
-                        {% if student.average_marks %}
-                            {{ total|add:student.average_marks }}
-                            {{ count|add:1 }}
+            <table class="matrix-table">
+                <thead>
+                    <tr>
+                        <th>Gender \ Division</th>
+                        {% for division in division_columns %}
+                            <th>{{ division }}</th>
+                        {% endfor %}
+                        <th>Total (Gender)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for gender, row in division_gender_matrix.items %}
+                        {% if gender != 'Total' %}
+                        <tr>
+                            <td>
+                                <span class="gender-badge gender-{{ gender|lower }}" style="padding: 2px 6px; font-size: 6px;">
+                                    <i class="fas fa-{% if gender == 'Male' %}mars{% elif gender == 'Female' %}venus{% else %}genderless{% endif %}" style="margin-right: 2px;"></i>
+                                    {{ gender }}
+                                </span>
+                            </td>
+                            {% for division in division_columns %}
+                                <td>
+                                    {% with count=row|get_item:division %}
+                                        {% if count > 0 %}
+                                            <span class="text-bold">{{ count }}</span>
+                                        {% else %}
+                                            <span class="zero-value">-</span>
+                                        {% endif %}
+                                    {% endwith %}
+                                </td>
+                            {% endfor %}
+                            <td class="text-bold gender-total">{{ gender_totals|get_item:gender|default:0 }}</td>
+                        </tr>
                         {% endif %}
                     {% endfor %}
-                    {% if count > 0 %}
-                        {{ total|div:count|floatformat:2 }} marks
-                    {% else %}
-                        -
-                    {% endif %}
-                {% endwith %}
+
+                    <tr class="total-row">
+                        <td class="text-bold">
+                            <span style="background-color: #495057; color: white; padding: 3px 8px; border-radius: 10px;">TOTAL</span>
+                        </td>
+                        {% for division in division_columns %}
+                            <td class="text-bold">
+                                {% with total=division_totals|get_item:division|default:0 %}
+                                    {% if total > 0 %}
+                                        <span style="background-color: #ffd54f; color: #212529; padding: 2px 6px; border-radius: 10px;">{{ total }}</span>
+                                    {% else %}
+                                        <span class="zero-value">{{ total }}</span>
+                                    {% endif %}
+                                {% endwith %}
+                            </td>
+                        {% endfor %}
+                        <td class="text-bold grand-total">
+                            <span style="background-color: #ffb300; color: #212529; padding: 2px 8px; border-radius: 10px;">{{ grand_total|default:0 }}</span>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+            <div class="matrix-caption">
+                <span>📌 Cross-analysis showing student distribution by gender and division | </span>
+                <span><strong>Zero values (-)</strong> indicate no students in that category | </span>
+                <span><strong>Total students with division assigned: {{ grand_total }}</strong></span>
             </div>
-            
-            <div>
-                <strong>Median (Middle Value):</strong><br>
-                {% with sorted_students=student_data|dictsort:"average_marks" %}
-                    {% if sorted_students %}
-                        {% with mid_index=sorted_students|length|div:2|floatformat:0 %}
-                            {% with median_student=sorted_students.mid_index %}
-                                {{ median_student.average_marks|floatformat:2 }} marks
-                            {% endwith %}
-                        {% endwith %}
-                    {% else %}
-                        -
-                    {% endif %}
-                {% endwith %}
-            </div>
-            
-            <div>
-                <strong>Range (Spread):</strong><br>
-                {% with min_marks=100 max_marks=0 %}
-                    {% for student in student_data %}
-                        {% if student.average_marks %}
-                            {% if student.average_marks < min_marks %}
-                                {{ student.average_marks }}
-                            {% endif %}
-                            {% if student.average_marks > max_marks %}
-                                {{ student.average_marks }}
-                            {% endif %}
-                        {% endif %}
-                    {% endfor %}
-                    {% if max_marks > 0 %}
-                        {{ min_marks|floatformat:1 }} - {{ max_marks|floatformat:1 }}
-                        ({{ max_marks|sub:min_marks|floatformat:1 }} range)
-                    {% else %}
-                        -
-                    {% endif %}
-                {% endwith %}
-            </div>
-            
-            <div>
-                <strong>Standard Deviation:</strong><br>
-                {% comment %}
-                Calculate standard deviation - this is complex in templates
-                Consider calculating in view and passing as context
-                {% endcomment %}
-                {% if std_dev %}
-                    {{ std_dev|floatformat:2 }} marks
-                {% else %}
-                    (Calculated in backend)
-                {% endif %}
-            </div>
-            
-            <div>
-                <strong>Pass Rate:</strong><br>
-                {% with passed=0 total=0 %}
-                    {% for student in student_data %}
-                        {% if student.average_percentage %}
-                            {{ total|add:1 }}
-                            {% if student.average_percentage >= 40 %}
-                                {{ passed|add:1 }}
-                            {% endif %}
-                        {% endif %}
-                    {% endfor %}
-                    {% if total > 0 %}
-                        {% widthratio passed total 100 %}% ({{ passed }}/{{ total }})
-                    {% else %}
-                        -
-                    {% endif %}
-                {% endwith %}
-            </div>
-            
-            <div>
-                <strong>Gender Distribution:</strong><br>
-                {% with male=0 female=0 other=0 %}
-                    {% for student in student_data %}
-                        {% if student.gender == 'Male' or student.gender == 'M' %}
-                            {{ male|add:1 }}
-                        {% elif student.gender == 'Female' or student.gender == 'F' %}
-                            {{ female|add:1 }}
-                        {% else %}
-                            {{ other|add:1 }}
-                        {% endif %}
-                    {% endfor %}
-                    M:{{ male }} F:{{ female }} O:{{ other }}
-                {% endwith %}
-            </div>
-        </div>
+        {% endif %}
     </div>
     
     <!-- Footer -->
@@ -950,9 +799,20 @@
         <div>
             Detailed Student Analysis Report | {{ exam_session.name }} | {{ exam_session.class_level.name }}
             {% if exam_session.stream_class %}| Stream {{ exam_session.stream_class.stream_letter }}{% endif %}
+            | {{ exam_session.class_level.educational_level.name }}
         </div>
         <div>Report ID: {{ exam_session.id }}-detailed-{{ generated_date|date:'YmdHis' }}</div>
-        <div>{{ school_name }} | Generated: {{ generated_date|date:'F d, Y H:i' }} | By: {{ generated_by }}</div>
+        <div>
+            {{ school_name }} | Generated: {{ generated_date|date:'F d, Y H:i' }} | By: {{ generated_by }}
+            {% if division_filter or grade_filter or gender_filter or rank_filter %}
+            | Filters: 
+                {% if not is_primary_nursery and division_filter %}Div:{{ division_filter }}{% endif %}
+                {% if is_primary_nursery and grade_filter %}Grade:{{ grade_filter }}{% endif %}
+                {% if gender_filter %}{% if division_filter or grade_filter %}, {% endif %}Gen:{{ gender_filter }}{% endif %}
+                {% if rank_filter == 'top' %}{% if division_filter or grade_filter or gender_filter %}, {% endif %}Top{{ top_n }}{% endif %}
+                {% if rank_filter == 'bottom' %}{% if division_filter or grade_filter or gender_filter %}, {% endif %}Bottom{{ bottom_n }}{% endif %}
+            {% endif %}
+        </div>
         <div>Confidential - For academic review purposes only</div>
     </div>
 </body>

@@ -4293,7 +4293,7 @@ def student_sessions_list(request, student_id):
 
 @login_required
 def student_session_results(request, student_id, exam_session_id):
-    """Display detailed results for a student in a specific exam session"""
+    """Display detailed results for a student in a specific exam session with subject positions"""
     try:
         student = get_object_or_404(
             Student.objects.select_related(
@@ -4336,6 +4336,18 @@ def student_session_results(request, student_id, exam_session_id):
 
         results_dict = {result.subject_id: result for result in results}
 
+        # Get all students in the same class/stream for position calculation
+        student_filters = {
+            'class_level': exam_session.class_level,
+            'is_active': True
+        }
+        
+        if exam_session.stream_class:
+            student_filters['stream_class'] = exam_session.stream_class
+        
+        all_students = Student.objects.filter(**student_filters)
+        total_students_count = all_students.count()
+
         subject_results = []
         total_marks = 0
         total_grade_points = 0
@@ -4353,6 +4365,18 @@ def student_session_results(request, student_id, exam_session_id):
                 total_grade_points += grade_point
                 subjects_with_marks += 1
 
+                # Calculate subject position on the fly
+                subject_position = get_student_subject_position(
+                    student_id, subject.id, exam_session_id, exam_session
+                )
+                
+                # Get total students with marks in this subject
+                students_with_marks_in_subject = StudentResult.objects.filter(
+                    exam_session=exam_session,
+                    subject=subject,
+                    marks_obtained__isnull=False
+                ).count()
+
                 subject_results.append({
                     'subject': subject,
                     'result': result,
@@ -4360,7 +4384,8 @@ def student_session_results(request, student_id, exam_session_id):
                     'percentage': percentage,
                     'grade': result.grade,
                     'grade_point': grade_point,
-                    'position': result.position_in_paper,
+                    'position': subject_position,
+                    'total_students_in_subject': students_with_marks_in_subject,
                     'has_result': True
                 })
             else:
@@ -4372,6 +4397,7 @@ def student_session_results(request, student_id, exam_session_id):
                     'grade': '-',
                     'grade_point': None,
                     'position': None,
+                    'total_students_in_subject': 0,
                     'has_result': False
                 })
 
@@ -4422,6 +4448,7 @@ def student_session_results(request, student_id, exam_session_id):
             'overall_stats': overall_stats,
             'class_ranking': class_ranking,
             'class_students_count': class_students_count,
+            'total_students_count': total_students_count,
             'page_title': f'{student.full_name} - {exam_session.name}',
             'breadcrumb_title': 'Student Results Detail',
         }
@@ -4433,11 +4460,71 @@ def student_session_results(request, student_id, exam_session_id):
         return redirect('student_sessions_list', student_id=student_id)
 
 
+def get_student_subject_position(student_id, subject_id, exam_session_id, exam_session=None):
+    """
+    Helper function to calculate a student's position in a specific subject
+    based on marks, with tie-breaking by registration number and name.
+    Returns the position as an integer or None if not found.
+    """
+    try:
+        if not exam_session:
+            exam_session = ExamSession.objects.get(id=exam_session_id)
+        
+        # Get all students in the same class/stream
+        student_filters = {
+            'class_level': exam_session.class_level,
+            'is_active': True
+        }
+        
+        if exam_session.stream_class:
+            student_filters['stream_class'] = exam_session.stream_class
+        
+        students = Student.objects.filter(**student_filters)
+        
+        # Get results for this subject
+        results = StudentResult.objects.filter(
+            exam_session_id=exam_session_id,
+            subject_id=subject_id,
+            marks_obtained__isnull=False
+        ).select_related('student')
+        
+        # Build list of students with marks
+        students_with_marks = []
+        for result in results:
+            if result.marks_obtained is not None:
+                try:
+                    marks_float = float(result.marks_obtained)
+                    students_with_marks.append({
+                        'student_id': result.student_id,
+                        'marks': marks_float,
+                        'registration_number': result.student.registration_number or f"S{result.student_id:04d}",
+                        'full_name': result.student.full_name
+                    })
+                except (TypeError, ValueError):
+                    continue
+        
+        # Sort by marks (descending) and then by tie-breakers
+        students_with_marks.sort(key=lambda x: (
+            -x['marks'],  # Primary: Higher marks first
+            x['registration_number'],  # Secondary: Registration number (alphabetical)
+            x['full_name']  # Tertiary: Full name (alphabetical)
+        ))
+        
+        # Find the target student's position
+        for position, item in enumerate(students_with_marks, start=1):
+            if item['student_id'] == student_id:
+                return position
+        
+        return None
+        
+    except Exception as e:
+        print(f"Error calculating subject position: {str(e)}")
+        return None
 
 
 @login_required
 def download_student_pdf_report(request, student_id, exam_session_id):
-    """Generate and download PDF report for student exam results"""
+    """Generate and download PDF report for student exam results with subject positions"""
     try:
         # Get student
         student = get_object_or_404(
@@ -4462,6 +4549,18 @@ def download_student_pdf_report(request, student_id, exam_session_id):
             ),
             id=exam_session_id
         )
+
+        # Get all students count for ranking context
+        student_filters = {
+            'class_level': exam_session.class_level,
+            'is_active': True
+        }
+        
+        if exam_session.stream_class:
+            student_filters['stream_class'] = exam_session.stream_class
+        
+        all_students = Student.objects.filter(**student_filters)
+        total_students_count = all_students.count()
 
         # Subjects
         subjects = Subject.objects.filter(
@@ -4494,6 +4593,18 @@ def download_student_pdf_report(request, student_id, exam_session_id):
                 total_grade_points += grade_point
                 subjects_with_marks += 1
 
+                # Calculate subject position on the fly
+                subject_position = get_student_subject_position(
+                    student_id, subject.id, exam_session_id, exam_session
+                )
+                
+                # Get total students with marks in this subject
+                students_with_marks_in_subject = StudentResult.objects.filter(
+                    exam_session=exam_session,
+                    subject=subject,
+                    marks_obtained__isnull=False
+                ).count()
+
                 subject_results.append({
                     'subject': subject,
                     'result': result,
@@ -4501,7 +4612,8 @@ def download_student_pdf_report(request, student_id, exam_session_id):
                     'percentage': percentage,
                     'grade': result.grade,
                     'grade_point': grade_point,
-                    'position': result.position_in_paper,
+                    'position': subject_position,
+                    'total_students_in_subject': students_with_marks_in_subject,
                     'has_result': True
                 })
             else:
@@ -4513,6 +4625,7 @@ def download_student_pdf_report(request, student_id, exam_session_id):
                     'grade': '-',
                     'grade_point': None,
                     'position': None,
+                    'total_students_in_subject': 0,
                     'has_result': False
                 })
 
@@ -4566,10 +4679,12 @@ def download_student_pdf_report(request, student_id, exam_session_id):
             'overall_stats': overall_stats,
             'class_ranking': class_ranking,
             'class_students_count': class_students_count,
+            'total_students_count': total_students_count,
             'generated_date': timezone.now(),
             'generated_by': request.user.get_full_name() or request.user.username,
-            'school_name': 'Your School Name',
-            'school_logo': os.path.join(settings.MEDIA_ROOT, 'school_logo.png'),
+            'school_name': getattr(settings, 'SCHOOL_NAME', 'Your School Name'),
+            'school_address': getattr(settings, 'SCHOOL_ADDRESS', ''),
+            'school_logo': os.path.join(settings.MEDIA_ROOT, 'school_logo.png') if os.path.exists(os.path.join(settings.MEDIA_ROOT, 'school_logo.png')) else None,
         }
 
         html_string = render_to_string(
@@ -4585,8 +4700,8 @@ def download_student_pdf_report(request, student_id, exam_session_id):
         pdf_file = html.write_pdf()
 
         filename = (
-            f"Results_{student.registration_number}_"
-            f"{exam_session.name}_{timezone.now().strftime('%Y%m%d')}.pdf"
+            f"Results_{student.registration_number or student.id}_"
+            f"{exam_session.name.replace(' ', '_')}_{timezone.now().strftime('%Y%m%d')}.pdf"
         )
 
         response = HttpResponse(pdf_file, content_type='application/pdf')
@@ -4704,7 +4819,7 @@ def exam_session_report_view(request, exam_session_id):
 
 @login_required
 def exam_session_analysis_view(request, exam_session_id):
-    """Enhanced exam session analysis with divisions, gender, rankings and filters"""
+    """Enhanced exam session analysis with divisions/grades, gender, rankings, filters and cross-analysis matrix"""
     exam_session = get_object_or_404(
         ExamSession.objects.select_related(
             'exam_type',
@@ -4717,6 +4832,9 @@ def exam_session_analysis_view(request, exam_session_id):
         id=exam_session_id
     )
     
+    # Check if education level is Primary or Nursery
+    is_primary_nursery = exam_session.class_level.educational_level.code in ['PRIMARY', 'NURSERY']
+    
     # Get all metrics for this exam session
     metrics = StudentExamMetrics.objects.filter(
         exam_session=exam_session
@@ -4727,12 +4845,58 @@ def exam_session_analysis_view(request, exam_session_id):
         exam_session=exam_session
     ).select_related('student')
     
+    # Get all possible divisions from DivisionScale for this education level (only for non-primary/nursery)
+    all_possible_divisions = []
+    division_code_to_display = {}
+    division_display_to_code = {}
+    
+    if not is_primary_nursery:
+        if exam_session.class_level and exam_session.class_level.educational_level:
+            division_scales = DivisionScale.objects.filter(
+                education_level=exam_session.class_level.educational_level
+            ).order_by('min_points')
+            
+            for scale in division_scales:
+                display_name = scale.get_division_display()
+                code = scale.division
+                all_possible_divisions.append(display_name)
+                division_code_to_display[code] = display_name
+                division_display_to_code[display_name] = code
+    
+    # Get all possible genders
+    all_possible_genders = ['Male', 'Female']
+    other_genders = set()
+    for metric in metrics:
+        gender = metric.student.get_gender_display()
+        if gender not in all_possible_genders:
+            other_genders.add(gender)
+    all_possible_genders.extend(sorted(list(other_genders)))
+    
+    # Get all possible grades for Primary/Nursery
+    all_possible_grades = []
+    grade_distribution_all = {}
+    if is_primary_nursery:
+        # Get all grades from GradingScale for this education level
+        grading_scales = GradingScale.objects.filter(
+            education_level=exam_session.class_level.educational_level
+        ).order_by('min_mark')
+        all_possible_grades = [scale.grade for scale in grading_scales]
+        
+        # Count grade distribution for all students
+        for metric in metrics:
+            if metric.average_grade:
+                grade_distribution_all[metric.average_grade] = grade_distribution_all.get(metric.average_grade, 0) + 1
+    
     # Combine data
-    student_data = []
+    all_student_data = []
     for metric in metrics:
         position = positions.filter(student=metric.student).first()
         
-        student_data.append({
+        # Get division display name (only for non-primary/nursery)
+        division_code = metric.division.division if metric.division else None
+        division_display = metric.division.get_division_display() if metric.division else 'Not Assigned'
+        
+        student_info = {
             'id': metric.student.id,
             'registration_number': metric.student.registration_number or f"S{metric.student.id:04d}",
             'full_name': metric.student.full_name,
@@ -4742,55 +4906,91 @@ def exam_session_analysis_view(request, exam_session_id):
             'average_percentage': metric.average_percentage,
             'average_grade': metric.average_grade,
             'total_grade_points': metric.total_grade_points,
-            'division': metric.division.division if metric.division else None,
-            'division_display': metric.division.get_division_display() if metric.division else 'Not Assigned',
+            'division_code': division_code,
+            'division_display': division_display,
+            'division': division_code,
             'class_position': position.class_position if position else None,
             'stream_position': position.stream_position if position else None,
             'rank': position.class_position if position else None,
-        })
+        }
+        all_student_data.append(student_info)
     
     # Get filter parameters
     division_filter = request.GET.get('division', '')
+    grade_filter = request.GET.get('grade', '')
     gender_filter = request.GET.get('gender', '')
     rank_filter = request.GET.get('rank_filter', '')
     top_n = request.GET.get('top_n', '10')
     bottom_n = request.GET.get('bottom_n', '10')
     
-    # Apply filters
-    if division_filter:
-        student_data = [s for s in student_data if s['division'] == division_filter]
+    # Apply filters to get filtered student_data
+    student_data = all_student_data.copy()
+    
+    # Apply division filter (only for non-primary/nursery)
+    if division_filter and not is_primary_nursery:
+        filtered_students = []
+        for student in student_data:
+            if division_filter == 'Not Assigned':
+                if not student['division']:
+                    filtered_students.append(student)
+            elif student['division_display'] == division_filter or student['division_code'] == division_filter:
+                filtered_students.append(student)
+        student_data = filtered_students
+    
+    # Apply grade filter (only for primary/nursery)
+    if grade_filter and is_primary_nursery:
+        filtered_students = []
+        for student in student_data:
+            if grade_filter == 'No Grade':
+                if not student['average_grade']:
+                    filtered_students.append(student)
+            elif student['average_grade'] == grade_filter:
+                filtered_students.append(student)
+        student_data = filtered_students
     
     if gender_filter:
         student_data = [s for s in student_data if s['gender'].lower() == gender_filter.lower()]
     
-    # Apply rank filters
     if rank_filter == 'top':
         try:
             n = int(top_n)
-            student_data = sorted(student_data, key=lambda x: x['rank'] if x['rank'] else float('inf'))[:n]
+            student_data = sorted(
+                [s for s in student_data if s['rank']], 
+                key=lambda x: x['rank']
+            )[:n]
         except ValueError:
             pass
     elif rank_filter == 'bottom':
         try:
             n = int(bottom_n)
-            # Sort by rank descending (higher numbers first for bottom)
-            sorted_data = sorted(student_data, 
-                               key=lambda x: x['rank'] if x['rank'] else float('-inf'),
-                               reverse=True)
+            sorted_data = sorted(
+                [s for s in student_data if s['rank']], 
+                key=lambda x: x['rank'],
+                reverse=True
+            )
             student_data = sorted_data[:n]
         except ValueError:
             pass
     
-    # Calculate statistics
+    # Calculate statistics for filtered data
     total_students = len(student_data)
-    students_with_division = len([s for s in student_data if s['division']])
+    students_with_division = len([s for s in student_data if s['division']]) if not is_primary_nursery else 0
+    students_without_division = total_students - students_with_division if not is_primary_nursery else 0
     
-    # Division distribution
+    # Division distribution (only divisions with students) - for non-primary/nursery
     division_distribution = {}
-    for student in student_data:
-        if student['division']:
-            division_distribution[student['division_display']] = division_distribution.get(
-                student['division_display'], 0) + 1
+    if not is_primary_nursery:
+        for student in student_data:
+            if student['division_display'] and student['division_display'] != 'Not Assigned':
+                division_distribution[student['division_display']] = division_distribution.get(
+                    student['division_display'], 0) + 1
+    
+    # Grade distribution (only grades with students) - for primary/nursery
+    grade_distribution = {}
+    if is_primary_nursery:
+        for student in student_data:
+            if student['average_grade']:
+                grade_distribution[student['average_grade']] = grade_distribution.get(student['average_grade'], 0) + 1
     
     # Gender distribution
     gender_distribution = {}
@@ -4804,77 +5004,224 @@ def exam_session_analysis_view(request, exam_session_id):
     for student in student_data:
         gender = student['gender']
         if student['average_marks']:
-            if gender not in gender_averages:
-                gender_averages[gender] = 0
-                gender_counts[gender] = 0
-            gender_averages[gender] += float(student['average_marks'])
-            gender_counts[gender] += 1
+            gender_averages[gender] = gender_averages.get(gender, 0) + float(student['average_marks'])
+            gender_counts[gender] = gender_counts.get(gender, 0) + 1
     
     for gender in gender_averages:
         if gender_counts[gender] > 0:
             gender_averages[gender] = round(gender_averages[gender] / gender_counts[gender], 2)
     
-    # Average marks by division
+    # Average marks by division (for non-primary/nursery)
     division_averages = {}
     division_counts = {}
-    for student in student_data:
-        division = student['division_display']
-        if division and student['average_marks']:
-            if division not in division_averages:
-                division_averages[division] = 0
-                division_counts[division] = 0
-            division_averages[division] += float(student['average_marks'])
-            division_counts[division] += 1
+    if not is_primary_nursery:
+        for student in student_data:
+            division = student['division_display']
+            if division and division != 'Not Assigned' and student['average_marks']:
+                division_averages[division] = division_averages.get(division, 0) + float(student['average_marks'])
+                division_counts[division] = division_counts.get(division, 0) + 1
+        
+        for division in division_averages:
+            if division_counts[division] > 0:
+                division_averages[division] = round(division_averages[division] / division_counts[division], 2)
     
-    for division in division_averages:
-        if division_counts[division] > 0:
-            division_averages[division] = round(division_averages[division] / division_counts[division], 2)
+    # ---------------------------------------------------------
+    # CROSS-ANALYSIS MATRIX - CONDITIONAL BASED ON EDUCATION LEVEL
+    # ---------------------------------------------------------
     
-    # Top performers (always show top 10)
+    if is_primary_nursery:
+        # ---------------------------------------------------------
+        # GRADE × GENDER CROSS-ANALYSIS MATRIX - FOR PRIMARY/NURSERY
+        # ---------------------------------------------------------
+        
+        # Use all possible grades from GradingScale
+        matrix_grades = all_possible_grades.copy()
+        matrix_genders = all_possible_genders.copy()
+        
+        # Initialize matrix with zeros
+        grade_gender_matrix = {gender: {grade: 0 for grade in matrix_grades} for gender in matrix_genders}
+        grade_totals = {grade: 0 for grade in matrix_grades}
+        gender_totals = {gender: 0 for gender in matrix_genders}
+        grand_total = 0
+        
+        # Populate matrix with actual data from ALL students (not filtered)
+        for student in all_student_data:
+            gen = student['gender']
+            grade = student['average_grade']
+            
+            if grade and grade in matrix_grades:
+                grade_gender_matrix[gen][grade] += 1
+                grade_totals[grade] += 1
+                gender_totals[gen] += 1
+                grand_total += 1
+        
+        # Add 'No Grade' category if needed
+        students_without_grade_all = len([s for s in all_student_data if not s['average_grade']])
+        if students_without_grade_all > 0:
+            matrix_grades_with_na = matrix_grades + ['No Grade']
+            
+            for gender in matrix_genders:
+                grade_gender_matrix[gender]['No Grade'] = 0
+            grade_totals['No Grade'] = 0
+            
+            for student in all_student_data:
+                gen = student['gender']
+                grade = student['average_grade']
+                if not grade:
+                    grade_gender_matrix[gen]['No Grade'] += 1
+                    grade_totals['No Grade'] += 1
+                    gender_totals[gen] += 1
+                    grand_total += 1
+            
+            matrix_grades = matrix_grades_with_na
+        
+        matrix_columns = matrix_grades
+        matrix_data = grade_gender_matrix
+        column_totals = grade_totals
+        
+    else:
+        # ---------------------------------------------------------
+        # DIVISION × GENDER CROSS-ANALYSIS MATRIX - FOR SECONDARY
+        # ---------------------------------------------------------
+        
+        # Use all possible divisions from DivisionScale
+        matrix_divisions = all_possible_divisions.copy()
+        matrix_genders = all_possible_genders.copy()
+        
+        # Initialize matrix with zeros
+        division_gender_matrix = {gender: {div: 0 for div in matrix_divisions} for gender in matrix_genders}
+        division_totals = {div: 0 for div in matrix_divisions}
+        gender_totals = {gender: 0 for gender in matrix_genders}
+        grand_total = 0
+        
+        # Populate matrix with actual data from ALL students (not filtered)
+        for student in all_student_data:
+            gen = student['gender']
+            div = student['division_display']
+            
+            if div and div != 'Not Assigned' and div in matrix_divisions:
+                division_gender_matrix[gen][div] += 1
+                division_totals[div] += 1
+                gender_totals[gen] += 1
+                grand_total += 1
+        
+        # Add 'Not Assigned' category if needed
+        students_without_division_all = len([s for s in all_student_data if not s['division']])
+        if students_without_division_all > 0:
+            matrix_divisions_with_na = matrix_divisions + ['Not Assigned']
+            
+            for gender in matrix_genders:
+                division_gender_matrix[gender]['Not Assigned'] = 0
+            division_totals['Not Assigned'] = 0
+            
+            for student in all_student_data:
+                gen = student['gender']
+                div = student['division_display']
+                if not div or div == 'Not Assigned':
+                    division_gender_matrix[gen]['Not Assigned'] += 1
+                    division_totals['Not Assigned'] += 1
+                    gender_totals[gen] += 1
+                    grand_total += 1
+            
+            matrix_divisions = matrix_divisions_with_na
+        
+        matrix_columns = matrix_divisions
+        matrix_data = division_gender_matrix
+        column_totals = division_totals
+    
+    # Top performers (from all students, not filtered)
     top_performers = sorted(
-        [s for s in student_data if s['rank']], 
+        [s for s in all_student_data if s['rank']],
         key=lambda x: x['rank']
     )[:10]
     
-    # Bottom performers (always show bottom 10)
+    # Bottom performers (from all students, not filtered)
     bottom_performers = sorted(
-        [s for s in student_data if s['rank']], 
+        [s for s in all_student_data if s['rank']],
         key=lambda x: x['rank'],
         reverse=True
     )[:10]
     
-    # Get unique divisions and genders for filter dropdowns
-    unique_divisions = sorted(set([s['division_display'] for s in student_data if s['division_display']]))
-    unique_genders = sorted(set([s['gender'] for s in student_data if s['gender']]))
+    # Filter options
+    if is_primary_nursery:
+        unique_divisions_for_filter = []  # No division filter for primary/nursery
+        unique_divisions_display = []
+        unique_grades_for_filter = all_possible_grades + ['No Grade'] if all_possible_grades else []
+    else:
+        unique_divisions_for_filter = ['Division I', 'Division II', 'Division III', 'Division IV', 'Division 0', 'Not Assigned']
+        unique_divisions_display = matrix_divisions
+        unique_grades_for_filter = []
+    
+    # Get unique genders for filter dropdowns
+    unique_genders = sorted(set([s['gender'] for s in all_student_data if s['gender']]))
     
     context = {
         'exam_session': exam_session,
+        'is_primary_nursery': is_primary_nursery,
+        
+        # Student data
         'student_data': student_data,
-        'total_students': total_students,
-        'students_with_division': students_with_division,
+        'all_student_data': all_student_data,
+        'total_students': len(student_data),
+        'total_students_all': len(all_student_data),
+        
+        # Division/Grade stats
+        'students_with_division': students_with_division if not is_primary_nursery else 0,
+        'students_with_division_all': len([s for s in all_student_data if s['division']]) if not is_primary_nursery else 0,
+        'students_without_division': students_without_division if not is_primary_nursery else 0,
+        'students_without_division_all': len([s for s in all_student_data if not s['division']]) if not is_primary_nursery else 0,
         
         # Distributions
-        'division_distribution': division_distribution,
+        'division_distribution': division_distribution if not is_primary_nursery else {},
+        'grade_distribution': grade_distribution if is_primary_nursery else {},
         'gender_distribution': gender_distribution,
         
         # Averages
         'gender_averages': gender_averages,
-        'division_averages': division_averages,
+        'division_averages': division_averages if not is_primary_nursery else {},
         
         # Top/Bottom performers
         'top_performers': top_performers,
         'bottom_performers': bottom_performers,
         
+        # Cross-analysis matrix data
+        'matrix_data': matrix_data,
+        'matrix_columns': matrix_columns,
+        'column_totals': column_totals,
+        'gender_totals': gender_totals,
+        'grand_total': grand_total,
+        
+        # Education level specific data
+        'all_possible_grades': all_possible_grades if is_primary_nursery else [],
+        'grade_distribution_all': grade_distribution_all if is_primary_nursery else {},
+        
+        # Division specific data (for secondary)
+        'division_gender_matrix': division_gender_matrix if not is_primary_nursery else {},
+        'division_columns': matrix_divisions if not is_primary_nursery else [],
+        'division_totals': division_totals if not is_primary_nursery else {},
+        
+        # Grade specific data (for primary/nursery)
+        'grade_gender_matrix': grade_gender_matrix if is_primary_nursery else {},
+        'grade_columns': matrix_grades if is_primary_nursery else [],
+        'grade_totals': grade_totals if is_primary_nursery else {},
+        
         # Filter options
-        'unique_divisions': unique_divisions,
+        'unique_divisions': unique_divisions_for_filter,
+        'unique_divisions_display': unique_divisions_display,
+        'unique_grades': unique_grades_for_filter,
         'unique_genders': unique_genders,
         
         # Current filter values
-        'division_filter': division_filter,
+        'division_filter': division_filter if not is_primary_nursery else '',
+        'grade_filter': grade_filter if is_primary_nursery else '',
         'gender_filter': gender_filter,
         'rank_filter': rank_filter,
         'top_n': top_n,
         'bottom_n': bottom_n,
+        
+        # Division display mapping
+        'division_code_to_display': division_code_to_display if not is_primary_nursery else {},
+        'division_display_to_code': division_display_to_code if not is_primary_nursery else {},
         
         # Rank filter options
         'rank_filter_options': [
@@ -4891,8 +5238,10 @@ def exam_session_analysis_view(request, exam_session_id):
 
 @login_required
 def exam_session_analysis_pdf(request, exam_session_id):
-    """Generate PDF report for exam session analysis with sections"""
+    """Generate PDF report for exam session analysis with sections and filter support"""
     try:
+        print(f"[ANALYSIS_PDF] Start | exam_session_id={exam_session_id}")
+
         # Get exam session
         exam_session = get_object_or_404(
             ExamSession.objects.select_related(
@@ -4905,25 +5254,87 @@ def exam_session_analysis_pdf(request, exam_session_id):
             ),
             id=exam_session_id
         )
-        
-        # Get section parameter
+        print(f"[ANALYSIS_PDF] Loaded session: {exam_session.name}")
+
+        # Check if education level is Primary or Nursery
+        is_primary_nursery = exam_session.class_level.educational_level.code in ['PRIMARY', 'NURSERY']
+        print(f"[ANALYSIS_PDF] Is Primary/Nursery: {is_primary_nursery}")
+
+        # Section parameter
         section = request.GET.get('section', 'full')
+        print(f"[ANALYSIS_PDF] Section requested: {section}")
+
+        # ============= GET FILTER PARAMETERS =============
+        division_filter = request.GET.get('division', '')
+        grade_filter = request.GET.get('grade', '')
+        gender_filter = request.GET.get('gender', '')
+        rank_filter = request.GET.get('rank_filter', '')
+        top_n = request.GET.get('top_n', '10')
+        bottom_n = request.GET.get('bottom_n', '10')
         
-        # Get all metrics for this exam session
+        print(f"[ANALYSIS_PDF] Filters - Division: '{division_filter}', Grade: '{grade_filter}', Gender: '{gender_filter}', Rank: '{rank_filter}', TopN: {top_n}, BottomN: {bottom_n}")
+
+        # Metrics
         metrics = StudentExamMetrics.objects.filter(
             exam_session=exam_session
         ).select_related('student', 'division').order_by('-average_marks')
-        
-        # Get positions
+        print(f"[ANALYSIS_PDF] Metrics count: {metrics.count()}")
+
+        # Positions
         positions = StudentExamPosition.objects.filter(
             exam_session=exam_session
         ).select_related('student')
+        print(f"[ANALYSIS_PDF] Positions count: {positions.count()}")
+
+        # Get all possible divisions from DivisionScale for this education level (only for non-primary/nursery)
+        all_possible_divisions = []
+        division_code_to_display = {}
+        division_display_to_code = {}
         
-        # Combine data
-        student_data = []
-        all_student_data = []  # Keep all data for comparison
+        if not is_primary_nursery:
+            if exam_session.class_level and exam_session.class_level.educational_level:
+                division_scales = DivisionScale.objects.filter(
+                    education_level=exam_session.class_level.educational_level
+                ).order_by('min_points')
+                
+                for scale in division_scales:
+                    display_name = scale.get_division_display()
+                    code = scale.division
+                    all_possible_divisions.append(display_name)
+                    division_code_to_display[code] = display_name
+                    division_display_to_code[display_name] = code
+            
+            print(f"[ANALYSIS_PDF] All possible divisions: {all_possible_divisions}")
+        
+        # Get all possible grades from GradingScale for this education level (only for primary/nursery)
+        all_possible_grades = []
+        grade_distribution_all = {}
+        if is_primary_nursery:
+            grading_scales = GradingScale.objects.filter(
+                education_level=exam_session.class_level.educational_level
+            ).order_by('min_mark')
+            all_possible_grades = [scale.grade for scale in grading_scales]
+            print(f"[ANALYSIS_PDF] All possible grades: {all_possible_grades}")
+
+        # Get all possible genders from the Student model
+        all_possible_genders = ['Male', 'Female']
+        other_genders = set()
+        for metric in metrics:
+            gender = metric.student.get_gender_display()
+            if gender not in all_possible_genders:
+                other_genders.add(gender)
+        all_possible_genders.extend(sorted(list(other_genders)))
+        print(f"[ANALYSIS_PDF] All possible genders: {all_possible_genders}")
+
+        # ============= BUILD ALL STUDENT DATA =============
+        all_student_data = []
+        
         for metric in metrics:
             position = positions.filter(student=metric.student).first()
+            
+            # Get division information (only for non-primary/nursery)
+            division_code = metric.division.division if metric.division else None
+            division_display = metric.division.get_division_display() if metric.division else 'Not Assigned'
             
             student_info = {
                 'id': metric.student.id,
@@ -4935,112 +5346,283 @@ def exam_session_analysis_pdf(request, exam_session_id):
                 'average_percentage': metric.average_percentage,
                 'average_grade': metric.average_grade,
                 'total_grade_points': metric.total_grade_points,
-                'division': metric.division.division if metric.division else None,
-                'division_display': metric.division.get_division_display() if metric.division else 'Not Assigned',
+                'division_code': division_code,
+                'division_display': division_display,
+                'division': division_code,
                 'class_position': position.class_position if position else None,
                 'stream_position': position.stream_position if position else None,
                 'rank': position.class_position if position else None,
             }
-            
             all_student_data.append(student_info)
-            student_data.append(student_info)
+
+        print(f"[ANALYSIS_PDF] Total students processed: {len(all_student_data)}")
+
+        # ============= APPLY FILTERS =============
+        filtered_student_data = all_student_data.copy()
         
-        # Calculate statistics
-        total_students = len(student_data)
-        students_with_division = len([s for s in student_data if s['division']])
+        # Apply Division Filter (only for non-primary/nursery)
+        if division_filter and not is_primary_nursery:
+            division_filtered = []
+            for student in filtered_student_data:
+                if division_filter == 'Not Assigned':
+                    if not student['division_code']:
+                        division_filtered.append(student)
+                elif student['division_display'] == division_filter or student['division_code'] == division_filter:
+                    division_filtered.append(student)
+            
+            filtered_student_data = division_filtered
+            print(f"[ANALYSIS_PDF] After division filter '{division_filter}': {len(filtered_student_data)} students")
         
-        # Division distribution
-        division_distribution = {}
-        for student in student_data:
-            if student['division_display']:
-                division_distribution[student['division_display']] = division_distribution.get(
-                    student['division_display'], 0) + 1
+        # Apply Grade Filter (only for primary/nursery)
+        if grade_filter and is_primary_nursery:
+            grade_filtered = []
+            for student in filtered_student_data:
+                if grade_filter == 'No Grade':
+                    if not student['average_grade']:
+                        grade_filtered.append(student)
+                elif student['average_grade'] == grade_filter:
+                    grade_filtered.append(student)
+            
+            filtered_student_data = grade_filtered
+            print(f"[ANALYSIS_PDF] After grade filter '{grade_filter}': {len(filtered_student_data)} students")
         
-        # Gender distribution
-        gender_distribution = {}
-        for student in student_data:
+        # Apply Gender Filter
+        if gender_filter:
+            filtered_student_data = [
+                s for s in filtered_student_data 
+                if s['gender'].lower() == gender_filter.lower()
+            ]
+            print(f"[ANALYSIS_PDF] After gender filter '{gender_filter}': {len(filtered_student_data)} students")
+        
+        # Apply Rank Filter
+        if rank_filter == 'top':
+            try:
+                n = int(top_n)
+                ranked_students = [s for s in filtered_student_data if s['rank']]
+                filtered_student_data = sorted(
+                    ranked_students,
+                    key=lambda x: x['rank']
+                )[:n]
+                print(f"[ANALYSIS_PDF] After top {n} filter: {len(filtered_student_data)} students")
+            except ValueError:
+                pass
+        elif rank_filter == 'bottom':
+            try:
+                n = int(bottom_n)
+                ranked_students = [s for s in filtered_student_data if s['rank']]
+                filtered_student_data = sorted(
+                    ranked_students,
+                    key=lambda x: x['rank'],
+                    reverse=True
+                )[:n]
+                print(f"[ANALYSIS_PDF] After bottom {n} filter: {len(filtered_student_data)} students")
+            except ValueError:
+                pass
+
+        # Statistics for filtered data
+        total_students_filtered = len(filtered_student_data)
+        
+        if not is_primary_nursery:
+            students_with_division_filtered = len([s for s in filtered_student_data if s['division_code']])
+            students_without_division_filtered = total_students_filtered - students_with_division_filtered
+        else:
+            students_with_division_filtered = 0
+            students_without_division_filtered = 0
+        
+        # Division distribution (filtered) - for non-primary/nursery
+        division_distribution_filtered = {}
+        if not is_primary_nursery:
+            for student in filtered_student_data:
+                if student['division_display'] and student['division_display'] != 'Not Assigned':
+                    division_distribution_filtered[student['division_display']] = division_distribution_filtered.get(
+                        student['division_display'], 0) + 1
+        
+        # Grade distribution (filtered) - for primary/nursery
+        grade_distribution_filtered = {}
+        if is_primary_nursery:
+            for student in filtered_student_data:
+                if student['average_grade']:
+                    grade_distribution_filtered[student['average_grade']] = grade_distribution_filtered.get(
+                        student['average_grade'], 0) + 1
+        
+        # Gender distribution (filtered)
+        gender_distribution_filtered = {}
+        for student in filtered_student_data:
             gender = student['gender']
-            gender_distribution[gender] = gender_distribution.get(gender, 0) + 1
+            gender_distribution_filtered[gender] = gender_distribution_filtered.get(gender, 0) + 1
         
-        # Average marks by gender
-        gender_averages = {}
-        gender_counts = {}
-        for student in student_data:
+        # Gender averages (filtered)
+        gender_averages_filtered = {}
+        gender_counts_filtered = {}
+        for student in filtered_student_data:
             gender = student['gender']
             if student['average_marks']:
-                if gender not in gender_averages:
-                    gender_averages[gender] = 0
-                    gender_counts[gender] = 0
-                gender_averages[gender] += float(student['average_marks'])
-                gender_counts[gender] += 1
+                gender_averages_filtered[gender] = gender_averages_filtered.get(gender, 0) + float(student['average_marks'])
+                gender_counts_filtered[gender] = gender_counts_filtered.get(gender, 0) + 1
         
-        for gender in gender_averages:
-            if gender_counts[gender] > 0:
-                gender_averages[gender] = round(gender_averages[gender] / gender_counts[gender], 2)
+        for gender in gender_averages_filtered:
+            if gender_counts_filtered[gender] > 0:
+                gender_averages_filtered[gender] = round(gender_averages_filtered[gender] / gender_counts_filtered[gender], 2)
         
-        # Average marks by division
-        division_averages = {}
-        division_counts = {}
-        for student in student_data:
-            division = student['division_display']
-            if division and student['average_marks']:
-                if division not in division_averages:
-                    division_averages[division] = 0
-                    division_counts[division] = 0
-                division_averages[division] += float(student['average_marks'])
-                division_counts[division] += 1
+        # Division averages (filtered) - for non-primary/nursery
+        division_averages_filtered = {}
+        division_counts_filtered = {}
+        if not is_primary_nursery:
+            for student in filtered_student_data:
+                division = student['division_display']
+                if division and division != 'Not Assigned' and student['average_marks']:
+                    division_averages_filtered[division] = division_averages_filtered.get(division, 0) + float(student['average_marks'])
+                    division_counts_filtered[division] = division_counts_filtered.get(division, 0) + 1
+            
+            for division in division_averages_filtered:
+                if division_counts_filtered[division] > 0:
+                    division_averages_filtered[division] = round(
+                        division_averages_filtered[division] / division_counts_filtered[division], 2
+                    )
+
+        # ============= CROSS-ANALYSIS MATRIX (ALL STUDENTS - UNFILTERED) =============
         
-        for division in division_averages:
-            if division_counts[division] > 0:
-                division_averages[division] = round(division_averages[division] / division_counts[division], 2)
-        
-        # Top performers (always top 10 from all data)
+        if is_primary_nursery:
+            # ---------------------------------------------------------
+            # GRADE × GENDER CROSS-ANALYSIS MATRIX - FOR PRIMARY/NURSERY
+            # ---------------------------------------------------------
+            
+            matrix_grades = all_possible_grades.copy()
+            matrix_genders = all_possible_genders.copy()
+            
+            # Initialize matrix with zeros
+            grade_gender_matrix = {gender: {grade: 0 for grade in matrix_grades} for gender in matrix_genders}
+            grade_totals = {grade: 0 for grade in matrix_grades}
+            gender_totals = {gender: 0 for gender in matrix_genders}
+            grand_total = 0
+            
+            # Populate matrix with ALL students (unfiltered)
+            for student in all_student_data:
+                gen = student['gender']
+                grade = student['average_grade']
+                
+                if grade and grade in matrix_grades:
+                    grade_gender_matrix[gen][grade] += 1
+                    grade_totals[grade] += 1
+                    gender_totals[gen] += 1
+                    grand_total += 1
+            
+            # Add 'No Grade' category
+            students_without_grade_all = len([s for s in all_student_data if not s['average_grade']])
+            if students_without_grade_all > 0:
+                matrix_grades_with_na = matrix_grades + ['No Grade']
+                
+                for gender in matrix_genders:
+                    grade_gender_matrix[gender]['No Grade'] = 0
+                grade_totals['No Grade'] = 0
+                
+                for student in all_student_data:
+                    gen = student['gender']
+                    grade = student['average_grade']
+                    if not grade:
+                        grade_gender_matrix[gen]['No Grade'] += 1
+                        grade_totals['No Grade'] += 1
+                        gender_totals[gen] += 1
+                        grand_total += 1
+                
+                matrix_grades = matrix_grades_with_na
+            
+            unique_columns = matrix_grades
+            matrix_data = grade_gender_matrix
+            column_totals = grade_totals
+            matrix_name = "Grade × Gender Cross-Analysis"
+            
+        else:
+            # ---------------------------------------------------------
+            # DIVISION × GENDER CROSS-ANALYSIS MATRIX - FOR SECONDARY
+            # ---------------------------------------------------------
+            
+            unique_columns = all_possible_divisions.copy()
+            matrix_genders = all_possible_genders.copy()
+            
+            # Initialize matrix with zeros
+            division_gender_matrix = {gender: {div: 0 for div in unique_columns} for gender in matrix_genders}
+            division_totals = {div: 0 for div in unique_columns}
+            gender_totals = {gender: 0 for gender in matrix_genders}
+            grand_total = 0
+            
+            # Populate matrix with ALL students (unfiltered)
+            for student in all_student_data:
+                gen = student['gender']
+                div = student['division_display']
+                
+                if div and div != 'Not Assigned' and div in unique_columns:
+                    division_gender_matrix[gen][div] += 1
+                    division_totals[div] += 1
+                    gender_totals[gen] += 1
+                    grand_total += 1
+            
+            # Add 'Not Assigned' category
+            students_without_division_all = len([s for s in all_student_data if not s['division_code']])
+            if students_without_division_all > 0:
+                unique_columns_with_na = unique_columns + ['Not Assigned']
+                
+                for gender in matrix_genders:
+                    division_gender_matrix[gender]['Not Assigned'] = 0
+                division_totals['Not Assigned'] = 0
+                
+                for student in all_student_data:
+                    gen = student['gender']
+                    div = student['division_display']
+                    if not div or div == 'Not Assigned':
+                        division_gender_matrix[gen]['Not Assigned'] += 1
+                        division_totals['Not Assigned'] += 1
+                        gender_totals[gen] += 1
+                        grand_total += 1
+                
+                unique_columns = unique_columns_with_na
+            
+            matrix_data = division_gender_matrix
+            column_totals = division_totals
+            matrix_name = "Division × Gender Cross-Analysis"
+
+        # ============= TOP/BOTTOM PERFORMERS (ALL STUDENTS) =============
         top_performers = sorted(
-            [s for s in all_student_data if s['rank']], 
+            [s for s in all_student_data if s['rank']],
             key=lambda x: x['rank']
         )[:10]
-        
-        # Bottom performers (always bottom 10 from all data)
+
         bottom_performers = sorted(
-            [s for s in all_student_data if s['rank']], 
+            [s for s in all_student_data if s['rank']],
             key=lambda x: x['rank'],
             reverse=True
         )[:10]
-        
-        # Filter student data based on section
+
+        print(f"[ANALYSIS_PDF] Top performers: {len(top_performers)}")
+        print(f"[ANALYSIS_PDF] Bottom performers: {len(bottom_performers)}")
+
+        # ============= SECTION FILTERING =============
+        # This is for PDF section selection, not the same as filter parameters
         if section == 'top_performers':
-            student_data = top_performers
+            display_data = top_performers
         elif section == 'bottom_performers':
-            student_data = bottom_performers
-        elif section == 'detailed_list':
-            # Keep all student data
-            pass
-        elif section == 'divisions_only':
-            # Show only students with divisions
-            student_data = [s for s in student_data if s['division']]
+            display_data = bottom_performers
+        elif section == 'divisions_only' and not is_primary_nursery:
+            display_data = [s for s in filtered_student_data if s['division_code']]
+        elif section == 'grades_only' and is_primary_nursery:
+            display_data = [s for s in filtered_student_data if s['average_grade']]
         elif section == 'genders_only':
-            # Show all student data (gender analysis)
-            pass
-        
-        # Context for template
+            display_data = filtered_student_data
+        elif section == 'detailed_list':
+            display_data = filtered_student_data
+        else:
+            display_data = filtered_student_data
+
+        # ============= PREPARE CONTEXT =============
         context = {
+            # Exam session info
             'exam_session': exam_session,
-            'student_data': student_data,
-            'all_student_data': all_student_data,  # For comparison
-            'total_students': len(all_student_data),
-            'students_with_division': students_with_division,
-            
-            # Distributions
-            'division_distribution': division_distribution,
-            'gender_distribution': gender_distribution,
-            
-            # Averages
-            'gender_averages': gender_averages,
-            'division_averages': division_averages,
-            
-            # Top/Bottom performers
-            'top_performers': top_performers,
-            'bottom_performers': bottom_performers,
+            'is_primary_nursery': is_primary_nursery,
+            'generated_date': timezone.now(),
+            'generated_by': request.user.get_full_name() or request.user.username,
+            'school_name': getattr(settings, 'SCHOOL_NAME', 'School Management System'),
+            'school_address': getattr(settings, 'SCHOOL_ADDRESS', ''),
+            'is_pdf': True,
             
             # Section info
             'section': section,
@@ -5053,48 +5635,1148 @@ def exam_session_analysis_pdf(request, exam_session_id):
                 'top_performers': 'Top Performers Report',
                 'bottom_performers': 'Bottom Performers Report',
                 'divisions_only': 'Division Analysis Report',
+                'grades_only': 'Grade Analysis Report',
                 'genders_only': 'Gender Analysis Report',
                 'detailed_list': 'Detailed Student List',
+                'cross_analysis': matrix_name,
             }.get(section, 'Analysis Report'),
             
-            # Generation info
+            # FILTERED DATA - for detailed lists and section-specific views
+            'student_data': display_data,
+            'total_students': len(filtered_student_data),
+            'total_students_all': len(all_student_data),
+            
+            # Division/Grade stats
+            'students_with_division': students_with_division_filtered if not is_primary_nursery else 0,
+            'students_with_division_all': len([s for s in all_student_data if s['division_code']]) if not is_primary_nursery else 0,
+            'students_without_division': students_without_division_filtered if not is_primary_nursery else 0,
+            'students_without_division_all': len([s for s in all_student_data if not s['division_code']]) if not is_primary_nursery else 0,
+            
+            # Distributions (filtered)
+            'division_distribution': division_distribution_filtered if not is_primary_nursery else {},
+            'grade_distribution': grade_distribution_filtered if is_primary_nursery else {},
+            'gender_distribution': gender_distribution_filtered,
+            
+            # Averages (filtered)
+            'gender_averages': gender_averages_filtered,
+            'division_averages': division_averages_filtered if not is_primary_nursery else {},
+            
+            # ALL STUDENTS DATA - for cross-analysis and top/bottom performers
+            'all_student_data': all_student_data,
+            'top_performers': top_performers,
+            'bottom_performers': bottom_performers,
+            
+            # Cross-analysis matrix (ALL students)
+            'matrix_data': matrix_data,
+            'matrix_columns': unique_columns,
+            'column_totals': column_totals,
+            'gender_totals': gender_totals,
+            'grand_total': grand_total,
+            'matrix_name': matrix_name,
+            
+            # Education level specific data
+            'all_possible_grades': all_possible_grades if is_primary_nursery else [],
+            'grade_columns': unique_columns if is_primary_nursery else [],
+            'grade_totals': grade_totals if is_primary_nursery else {},
+            'grade_gender_matrix': grade_gender_matrix if is_primary_nursery else {},
+            
+            'division_columns': unique_columns if not is_primary_nursery else [],
+            'division_totals': column_totals if not is_primary_nursery else {},
+            'division_gender_matrix': matrix_data if not is_primary_nursery else {},
+            
+            # Filter values (for displaying current filters in PDF)
+            'division_filter': division_filter if not is_primary_nursery else '',
+            'grade_filter': grade_filter if is_primary_nursery else '',
+            'gender_filter': gender_filter,
+            'rank_filter': rank_filter,
+            'top_n': top_n,
+            'bottom_n': bottom_n,
+            
+            # Division mapping
+            'division_code_to_display': division_code_to_display if not is_primary_nursery else {},
+            'division_display_to_code': division_display_to_code if not is_primary_nursery else {},
+        }
+
+        # ============= TEMPLATE SELECTION =============
+        template_mapping = {
+            'full': 'admin/results/analysis_pdf_full.html',
+            'overview': 'admin/results/analysis_pdf_section.html',
+            'divisions': 'admin/results/analysis_pdf_section.html',
+            'genders': 'admin/results/analysis_pdf_section.html',
+            'rankings': 'admin/results/analysis_pdf_section.html',
+            'top_performers': 'admin/results/analysis_pdf_performers.html',
+            'bottom_performers': 'admin/results/analysis_pdf_performers.html',
+            'divisions_only': 'admin/results/analysis_pdf_distribution.html',
+            'grades_only': 'admin/results/analysis_pdf_distribution.html',
+            'genders_only': 'admin/results/analysis_pdf_distribution.html',
+            'detailed_list': 'admin/results/analysis_pdf_detailed.html',
+            'cross_analysis': 'admin/results/analysis_pdf_distribution.html',
+        }
+        
+        template_name = template_mapping.get(section, 'admin/results/analysis_pdf_section.html')
+        print(f"[ANALYSIS_PDF] Using template: {template_name}")
+
+        # ============= GENERATE PDF =============
+        html_string = render_to_string(template_name, context)
+        
+        print("[ANALYSIS_PDF] Generating PDF...")
+        html = HTML(string=html_string, base_url=request.build_absolute_uri())
+        pdf_file = html.write_pdf()
+
+        # Create filename with filter information
+        filename_parts = [f"Analysis_{exam_session.name.replace(' ', '_')}"]
+        
+        if not is_primary_nursery and division_filter:
+            filename_parts.append(f"div_{division_filter.replace(' ', '_')}")
+        if is_primary_nursery and grade_filter:
+            filename_parts.append(f"grade_{grade_filter}")
+        if gender_filter:
+            filename_parts.append(f"gender_{gender_filter}")
+        if rank_filter:
+            filename_parts.append(f"{rank_filter}_{top_n if rank_filter == 'top' else bottom_n}")
+        
+        filename_parts.append(timezone.now().strftime('%Y%m%d'))
+        filename = "_".join(filename_parts) + ".pdf"
+        filename = filename.replace('/', '_')
+
+        print(f"[ANALYSIS_PDF] PDF generated successfully: {filename}")
+
+        response = HttpResponse(pdf_file, content_type='application/pdf')
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+
+        return response
+
+    except Exception as e:
+        print(f"[ANALYSIS_PDF][ERROR] {str(e)}")
+        import traceback
+        traceback.print_exc()
+        messages.error(request, f"Error generating PDF report: {str(e)}")
+        return redirect('exam_session_analysis_view', exam_session_id=exam_session_id)
+
+
+
+
+
+
+@login_required
+def session_subject_analysis_view(request, exam_session_id):
+    """
+    Session-based subject performance analysis.
+    Subject is selected via filter, not URL parameter.
+    """
+    # Get exam session with related data
+    exam_session = get_object_or_404(
+        ExamSession.objects.select_related(
+            'exam_type',
+            'academic_year',
+            'term',
+            'class_level',
+            'class_level__educational_level',
+            'stream_class'
+        ),
+        id=exam_session_id
+    )
+    
+    # Get filter parameters
+    subject_id = request.GET.get('subject_id', '')
+    grade_filter = request.GET.get('grade_filter', '')
+    gender_filter = request.GET.get('gender', '')
+    rank_filter = request.GET.get('rank_filter', '')
+    top_n = request.GET.get('top_n', '10')
+    bottom_n = request.GET.get('bottom_n', '10')
+    
+    # Convert to integers where applicable
+    try:
+        top_n = int(top_n) if top_n else 10
+    except ValueError:
+        top_n = 10
+    
+    try:
+        bottom_n = int(bottom_n) if bottom_n else 10
+    except ValueError:
+        bottom_n = 10
+    
+    # Get all active subjects for this educational level
+    all_subjects = Subject.objects.filter(
+        educational_level=exam_session.class_level.educational_level,
+        is_active=True
+    ).order_by('name')
+    
+    # Get the selected subject (default to first subject if none selected)
+    selected_subject = None
+    if subject_id:
+        try:
+            selected_subject = all_subjects.get(id=subject_id)
+        except Subject.DoesNotExist:
+            selected_subject = all_subjects.first()
+    else:
+        selected_subject = all_subjects.first()
+    
+    # If no subjects exist, return early
+    if not selected_subject:
+        context = {
+            'exam_session': exam_session,
+            'all_subjects': all_subjects,
+            'selected_subject': None,
+            'no_subjects': True,
+            'page_title': f'Subject Analysis - {exam_session.name}',
+        }
+        return render(request, 'admin/results/session_subject_analysis.html', context)
+    
+    # Get students based on stream
+    student_filters = {
+        'class_level': exam_session.class_level,
+        'is_active': True
+    }
+    
+    if exam_session.stream_class:
+        student_filters['stream_class'] = exam_session.stream_class
+    
+    students = Student.objects.filter(**student_filters).order_by('first_name', 'last_name')
+    total_students = students.count()
+    
+    # Get results for the selected subject
+    results = StudentResult.objects.filter(
+        exam_session=exam_session,
+        subject=selected_subject
+    ).select_related('student')
+    
+    results_by_student = {r.student_id: r for r in results}
+    
+    # ============================================
+    # CALCULATE POSITIONS DYNAMICALLY USING HELPER FUNCTION
+    # ============================================
+    
+    # Get position map using helper function
+    position_map = calculate_subject_positions(students, results_by_student)
+    
+    # ============================================
+    # DATA STRUCTURES INITIALIZATION
+    # ============================================
+    
+    # Get all possible grades from GradingScale
+    grading_scales = GradingScale.objects.filter(
+        education_level=exam_session.class_level.educational_level
+    ).order_by('min_mark')
+    all_grades = [scale.grade for scale in grading_scales]
+    
+    # Gender tracking
+    all_genders = ['Male', 'Female', 'Other']
+    
+    # Initialize ALL STUDENTS data structures (unfiltered)
+    all_student_data = []
+    all_students_with_marks = 0
+    all_total_marks_sum = 0
+    all_marks_list = []
+    all_gender_stats = {}
+    all_grade_gender_matrix = {}
+    all_grade_counts = {}
+    
+    # Initialize all gender stats
+    for gender in all_genders:
+        all_gender_stats[gender] = {
+            'total': 0,
+            'with_marks': 0,
+            'marks_sum': 0,
+            'average': 0
+        }
+    
+    # Initialize all grade-gender matrix
+    for gender in all_genders:
+        all_grade_gender_matrix[gender] = {}
+        for grade in all_grades:
+            all_grade_gender_matrix[gender][grade] = 0
+        all_grade_gender_matrix[gender]['No Grade'] = 0
+    
+    # Process each student for ALL DATA
+    for student in students:
+        gender = student.get_gender_display() or 'Other'
+        if gender not in all_gender_stats:
+            all_gender_stats[gender] = {'total': 0, 'with_marks': 0, 'marks_sum': 0, 'average': 0}
+        if gender not in all_grade_gender_matrix:
+            all_grade_gender_matrix[gender] = {}
+            for grade in all_grades:
+                all_grade_gender_matrix[gender][grade] = 0
+            all_grade_gender_matrix[gender]['No Grade'] = 0
+        
+        all_gender_stats[gender]['total'] += 1
+        
+        result = results_by_student.get(student.id)
+        marks = result.marks_obtained if result else None
+        percentage = result.percentage if result else None
+        grade = result.grade if result else None
+        grade_point = result.grade_point if result else None
+        # Get position from dynamically calculated map
+        position = position_map.get(student.id)
+        
+        # Convert marks to float for calculations
+        marks_float = None
+        if marks is not None:
+            try:
+                marks_float = float(marks)
+            except (TypeError, ValueError):
+                marks_float = None
+        
+        if marks_float is not None:
+            all_students_with_marks += 1
+            all_total_marks_sum += marks_float
+            all_marks_list.append(marks_float)
+            
+            all_gender_stats[gender]['with_marks'] += 1
+            all_gender_stats[gender]['marks_sum'] += marks_float
+            
+            if grade:
+                all_grade_counts[grade] = all_grade_counts.get(grade, 0) + 1
+                all_grade_gender_matrix[gender][grade] = all_grade_gender_matrix[gender].get(grade, 0) + 1
+            else:
+                all_grade_gender_matrix[gender]['No Grade'] += 1
+        
+        # Add to all_student_data regardless of marks
+        all_student_data.append({
+            'id': student.id,
+            'registration_number': student.registration_number or f"S{student.id:04d}",
+            'full_name': student.full_name,
+            'gender': gender,
+            'marks': marks_float,
+            'percentage': float(percentage) if percentage else None,
+            'grade': grade,
+            'grade_point': float(grade_point) if grade_point else None,
+            'position': position,
+            'has_marks': marks_float is not None
+        })
+    
+    # Calculate all gender averages
+    for gender in all_gender_stats:
+        if all_gender_stats[gender]['with_marks'] > 0:
+            all_gender_stats[gender]['average'] = round(
+                all_gender_stats[gender]['marks_sum'] / all_gender_stats[gender]['with_marks'], 2
+            )
+    
+    # ============================================
+    # FILTERED DATA PROCESSING
+    # ============================================
+    
+    # Start with a copy of all student data
+    filtered_student_data = []
+    for student in all_student_data:
+        # Only include students with marks in filtered data
+        if student['has_marks']:
+            filtered_student_data.append(student.copy())
+    
+    # Apply grade filter
+    if grade_filter:
+        if grade_filter == 'No Grade':
+            filtered_student_data = [s for s in filtered_student_data if not s['grade']]
+        else:
+            filtered_student_data = [s for s in filtered_student_data if s['grade'] == grade_filter]
+    
+    # Apply gender filter
+    if gender_filter:
+        filtered_student_data = [
+            s for s in filtered_student_data 
+            if s['gender'] and s['gender'].lower() == gender_filter.lower()
+        ]
+    
+    # Apply rank filter - this must be applied AFTER grade and gender filters
+    if rank_filter == 'top':
+        # Get students with position from already filtered data
+        students_with_position = [s for s in filtered_student_data if s['position']]
+        students_with_position.sort(key=lambda x: x['position'])
+        filtered_student_data = students_with_position[:min(top_n, len(students_with_position))]
+    elif rank_filter == 'bottom':
+        students_with_position = [s for s in filtered_student_data if s['position']]
+        students_with_position.sort(key=lambda x: x['position'], reverse=True)
+        filtered_student_data = students_with_position[:min(bottom_n, len(students_with_position))]
+    
+    # ============================================
+    # CALCULATE FILTERED STATISTICS
+    # ============================================
+    
+    filtered_students_with_marks = len(filtered_student_data)
+    filtered_total_marks_sum = 0
+    filtered_marks_list = []
+    filtered_gender_stats = {}
+    
+    # Initialize filtered gender stats
+    for gender in all_genders:
+        filtered_gender_stats[gender] = {
+            'total': 0,
+            'with_marks': 0,
+            'marks_sum': 0,
+            'average': 0
+        }
+    
+    # Process filtered data
+    for student in filtered_student_data:
+        gender = student['gender']
+        if gender not in filtered_gender_stats:
+            filtered_gender_stats[gender] = {'total': 0, 'with_marks': 0, 'marks_sum': 0, 'average': 0}
+        
+        filtered_gender_stats[gender]['total'] += 1
+        filtered_gender_stats[gender]['with_marks'] += 1
+        
+        if student['marks'] is not None:
+            filtered_total_marks_sum += student['marks']
+            filtered_marks_list.append(student['marks'])
+            filtered_gender_stats[gender]['marks_sum'] += student['marks']
+    
+    # Calculate filtered gender averages
+    for gender in filtered_gender_stats:
+        if filtered_gender_stats[gender]['with_marks'] > 0:
+            filtered_gender_stats[gender]['average'] = round(
+                filtered_gender_stats[gender]['marks_sum'] / filtered_gender_stats[gender]['with_marks'], 2
+            )
+    
+    # Calculate filtered statistics
+    filtered_statistics = {
+        'total_students': len(filtered_student_data),
+        'students_with_marks': filtered_students_with_marks,
+        'students_without_marks': 0,  # All students in filtered data have marks
+        'percentage_completed': 100.0 if filtered_students_with_marks > 0 else 0,
+        'average_marks': filtered_total_marks_sum / filtered_students_with_marks if filtered_students_with_marks > 0 else 0,
+        'highest_marks': max(filtered_marks_list) if filtered_marks_list else 0,
+        'lowest_marks': min(filtered_marks_list) if filtered_marks_list else 0,
+        'pass_rate': calculate_pass_rate(filtered_marks_list),
+        'median_marks': calculate_median(filtered_marks_list),
+        'std_deviation': calculate_std_deviation(filtered_marks_list),
+    }
+    
+    # ============================================
+    # OVERALL STATISTICS (ALL STUDENTS)
+    # ============================================
+    
+    overall_statistics = {
+        'total_students': total_students,
+        'students_with_marks': all_students_with_marks,
+        'students_without_marks': total_students - all_students_with_marks,
+        'percentage_completed': (all_students_with_marks / total_students * 100) if total_students > 0 else 0,
+        'average_marks': all_total_marks_sum / all_students_with_marks if all_students_with_marks > 0 else 0,
+        'highest_marks': max(all_marks_list) if all_marks_list else 0,
+        'lowest_marks': min(all_marks_list) if all_marks_list else 0,
+        'pass_rate': calculate_pass_rate(all_marks_list),
+        'median_marks': calculate_median(all_marks_list),
+        'std_deviation': calculate_std_deviation(all_marks_list),
+    }
+    
+    # ============================================
+    # TOP/BOTTOM PERFORMERS FROM FILTERED DATA
+    # ============================================
+    
+    # Get top performers from filtered data
+    top_performers_filtered = []
+    students_with_pos_filtered = [s for s in filtered_student_data if s['position']]
+    students_with_pos_filtered.sort(key=lambda x: x['position'])
+    
+    # Limit to 10 or less
+    for student in students_with_pos_filtered[:10]:
+        top_performers_filtered.append(student)
+    
+    # Get bottom performers from filtered data
+    bottom_performers_filtered = []
+    students_with_pos_filtered.sort(key=lambda x: x['position'], reverse=True)
+    for student in students_with_pos_filtered[:10]:
+        bottom_performers_filtered.append(student)
+    
+    # ============================================
+    # MATRIX DATA (FROM ALL STUDENTS - UNFILTERED)
+    # ============================================
+    
+    # Calculate grade totals for matrix
+    grade_totals = {}
+    for grade in all_grades + ['No Grade']:
+        grade_totals[grade] = 0
+        for gender in all_grade_gender_matrix:
+            grade_totals[grade] += all_grade_gender_matrix[gender].get(grade, 0)
+    
+    # Calculate gender totals for matrix
+    gender_totals = {}
+    for gender in all_grade_gender_matrix:
+        gender_totals[gender] = sum(all_grade_gender_matrix[gender].values())
+    
+    grand_total = sum(gender_totals.values())
+    
+    # ============================================
+    # GRADE DISTRIBUTION DATA (FROM ALL STUDENTS)
+    # ============================================
+    
+    # Get grade distribution for filter dropdown (from all data)
+    grade_distribution_all = {}
+    for student in all_student_data:
+        if student['grade'] and student['has_marks']:
+            grade_distribution_all[student['grade']] = grade_distribution_all.get(student['grade'], 0) + 1
+    
+    # Prepare grade distribution list for summary table (from all data)
+    grade_distribution_list = []
+    for scale in grading_scales:
+        grade_data = {
+            'grade': scale.grade,
+            'description': scale.get_grade_display().split(' - ')[1] if ' - ' in scale.get_grade_display() else scale.description,
+            'range': f"{scale.min_mark}-{scale.max_mark}",
+            'count': all_grade_counts.get(scale.grade, 0),
+            'percentage': (all_grade_counts.get(scale.grade, 0) / all_students_with_marks * 100) if all_students_with_marks > 0 else 0,
+            'male_count': all_grade_gender_matrix.get('Male', {}).get(scale.grade, 0),
+            'female_count': all_grade_gender_matrix.get('Female', {}).get(scale.grade, 0),
+            'other_count': all_grade_gender_matrix.get('Other', {}).get(scale.grade, 0),
+        }
+        grade_distribution_list.append(grade_data)
+    
+    # ============================================
+    # SUBJECT COMPARISON DATA
+    # ============================================
+    
+    # Get subject comparison data (overall)
+    subject_comparison = get_subject_comparison_data(exam_session)
+    
+    # Get subject ranking
+    subject_ranking = {
+        'position': get_subject_ranking(exam_session, selected_subject),
+        'total_subjects': len(subject_comparison)
+    }
+    
+    # Get subject statistics for each subject (for subject cards)
+    subject_stats = {}
+    for subject in all_subjects:
+        subject_results = StudentResult.objects.filter(
+            exam_session=exam_session,
+            subject=subject,
+            marks_obtained__isnull=False
+        )
+        marks_list_subj = []
+        for r in subject_results:
+            if r.marks_obtained is not None:
+                try:
+                    marks_list_subj.append(float(r.marks_obtained))
+                except (TypeError, ValueError):
+                    continue
+        
+        subject_stats[subject.id] = {
+            'students_with_marks': len(marks_list_subj),
+            'average_marks': sum(marks_list_subj) / len(marks_list_subj) if marks_list_subj else 0,
+            'pass_rate': calculate_pass_rate(marks_list_subj),
+        }
+    
+    # ============================================
+    # CONTEXT PREPARATION
+    # ============================================
+    
+    context = {
+        # Core objects
+        'exam_session': exam_session,
+        'all_subjects': all_subjects,
+        'selected_subject': selected_subject,
+        'subject_id': selected_subject.id,
+        
+        # FILTERED DATA - used for detailed view and top/bottom performers
+        'student_data': filtered_student_data,  # This is for the detailed table
+        'filtered_student_data': filtered_student_data,  # Alias for clarity
+        'filtered_statistics': filtered_statistics,  # Statistics for filtered data
+        'filtered_gender_statistics': filtered_gender_stats,  # Gender stats for filtered data
+        'top_performers': top_performers_filtered,  # Top performers from filtered data
+        'bottom_performers': bottom_performers_filtered,  # Bottom performers from filtered data
+        
+        # ALL DATA - used for matrix and overall summaries
+        'all_student_data': all_student_data,
+        'total_students': total_students,
+        'students_with_marks': all_students_with_marks,
+        'students_without_marks': total_students - all_students_with_marks,
+        'statistics': filtered_statistics if (grade_filter or gender_filter or rank_filter) else overall_statistics,  # Show filtered stats when filters applied
+        'overall_statistics': overall_statistics,
+        'gender_statistics': all_gender_stats,  # Overall gender stats for filter dropdown
+        
+        # Grade-Gender Matrix (ALWAYS from all data - unfiltered)
+        'grade_gender_matrix': all_grade_gender_matrix,
+        'matrix_grades': all_grades + (['No Grade'] if any(all_grade_gender_matrix[g]['No Grade'] > 0 for g in all_grade_gender_matrix) else []),
+        'grade_totals': grade_totals,
+        'gender_totals': gender_totals,
+        'grand_total': grand_total,
+        
+        # Grade distribution (ALWAYS from all data)
+        'grade_distribution_all': grade_distribution_all,
+        'grade_distribution_list': grade_distribution_list,
+        
+        # Subject comparison (ALWAYS from all data)
+        'subject_comparison': subject_comparison,
+        'subject_ranking': subject_ranking,
+        'subject_stats': subject_stats,
+        
+        # Filter values
+        'subject_id': subject_id,
+        'grade_filter': grade_filter,
+        'gender_filter': gender_filter,
+        'rank_filter': rank_filter,
+        'top_n': str(top_n),
+        'bottom_n': str(bottom_n),
+        
+        # Filter status flags
+        'has_filters': bool(grade_filter or gender_filter or rank_filter),
+        
+        # Filter options
+        'rank_filter_options': [
+            ('', 'All Students'),
+            ('top', 'Top N Students'),
+            ('bottom', 'Bottom N Students'),
+        ],
+        
+        'page_title': f'Subject Performance Analysis - {exam_session.name}',
+    }
+    
+    return render(request, 'admin/results/session_subject_analysis.html', context)
+
+
+# ============================================
+# HELPER FUNCTIONS FOR POSITION CALCULATION
+# ============================================
+
+def calculate_subject_positions(students, results_by_student):
+    """
+    Calculate unique positions for students based on their marks in a subject.
+    Returns a dictionary mapping student_id to position (1, 2, 3, etc.)
+    No two students share the same position - ties are broken by additional criteria.
+    """
+    # Collect students with valid marks
+    students_with_marks = []
+    
+    for student in students:
+        result = results_by_student.get(student.id)
+        if result and result.marks_obtained is not None:
+            try:
+                marks_float = float(result.marks_obtained)
+                students_with_marks.append({
+                    'student_id': student.id,
+                    'marks': marks_float,
+                    'registration_number': student.registration_number or f"S{student.id:04d}",
+                    'full_name': student.full_name,
+                    'result': result
+                })
+            except (TypeError, ValueError):
+                continue
+    
+    # Sort by marks (descending) and then by tie-breakers
+    students_with_marks.sort(key=lambda x: (
+        -x['marks'],  # Primary: Higher marks first
+        x['registration_number'],  # Secondary: Registration number (alphabetical)
+        x['full_name']  # Tertiary: Full name (alphabetical)
+    ))
+    
+    # Assign unique positions
+    position_map = {}
+    for position, item in enumerate(students_with_marks, start=1):
+        position_map[item['student_id']] = position
+    
+    return position_map
+
+
+def get_student_position_in_subject(student_id, subject_id, exam_session_id):
+    """
+    Helper function to get a specific student's position in a subject.
+    Useful for AJAX calls or detailed views.
+    """
+    try:
+        # Get the student
+        student = Student.objects.get(id=student_id)
+        
+        # Get all students in the same class/stream
+        student_filters = {
+            'class_level_id': student.class_level_id,
+            'is_active': True
+        }
+        if student.stream_class:
+            student_filters['stream_class'] = student.stream_class
+        
+        students = Student.objects.filter(**student_filters)
+        
+        # Get results for the subject
+        results = StudentResult.objects.filter(
+            exam_session_id=exam_session_id,
+            subject_id=subject_id
+        ).select_related('student')
+        
+        results_by_student = {r.student_id: r for r in results}
+        
+        # Calculate positions
+        position_map = calculate_subject_positions(students, results_by_student)
+        
+        return position_map.get(student_id)
+        
+    except (Student.DoesNotExist, StudentResult.DoesNotExist):
+        return None
+
+
+def get_subject_rankings_list(exam_session_id, subject_id):
+    """
+    Helper function to get a complete ranking list for a subject.
+    Returns a list of students with their marks and positions.
+    """
+    try:
+        exam_session = ExamSession.objects.get(id=exam_session_id)
+        
+        # Get students
+        student_filters = {
+            'class_level': exam_session.class_level,
+            'is_active': True
+        }
+        if exam_session.stream_class:
+            student_filters['stream_class'] = exam_session.stream_class
+        
+        students = Student.objects.filter(**student_filters)
+        
+        # Get results
+        results = StudentResult.objects.filter(
+            exam_session_id=exam_session_id,
+            subject_id=subject_id
+        ).select_related('student')
+        
+        results_by_student = {r.student_id: r for r in results}
+        
+        # Calculate positions
+        position_map = calculate_subject_positions(students, results_by_student)
+        
+        # Build ranking list
+        ranking_list = []
+        for student in students:
+            result = results_by_student.get(student.id)
+            position = position_map.get(student.id)
+            
+            if result and result.marks_obtained is not None:
+                ranking_list.append({
+                    'position': position,
+                    'student_id': student.id,
+                    'registration_number': student.registration_number or f"S{student.id:04d}",
+                    'full_name': student.full_name,
+                    'marks': float(result.marks_obtained),
+                    'grade': result.grade,
+                    'percentage': float(result.percentage) if result.percentage else None,
+                })
+        
+        # Sort by position
+        ranking_list.sort(key=lambda x: x['position'])
+        
+        return ranking_list
+        
+    except ExamSession.DoesNotExist:
+        return []
+    
+
+@login_required
+def session_subject_analysis_pdf(request, exam_session_id):
+    """
+    Generate PDF report for session-based subject performance analysis.
+    """
+    try:
+        # Get exam session
+        exam_session = get_object_or_404(
+            ExamSession.objects.select_related(
+                'exam_type', 'academic_year', 'term', 'class_level',
+                'class_level__educational_level', 'stream_class'
+            ),
+            id=exam_session_id
+        )
+        
+        # Get filter parameters
+        section = request.GET.get('section', 'full')
+        subject_id = request.GET.get('subject_id', '')
+        grade_filter = request.GET.get('grade_filter', '')
+        gender_filter = request.GET.get('gender', '')
+        rank_filter = request.GET.get('rank_filter', '')
+        top_n = request.GET.get('top_n', '10')
+        bottom_n = request.GET.get('bottom_n', '10')
+        
+        # Convert to integers where applicable
+        try:
+            top_n = int(top_n) if top_n else 10
+        except ValueError:
+            top_n = 10
+        
+        try:
+            bottom_n = int(bottom_n) if bottom_n else 10
+        except ValueError:
+            bottom_n = 10
+        
+        # Get all subjects
+        all_subjects = Subject.objects.filter(
+            educational_level=exam_session.class_level.educational_level,
+            is_active=True
+        ).order_by('name')
+        
+        # Get selected subject
+        selected_subject = None
+        if subject_id:
+            try:
+                selected_subject = all_subjects.get(id=subject_id)
+            except Subject.DoesNotExist:
+                selected_subject = all_subjects.first()
+        else:
+            selected_subject = all_subjects.first()
+        
+        if not selected_subject:
+            messages.error(request, "No subjects available for this educational level.")
+            return redirect('session_subject_analysis_view', exam_session_id=exam_session_id)
+        
+        # Get students
+        student_filters = {
+            'class_level': exam_session.class_level,
+            'is_active': True
+        }
+        
+        if exam_session.stream_class:
+            student_filters['stream_class'] = exam_session.stream_class
+        
+        students = Student.objects.filter(**student_filters)
+        total_students = students.count()
+        
+        # Get results for selected subject
+        results = StudentResult.objects.filter(
+            exam_session=exam_session,
+            subject=selected_subject
+        ).select_related('student')
+        
+        results_by_student = {r.student_id: r for r in results}
+        
+        # ============================================
+        # CALCULATE POSITIONS DYNAMICALLY USING HELPER FUNCTION
+        # ============================================
+        position_map = calculate_subject_positions(students, results_by_student)
+        
+        # ============================================
+        # DATA STRUCTURES INITIALIZATION
+        # ============================================
+        
+        # Prepare data structures
+        all_student_data = []
+        students_with_marks = 0
+        total_marks_sum = 0
+        marks_list = []
+        gender_stats = {}
+        grade_gender_matrix = {}
+        grade_counts = {}
+        
+        # Get grading scales
+        grading_scales = GradingScale.objects.filter(
+            education_level=exam_session.class_level.educational_level
+        ).order_by('min_mark')
+        all_grades = [scale.grade for scale in grading_scales]
+        
+        # Initialize
+        all_genders = ['Male', 'Female', 'Other']
+        for gender in all_genders:
+            gender_stats[gender] = {'total': 0, 'with_marks': 0, 'marks_sum': 0, 'average': 0}
+            grade_gender_matrix[gender] = {grade: 0 for grade in all_grades}
+            grade_gender_matrix[gender]['No Grade'] = 0
+        
+        # Process students
+        for student in students:
+            gender = student.get_gender_display() or 'Other'
+            if gender not in gender_stats:
+                gender_stats[gender] = {'total': 0, 'with_marks': 0, 'marks_sum': 0, 'average': 0}
+            if gender not in grade_gender_matrix:
+                grade_gender_matrix[gender] = {grade: 0 for grade in all_grades}
+                grade_gender_matrix[gender]['No Grade'] = 0
+            
+            gender_stats[gender]['total'] += 1
+            
+            result = results_by_student.get(student.id)
+            marks = result.marks_obtained if result else None
+            percentage = result.percentage if result else None
+            grade = result.grade if result else None
+            grade_point = result.grade_point if result else None
+            # Get position from dynamically calculated map
+            position = position_map.get(student.id)
+            
+            # Convert marks to float
+            marks_float = None
+            if marks is not None:
+                try:
+                    marks_float = float(marks)
+                except (TypeError, ValueError):
+                    marks_float = None
+            
+            if marks_float is not None:
+                students_with_marks += 1
+                total_marks_sum += marks_float
+                marks_list.append(marks_float)
+                
+                gender_stats[gender]['with_marks'] += 1
+                gender_stats[gender]['marks_sum'] += marks_float
+                
+                if grade:
+                    grade_counts[grade] = grade_counts.get(grade, 0) + 1
+                    grade_gender_matrix[gender][grade] += 1
+                else:
+                    grade_gender_matrix[gender]['No Grade'] += 1
+            
+            all_student_data.append({
+                'id': student.id,
+                'registration_number': student.registration_number or f"S{student.id:04d}",
+                'full_name': student.full_name,
+                'gender': gender,
+                'marks': marks_float,
+                'percentage': float(percentage) if percentage else None,
+                'grade': grade,
+                'grade_point': float(grade_point) if grade_point else None,
+                'position': position,
+                'has_marks': marks_float is not None
+            })
+        
+        # Calculate averages
+        for gender in gender_stats:
+            if gender_stats[gender]['with_marks'] > 0:
+                gender_stats[gender]['average'] = round(
+                    gender_stats[gender]['marks_sum'] / gender_stats[gender]['with_marks'], 2
+                )
+        
+        # ============================================
+        # FILTERED DATA PROCESSING
+        # ============================================
+        
+        # Start with a copy of all student data with marks
+        filtered_data = [s.copy() for s in all_student_data if s['has_marks']]
+        
+        # Apply grade filter
+        if grade_filter:
+            if grade_filter == 'No Grade':
+                filtered_data = [s for s in filtered_data if not s['grade']]
+            else:
+                filtered_data = [s for s in filtered_data if s['grade'] == grade_filter]
+        
+        # Apply gender filter
+        if gender_filter:
+            filtered_data = [
+                s for s in filtered_data 
+                if s['gender'] and s['gender'].lower() == gender_filter.lower()
+            ]
+        
+        # Apply rank filter
+        if rank_filter == 'top':
+            students_with_position = [s for s in filtered_data if s['position']]
+            students_with_position.sort(key=lambda x: x['position'])
+            filtered_data = students_with_position[:min(top_n, len(students_with_position))]
+        elif rank_filter == 'bottom':
+            students_with_position = [s for s in filtered_data if s['position']]
+            students_with_position.sort(key=lambda x: x['position'], reverse=True)
+            filtered_data = students_with_position[:min(bottom_n, len(students_with_position))]
+        
+        # ============================================
+        # TOP/BOTTOM PERFORMERS (FROM ALL DATA)
+        # ============================================
+        
+        # Get top performers from all data
+        top_performers = []
+        students_with_pos_all = [s for s in all_student_data if s['position']]
+        students_with_pos_all.sort(key=lambda x: x['position'])
+        for student in students_with_pos_all[:10]:
+            if student['has_marks']:
+                top_performers.append(student)
+        
+        # Get bottom performers from all data
+        bottom_performers = []
+        students_with_pos_all.sort(key=lambda x: x['position'], reverse=True)
+        for student in students_with_pos_all[:10]:
+            if student['has_marks']:
+                bottom_performers.append(student)
+        
+        # ============================================
+        # CALCULATE STATISTICS
+        # ============================================
+        
+        # Overall statistics
+        overall_statistics = {
+            'total_students': total_students,
+            'students_with_marks': students_with_marks,
+            'students_without_marks': total_students - students_with_marks,
+            'percentage_completed': (students_with_marks / total_students * 100) if total_students > 0 else 0,
+            'average_marks': total_marks_sum / students_with_marks if students_with_marks > 0 else 0,
+            'highest_marks': max(marks_list) if marks_list else 0,
+            'lowest_marks': min(marks_list) if marks_list else 0,
+            'pass_rate': calculate_pass_rate(marks_list),
+            'median_marks': calculate_median(marks_list),
+            'std_deviation': calculate_std_deviation(marks_list),
+        }
+        
+        # Filtered statistics (if filters applied)
+        filtered_statistics = None
+        if grade_filter or gender_filter or rank_filter:
+            filtered_marks_list = [s['marks'] for s in filtered_data if s['marks'] is not None]
+            filtered_statistics = {
+                'total_students': len(filtered_data),
+                'students_with_marks': len([s for s in filtered_data if s['marks'] is not None]),
+                'students_without_marks': 0,
+                'percentage_completed': 100.0 if filtered_data else 0,
+                'average_marks': sum(filtered_marks_list) / len(filtered_marks_list) if filtered_marks_list else 0,
+                'highest_marks': max(filtered_marks_list) if filtered_marks_list else 0,
+                'lowest_marks': min(filtered_marks_list) if filtered_marks_list else 0,
+                'pass_rate': calculate_pass_rate(filtered_marks_list),
+                'median_marks': calculate_median(filtered_marks_list),
+                'std_deviation': calculate_std_deviation(filtered_marks_list),
+            }
+        
+        # ============================================
+        # MATRIX DATA
+        # ============================================
+        
+        # Calculate matrix totals
+        grade_totals = {}
+        for grade in all_grades + ['No Grade']:
+            grade_totals[grade] = 0
+            for gender in grade_gender_matrix:
+                grade_totals[grade] += grade_gender_matrix[gender].get(grade, 0)
+        
+        gender_totals = {}
+        for gender in grade_gender_matrix:
+            gender_totals[gender] = sum(grade_gender_matrix[gender].values())
+        
+        grand_total = sum(gender_totals.values())
+        
+        # ============================================
+        # GRADE DISTRIBUTION
+        # ============================================
+        
+        # Grade distribution list
+        grade_distribution_list = []
+        for scale in grading_scales:
+            grade_data = {
+                'grade': scale.grade,
+                'description': scale.get_grade_display().split(' - ')[1] if ' - ' in scale.get_grade_display() else scale.description,
+                'range': f"{scale.min_mark}-{scale.max_mark}",
+                'count': grade_counts.get(scale.grade, 0),
+                'percentage': (grade_counts.get(scale.grade, 0) / students_with_marks * 100) if students_with_marks > 0 else 0,
+                'male_count': grade_gender_matrix.get('Male', {}).get(scale.grade, 0),
+                'female_count': grade_gender_matrix.get('Female', {}).get(scale.grade, 0),
+                'other_count': grade_gender_matrix.get('Other', {}).get(scale.grade, 0),
+            }
+            grade_distribution_list.append(grade_data)
+        
+        # ============================================
+        # SUBJECT COMPARISON
+        # ============================================
+        
+        subject_comparison = get_subject_comparison_data(exam_session)
+        subject_ranking = {
+            'position': get_subject_ranking(exam_session, selected_subject),
+            'total_subjects': len(subject_comparison)
+        }
+        
+        # ============================================
+        # DETERMINE DISPLAY DATA BASED ON SECTION
+        # ============================================
+        
+        display_data = filtered_data
+        if section == 'top_performers':
+            display_data = top_performers
+        elif section == 'bottom_performers':
+            display_data = bottom_performers
+        elif section == 'matrix':
+            display_data = all_student_data
+        elif section == 'comparison':
+            display_data = filtered_data
+        elif section == 'detailed':
+            display_data = filtered_data
+        elif section == 'grades':
+            display_data = filtered_data
+        
+        # Determine which statistics to use
+        active_statistics = filtered_statistics if (grade_filter or gender_filter or rank_filter) else overall_statistics
+        
+        # ============================================
+        # CONTEXT PREPARATION
+        # ============================================
+        
+        # Prepare matrix grades list
+        matrix_grades = all_grades + (['No Grade'] if any(grade_gender_matrix[g]['No Grade'] > 0 for g in grade_gender_matrix) else [])
+        
+        context = {
+            # Core objects
+            'exam_session': exam_session,
+            'all_subjects': all_subjects,
+            'selected_subject': selected_subject,
+            'subject_id': selected_subject.id,
+            
+            # Data
+            'student_data': display_data,
+            'filtered_student_data': display_data,
+            'all_student_data': all_student_data,
+            
+            # Statistics
+            'statistics': active_statistics,
+            'overall_statistics': overall_statistics,
+            
+            # Performers
+            'top_performers': top_performers,
+            'bottom_performers': bottom_performers,
+            
+            # Matrix data
+            'grade_gender_matrix': grade_gender_matrix,
+            'matrix_grades': matrix_grades,
+            'grade_totals': grade_totals,
+            'gender_totals': gender_totals,
+            'grand_total': grand_total,
+            
+            # Gender statistics
+            'gender_statistics': gender_stats,
+            
+            # Grade distribution
+            'grade_distribution_list': grade_distribution_list,
+            
+            # Subject comparison
+            'subject_comparison': subject_comparison,
+            'subject_ranking': subject_ranking,
+            
+            # Counts
+            'students_with_marks': students_with_marks,
+            'total_students': total_students,
+            
+            # Section and filters
+            'section': section,
+            'subject_id': subject_id,
+            'grade_filter': grade_filter,
+            'gender_filter': gender_filter,
+            'rank_filter': rank_filter,
+            'top_n': str(top_n),
+            'bottom_n': str(bottom_n),
+            'has_filters': bool(grade_filter or gender_filter or rank_filter),
+            
+            # PDF metadata
             'generated_date': timezone.now(),
             'generated_by': request.user.get_full_name() or request.user.username,
             'school_name': getattr(settings, 'SCHOOL_NAME', 'School Management System'),
             'school_address': getattr(settings, 'SCHOOL_ADDRESS', ''),
-            
-            # For print/PDF
             'is_pdf': True,
         }
         
-        # Determine which template to use
-        if section == 'full':
-            template_name = 'admin/results/analysis_pdf_full.html'
-        elif section in ['overview', 'divisions', 'genders', 'rankings']:
-            template_name = 'admin/results/analysis_pdf_section.html'
-        elif section in ['top_performers', 'bottom_performers']:
-            template_name = 'admin/results/analysis_pdf_performers.html'
-        elif section in ['divisions_only', 'genders_only']:
-            template_name = 'admin/results/analysis_pdf_distribution.html'
-        elif section == 'detailed_list':
-            template_name = 'admin/results/analysis_pdf_detailed.html'
-        else:
-            template_name = 'admin/results/analysis_pdf_section.html'
+        # Select template based on section
+        template_mapping = {
+            'full': 'admin/results/session_subject_analysis_pdf_full.html',
+            'overview': 'admin/results/session_subject_analysis_pdf_full.html',
+            'matrix': 'admin/results/session_subject_analysis_pdf_full.html',
+            'top_performers': 'admin/results/session_subject_analysis_pdf_full.html',
+            'bottom_performers': 'admin/results/session_subject_analysis_pdf_full.html',
+            'comparison': 'admin/results/session_subject_analysis_pdf_full.html',
+            'detailed': 'admin/results/session_subject_analysis_pdf_full.html',
+            'grades': 'admin/results/session_subject_analysis_pdf_full.html',
+        }
         
-        # Render HTML
-        html_string = render_to_string(template_name, context)
+        template_name = template_mapping.get(section, 'admin/results/session_subject_analysis_pdf_full.html')
         
         # Generate PDF
-        html = HTML(
-            string=html_string,
-            base_url=request.build_absolute_uri()
-        )
-        
+        html_string = render_to_string(template_name, context)
+        html = HTML(string=html_string, base_url=request.build_absolute_uri())
         pdf_file = html.write_pdf()
         
-        # Create filename
-        filename = f"Analysis_{exam_session.name.replace(' ', '_')}_{section}_{timezone.now().strftime('%Y%m%d')}.pdf"
-        filename = filename.replace('/', '_')
+        # Generate filename
+        filename_parts = [
+            f"Subject_{selected_subject.code}",
+            exam_session.name.replace(' ', '_'),
+            section.capitalize() if section != 'full' else 'Full_Report'
+        ]
+        
+        if grade_filter:
+            filename_parts.append(f"Grade_{grade_filter}")
+        if gender_filter:
+            filename_parts.append(f"Gender_{gender_filter}")
+        if rank_filter:
+            filename_parts.append(f"{rank_filter}_{top_n if rank_filter == 'top' else bottom_n}")
+        
+        filename_parts.append(timezone.now().strftime('%Y%m%d'))
+        filename = "_".join(filename_parts) + ".pdf"
         
         response = HttpResponse(pdf_file, content_type='application/pdf')
         response['Content-Disposition'] = f'attachment; filename="{filename}"'
@@ -5102,5 +6784,978 @@ def exam_session_analysis_pdf(request, exam_session_id):
         return response
         
     except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error generating subject analysis PDF: {str(e)}")
+        
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({'success': False, 'message': str(e)}, status=500)
+        
         messages.error(request, f"Error generating PDF report: {str(e)}")
+        return redirect('session_subject_analysis_view', exam_session_id=exam_session_id)
+    
+
+@login_required
+def ajax_subject_performance(request, exam_session_id, subject_id):
+    """
+    AJAX endpoint to get subject performance data for dynamic updates.
+    """
+    try:
+        exam_session = get_object_or_404(ExamSession, id=exam_session_id)
+        subject = get_object_or_404(Subject, id=subject_id)
+        
+        # Get results
+        results = StudentResult.objects.filter(
+            exam_session=exam_session,
+            subject=subject,
+            marks_obtained__isnull=False
+        )
+        
+        # Calculate performance metrics - convert Decimal to float
+        marks_list = []
+        for r in results:
+            if r.marks_obtained is not None:
+                try:
+                    marks_list.append(float(r.marks_obtained))
+                except (TypeError, ValueError):
+                    continue
+        
+        performance_data = {
+            'subject_id': subject.id,
+            'subject_code': subject.code,
+            'subject_name': subject.name,
+            'total_students': len(marks_list),
+            'average_marks': sum(marks_list) / len(marks_list) if marks_list else 0,
+            'highest_marks': max(marks_list) if marks_list else 0,
+            'lowest_marks': min(marks_list) if marks_list else 0,
+            'pass_rate': calculate_pass_rate(marks_list),
+            'median_marks': calculate_median(marks_list),
+            'std_deviation': calculate_std_deviation(marks_list),
+        }
+        
+        # Grade distribution
+        grade_counts = {}
+        for result in results:
+            if result.grade:
+                grade_counts[result.grade] = grade_counts.get(result.grade, 0) + 1
+        
+        performance_data['grade_distribution'] = grade_counts
+        
+        return JsonResponse({
+            'success': True,
+            'data': performance_data
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': str(e)
+        }, status=500)
+    
+
+@login_required
+def ajax_subject_comparison(request, exam_session_id):
+    """
+    AJAX endpoint to get comparison data for all subjects.
+    """
+    try:
+        exam_session = get_object_or_404(ExamSession, id=exam_session_id)
+        
+        subjects = Subject.objects.filter(
+            educational_level=exam_session.class_level.educational_level,
+            is_active=True
+        )
+        
+        comparison_data = []
+        
+        for subject in subjects:
+            results = StudentResult.objects.filter(
+                exam_session=exam_session,
+                subject=subject,
+                marks_obtained__isnull=False
+            )
+            
+            marks_list = [float(r.marks_obtained) for r in results]
+            
+            if marks_list:
+                pass_count = sum(1 for m in marks_list if m >= 40)
+                pass_rate = (pass_count / len(marks_list)) * 100 if marks_list else 0
+                
+                grade_a_count = results.filter(grade='A').count()
+                grade_f_count = results.filter(grade='F').count()
+                
+                comparison_data.append({
+                    'subject_id': subject.id,
+                    'subject_code': subject.code,
+                    'subject_name': subject.name,
+                    'students_count': len(marks_list),
+                    'average_marks': sum(marks_list) / len(marks_list),
+                    'highest_marks': max(marks_list),
+                    'lowest_marks': min(marks_list),
+                    'pass_rate': pass_rate,
+                    'grade_a_count': grade_a_count,
+                    'grade_f_count': grade_f_count,
+                })
+        
+        # Sort by average marks descending
+        comparison_data.sort(key=lambda x: x['average_marks'], reverse=True)
+        
+        # Add ranking positions
+        for idx, subject in enumerate(comparison_data, start=1):
+            subject['ranking_position'] = idx
+            subject['average_percentage'] = (subject['average_marks'] / 
+                                           exam_session.exam_type.max_score * 100) if exam_session.exam_type.max_score else 0
+        
+        return JsonResponse({
+            'success': True,
+            'data': comparison_data
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': str(e)
+        }, status=500)
+
+
+@login_required
+def ajax_subject_list(request, exam_session_id):
+    """
+    AJAX endpoint to get list of subjects for dropdown.
+    """
+    try:
+        exam_session = get_object_or_404(ExamSession, id=exam_session_id)
+        
+        subjects = Subject.objects.filter(
+            educational_level=exam_session.class_level.educational_level,
+            is_active=True
+        ).order_by('name')
+        
+        subject_list = []
+        for subject in subjects:
+            # Get basic stats for each subject
+            results = StudentResult.objects.filter(
+                exam_session=exam_session,
+                subject=subject,
+                marks_obtained__isnull=False
+            )
+            marks_list = [float(r.marks_obtained) for r in results]
+            
+            subject_list.append({
+                'id': subject.id,
+                'name': subject.name,
+                'code': subject.code,
+                'students_count': results.count(),
+                'average_marks': sum(marks_list) / len(marks_list) if marks_list else 0,
+            })
+        
+        return JsonResponse({
+            'success': True,
+            'subjects': subject_list
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': str(e)
+        }, status=500)
+
+
+# ============= HELPER FUNCTIONS =============
+
+def get_subject_comparison_data(exam_session):
+    """
+    Helper function to get comparison data for all subjects.
+    Handles Decimal/float conversion properly.
+    """
+    subjects = Subject.objects.filter(
+        educational_level=exam_session.class_level.educational_level,
+        is_active=True
+    )
+    
+    comparison_data = []
+    
+    for subject in subjects:
+        results = StudentResult.objects.filter(
+            exam_session=exam_session,
+            subject=subject,
+            marks_obtained__isnull=False
+        )
+        
+        # Convert Decimal marks to float
+        marks_list = []
+        for r in results:
+            if r.marks_obtained is not None:
+                try:
+                    marks_list.append(float(r.marks_obtained))
+                except (TypeError, ValueError):
+                    continue
+        
+        if marks_list:
+            pass_count = sum(1 for m in marks_list if m >= 40)
+            pass_rate = (pass_count / len(marks_list)) * 100 if marks_list else 0
+            
+            grade_a_count = results.filter(grade='A').count()
+            grade_f_count = results.filter(grade='F').count()
+            
+            # Convert max_score to float to avoid Decimal/float division issues
+            max_score = float(exam_session.exam_type.max_score) if exam_session.exam_type.max_score else 100.0
+            
+            comparison_data.append({
+                'subject_id': subject.id,
+                'subject_code': subject.code,
+                'subject_name': subject.name,
+                'students_count': len(marks_list),
+                'average_marks': sum(marks_list) / len(marks_list),
+                'highest_marks': max(marks_list),
+                'lowest_marks': min(marks_list),
+                'pass_rate': pass_rate,
+                'grade_a_count': grade_a_count,
+                'grade_f_count': grade_f_count,
+                'average_percentage': (sum(marks_list) / len(marks_list) / max_score * 100),
+            })
+    
+    # Sort by average marks descending
+    comparison_data.sort(key=lambda x: x['average_marks'], reverse=True)
+    
+    # Add ranking positions
+    for idx, subject in enumerate(comparison_data, start=1):
+        subject['ranking_position'] = idx
+    
+    return comparison_data
+
+
+def get_subject_ranking(exam_session, target_subject):
+    """
+    Helper function to get ranking position of a subject.
+    """
+    subjects = Subject.objects.filter(
+        educational_level=exam_session.class_level.educational_level,
+        is_active=True
+    )
+    
+    subject_averages = []
+    
+    for subject in subjects:
+        avg = StudentResult.objects.filter(
+            exam_session=exam_session,
+            subject=subject,
+            marks_obtained__isnull=False
+        ).aggregate(avg_marks=Avg('marks_obtained'))['avg_marks']
+        
+        if avg:
+            subject_averages.append({
+                'subject_id': subject.id,
+                'average': avg
+            })
+    
+    subject_averages.sort(key=lambda x: x['average'], reverse=True)
+    
+    for idx, subject in enumerate(subject_averages, start=1):
+        if subject['subject_id'] == target_subject.id:
+            return idx
+    
+    return None
+
+
+def calculate_pass_rate(marks_list):
+    """
+    Calculate pass rate based on 40% pass mark.
+    Handles Decimal values by converting to float.
+    """
+    if not marks_list:
+        return 0
+    
+    # Convert any Decimal values to float
+    float_marks = []
+    for m in marks_list:
+        try:
+            float_marks.append(float(m))
+        except (TypeError, ValueError):
+            continue
+    
+    if not float_marks:
+        return 0
+    
+    pass_mark = 40
+    passed = sum(1 for m in float_marks if m >= pass_mark)
+    return (passed / len(float_marks)) * 100
+
+
+def calculate_median(marks_list):
+    """
+    Calculate median of marks list.
+    Handles Decimal values by converting to float.
+    """
+    if not marks_list:
+        return 0
+    
+    # Convert any Decimal values to float
+    float_marks = []
+    for m in marks_list:
+        try:
+            float_marks.append(float(m))
+        except (TypeError, ValueError):
+            continue
+    
+    if not float_marks:
+        return 0
+    
+    sorted_marks = sorted(float_marks)
+    n = len(sorted_marks)
+    
+    if n % 2 == 0:
+        return (sorted_marks[n//2 - 1] + sorted_marks[n//2]) / 2
+    else:
+        return sorted_marks[n//2]
+
+
+def calculate_std_deviation(marks_list):
+    """
+    Calculate standard deviation of marks list.
+    Handles Decimal values by converting to float.
+    """
+    if not marks_list or len(marks_list) < 2:
+        return 0
+    
+    # Convert any Decimal values to float
+    float_marks = []
+    for m in marks_list:
+        try:
+            float_marks.append(float(m))
+        except (TypeError, ValueError):
+            continue
+    
+    if len(float_marks) < 2:
+        return 0
+    
+    n = len(float_marks)
+    mean = sum(float_marks) / n
+    variance = sum((x - mean) ** 2 for x in float_marks) / n
+    
+    return variance ** 0.5
+
+
+@login_required
+def session_subject_matrix_analysis(request, exam_session_id):
+    """
+    Simplified subject analysis view showing only:
+    1. Grade × Gender Cross-Analysis Matrix
+    2. Detailed Student Analysis with filters (grade, marks range, gender, top/bottom N)
+    """
+    try:
+        # Get exam session with related data
+        exam_session = get_object_or_404(
+            ExamSession.objects.select_related(
+                'exam_type',
+                'academic_year',
+                'term',
+                'class_level',
+                'class_level__educational_level',
+                'stream_class'
+            ),
+            id=exam_session_id
+        )
+
+        # Get filter parameters
+        subject_id = request.GET.get('subject_id', '')
+        grade_filter = request.GET.get('grade_filter', '')
+        marks_min = request.GET.get('marks_min', '')
+        marks_max = request.GET.get('marks_max', '')
+        gender_filter = request.GET.get('gender', '')
+        rank_filter = request.GET.get('rank_filter', '')
+        top_n = request.GET.get('top_n', '10')
+        bottom_n = request.GET.get('bottom_n', '10')
+
+        # Convert to integers where applicable
+        try:
+            top_n = int(top_n) if top_n else 10
+        except ValueError:
+            top_n = 10
+
+        try:
+            bottom_n = int(bottom_n) if bottom_n else 10
+        except ValueError:
+            bottom_n = 10
+
+        try:
+            marks_min = float(marks_min) if marks_min else None
+        except ValueError:
+            marks_min = None
+
+        try:
+            marks_max = float(marks_max) if marks_max else None
+        except ValueError:
+            marks_max = None
+
+        # Get all active subjects for this educational level
+        all_subjects = Subject.objects.filter(
+            educational_level=exam_session.class_level.educational_level,
+            is_active=True
+        ).order_by('name')
+
+        # Get the selected subject (default to first subject if none selected)
+        selected_subject = None
+        if subject_id:
+            try:
+                selected_subject = all_subjects.get(id=subject_id)
+            except Subject.DoesNotExist:
+                selected_subject = all_subjects.first()
+        else:
+            selected_subject = all_subjects.first()
+
+        # If no subjects exist, return early
+        if not selected_subject:
+            context = {
+                'exam_session': exam_session,
+                'all_subjects': all_subjects,
+                'selected_subject': None,
+                'no_subjects': True,
+                'page_title': f'Subject Matrix Analysis - {exam_session.name}',
+            }
+            return render(request, 'admin/results/session_subject_matrix_analysis.html', context)
+
+        # Get students based on stream
+        student_filters = {
+            'class_level': exam_session.class_level,
+            'is_active': True
+        }
+
+        if exam_session.stream_class:
+            student_filters['stream_class'] = exam_session.stream_class
+
+        students = Student.objects.filter(**student_filters)
+        total_students = students.count()
+
+        # Get results for the selected subject
+        results = StudentResult.objects.filter(
+            exam_session=exam_session,
+            subject=selected_subject
+        ).select_related('student')
+
+        results_by_student = {r.student_id: r for r in results}
+
+        # ============================================
+        # CALCULATE POSITIONS DYNAMICALLY
+        # ============================================
+        position_map = calculate_subject_positions(students, results_by_student)
+
+        # ============================================
+        # DATA STRUCTURES INITIALIZATION
+        # ============================================
+
+        # Get all possible grades from GradingScale
+        grading_scales = GradingScale.objects.filter(
+            education_level=exam_session.class_level.educational_level
+        ).order_by('min_mark')
+        all_grades = [scale.grade for scale in grading_scales]
+
+        # Gender tracking
+        all_genders = ['Male', 'Female', 'Other']
+
+        # Initialize ALL STUDENTS data structures (unfiltered)
+        all_student_data = []
+        students_with_marks = 0
+        total_marks_sum = 0
+        marks_list = []
+        gender_stats = {}
+        grade_gender_matrix = {}
+        grade_counts = {}
+
+        # Initialize gender stats
+        for gender in all_genders:
+            gender_stats[gender] = {
+                'total': 0,
+                'with_marks': 0,
+                'marks_sum': 0,
+                'average': 0
+            }
+
+        # Initialize grade-gender matrix
+        for gender in all_genders:
+            grade_gender_matrix[gender] = {}
+            for grade in all_grades:
+                grade_gender_matrix[gender][grade] = 0
+            grade_gender_matrix[gender]['No Grade'] = 0
+
+        # Process each student for ALL DATA
+        for student in students:
+            gender = student.get_gender_display() or 'Other'
+            if gender not in gender_stats:
+                gender_stats[gender] = {'total': 0, 'with_marks': 0, 'marks_sum': 0, 'average': 0}
+            if gender not in grade_gender_matrix:
+                grade_gender_matrix[gender] = {}
+                for grade in all_grades:
+                    grade_gender_matrix[gender][grade] = 0
+                grade_gender_matrix[gender]['No Grade'] = 0
+
+            gender_stats[gender]['total'] += 1
+
+            result = results_by_student.get(student.id)
+            marks = result.marks_obtained if result else None
+            percentage = result.percentage if result else None
+            grade = result.grade if result else None
+            grade_point = result.grade_point if result else None
+            position = position_map.get(student.id)
+
+            # Convert marks to float
+            marks_float = None
+            if marks is not None:
+                try:
+                    marks_float = float(marks)
+                except (TypeError, ValueError):
+                    marks_float = None
+
+            if marks_float is not None:
+                students_with_marks += 1
+                total_marks_sum += marks_float
+                marks_list.append(marks_float)
+
+                gender_stats[gender]['with_marks'] += 1
+                gender_stats[gender]['marks_sum'] += marks_float
+
+                if grade:
+                    grade_counts[grade] = grade_counts.get(grade, 0) + 1
+                    grade_gender_matrix[gender][grade] += 1
+                else:
+                    grade_gender_matrix[gender]['No Grade'] += 1
+
+            all_student_data.append({
+                'id': student.id,
+                'registration_number': student.registration_number or f"S{student.id:04d}",
+                'full_name': student.full_name,
+                'gender': gender,
+                'marks': marks_float,
+                'percentage': float(percentage) if percentage else None,
+                'grade': grade,
+                'grade_point': float(grade_point) if grade_point else None,
+                'position': position,
+                'has_marks': marks_float is not None
+            })
+
+        # Calculate gender averages
+        for gender in gender_stats:
+            if gender_stats[gender]['with_marks'] > 0:
+                gender_stats[gender]['average'] = round(
+                    gender_stats[gender]['marks_sum'] / gender_stats[gender]['with_marks'], 2
+                )
+
+        # ============================================
+        # FILTERED DATA PROCESSING
+        # ============================================
+
+        # Start with a copy of all student data with marks
+        filtered_student_data = []
+        for student in all_student_data:
+            if student['has_marks']:
+                filtered_student_data.append(student.copy())
+
+        # Apply grade filter
+        if grade_filter:
+            if grade_filter == 'No Grade':
+                filtered_student_data = [s for s in filtered_student_data if not s['grade']]
+            else:
+                filtered_student_data = [s for s in filtered_student_data if s['grade'] == grade_filter]
+
+        # Apply marks range filter
+        if marks_min is not None:
+            filtered_student_data = [s for s in filtered_student_data if s['marks'] >= marks_min]
+        if marks_max is not None:
+            filtered_student_data = [s for s in filtered_student_data if s['marks'] <= marks_max]
+
+        # Apply gender filter
+        if gender_filter:
+            filtered_student_data = [
+                s for s in filtered_student_data 
+                if s['gender'] and s['gender'].lower() == gender_filter.lower()
+            ]
+
+        # Apply rank filter
+        if rank_filter == 'top':
+            students_with_position = [s for s in filtered_student_data if s['position']]
+            students_with_position.sort(key=lambda x: x['position'])
+            filtered_student_data = students_with_position[:min(top_n, len(students_with_position))]
+        elif rank_filter == 'bottom':
+            students_with_position = [s for s in filtered_student_data if s['position']]
+            students_with_position.sort(key=lambda x: x['position'], reverse=True)
+            filtered_student_data = students_with_position[:min(bottom_n, len(students_with_position))]
+
+        # ============================================
+        # CALCULATE FILTERED STATISTICS
+        # ============================================
+
+        filtered_marks_list = [s['marks'] for s in filtered_student_data if s['marks'] is not None]
+        
+        statistics = {
+            'total_students': len(filtered_student_data),
+            'students_with_marks': len(filtered_student_data),
+            'students_without_marks': 0,
+            'percentage_completed': 100.0 if filtered_student_data else 0,
+            'average_marks': sum(filtered_marks_list) / len(filtered_marks_list) if filtered_marks_list else 0,
+            'highest_marks': max(filtered_marks_list) if filtered_marks_list else 0,
+            'lowest_marks': min(filtered_marks_list) if filtered_marks_list else 0,
+            'pass_rate': calculate_pass_rate(filtered_marks_list),
+            'median_marks': calculate_median(filtered_marks_list),
+            'std_deviation': calculate_std_deviation(filtered_marks_list),
+        }
+
+        # ============================================
+        # MATRIX DATA (FROM ALL STUDENTS - UNFILTERED)
+        # ============================================
+
+        # Calculate grade totals for matrix
+        grade_totals = {}
+        for grade in all_grades + ['No Grade']:
+            grade_totals[grade] = 0
+            for gender in grade_gender_matrix:
+                grade_totals[grade] += grade_gender_matrix[gender].get(grade, 0)
+
+        # Calculate gender totals for matrix
+        gender_totals = {}
+        for gender in grade_gender_matrix:
+            gender_totals[gender] = sum(grade_gender_matrix[gender].values())
+
+        grand_total = sum(gender_totals.values())
+
+        # Determine matrix grades (include No Grade if exists)
+        matrix_grades = all_grades.copy()
+        if any(grade_gender_matrix[g]['No Grade'] > 0 for g in grade_gender_matrix):
+            matrix_grades.append('No Grade')
+
+        # ============================================
+        # PREPARE CONTEXT
+        # ============================================
+
+        context = {
+            # Core objects
+            'exam_session': exam_session,
+            'all_subjects': all_subjects,
+            'selected_subject': selected_subject,
+            'subject_id': selected_subject.id,
+
+            # Data
+            'filtered_student_data': filtered_student_data,
+            'all_student_data': all_student_data,
+
+            # Statistics
+            'statistics': statistics,
+            'students_with_marks': students_with_marks,
+            'total_students': total_students,
+
+            # Matrix data
+            'grade_gender_matrix': grade_gender_matrix,
+            'matrix_grades': matrix_grades,
+            'grade_totals': grade_totals,
+            'gender_totals': gender_totals,
+            'grand_total': grand_total,
+
+            # Gender statistics
+            'gender_statistics': gender_stats,
+
+            # Filter values
+            'subject_id': subject_id,
+            'grade_filter': grade_filter,
+            'marks_min': marks_min if marks_min is not None else '',
+            'marks_max': marks_max if marks_max is not None else '',
+            'gender_filter': gender_filter,
+            'rank_filter': rank_filter,
+            'top_n': str(top_n),
+            'bottom_n': str(bottom_n),
+
+            # Filter status flags
+            'has_filters': bool(grade_filter or marks_min or marks_max or gender_filter or rank_filter),
+
+            # Filter options
+            'rank_filter_options': [
+                ('', 'All Students'),
+                ('top', 'Top N Students'),
+                ('bottom', 'Bottom N Students'),
+            ],
+            'all_genders': all_genders,
+            'all_grades': all_grades,
+
+            'page_title': f'Subject Matrix Analysis - {exam_session.name}',
+        }
+
+        return render(request, 'admin/results/session_subject_matrix_analysis.html', context)
+
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error in session_subject_matrix_analysis: {str(e)}")
+        messages.error(request, f"Error loading subject matrix analysis: {str(e)}")
         return redirect('exam_session_analysis_view', exam_session_id=exam_session_id)    
+    
+
+@login_required
+def session_subject_matrix_analysis_pdf(request, exam_session_id):
+    """
+    Generate PDF report for subject matrix analysis.
+    """
+    try:
+        # Get exam session
+        exam_session = get_object_or_404(
+            ExamSession.objects.select_related(
+                'exam_type', 'academic_year', 'term', 'class_level',
+                'class_level__educational_level', 'stream_class'
+            ),
+            id=exam_session_id
+        )
+
+        # Get filter parameters
+        subject_id = request.GET.get('subject_id', '')
+        grade_filter = request.GET.get('grade_filter', '')
+        marks_min = request.GET.get('marks_min', '')
+        marks_max = request.GET.get('marks_max', '')
+        gender_filter = request.GET.get('gender', '')
+        rank_filter = request.GET.get('rank_filter', '')
+        top_n = request.GET.get('top_n', '10')
+        bottom_n = request.GET.get('bottom_n', '10')
+
+        # Convert to integers where applicable
+        try:
+            top_n = int(top_n) if top_n else 10
+        except ValueError:
+            top_n = 10
+
+        try:
+            bottom_n = int(bottom_n) if bottom_n else 10
+        except ValueError:
+            bottom_n = 10
+
+        try:
+            marks_min = float(marks_min) if marks_min else None
+        except ValueError:
+            marks_min = None
+
+        try:
+            marks_max = float(marks_max) if marks_max else None
+        except ValueError:
+            marks_max = None
+
+        # Get all subjects
+        all_subjects = Subject.objects.filter(
+            educational_level=exam_session.class_level.educational_level,
+            is_active=True
+        ).order_by('name')
+
+        # Get selected subject
+        selected_subject = None
+        if subject_id:
+            try:
+                selected_subject = all_subjects.get(id=subject_id)
+            except Subject.DoesNotExist:
+                selected_subject = all_subjects.first()
+        else:
+            selected_subject = all_subjects.first()
+
+        if not selected_subject:
+            messages.error(request, "No subjects available for this educational level.")
+            return redirect('session_subject_matrix_analysis', exam_session_id=exam_session_id)
+
+        # Get students
+        student_filters = {
+            'class_level': exam_session.class_level,
+            'is_active': True
+        }
+
+        if exam_session.stream_class:
+            student_filters['stream_class'] = exam_session.stream_class
+
+        students = Student.objects.filter(**student_filters)
+        total_students = students.count()
+
+        # Get results for selected subject
+        results = StudentResult.objects.filter(
+            exam_session=exam_session,
+            subject=selected_subject
+        ).select_related('student')
+
+        results_by_student = {r.student_id: r for r in results}
+
+        # Calculate positions
+        position_map = calculate_subject_positions(students, results_by_student)
+
+        # Get grading scales
+        grading_scales = GradingScale.objects.filter(
+            education_level=exam_session.class_level.educational_level
+        ).order_by('min_mark')
+        all_grades = [scale.grade for scale in grading_scales]
+
+        # Initialize data structures
+        all_genders = ['Male', 'Female', 'Other']
+        all_student_data = []
+        students_with_marks = 0
+        grade_gender_matrix = {}
+        grade_counts = {}
+
+        # Initialize matrix
+        for gender in all_genders:
+            grade_gender_matrix[gender] = {}
+            for grade in all_grades:
+                grade_gender_matrix[gender][grade] = 0
+            grade_gender_matrix[gender]['No Grade'] = 0
+
+        # Process students
+        for student in students:
+            gender = student.get_gender_display() or 'Other'
+            if gender not in grade_gender_matrix:
+                grade_gender_matrix[gender] = {}
+                for grade in all_grades:
+                    grade_gender_matrix[gender][grade] = 0
+                grade_gender_matrix[gender]['No Grade'] = 0
+
+            result = results_by_student.get(student.id)
+            marks = result.marks_obtained if result else None
+            percentage = result.percentage if result else None
+            grade = result.grade if result else None
+            grade_point = result.grade_point if result else None
+            position = position_map.get(student.id)
+
+            marks_float = None
+            if marks is not None:
+                try:
+                    marks_float = float(marks)
+                except (TypeError, ValueError):
+                    marks_float = None
+
+            if marks_float is not None:
+                students_with_marks += 1
+
+                if grade:
+                    grade_counts[grade] = grade_counts.get(grade, 0) + 1
+                    grade_gender_matrix[gender][grade] += 1
+                else:
+                    grade_gender_matrix[gender]['No Grade'] += 1
+
+            all_student_data.append({
+                'id': student.id,
+                'registration_number': student.registration_number or f"S{student.id:04d}",
+                'full_name': student.full_name,
+                'gender': gender,
+                'marks': marks_float,
+                'percentage': float(percentage) if percentage else None,
+                'grade': grade,
+                'grade_point': float(grade_point) if grade_point else None,
+                'position': position,
+                'has_marks': marks_float is not None
+            })
+
+        # Calculate matrix totals
+        grade_totals = {}
+        for grade in all_grades + ['No Grade']:
+            grade_totals[grade] = 0
+            for gender in grade_gender_matrix:
+                grade_totals[grade] += grade_gender_matrix[gender].get(grade, 0)
+
+        gender_totals = {}
+        for gender in grade_gender_matrix:
+            gender_totals[gender] = sum(grade_gender_matrix[gender].values())
+
+        grand_total = sum(gender_totals.values())
+
+        matrix_grades = all_grades.copy()
+        if any(grade_gender_matrix[g]['No Grade'] > 0 for g in grade_gender_matrix):
+            matrix_grades.append('No Grade')
+
+        # Apply filters for filtered data
+        filtered_data = [s.copy() for s in all_student_data if s['has_marks']]
+
+        if grade_filter:
+            if grade_filter == 'No Grade':
+                filtered_data = [s for s in filtered_data if not s['grade']]
+            else:
+                filtered_data = [s for s in filtered_data if s['grade'] == grade_filter]
+
+        if marks_min is not None:
+            filtered_data = [s for s in filtered_data if s['marks'] >= marks_min]
+        if marks_max is not None:
+            filtered_data = [s for s in filtered_data if s['marks'] <= marks_max]
+
+        if gender_filter:
+            filtered_data = [
+                s for s in filtered_data 
+                if s['gender'] and s['gender'].lower() == gender_filter.lower()
+            ]
+
+        if rank_filter == 'top':
+            students_with_position = [s for s in filtered_data if s['position']]
+            students_with_position.sort(key=lambda x: x['position'])
+            filtered_data = students_with_position[:min(top_n, len(students_with_position))]
+        elif rank_filter == 'bottom':
+            students_with_position = [s for s in filtered_data if s['position']]
+            students_with_position.sort(key=lambda x: x['position'], reverse=True)
+            filtered_data = students_with_position[:min(bottom_n, len(students_with_position))]
+
+        # Calculate filtered statistics
+        filtered_marks_list = [s['marks'] for s in filtered_data if s['marks'] is not None]
+        statistics = {
+            'average_marks': sum(filtered_marks_list) / len(filtered_marks_list) if filtered_marks_list else 0,
+            'pass_rate': calculate_pass_rate(filtered_marks_list),
+        }
+
+        # Prepare context for PDF
+        context = {
+            'exam_session': exam_session,
+            'selected_subject': selected_subject,
+            'filtered_student_data': filtered_data,
+            'statistics': statistics,
+            'students_with_marks': students_with_marks,
+            'total_students': total_students,
+            'grade_gender_matrix': grade_gender_matrix,
+            'matrix_grades': matrix_grades,
+            'grade_totals': grade_totals,
+            'gender_totals': gender_totals,
+            'grand_total': grand_total,
+            'grade_filter': grade_filter,
+            'marks_min': marks_min,
+            'marks_max': marks_max,
+            'gender_filter': gender_filter,
+            'rank_filter': rank_filter,
+            'top_n': top_n,
+            'bottom_n': bottom_n,
+            'has_filters': bool(grade_filter or marks_min or marks_max or gender_filter or rank_filter),
+            'generated_date': timezone.now(),
+            'generated_by': request.user.get_full_name() or request.user.username,
+            'school_name': getattr(settings, 'SCHOOL_NAME', 'School Management System'),
+            'school_address': getattr(settings, 'SCHOOL_ADDRESS', ''),
+            'is_pdf': True,
+        }
+
+        # Generate PDF
+        html_string = render_to_string('admin/results/session_subject_matrix_analysis_pdf.html', context)
+        html = HTML(string=html_string, base_url=request.build_absolute_uri())
+        pdf_file = html.write_pdf()
+
+        # Generate filename
+        filename_parts = [
+            f"Matrix_{selected_subject.code}",
+            exam_session.name.replace(' ', '_')
+        ]
+
+        if grade_filter:
+            filename_parts.append(f"Grade_{grade_filter}")
+        if marks_min is not None:
+            filename_parts.append(f"Min{marks_min}")
+        if marks_max is not None:
+            filename_parts.append(f"Max{marks_max}")
+        if gender_filter:
+            filename_parts.append(f"Gender_{gender_filter}")
+        if rank_filter:
+            filename_parts.append(f"{rank_filter}_{top_n if rank_filter == 'top' else bottom_n}")
+
+        filename_parts.append(timezone.now().strftime('%Y%m%d'))
+        filename = "_".join(filename_parts) + ".pdf"
+
+        response = HttpResponse(pdf_file, content_type='application/pdf')
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+
+        return response
+
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error generating matrix analysis PDF: {str(e)}")
+        messages.error(request, f"Error generating PDF report: {str(e)}")
+        return redirect('session_subject_matrix_analysis', exam_session_id=exam_session_id)    
+    

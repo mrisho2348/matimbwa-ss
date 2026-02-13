@@ -17,6 +17,7 @@
 
 {% block extra_css %}
 <style>
+    /* Statistics Cards */
     .stat-card {
         border-radius: 8px;
         padding: 15px;
@@ -56,6 +57,7 @@
         opacity: 1;
     }
     
+    /* Filter Panel */
     .filter-panel {
         background-color: #f8f9fa;
         border-radius: 8px;
@@ -71,6 +73,7 @@
         border-bottom: 2px solid #dee2e6;
     }
     
+    /* Analysis Sections */
     .analysis-section {
         background: white;
         border-radius: 8px;
@@ -100,6 +103,7 @@
         padding-right: 40px;
     }
     
+    /* Badges and Indicators */
     .distribution-badge {
         padding: 5px 12px;
         border-radius: 20px;
@@ -107,10 +111,6 @@
         margin-right: 8px;
         margin-bottom: 8px;
         display: inline-block;
-    }
-    
-    .table td, .table th {
-        vertical-align: middle;
     }
     
     .division-badge {
@@ -124,6 +124,23 @@
     .division-III { background-color: #ffc107; color: #212529; }
     .division-IV { background-color: #fd7e14; color: white; }
     .division-0 { background-color: #dc3545; color: white; }
+    .division-Not-Assigned { background-color: #6c757d; color: white; }
+    
+    .grade-badge {
+        display: inline-block;
+        padding: 4px 10px;
+        border-radius: 12px;
+        font-weight: 500;
+        font-size: 0.85em;
+        color: white;
+    }
+    .grade-A { background-color: #28a745; color: white; }
+    .grade-B { background-color: #17a2b8; color: white; }
+    .grade-C { background-color: #ffc107; color: #212529; }
+    .grade-D { background-color: #fd7e14; color: white; }
+    .grade-E { background-color: #6c757d; color: white; }
+    .grade-F { background-color: #dc3545; color: white; }
+    .grade-S { background-color: #6610f2; color: white; }
     
     .rank-badge {
         display: inline-block;
@@ -153,10 +170,108 @@
     .gender-female { background-color: #f8d7da; color: #721c24; }
     .gender-other { background-color: #e2e3e5; color: #383d41; }
     
-    .download-btn {
-        margin-left: 10px;
+    .gender-badge {
+        display: inline-block;
+        padding: 4px 10px;
+        border-radius: 12px;
+        font-size: 0.85em;
+        font-weight: 500;
+        color: white;
+    }
+    .gender-male-badge { background-color: #007bff; }
+    .gender-female-badge { background-color: #e83e8c; }
+    .gender-other-badge { background-color: #6c757d; }
+    
+    /* Matrix Table Styles */
+    .matrix-section {
+        margin-top: 20px;
+        margin-bottom: 30px;
     }
     
+    .matrix-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.9rem;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        border-radius: 8px;
+        overflow: hidden;
+    }
+    
+    .matrix-table th {
+        background: linear-gradient(135deg, #495057, #343a40);
+        color: white;
+        padding: 12px 8px;
+        text-align: center;
+        font-weight: 600;
+        font-size: 0.85rem;
+    }
+    
+    .matrix-table td {
+        padding: 10px 6px;
+        border: 1px solid #dee2e6;
+        text-align: center;
+        vertical-align: middle;
+    }
+    
+    .matrix-table tr:nth-child(even) {
+        background-color: #f8f9fa;
+    }
+    
+    .matrix-table tr:hover {
+        background-color: #e9ecef;
+    }
+    
+    .matrix-table td:first-child {
+        font-weight: 600;
+        background: linear-gradient(to right, #f8f9fa, #e9ecef);
+        text-align: left;
+        padding-left: 12px;
+    }
+    
+    .total-row {
+        background: linear-gradient(135deg, #e9ecef, #dee2e6) !important;
+        font-weight: bold;
+        border-top: 2px solid #495057;
+    }
+    
+    .total-row td {
+        font-weight: 700;
+    }
+    
+    .gender-total {
+        background-color: #cce5ff !important;
+        font-weight: 700;
+        border-left: 2px solid #004085;
+    }
+    
+    .grand-total {
+        background: linear-gradient(135deg, #ffd54f, #ffb300) !important;
+        font-weight: 700;
+        color: #212529;
+    }
+    
+    .zero-value {
+        color: #6c757d;
+        font-style: italic;
+    }
+    
+    .matrix-caption {
+        margin-top: 8px;
+        font-size: 0.8rem;
+        color: #6c757d;
+        text-align: center;
+        font-style: italic;
+        padding: 8px;
+        background-color: #f8f9fa;
+        border-radius: 4px;
+    }
+    
+    /* Table Styles */
+    .table td, .table th {
+        vertical-align: middle;
+    }
+    
+    /* No Data Placeholder */
     .no-data {
         text-align: center;
         padding: 40px 20px;
@@ -168,12 +283,18 @@
         opacity: 0.5;
     }
     
+    /* Form Styles */
     .form-group-sm label {
         font-weight: 500;
         font-size: 0.9em;
         margin-bottom: 5px;
     }
     
+    .download-btn {
+        margin-left: 10px;
+    }
+    
+    /* Print Styles */
     @media print {
         .filter-panel, .download-btn, .no-print, .pdf-download-btn {
             display: none !important;
@@ -182,6 +303,17 @@
             break-inside: avoid;
             page-break-inside: avoid;
         }
+        .matrix-table {
+            break-inside: avoid;
+        }
+    }
+    
+    /* Background Colors */
+    .bg-pink {
+        background-color: #e83e8c !important;
+    }
+    .bg-orange {
+        background-color: #fd7e14 !important;
     }
 </style>
 {% endblock extra_css %}
@@ -208,6 +340,7 @@
                                     <i class="fas fa-school"></i> {{ exam_session.academic_year.name }} - 
                                     <i class="fas fa-layer-group"></i> {{ exam_session.term.get_term_number_display }} |
                                     <span class="badge badge-{{ exam_session.status }}">{{ exam_session.get_status_display }}</span>
+                                    <span class="badge badge-dark ml-2">{{ exam_session.class_level.educational_level.name }}</span>
                                 </p>
                             </div>
                             <div class="col-md-4 text-right">
@@ -217,88 +350,11 @@
                                 <button onclick="window.print()" class="btn btn-outline-primary no-print">
                                     <i class="fas fa-print"></i> Print
                                 </button>
-                                <!-- Full PDF Download -->
-                                <a href="{% url 'exam_session_analysis_pdf' exam_session.id %}?section=full" 
+                                <a href="{% url 'exam_session_analysis_pdf' exam_session.id %}?section=full&{% if not is_primary_nursery %}division={{ division_filter|urlencode }}&{% endif %}{% if is_primary_nursery %}grade={{ grade_filter|urlencode }}&{% endif %}gender={{ gender_filter|urlencode }}&rank_filter={{ rank_filter|urlencode }}&top_n={{ top_n }}&bottom_n={{ bottom_n }}" 
                                    class="btn btn-danger no-print" target="_blank">
                                     <i class="fas fa-file-pdf"></i> Download Full PDF
                                 </a>
                             </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Statistics Cards -->
-        <div class="row mb-4">
-            <div class="col-lg-3 col-md-6">
-                <div class="stat-card bg-primary text-white">
-                    <a href="{% url 'exam_session_analysis_pdf' exam_session.id %}?section=overview" 
-                       class="btn btn-sm btn-light pdf-download-btn no-print" target="_blank" title="Download Overview PDF">
-                        <i class="fas fa-file-pdf"></i>
-                    </a>
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div>
-                            <h5>Total Students</h5>
-                            <h3>{{ total_students }}</h3>
-                            <small>{{ students_with_division }} with division assigned</small>
-                        </div>
-                        <div class="stat-icon">
-                            <i class="fas fa-users"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="col-lg-3 col-md-6">
-                <div class="stat-card bg-success text-white">
-                    <a href="{% url 'exam_session_analysis_pdf' exam_session.id %}?section=divisions" 
-                       class="btn btn-sm btn-light pdf-download-btn no-print" target="_blank" title="Download Division Analysis PDF">
-                        <i class="fas fa-file-pdf"></i>
-                    </a>
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div>
-                            <h5>Unique Divisions</h5>
-                            <h3>{{ division_distribution|length }}</h3>
-                            <small>{% for division, count in division_distribution.items %}{% if forloop.first %}{{ division }}{% endif %}{% endfor %} most common</small>
-                        </div>
-                        <div class="stat-icon">
-                            <i class="fas fa-chart-pie"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="col-lg-3 col-md-6">
-                <div class="stat-card bg-info text-white">
-                    <a href="{% url 'exam_session_analysis_pdf' exam_session.id %}?section=genders" 
-                       class="btn btn-sm btn-light pdf-download-btn no-print" target="_blank" title="Download Gender Analysis PDF">
-                        <i class="fas fa-file-pdf"></i>
-                    </a>
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div>
-                            <h5>Gender Groups</h5>
-                            <h3>{{ gender_distribution|length }}</h3>
-                            <small>{% for gender, count in gender_distribution.items %}{% if forloop.first %}{{ gender }}{% endif %}{% endfor %} largest group</small>
-                        </div>
-                        <div class="stat-icon">
-                            <i class="fas fa-venus-mars"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="col-lg-3 col-md-6">
-                <div class="stat-card bg-warning text-dark">
-                    <a href="{% url 'exam_session_analysis_pdf' exam_session.id %}?section=rankings" 
-                       class="btn btn-sm btn-light pdf-download-btn no-print" target="_blank" title="Download Rankings PDF">
-                        <i class="fas fa-file-pdf"></i>
-                    </a>
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div>
-                            <h5>Ranked Students</h5>
-                            <h3>{{ all_student_data|length }}</h3>
-                            <small>All students ranked</small>
-                        </div>
-                        <div class="stat-icon">
-                            <i class="fas fa-trophy"></i>
                         </div>
                     </div>
                 </div>
@@ -313,19 +369,43 @@
             <form method="get" id="analysis-filters">
                 <input type="hidden" name="exam_session_id" value="{{ exam_session.id }}">
                 <div class="row">
+                    <!-- Division Filter - Only show for non-Primary/Nursery -->
+                    {% if not is_primary_nursery %}
                     <div class="col-md-3">
                         <div class="form-group form-group-sm">
                             <label for="division">Division</label>
                             <select class="form-control" id="division" name="division">
-                                <option value="">All Divisions</option>
-                                {% for division in unique_divisions %}
+                                <option value="">All divisions</option>
+                                {% for division in division_columns %}
                                     <option value="{{ division }}" {% if division_filter == division %}selected{% endif %}>
                                         {{ division }}
                                     </option>
                                 {% endfor %}
+                                <option value="Not Assigned" {% if division_filter == 'Not Assigned' %}selected{% endif %}>Not Assigned</option>
                             </select>
                         </div>
                     </div>
+                    {% endif %}
+                    
+                    <!-- Grade Filter - Only show for Primary/Nursery -->
+                    {% if is_primary_nursery %}
+                    <div class="col-md-3">
+                        <div class="form-group form-group-sm">
+                            <label for="grade">Grade</label>
+                            <select class="form-control" id="grade" name="grade">
+                                <option value="">All grades</option>
+                                {% for grade in grade_columns %}
+                                    <option value="{{ grade }}" {% if grade_filter == grade %}selected{% endif %}>
+                                        Grade {{ grade }}
+                                    </option>
+                                {% endfor %}
+                                <option value="No Grade" {% if grade_filter == 'No Grade' %}selected{% endif %}>No Grade</option>
+                            </select>
+                        </div>
+                    </div>
+                    {% endif %}
+                    
+                    <!-- Gender Filter - Always show -->
                     <div class="col-md-3">
                         <div class="form-group form-group-sm">
                             <label for="gender">Gender</label>
@@ -339,6 +419,8 @@
                             </select>
                         </div>
                     </div>
+                    
+                    <!-- Rank Filter - Always show -->
                     <div class="col-md-3">
                         <div class="form-group form-group-sm">
                             <label for="rank_filter">Rank Filter</label>
@@ -351,6 +433,8 @@
                             </select>
                         </div>
                     </div>
+                    
+                    <!-- N Filter Inputs -->
                     <div class="col-md-3">
                         <div class="form-group form-group-sm" id="top_n_container" {% if rank_filter != 'top' %}style="display: none;"{% endif %}>
                             <label for="top_n">Top N Students</label>
@@ -377,7 +461,7 @@
                             </div>
                             <div>
                                 <span class="badge badge-info">
-                                    Showing {{ student_data|length }} of {{ total_students }} students
+                                    Showing {{ student_data|length }} of {{ total_students_all }} students
                                 </span>
                             </div>
                         </div>
@@ -386,166 +470,233 @@
             </form>
         </div>
 
-        {% if student_data %}
-            <!-- Distribution Analysis -->
-            <div class="row">
-                <div class="col-lg-6">
-                    <div class="analysis-section">
-                        <a href="{% url 'exam_session_analysis_pdf' exam_session.id %}?section=divisions_only" 
-                           class="btn btn-sm btn-danger pdf-download-btn no-print" target="_blank" title="Download Division Analysis PDF">
-                            <i class="fas fa-file-pdf"></i> PDF
-                        </a>
-                        <h5 class="section-title">
-                            <i class="fas fa-chart-pie"></i> Division Distribution
-                        </h5>
-                        {% if division_distribution %}
-                            <div class="mb-4">
-                                {% for division, count in division_distribution.items %}
-                                    <span class="distribution-badge 
-                                        {% if division == 'Division I' %}bg-success text-white
-                                        {% elif division == 'Division II' %}bg-info text-white
-                                        {% elif division == 'Division III' %}bg-warning text-dark
-                                        {% elif division == 'Division IV' %}bg-orange text-white
-                                        {% else %}bg-danger text-white{% endif %}">
-                                        {{ division }}: {{ count }} students
-                                    </span>
-                                {% endfor %}
-                            </div>
-                            <div class="table-responsive">
-                                <table class="table table-sm table-hover">
-                                    <thead class="bg-light">
-                                        <tr>
-                                            <th>Division</th>
-                                            <th class="text-center">Students</th>
-                                            <th class="text-center">Percentage</th>
-                                            <th class="text-center">Avg. Marks</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {% for division, count in division_distribution.items %}
-                                        <tr>
-                                            <td>
-                                                <span class="division-badge division-{{ division|slice:"-1:" }}">
-                                                    {{ division }}
-                                                </span>
-                                            </td>
-                                            <td class="text-center">{{ count }}</td>
-                                            <td class="text-center">
-                                                {% widthratio count total_students 100 as percentage %}
-                                                {{ count }}/{{ total_students }}
-                                                ({{ percentage|floatformat:1 }}%)
-                                            </td>
-                                            <td class="text-center">
-                                                {% if division_averages and division in division_averages %}
-                                                    <strong>{{ division_averages|get_item:division|floatformat:2 }}</strong>
-                                                {% else %}
-                                                    <span class="text-muted">-</span>
-                                                {% endif %}
-                                            </td>
-                                        </tr>
-                                        {% endfor %}
-                                    </tbody>
-                                </table>
-                            </div>
-                        {% else %}
-                            <div class="no-data">
-                                <i class="fas fa-chart-pie"></i>
-                                <p>No division data available</p>
-                            </div>
-                        {% endif %}
-                    </div>
-                </div>
-                
-                <div class="col-lg-6">
-                    <div class="analysis-section">
-                        <a href="{% url 'exam_session_analysis_pdf' exam_session.id %}?section=genders_only" 
-                           class="btn btn-sm btn-danger pdf-download-btn no-print" target="_blank" title="Download Gender Analysis PDF">
-                            <i class="fas fa-file-pdf"></i> PDF
-                        </a>
-                        <h5 class="section-title">
-                            <i class="fas fa-venus-mars"></i> Gender Distribution
-                        </h5>
-                        {% if gender_distribution %}
-                            <div class="mb-4">
-                                {% for gender, count in gender_distribution.items %}
-                                    <span class="distribution-badge 
-                                        {% if gender == 'Male' %}bg-info text-white
-                                        {% elif gender == 'Female' %}bg-pink text-white
-                                        {% else %}bg-secondary text-white{% endif %}">
-                                        <i class="fas fa-{% if gender == 'Male' %}mars{% elif gender == 'Female' %}venus{% else %}genderless{% endif %}"></i>
-                                        {{ gender }}: {{ count }} students
-                                    </span>
-                                {% endfor %}
-                            </div>
-                            <div class="table-responsive">
-                                <table class="table table-sm table-hover">
-                                    <thead class="bg-light">
-                                        <tr>
-                                            <th>Gender</th>
-                                            <th class="text-center">Students</th>
-                                            <th class="text-center">Percentage</th>
-                                            <th class="text-center">Avg. Marks</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {% for gender, count in gender_distribution.items %}
-                                        <tr>
-                                            <td>
-                                                <span class="gender-icon gender-{{ gender|lower }}">
-                                                    <i class="fas fa-{% if gender == 'Male' %}mars{% elif gender == 'Female' %}venus{% else %}genderless{% endif %}"></i>
-                                                </span>
-                                                {{ gender }}
-                                            </td>
-                                            <td class="text-center">{{ count }}</td>
-                                            <td class="text-center">
-                                                {% widthratio count total_students 100 as percentage %}
-                                                {{ count }}/{{ total_students }}
-                                                ({{ percentage|floatformat:1 }}%)
-                                            </td>
-                                            <td class="text-center">
-                                                {% if gender_averages and gender in gender_averages %}
-                                                    <strong>{{ gender_averages|get_item:gender|floatformat:2 }}</strong>
-                                                {% else %}
-                                                    <span class="text-muted">-</span>
-                                                {% endif %}
-                                            </td>
-                                        </tr>
-                                        {% endfor %}
-                                    </tbody>
-                                </table>
-                            </div>
-                        {% else %}
-                            <div class="no-data">
-                                <i class="fas fa-venus-mars"></i>
-                                <p>No gender data available</p>
-                            </div>
-                        {% endif %}
-                    </div>
+        <!-- Current Active Filters Display -->
+        {% if division_filter or grade_filter or gender_filter or rank_filter %}
+        <div class="row mb-3">
+            <div class="col-12">
+                <div class="alert alert-info no-print">
+                    <i class="fas fa-filter"></i> <strong>Active Filters:</strong>
+                    {% if not is_primary_nursery %}
+                        {% if division_filter %} Division: <span class="badge badge-primary">{{ division_filter }}</span> {% endif %}
+                    {% endif %}
+                    {% if is_primary_nursery %}
+                        {% if grade_filter %} Grade: <span class="badge badge-primary">{{ grade_filter }}</span> {% endif %}
+                    {% endif %}
+                    {% if gender_filter %} Gender: <span class="badge badge-primary">{{ gender_filter }}</span> {% endif %}
+                    {% if rank_filter == 'top' %} Rank: <span class="badge badge-primary">Top {{ top_n }} Students</span> {% endif %}
+                    {% if rank_filter == 'bottom' %} Rank: <span class="badge badge-primary">Bottom {{ bottom_n }} Students</span> {% endif %}
+                    <a href="?exam_session_id={{ exam_session.id }}" class="float-right text-danger">
+                        <i class="fas fa-times-circle"></i> Clear All Filters
+                    </a>
                 </div>
             </div>
+        </div>
+        {% endif %}
+
+        {% if student_data %}
+            <!-- Cross-Analysis Matrix - Conditional based on Education Level -->
+            {% if is_primary_nursery %}
+                <!-- Grade × Gender Cross-Analysis Matrix for Primary/Nursery -->
+                <div class="matrix-section">
+                    <div class="analysis-section">
+                        <a href="{% url 'exam_session_analysis_pdf' exam_session.id %}?section=grades_only&grade={{ grade_filter|urlencode }}&gender={{ gender_filter|urlencode }}&rank_filter={{ rank_filter|urlencode }}&top_n={{ top_n }}&bottom_n={{ bottom_n }}" 
+                           class="btn btn-sm btn-danger pdf-download-btn no-print" target="_blank" title="Download Grade × Gender Analysis PDF">
+                            <i class="fas fa-file-pdf"></i> PDF
+                        </a>
+                        <h5 class="section-title">
+                            <i class="fas fa-table"></i> Grade × Gender Cross-Analysis Matrix
+                            <small class="text-muted">(All students - unfiltered)</small>
+                        </h5>
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle"></i> Division analysis is not applicable for {{ exam_session.class_level.educational_level.name }} level. Showing grade distribution instead.
+                        </div>
+                        <div class="table-responsive">
+                            <table class="matrix-table table table-hover text-nowrap table-responsive-sm table-bordered table-striped table-sm result-table">
+                                <thead>
+                                    <tr>
+                                        <th>Gender \ Grade</th>
+                                        {% for grade in grade_columns %}
+                                            <th>{{ grade }}</th>
+                                        {% endfor %}
+                                        <th>Total (Gender)</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for gender, row in grade_gender_matrix.items %}
+                                        <tr>
+                                            <td>
+                                                <span class="gender-badge gender-{{ gender|lower }}-badge">
+                                                    <i class="fas fa-{% if gender == 'Male' %}mars{% elif gender == 'Female' %}venus{% else %}genderless{% endif %} mr-1"></i>
+                                                    {{ gender }}
+                                                </span>
+                                            </td>
+                                            {% for grade in grade_columns %}
+                                                <td>
+                                                    {% with count=row|get_item:grade %}
+                                                        {% if count > 0 %}
+                                                            <span class="text-bold">{{ count }}</span>
+                                                        {% else %}
+                                                            <span class="zero-value">-</span>
+                                                        {% endif %}
+                                                    {% endwith %}
+                                                </td>
+                                            {% endfor %}
+                                            <td class="gender-total">
+                                                <strong>{{ gender_totals|get_item:gender|default:0 }}</strong>
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+
+                                    <tr class="total-row">
+                                        <td>
+                                            <span style="background-color: #495057; color: white; padding: 5px 12px; border-radius: 20px;">
+                                                <strong>TOTAL</strong>
+                                            </span>
+                                        </td>
+                                        {% for grade in grade_columns %}
+                                            <td>
+                                                {% with total=grade_totals|get_item:grade|default:0 %}
+                                                    {% if total > 0 %}
+                                                        <span style="background-color: #ffd54f; color: #212529; padding: 4px 10px; border-radius: 20px; font-weight: 700;">
+                                                            {{ total }}
+                                                        </span>
+                                                    {% else %}
+                                                        <span class="zero-value">{{ total }}</span>
+                                                    {% endif %}
+                                                {% endwith %}
+                                            </td>
+                                        {% endfor %}
+                                        <td class="grand-total">
+                                            <span style="background-color: #ffb300; color: #212529; padding: 4px 12px; border-radius: 20px; font-weight: 700;">
+                                                {{ grand_total }}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="matrix-caption">
+                            <i class="fas fa-info-circle"></i> Cross-analysis showing student distribution by gender and grade. 
+                            <strong>Zero values (-)</strong> indicate no students in that category. 
+                            <strong>Total students with grade assigned: {{ grand_total }}</strong>
+                        </div>
+                    </div>
+                </div>
+            {% else %}
+                <!-- Division × Gender Cross-Analysis Matrix for Secondary levels -->
+                {% if division_columns %}
+                <div class="matrix-section">
+                    <div class="analysis-section">
+                        <a href="{% url 'exam_session_analysis_pdf' exam_session.id %}?section=divisions_only&division={{ division_filter|urlencode }}&gender={{ gender_filter|urlencode }}&rank_filter={{ rank_filter|urlencode }}&top_n={{ top_n }}&bottom_n={{ bottom_n }}" 
+                           class="btn btn-sm btn-danger pdf-download-btn no-print" target="_blank" title="Download Division × Gender Analysis PDF">
+                            <i class="fas fa-file-pdf"></i> PDF
+                        </a>
+                        <h5 class="section-title">
+                            <i class="fas fa-table"></i> Division × Gender Cross-Analysis Matrix
+                            <small class="text-muted">(All students - unfiltered)</small>
+                        </h5>
+                        <div class="table-responsive">
+                            <table class="matrix-table table table-hover text-nowrap table-responsive-sm table-bordered table-striped table-sm result-table">
+                                <thead>
+                                    <tr>
+                                        <th>Gender \ Division</th>
+                                        {% for division in division_columns %}
+                                            <th>{{ division }}</th>
+                                        {% endfor %}
+                                        <th>Total (Gender)</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for gender, row in division_gender_matrix.items %}
+                                        <tr>
+                                            <td>
+                                                <span class="gender-badge gender-{{ gender|lower }}-badge">
+                                                    <i class="fas fa-{% if gender == 'Male' %}mars{% elif gender == 'Female' %}venus{% else %}genderless{% endif %} mr-1"></i>
+                                                    {{ gender }}
+                                                </span>
+                                            </td>
+                                            {% for division in division_columns %}
+                                                <td>
+                                                    {% with count=row|get_item:division %}
+                                                        {% if count > 0 %}
+                                                            <span class="text-bold">{{ count }}</span>
+                                                        {% else %}
+                                                            <span class="zero-value">-</span>
+                                                        {% endif %}
+                                                    {% endwith %}
+                                                </td>
+                                            {% endfor %}
+                                            <td class="gender-total">
+                                                <strong>{{ gender_totals|get_item:gender|default:0 }}</strong>
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+
+                                    <tr class="total-row">
+                                        <td>
+                                            <span style="background-color: #495057; color: white; padding: 5px 12px; border-radius: 20px;">
+                                                <strong>TOTAL</strong>
+                                            </span>
+                                        </td>
+                                        {% for division in division_columns %}
+                                            <td>
+                                                {% with total=division_totals|get_item:division|default:0 %}
+                                                    {% if total > 0 %}
+                                                        <span style="background-color: #ffd54f; color: #212529; padding: 4px 10px; border-radius: 20px; font-weight: 700;">
+                                                            {{ total }}
+                                                        </span>
+                                                    {% else %}
+                                                        <span class="zero-value">{{ total }}</span>
+                                                    {% endif %}
+                                                {% endwith %}
+                                            </td>
+                                        {% endfor %}
+                                        <td class="grand-total">
+                                            <span style="background-color: #ffb300; color: #212529; padding: 4px 12px; border-radius: 20px; font-weight: 700;">
+                                                {{ grand_total }}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="matrix-caption">
+                            <i class="fas fa-info-circle"></i> Cross-analysis showing student distribution by gender and division. 
+                            <strong>Zero values (-)</strong> indicate no students in that category. 
+                            <strong>Total students with division assigned: {{ grand_total }}</strong>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+            {% endif %}
 
             <!-- Top & Bottom Performers -->
             <div class="row">
                 <div class="col-lg-6">
                     <div class="analysis-section">
-                        <a href="{% url 'exam_session_analysis_pdf' exam_session.id %}?section=top_performers" 
+                        <a href="{% url 'exam_session_analysis_pdf' exam_session.id %}?section=top_performers&{% if not is_primary_nursery %}division={{ division_filter|urlencode }}&{% endif %}{% if is_primary_nursery %}grade={{ grade_filter|urlencode }}&{% endif %}gender={{ gender_filter|urlencode }}&rank_filter={{ rank_filter|urlencode }}&top_n={{ top_n }}&bottom_n={{ bottom_n }}" 
                            class="btn btn-sm btn-danger pdf-download-btn no-print" target="_blank" title="Download Top Performers PDF">
                             <i class="fas fa-file-pdf"></i> PDF
                         </a>
                         <h5 class="section-title">
                             <i class="fas fa-trophy text-warning"></i> Top 10 Performers
-                            <small class="text-muted">(Always shows top 10 from all students)</small>
+                            <small class="text-muted">(All students - unfiltered)</small>
                         </h5>
                         {% if top_performers %}
                             <div class="table-responsive">
-                                <table class="table table-sm table-hover">
+                                <table class="table table-hover text-nowrap table-responsive-sm table-bordered table-striped table-sm result-table">
                                     <thead class="bg-light">
                                         <tr>
                                             <th>Rank</th>
                                             <th>Student</th>
-                                            <th class="text-center">Division</th>
+                                            <th class="text-center">Gender</th>
+                                            <th class="text-center">
+                                                {% if is_primary_nursery %}Total Marks{% else %}Division{% endif %}
+                                            </th>
                                             <th class="text-center">Avg. Marks</th>
-                                            <th class="text-center">Grade Points</th>
+                                            <th class="text-center">
+                                                {% if is_primary_nursery %}Grade{% else %}Grade Points{% endif %}
+                                            </th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -562,22 +713,35 @@
                                             </td>
                                             <td>
                                                 <strong>{{ student.registration_number }}</strong><br>
-                                                <small class="text-muted">{{ student.full_name }}</small>
+                                                <small class="text-muted">{{ student.full_name|truncatechars:20 }}</small>
                                             </td>
                                             <td class="text-center">
-                                                {% if student.division %}
-                                                    <span class="division-badge division-{{ student.division|lower }}">
+                                                <span class="gender-icon gender-{{ student.gender|lower }}">
+                                                    <i class="fas fa-{% if student.gender == 'Male' %}mars{% elif student.gender == 'Female' %}venus{% else %}genderless{% endif %}"></i>
+                                                </span>
+                                            </td>
+                                            <td class="text-center">
+                                                {% if not is_primary_nursery and student.division %}
+                                                    <span class="division-badge division-{{ student.division }}">
                                                         {{ student.division_display }}
                                                     </span>
+                                                {% elif is_primary_nursery %}
+                                                    <strong>{{ student.total_marks|floatformat:2|default:"-" }}</strong>
                                                 {% else %}
-                                                    <span class="text-muted">-</span>
+                                                    <span class="badge badge-secondary">Not Assigned</span>
                                                 {% endif %}
                                             </td>
                                             <td class="text-center">
                                                 <strong>{{ student.average_marks|floatformat:2 }}</strong>
                                             </td>
                                             <td class="text-center">
-                                                {{ student.total_grade_points|floatformat:1|default:"-" }}
+                                                {% if is_primary_nursery %}
+                                                    <span class="grade-badge grade-{{ student.average_grade }}">
+                                                        {{ student.average_grade }}
+                                                    </span>
+                                                {% else %}
+                                                    <strong>{{ student.total_grade_points|floatformat:1|default:"-" }}</strong>
+                                                {% endif %}
                                             </td>
                                         </tr>
                                         {% endfor %}
@@ -595,24 +759,29 @@
                 
                 <div class="col-lg-6">
                     <div class="analysis-section">
-                        <a href="{% url 'exam_session_analysis_pdf' exam_session.id %}?section=bottom_performers" 
+                        <a href="{% url 'exam_session_analysis_pdf' exam_session.id %}?section=bottom_performers&{% if not is_primary_nursery %}division={{ division_filter|urlencode }}&{% endif %}{% if is_primary_nursery %}grade={{ grade_filter|urlencode }}&{% endif %}gender={{ gender_filter|urlencode }}&rank_filter={{ rank_filter|urlencode }}&top_n={{ top_n }}&bottom_n={{ bottom_n }}" 
                            class="btn btn-sm btn-danger pdf-download-btn no-print" target="_blank" title="Download Bottom Performers PDF">
                             <i class="fas fa-file-pdf"></i> PDF
                         </a>
                         <h5 class="section-title">
                             <i class="fas fa-exclamation-triangle text-danger"></i> Bottom 10 Performers
-                            <small class="text-muted">(Always shows bottom 10 from all students)</small>
+                            <small class="text-muted">(All students - unfiltered)</small>
                         </h5>
                         {% if bottom_performers %}
                             <div class="table-responsive">
-                                <table class="table table-sm table-hover">
+                                <table class="table table-hover text-nowrap table-responsive-sm table-bordered table-striped table-sm result-table">
                                     <thead class="bg-light">
                                         <tr>
                                             <th>Rank</th>
                                             <th>Student</th>
-                                            <th class="text-center">Division</th>
+                                            <th class="text-center">Gender</th>
+                                            <th class="text-center">
+                                                {% if is_primary_nursery %}Total Marks{% else %}Division{% endif %}
+                                            </th>
                                             <th class="text-center">Avg. Marks</th>
-                                            <th class="text-center">Grade Points</th>
+                                            <th class="text-center">
+                                                {% if is_primary_nursery %}Grade{% else %}Grade Points{% endif %}
+                                            </th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -625,22 +794,35 @@
                                             </td>
                                             <td>
                                                 <strong>{{ student.registration_number }}</strong><br>
-                                                <small class="text-muted">{{ student.full_name }}</small>
+                                                <small class="text-muted">{{ student.full_name|truncatechars:20 }}</small>
                                             </td>
                                             <td class="text-center">
-                                                {% if student.division %}
-                                                    <span class="division-badge division-{{ student.division|lower }}">
+                                                <span class="gender-icon gender-{{ student.gender|lower }}">
+                                                    <i class="fas fa-{% if student.gender == 'Male' %}mars{% elif student.gender == 'Female' %}venus{% else %}genderless{% endif %}"></i>
+                                                </span>
+                                            </td>
+                                            <td class="text-center">
+                                                {% if not is_primary_nursery and student.division %}
+                                                    <span class="division-badge division-{{ student.division }}">
                                                         {{ student.division_display }}
                                                     </span>
+                                                {% elif is_primary_nursery %}
+                                                    <strong>{{ student.total_marks|floatformat:2 }}</strong>
                                                 {% else %}
-                                                    <span class="text-muted">-</span>
+                                                    <span class="badge badge-secondary">Not Assigned</span>
                                                 {% endif %}
                                             </td>
                                             <td class="text-center">
                                                 <strong>{{ student.average_marks|floatformat:2 }}</strong>
                                             </td>
                                             <td class="text-center">
-                                                {{ student.total_grade_points|floatformat:1|default:"-" }}
+                                                {% if is_primary_nursery %}
+                                                    <span class="grade-badge grade-{{ student.average_grade }}">
+                                                        {{ student.average_grade }}
+                                                    </span>
+                                                {% else %}
+                                                    <strong>{{ student.total_grade_points|floatformat:1|default:"-" }}</strong>
+                                                {% endif %}
                                             </td>
                                         </tr>
                                         {% endfor %}
@@ -657,34 +839,42 @@
                 </div>
             </div>
 
-            <!-- Detailed Student List -->
+            <!-- Detailed Student List (Filtered) -->
             <div class="row">
                 <div class="col-12">
                     <div class="analysis-section">
-                        <a href="{% url 'exam_session_analysis_pdf' exam_session.id %}?section=detailed_list" 
+                        <a href="{% url 'exam_session_analysis_pdf' exam_session.id %}?section=detailed_list&{% if not is_primary_nursery %}division={{ division_filter|urlencode }}&{% endif %}{% if is_primary_nursery %}grade={{ grade_filter|urlencode }}&{% endif %}gender={{ gender_filter|urlencode }}&rank_filter={{ rank_filter|urlencode }}&top_n={{ top_n }}&bottom_n={{ bottom_n }}" 
                            class="btn btn-sm btn-danger pdf-download-btn no-print" target="_blank" title="Download Detailed List PDF">
                             <i class="fas fa-file-pdf"></i> PDF
                         </a>
                         <div class="d-flex justify-content-between align-items-center mb-3">
                             <h5 class="section-title mb-0">
                                 <i class="fas fa-list"></i> Detailed Student Analysis
-                                <span class="badge badge-light ml-2">{{ student_data|length }} students</span>
+                                <span class="badge badge-light ml-2">{{ student_data|length }} students (filtered)</span>
+                                <small class="text-muted ml-2">Total: {{ total_students_all }} students</small>
                             </h5>
                         </div>
                         
                         <div class="table-responsive">
-                            <table class="table table-hover table-sm" id="student-analysis-table">
+                            <table class="table table-hover text-nowrap table-responsive-sm table-bordered table-striped table-sm result-table" id="student-analysis-table">
                                 <thead class="thead-light">
                                     <tr>
                                         <th>#</th>
                                         <th>Student</th>
                                         <th class="text-center">Gender</th>
                                         <th class="text-center">Rank</th>
-                                        <th class="text-center">Division</th>
+                                        {% if not is_primary_nursery %}
+                                            <th class="text-center">Division</th>
+                                        {% endif %}
+                                        {% if is_primary_nursery %}
+                                            <th class="text-center">Grade</th>
+                                        {% endif %}
                                         <th class="text-center">Total Marks</th>
                                         <th class="text-center">Avg. Marks</th>
                                         <th class="text-center">Avg. %</th>
-                                        <th class="text-center">Grade Points</th>
+                                        {% if not is_primary_nursery %}
+                                            <th class="text-center">Grade Points</th>
+                                        {% endif %}
                                         <th class="text-center">Avg. Grade</th>
                                     </tr>
                                 </thead>
@@ -694,7 +884,7 @@
                                         <td>{{ forloop.counter }}</td>
                                         <td>
                                             <strong>{{ student.registration_number }}</strong><br>
-                                            <small class="text-muted">{{ student.full_name }}</small>
+                                            <small class="text-muted">{{ student.full_name|truncatechars:25 }}</small>
                                         </td>
                                         <td class="text-center">
                                             <span class="gender-icon gender-{{ student.gender|lower }}">
@@ -705,18 +895,31 @@
                                             {% if student.rank %}
                                                 <span class="badge badge-info">{{ student.rank }}</span>
                                             {% else %}
-                                                <span class="text-muted">-</span>
+                                                <span class="badge badge-secondary">NR</span>
                                             {% endif %}
                                         </td>
+                                        {% if not is_primary_nursery %}
                                         <td class="text-center">
                                             {% if student.division %}
                                                 <span class="division-badge division-{{ student.division }}">
                                                     {{ student.division_display }}
                                                 </span>
                                             {% else %}
-                                                <span class="text-muted">Not Assigned</span>
+                                                <span class="badge badge-secondary">Not Assigned</span>
                                             {% endif %}
                                         </td>
+                                        {% endif %}
+                                        {% if is_primary_nursery %}
+                                        <td class="text-center">
+                                            {% if student.average_grade %}
+                                                <span class="grade-badge grade-{{ student.average_grade }}">
+                                                    {{ student.average_grade }}
+                                                </span>
+                                            {% else %}
+                                                <span class="badge badge-secondary">No Grade</span>
+                                            {% endif %}
+                                        </td>
+                                        {% endif %}
                                         <td class="text-center">
                                             <strong>{{ student.total_marks|floatformat:2|default:"-" }}</strong>
                                         </td>
@@ -728,22 +931,25 @@
                                                 <span class="badge 
                                                     {% if student.average_percentage >= 80 %}badge-success
                                                     {% elif student.average_percentage >= 60 %}badge-info
-                                                    {% elif student.average_percentage >= 40 %}badge-warning
+                                                    {% elif student.average_percentage >= 50 %}badge-warning
+                                                    {% elif student.average_percentage >= 40 %}badge-primary
                                                     {% else %}badge-danger{% endif %}">
                                                     {{ student.average_percentage|floatformat:1 }}%
                                                 </span>
                                             {% else %}
-                                                <span class="text-muted">-</span>
+                                                <span class="badge badge-secondary">-</span>
                                             {% endif %}
                                         </td>
+                                        {% if not is_primary_nursery %}
                                         <td class="text-center">
                                             {{ student.total_grade_points|floatformat:1|default:"-" }}
                                         </td>
+                                        {% endif %}
                                         <td class="text-center">
                                             {% if student.average_grade %}
                                                 <span class="badge badge-secondary">{{ student.average_grade }}</span>
                                             {% else %}
-                                                <span class="text-muted">-</span>
+                                                <span class="badge badge-light">-</span>
                                             {% endif %}
                                         </td>
                                     </tr>
@@ -818,7 +1024,10 @@ $(document).ready(function() {
             "zeroRecords": "No matching students found"
         },
         "dom": '<"row"<"col-md-6"l><"col-md-6"f>>rt<"row"<"col-md-6"i><"col-md-6"p>>',
-        "responsive": true
+        "responsive": true,
+        "columnDefs": [
+            { "orderable": false, "targets": [0] }
+        ]
     });
 
     // Keyboard shortcuts
@@ -833,6 +1042,9 @@ $(document).ready(function() {
             $('.dataTables_filter input').val('').keyup();
         }
     });
+    
+    // Tooltip initialization
+    $('[data-toggle="tooltip"]').tooltip();
 });
 </script>
 {% endblock extra_js %}

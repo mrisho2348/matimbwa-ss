@@ -60,8 +60,15 @@ urlpatterns = [
     # Student Management URLs
     path('students/', students_list, name='admin_students_list'),
     path('students/add/', students_add, name='admin_students_add'),
-    path('students/by-class/', students_by_class, name='admin_students_by_class'),
+     # Main view
+    path('admin/students/by-class/', students_by_class, name='admin_students_by_class'),
+    
+    # API endpoints
+    path('api/students/', students_api, name='students_api'),
+    path('api/statistics/', statistics_api, name='statistics_api'),
     path('students/status/', student_status, name='admin_student_status'),
+    path('export/students/excel/', export_students_excel, name='export_students_excel'),
+    path('export/students/pdf/', export_students_pdf, name='export_students_pdf'),
     path('students/<int:student_id>/edit/', student_edit, name='admin_student_edit'),
     path('students/<int:id>/delete/', student_delete, name='admin_student_delete'),
     path('students/<int:id>/detail/', student_detail, name='admin_student_detail'),
