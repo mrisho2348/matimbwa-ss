@@ -1,0 +1,1351 @@
+{% extends 'admin/base.html' %}
+{% load static %}
+{% block title %} Bed Management {% endblock title %}
+
+{% block breadcrumb %}
+    <div class="btn-group">
+        <button type="button" class="btn btn-primary" data-toggle="modal" data-target="#addBedModal">
+            <i class="fas fa-plus"></i> Add Bed
+        </button>
+        <button type="button" class="btn btn-success" data-toggle="modal" data-target="#bulkAddBedsModal">
+            <i class="fas fa-layer-group"></i> Bulk Add Beds
+        </button>
+    </div>
+{% endblock breadcrumb %}
+
+{% block extra_css %}
+<style>
+    .table th {
+        font-weight: 600;
+        border-bottom-width: 2px;
+    }
+    .table td {
+        vertical-align: middle;
+    }
+    .badge {
+        font-size: 0.85em;
+        padding: 0.4em 0.8em;
+    }
+    .modal-header {
+        border-radius: 0;
+    }
+    .btn-group .btn {
+        margin: 0 2px;
+    }
+    /* DataTable Styles */
+    .dataTables_wrapper .dataTables_filter {
+        float: right;
+        text-align: right;
+    }
+    .dataTables_wrapper .dataTables_length {
+        float: left;
+    }
+    .dataTables_wrapper .dataTables_paginate {
+        float: right;
+        margin-top: 10px;
+    }
+    .success-toast, .error-toast {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 1056;
+        min-width: 300px;
+    }
+    /* Stats cards */
+    .stat-card {
+        background: linear-gradient(45deg, #20c997 0%, #0f8b6d 100%);
+        color: white;
+        border-radius: 10px;
+        padding: 20px;
+        margin-bottom: 20px;
+        position: relative;
+        overflow: hidden;
+    }
+    .stat-card.total {
+        background: linear-gradient(45deg, #007bff 0%, #0056b3 100%);
+    }
+    .stat-card.occupied {
+        background: linear-gradient(45deg, #dc3545 0%, #a71d2a 100%);
+    }
+    .stat-card.available {
+        background: linear-gradient(45deg, #28a745 0%, #1e7e34 100%);
+    }
+    .stat-card.rate {
+        background: linear-gradient(45deg, #fd7e14 0%, #c05c0b 100%);
+    }
+    .stat-icon {
+        font-size: 3rem;
+        opacity: 0.3;
+        position: absolute;
+        right: 20px;
+        top: 20px;
+    }
+    /* Quick action buttons */
+    .quick-actions {
+        display: flex;
+        gap: 4px;
+        justify-content: center;
+        align-items: center;
+    }
+    .quick-action-btn {
+        width: 28px;
+        height: 28px;
+        padding: 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        border: none;
+        transition: all 0.2s ease;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+    }
+    .quick-action-btn i {
+        font-size: 0.75rem;
+        color: #ffffff !important;
+    }
+    .quick-action-btn:hover {
+        transform: scale(1.1);
+        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        filter: brightness(1.05);
+    }
+    .btn-warning.quick-action-btn i {
+        color: #212529 !important;
+    }
+    /* Bed type badges */
+    .bed-type-single {
+        background-color: #17a2b8;
+        color: white;
+    }
+    .bed-type-upper {
+        background-color: #6f42c1;
+        color: white;
+    }
+    .bed-type-lower {
+        background-color: #fd7e14;
+        color: white;
+    }
+    /* Occupancy indicator */
+    .occupancy-indicator {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        display: inline-block;
+        margin-right: 5px;
+    }
+    .occupancy-occupied {
+        background-color: #dc3545;
+    }
+    .occupancy-available {
+        background-color: #28a745;
+    }
+    /* Hierarchy indicators */
+    .hierarchy-level {
+        margin-left: 20px;
+        border-left: 2px dashed #dee2e6;
+        padding-left: 15px;
+    }
+    .hostel-header {
+        background-color: #e9ecef;
+        padding: 10px 15px;
+        border-radius: 5px;
+        margin-bottom: 10px;
+        font-weight: bold;
+        color: #495057;
+    }
+    .room-header {
+        background-color: #f8f9fa;
+        padding: 8px 12px;
+        border-radius: 5px;
+        margin: 10px 0;
+        border-left: 3px solid #007bff;
+    }
+    /* Select2 in modal */
+    .select2-container {
+        z-index: 1056 !important;
+    }
+    .select2-dropdown {
+        z-index: 1057 !important;
+    }
+    /* Bed distribution cards */
+    .bed-type-card {
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        padding: 15px;
+        text-align: center;
+        background-color: #f8f9fa;
+    }
+    .bed-type-icon {
+        font-size: 2rem;
+        margin-bottom: 10px;
+    }
+    .bed-type-count {
+        font-size: 1.5rem;
+        font-weight: bold;
+    }
+    /* Progress bar */
+    .progress {
+        height: 8px;
+        border-radius: 4px;
+    }
+    .progress-bar-occupied {
+        background-color: #dc3545;
+    }
+    .progress-bar-available {
+        background-color: #28a745;
+    }
+</style>
+{% endblock extra_css %}
+
+{% block content %}
+<section class="content">
+    <div class="container-fluid"> 
+        <!-- Toast Notifications -->
+        <div id="success-toast" class="alert alert-success alert-dismissible fade success-toast" style="display: none;" role="alert">
+            <strong><i class="fas fa-check-circle"></i> Success!</strong> 
+            <span id="success-message"></span>
+            <button type="button" class="close" onclick="$('#success-toast').fadeOut()" data-dismiss="alert" aria-label="Close">
+                <span aria-hidden="true">&times;</span>
+            </button>
+        </div>
+
+        <div id="error-toast" class="alert alert-danger alert-dismissible fade error-toast" style="display: none;" role="alert">
+            <strong><i class="fas fa-exclamation-circle"></i> Error!</strong> 
+            <span id="error-message"></span>
+            <button type="button" class="close" onclick="$('#error-toast').fadeOut()" data-dismiss="alert" aria-label="Close">
+                <span aria-hidden="true">&times;</span>
+            </button>
+        </div>
+
+        <!-- Statistics Cards -->
+        <div class="row">
+            <div class="col-xl-3 col-md-6">
+                <div class="stat-card total">
+                    <div class="stat-icon">
+                        <i class="fas fa-bed"></i>
+                    </div>
+                    <h6 class="text-uppercase font-weight-bold">Total Beds</h6>
+                    <h2 class="font-weight-bold mb-0" id="total-beds">{{ total_beds }}</h2>
+                    <small>Across all hostels</small>
+                </div>
+            </div>
+            <div class="col-xl-3 col-md-6">
+                <div class="stat-card occupied">
+                    <div class="stat-icon">
+                        <i class="fas fa-user-check"></i>
+                    </div>
+                    <h6 class="text-uppercase font-weight-bold">Occupied</h6>
+                    <h2 class="font-weight-bold mb-0" id="occupied-beds">{{ occupied_beds }}</h2>
+                    <small>Currently occupied</small>
+                </div>
+            </div>
+            <div class="col-xl-3 col-md-6">
+                <div class="stat-card available">
+                    <div class="stat-icon">
+                        <i class="fas fa-user-plus"></i>
+                    </div>
+                    <h6 class="text-uppercase font-weight-bold">Available</h6>
+                    <h2 class="font-weight-bold mb-0" id="available-beds">{{ available_beds }}</h2>
+                    <small>Vacant beds</small>
+                </div>
+            </div>
+            <div class="col-xl-3 col-md-6">
+                <div class="stat-card rate">
+                    <div class="stat-icon">
+                        <i class="fas fa-chart-line"></i>
+                    </div>
+                    <h6 class="text-uppercase font-weight-bold">Occupancy Rate</h6>
+                    <h2 class="font-weight-bold mb-0">{{ occupancy_rate }}%</h2>
+                    <div class="progress mt-2" style="height: 5px;">
+                        <div class="progress-bar progress-bar-occupied" style="width: {{ occupancy_rate }}%"></div>
+                        <div class="progress-bar progress-bar-available" style="width: {{ available_beds|default:0|add:0 }}%"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bed Type Distribution -->
+        <div class="row mb-4">
+            <div class="col-md-4">
+                <div class="bed-type-card">
+                    <div class="bed-type-icon text-info">
+                        <i class="fas fa-bed"></i>
+                    </div>
+                    <div class="bed-type-count">{{ single_beds }}</div>
+                    <div class="text-muted">Single Beds</div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="bed-type-card">
+                    <div class="bed-type-icon text-purple">
+                        <i class="fas fa-arrow-up"></i>
+                    </div>
+                    <div class="bed-type-count">{{ bunk_upper }}</div>
+                    <div class="text-muted">Bunk Upper</div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="bed-type-card">
+                    <div class="bed-type-icon text-orange">
+                        <i class="fas fa-arrow-down"></i>
+                    </div>
+                    <div class="bed-type-count">{{ bunk_lower }}</div>
+                    <div class="text-muted">Bunk Lower</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Beds by Hostel Summary -->
+        <div class="row">
+            <div class="col-lg-12">
+                <div class="card mb-4">
+                    <div class="card-header bg-info text-white">
+                        <h6 class="mb-0"><i class="fas fa-chart-pie"></i> Beds per Hostel</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            {% for hostel in beds_per_hostel %}
+                            <div class="col-md-3">
+                                <div class="card mb-3">
+                                    <div class="card-body">
+                                        <h6 class="card-title text-primary">{{ hostel.name }}</h6>
+                                        <div class="d-flex justify-content-between mb-2">
+                                            <span>Total Beds:</span>
+                                            <span class="font-weight-bold">{{ hostel.bed_count }}</span>
+                                        </div>
+                                        <div class="d-flex justify-content-between mb-2">
+                                            <span>Occupied:</span>
+                                            <span class="font-weight-bold text-danger">{{ hostel.occupied_count }}</span>
+                                        </div>
+                                        <div class="d-flex justify-content-between">
+                                            <span>Available:</span>
+                                            <span class="font-weight-bold text-success">{{ hostel.bed_count|add:"-"|add:hostel.occupied_count }}</span>
+                                        </div>
+                                        <div class="progress mt-2">
+                                            {% widthratio hostel.occupied_count hostel.bed_count 100 as occupancy_pct %}
+                                            <div class="progress-bar bg-danger" style="width: {{ occupancy_pct }}%"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            {% empty %}
+                            <div class="col-12 text-center py-4">
+                                <i class="fas fa-bed fa-3x mb-3 text-muted"></i>
+                                <p class="text-muted">No beds found in any hostel.</p>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Card -->
+        <div class="row">
+            <div class="col-lg-12">
+                <div class="card shadow-lg">
+                    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                        <h6 class="header-title mb-0 text-uppercase">
+                            <i class="fas fa-bed"></i> Bed Management
+                        </h6>
+                        <div class="d-flex align-items-center">
+                            <span class="badge badge-success mr-2">
+                                <i class="fas fa-check-circle"></i> Available: <span id="available-count">{{ available_beds }}</span>
+                            </span>
+                            <span class="badge badge-danger mr-2">
+                                <i class="fas fa-user-check"></i> Occupied: <span id="occupied-count">{{ occupied_beds }}</span>
+                            </span>
+                            <span class="badge badge-light">
+                                Total: <span id="total-count">{{ total_beds }}</span>
+                            </span>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover text-nowrap table-responsive-sm table-bordered table-striped table-sm display" id="beds-table">
+                                <thead class="bg-light">
+                                    <tr>
+                                        <th>Hostel</th>
+                                        <th>Room</th>
+                                        <th>Bed Number</th>
+                                        <th>Bed Type</th>
+                                        <th>Status</th>
+                                        <th class="text-center">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for bed in beds %}
+                                    <tr id="row-{{ bed.id }}">
+                                        <td>
+                                            <span class="badge badge-secondary">
+                                                <i class="fas fa-hotel"></i> {{ bed.room.hostel.name }} ({{ bed.room.hostel.code }})
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <span class="badge badge-info">
+                                                <i class="fas fa-door-open"></i> Room {{ bed.room.room_number }}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <strong>Bed {{ bed.bed_number }}</strong>
+                                        </td>
+                                        <td>
+                                            {% if bed.bed_type == 'single' %}
+                                                <span class="badge bed-type-single">
+                                                    <i class="fas fa-bed"></i> Single
+                                                </span>
+                                            {% elif bed.bed_type == 'bunk_upper' %}
+                                                <span class="badge bed-type-upper">
+                                                    <i class="fas fa-arrow-up"></i> Bunk Upper
+                                                </span>
+                                            {% else %}
+                                                <span class="badge bed-type-lower">
+                                                    <i class="fas fa-arrow-down"></i> Bunk Lower
+                                                </span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if bed.is_occupied %}
+                                                <span class="badge badge-danger" id="status-badge-{{ bed.id }}">
+                                                    <span class="occupancy-indicator occupancy-occupied"></span> Occupied
+                                                </span>
+                                            {% else %}
+                                                <span class="badge badge-success" id="status-badge-{{ bed.id }}">
+                                                    <span class="occupancy-indicator occupancy-available"></span> Available
+                                                </span>
+                                            {% endif %}
+                                        </td>
+                                        <td class="text-center">
+                                            <div class="quick-actions">
+                                                <!-- Quick Occupancy Toggle -->
+                                                {% if bed.is_occupied %}
+                                                <button class="btn btn-sm btn-warning quick-action-btn toggle-occupancy-btn" 
+                                                        data-id="{{ bed.id }}"
+                                                        data-bed="{{ bed.bed_number }}"
+                                                        data-room="{{ bed.room.room_number }}"
+                                                        data-current-status="occupied"
+                                                        title="Mark as Vacant">
+                                                    <i class="fas fa-user-slash"></i>
+                                                </button>
+                                                {% else %}
+                                                <button class="btn btn-sm btn-success quick-action-btn toggle-occupancy-btn" 
+                                                        data-id="{{ bed.id }}"
+                                                        data-bed="{{ bed.bed_number }}"
+                                                        data-room="{{ bed.room.room_number }}"
+                                                        data-current-status="available"
+                                                        title="Mark as Occupied">
+                                                    <i class="fas fa-user-check"></i>
+                                                </button>
+                                                {% endif %}
+                                                
+                                                <!-- Edit Button -->
+                                                <button class="btn btn-sm btn-primary quick-action-btn edit-btn" 
+                                                        data-id="{{ bed.id }}"
+                                                        data-room-id="{{ bed.room.id }}"
+                                                        data-room-number="{{ bed.room.room_number }}"
+                                                        data-hostel-id="{{ bed.room.hostel.id }}"
+                                                        data-hostel-name="{{ bed.room.hostel.name }}"
+                                                        data-bed-number="{{ bed.bed_number }}"
+                                                        data-bed-type="{{ bed.bed_type }}"
+                                                        data-is-occupied="{{ bed.is_occupied|yesno:'true,false' }}"
+                                                        title="Edit Bed">
+                                                    <i class="fas fa-edit"></i>
+                                                </button>
+                                                
+                                                <!-- Delete Button -->
+                                                <button class="btn btn-sm btn-danger quick-action-btn delete-btn" 
+                                                        data-id="{{ bed.id }}"
+                                                        data-bed="{{ bed.bed_number }}"
+                                                        data-room="{{ bed.room.room_number }}"
+                                                        data-hostel="{{ bed.room.hostel.name }}"
+                                                        title="Delete Bed">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Add Bed Modal -->
+<div class="modal fade" id="addBedModal" tabindex="-1" role="dialog" aria-labelledby="addModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="addModalLabel">
+                    <i class="fas fa-plus-circle"></i> Add New Bed
+                </h5>
+                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <form id="add-form">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="hostel">Select Hostel <span class="text-danger">*</span></label>
+                                <select class="form-control select2bs4" id="hostel" name="hostel" required style="width: 100%;">
+                                    <option value="">Choose Hostel</option>
+                                    {% for hostel in hostels %}
+                                        <option value="{{ hostel.id }}">{{ hostel.name }} ({{ hostel.code }})</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="room">Select Room <span class="text-danger">*</span></label>
+                                <select class="form-control select2bs4" id="room" name="room" required style="width: 100%;">
+                                    <option value="">First select a hostel</option>
+                                </select>
+                                <small class="form-text text-muted" id="room-capacity-info"></small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="bed_number">Bed Number <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="bed_number" name="bed_number" required 
+                                       placeholder="e.g., 1, A1, B2" maxlength="20">
+                                <small class="form-text text-muted">Unique bed number within the room</small>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="bed_type">Bed Type <span class="text-danger">*</span></label>
+                                <select class="form-control" id="bed_type" name="bed_type" required>
+                                    <option value="">Select Type</option>
+                                    {% for type in bed_types %}
+                                        <option value="{{ type.0 }}">{{ type.1 }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label>Initial Status</label>
+                                <div class="custom-control custom-switch mt-2">
+                                    <input type="checkbox" class="custom-control-input" id="is_occupied" name="is_occupied">
+                                    <label class="custom-control-label" for="is_occupied">
+                                        <span id="occupied-label">Available</span>
+                                    </label>
+                                    <small class="form-text text-muted d-block">Toggle to mark as occupied</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-12">
+                            <div class="alert alert-info" id="room-status-info" style="display: none;">
+                                <i class="fas fa-info-circle"></i> 
+                                <span id="status-info-text"></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal" id="cancel-add-btn">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="save-btn">
+                        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="display: none;"></span>
+                        Save Bed
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Bulk Add Beds Modal -->
+<div class="modal fade" id="bulkAddBedsModal" tabindex="-1" role="dialog" aria-labelledby="bulkModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title" id="bulkModalLabel">
+                    <i class="fas fa-layer-group"></i> Bulk Add Beds
+                </h5>
+                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <form id="bulk-form">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <strong>Note:</strong> This will create multiple beds at once. All beds will have the same type.
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="bulk-hostel">Select Hostel <span class="text-danger">*</span></label>
+                                <select class="form-control select2bs4" id="bulk-hostel" name="hostel" required style="width: 100%;">
+                                    <option value="">Choose Hostel</option>
+                                    {% for hostel in hostels %}
+                                        <option value="{{ hostel.id }}">{{ hostel.name }} ({{ hostel.code }})</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="bulk-room">Select Room <span class="text-danger">*</span></label>
+                                <select class="form-control select2bs4" id="bulk-room" name="room" required style="width: 100%;">
+                                    <option value="">First select a hostel</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="bulk-bed_type">Bed Type <span class="text-danger">*</span></label>
+                                <select class="form-control" id="bulk-bed_type" name="bed_type" required>
+                                    <option value="">Select Type</option>
+                                    {% for type in bed_types %}
+                                        <option value="{{ type.0 }}">{{ type.1 }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="start_bed">Start Bed Number <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="start_bed" name="start_bed" required 
+                                       placeholder="e.g., 1">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="end_bed">End Bed Number <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="end_bed" name="end_bed" required 
+                                       placeholder="e.g., 4">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-12">
+                            <div class="alert alert-info" id="bulk-preview">
+                                <i class="fas fa-calculator"></i> 
+                                <span id="preview-text">Select room and enter bed range to see preview</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-success" id="bulk-save-btn">
+                        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="display: none;"></span>
+                        Create Beds
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Bed Modal -->
+<div class="modal fade" id="editBedModal" tabindex="-1" role="dialog" aria-labelledby="editModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-warning text-dark">
+                <h5 class="modal-title" id="editModalLabel">
+                    <i class="fas fa-edit"></i> Edit Bed
+                </h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <form id="edit-form">
+                {% csrf_token %}
+                <input type="hidden" id="edit-id" name="id">
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="edit-hostel">Hostel <span class="text-danger">*</span></label>
+                                <select class="form-control select2bs4" id="edit-hostel" name="hostel" required style="width: 100%;">
+                                    <option value="">Choose Hostel</option>
+                                    {% for hostel in hostels %}
+                                        <option value="{{ hostel.id }}">{{ hostel.name }} ({{ hostel.code }})</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="edit-room">Room <span class="text-danger">*</span></label>
+                                <select class="form-control select2bs4" id="edit-room" name="room" required style="width: 100%;">
+                                    <option value="">First select a hostel</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="edit-bed_number">Bed Number <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="edit-bed_number" name="bed_number" required 
+                                       maxlength="20">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="edit-bed_type">Bed Type <span class="text-danger">*</span></label>
+                                <select class="form-control" id="edit-bed_type" name="bed_type" required>
+                                    <option value="">Select Type</option>
+                                    {% for type in bed_types %}
+                                        <option value="{{ type.0 }}">{{ type.1 }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label>Status</label>
+                                <div class="custom-control custom-switch mt-2">
+                                    <input type="checkbox" class="custom-control-input" id="edit-is_occupied" name="is_occupied">
+                                    <label class="custom-control-label" for="edit-is_occupied">
+                                        <span id="edit-occupied-label">Available</span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal" id="cancel-edit-btn">Cancel</button>
+                    <button type="submit" class="btn btn-warning" id="update-btn">
+                        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="display: none;"></span>
+                        Update Bed
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Bed Modal -->
+<div class="modal fade" id="deleteBedModal" tabindex="-1" role="dialog" aria-labelledby="deleteModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="deleteModalLabel">
+                    <i class="fas fa-exclamation-triangle"></i> Confirm Deletion
+                </h5>
+                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete <strong id="delete-bed-number"></strong> in <strong id="delete-room-info"></strong>?</p>
+                <p class="text-danger"><small>This action cannot be undone. Student allocations will be affected.</small></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal" id="cancel-delete-btn">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirm-delete-btn">
+                    <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="display: none;"></span>
+                    Delete
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+<script>
+    $(document).ready(function() {
+        // Toggle switch label updates
+        $('#is_occupied').on('change', function() {
+            $('#occupied-label').text($(this).is(':checked') ? 'Occupied' : 'Available');
+        });
+        
+        $('#edit-is_occupied').on('change', function() {
+            $('#edit-occupied-label').text($(this).is(':checked') ? 'Occupied' : 'Available');
+        });
+
+        // Initialize Select2
+        function initializeSelect2() {
+            $('.select2bs4').select2({
+                theme: 'bootstrap4',
+                dropdownParent: $('.modal:visible'),
+                width: '100%',
+                placeholder: 'Select an option',
+                allowClear: false
+            });
+        }
+        
+        // Initialize on page load
+        initializeSelect2();
+
+    // Function to load rooms based on hostel selection
+        function loadRooms(hostelSelect, roomSelect, callback) {
+            const hostelId = hostelSelect.val();
+            const roomField = roomSelect;
+            
+            // Clear and show loading
+            roomField.empty().append('<option value="">Loading rooms...</option>');
+            roomField.prop('disabled', true);
+            
+            if (hostelId) {
+                // Use Django URL template tag with placeholder replacement
+                const url = '{% url "admin_hostel_rooms_by_hostel" 0 %}'.replace('0', hostelId);
+                
+                $.ajax({
+                    url: url,
+                    method: 'GET',
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    success: function(data) {
+                        roomField.empty().append('<option value="">Select Room</option>');
+                        roomField.prop('disabled', false);
+                        
+                        if (data.success && data.rooms && data.rooms.length > 0) {
+                            $.each(data.rooms, function(index, room) {
+                                const option = $('<option>', {
+                                    value: room.id,
+                                    text: room.display,
+                                    'data-capacity': room.capacity,
+                                    'data-current-beds': room.current_beds || 0,
+                                    'data-available-beds': room.available_beds || (room.capacity - (room.current_beds || 0))
+                                });
+                                
+                                // Disable rooms with no available beds if needed
+                                if (room.available_beds === 0) {
+                                    option.prop('disabled', true)
+                                        .text(room.display + ' (Full)');
+                                }
+                                
+                                roomField.append(option);
+                            });
+                            
+                            // Show capacity info
+                            const roomCapacityInfo = $('#room-capacity-info');
+                            if (roomCapacityInfo.length && data.rooms[0]) {
+                                roomCapacityInfo.text(
+                                    `First room capacity: ${data.rooms[0].capacity} beds ` +
+                                    `(${data.rooms[0].available_beds || data.rooms[0].capacity} available)`
+                                );
+                            }
+                            
+                            if (callback) callback(data);
+                        } else {
+                            roomField.append('<option value="">No rooms available in this hostel</option>');
+                        }
+                    },
+                    error: function(xhr, status, error) {
+                        console.error('Error loading rooms:', error);
+                        roomField.empty().append('<option value="">Error loading rooms</option>');
+                        roomField.prop('disabled', false);
+                        
+                        // Show error toast
+                        showToast('Failed to load rooms. Please try again.', 'danger');
+                    }
+                });
+            } else {
+                roomField.empty().append('<option value="">First select a hostel</option>');
+                roomField.prop('disabled', false);
+            }
+        }
+        
+        // Load rooms when hostel changes in add modal
+        $('#hostel').on('change', function() {
+            loadRooms($(this), $('#room'));
+        });
+
+        // Load rooms when hostel changes in bulk modal
+        $('#bulk-hostel').on('change', function() {
+            loadRooms($(this), $('#bulk-room'), updateBulkPreview);
+        });
+
+        // Load rooms when hostel changes in edit modal
+        $('#edit-hostel').on('change', function() {
+            const roomSelect = $('#edit-room');
+            const currentRoomId = roomSelect.data('current-room-id');
+            
+            loadRooms($(this), roomSelect, function(data) {
+                if (currentRoomId) {
+                    roomSelect.val(currentRoomId).trigger('change');
+                }
+            });
+        });
+
+        // Bulk preview update function
+        function updateBulkPreview() {
+            const roomId = $('#bulk-room').val();
+            const startBed = $('#start_bed').val();
+            const endBed = $('#end_bed').val();
+            const bedType = $('#bulk-bed_type option:selected').text();
+            
+            if (roomId && startBed && endBed) {
+                if (!isNaN(startBed) && !isNaN(endBed)) {
+                    const start = parseInt(startBed);
+                    const end = parseInt(endBed);
+                    if (start <= end) {
+                        const count = end - start + 1;
+                        $('#preview-text').text(
+                            `Will create ${count} beds from ${startBed} to ${endBed} (${bedType || 'selected type'})`
+                        );
+                    } else {
+                        $('#preview-text').text('Start number must be less than or equal to end number');
+                    }
+                } else {
+                    $('#preview-text').text('Please enter numeric bed numbers for bulk creation');
+                }
+            } else {
+                $('#preview-text').text('Select room and enter bed range to see preview');
+            }
+        }
+
+        // Trigger preview update on input changes
+        $('#start_bed, #end_bed, #bulk-bed_type').on('input change', updateBulkPreview);
+        $('#bulk-room').on('change', updateBulkPreview);
+
+        // CSRF token for AJAX requests
+        function getCSRFToken() {
+            return $('input[name="csrfmiddlewaretoken"]').val();
+        }
+
+        // Show toast message
+        function showToast(message, type = 'success') {
+            const toastId = type === 'success' ? '#success-toast' : '#error-toast';
+            const messageId = type === 'success' ? '#success-message' : '#error-message';
+            
+            $(messageId).text(message);
+            $(toastId).addClass('show').fadeIn();
+            
+            setTimeout(function() {
+                $(toastId).fadeOut(function() {
+                    $(this).removeClass('show');
+                });
+            }, type === 'success' ? 3000 : 5000);
+        }
+
+        // Function to reload page after delay
+        function reloadPageAfterDelay(message, type = 'success') {
+            showToast(message, type);
+            var delay = type === 'success' ? 2000 : 3000;
+            setTimeout(function() {
+                location.reload();
+            }, delay);
+        }
+
+        // Helper function to handle button loading state
+        function setButtonLoading(btn, isLoading) {
+            const spinner = btn.find('.spinner-border');
+            if (isLoading) {
+                btn.data('original-text', btn.html());
+                btn.prop('disabled', true);
+                spinner.show();
+                btn.html('Processing...');
+            } else {
+                btn.prop('disabled', false);
+                spinner.hide();
+                btn.html(btn.data('original-text'));
+            }
+        }
+
+        // Initialize DataTable
+        var table = $('#beds-table').DataTable({
+            "dom": "<'row'<'col-sm-12 col-md-6'l><'col-sm-12 col-md-6'f>>" +
+                   "<'row'<'col-sm-12'tr>>" +
+                   "<'row'<'col-sm-12 col-md-5'i><'col-sm-12 col-md-7'p>>",
+            "lengthMenu": [[10, 25, 50, -1], [10, 25, 50, "All"]],
+            "pageLength": 10,
+            "responsive": true,
+            "autoWidth": false,
+            "ordering": true,
+            "order": [[0, 'asc'], [1, 'asc'], [2, 'asc']],
+            "destroy": true,
+            "retrieve": true,
+            "deferRender": true,
+            "columnDefs": [
+                { 
+                    "targets": 5, // Actions column
+                    "orderable": false,
+                    "searchable": false
+                }
+            ],
+            "language": {
+                "emptyTable": "<div class='text-center py-4'><i class='fas fa-bed fa-2x mb-2'></i><br>No beds found. Click \"Add Bed\" to create one.</div>",
+                "search": "_INPUT_",
+                "searchPlaceholder": "Search beds...",
+                "lengthMenu": "_MENU_ beds per page",
+                "info": "Showing _START_ to _END_ of _TOTAL_ beds",
+                "infoEmpty": "Showing 0 to 0 of 0 beds",
+                "infoFiltered": "(filtered from _MAX_ total beds)",
+                "paginate": {
+                    "first": "First",
+                    "last": "Last",
+                    "next": "Next",
+                    "previous": "Previous"
+                }
+            },
+            "drawCallback": function(settings) {
+                var api = this.api();
+                var total = api.rows().count();
+                $('#total-count').text(total);
+                $('#total-beds').text(total);
+                
+                // Count occupied and available beds
+                var occupiedCount = 0;
+                var availableCount = 0;
+                
+                api.rows().every(function() {
+                    var data = this.data();
+                    var statusText = $(data[4]).text().toLowerCase();
+                    if (statusText.includes('occupied')) {
+                        occupiedCount++;
+                    } else {
+                        availableCount++;
+                    }
+                });
+                
+                $('#occupied-count').text(occupiedCount);
+                $('#available-count').text(availableCount);
+                $('#occupied-beds').text(occupiedCount);
+                $('#available-beds').text(availableCount);
+            }
+        });
+
+        // Add Bed Form Submit
+        $('#add-form').on('submit', function(e) {
+            e.preventDefault();
+            
+            const saveBtn = $('#save-btn');
+            setButtonLoading(saveBtn, true);
+            
+            const formData = new FormData(this);
+            formData.append('action', 'create');
+            
+            $.ajax({
+                url: '{% url "admin_beds_crud" %}',
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCSRFToken(),
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function(data) {
+                    if (data.success) {
+                        $('#addBedModal').modal('hide');
+                        reloadPageAfterDelay(data.message, 'success');
+                    } else {
+                        showToast(data.message, 'danger');
+                        setButtonLoading(saveBtn, false);
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error:', error);
+                    let errorMsg = 'An error occurred while saving. Please try again.';
+                    if (xhr.responseJSON && xhr.responseJSON.message) {
+                        errorMsg = xhr.responseJSON.message;
+                    }
+                    showToast(errorMsg, 'danger');
+                    setButtonLoading(saveBtn, false);
+                }
+            });
+        });
+
+        // Bulk Add Beds Form Submit
+        $('#bulk-form').on('submit', function(e) {
+            e.preventDefault();
+            
+            const bulkBtn = $('#bulk-save-btn');
+            setButtonLoading(bulkBtn, true);
+            
+            const formData = new FormData(this);
+            formData.append('action', 'bulk_create');
+            
+            $.ajax({
+                url: '{% url "admin_beds_crud" %}',
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCSRFToken(),
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function(data) {
+                    if (data.success) {
+                        $('#bulkAddBedsModal').modal('hide');
+                        reloadPageAfterDelay(data.message, 'success');
+                    } else {
+                        showToast(data.message, 'danger');
+                        setButtonLoading(bulkBtn, false);
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error:', error);
+                    let errorMsg = 'An error occurred while creating beds. Please try again.';
+                    if (xhr.responseJSON && xhr.responseJSON.message) {
+                        errorMsg = xhr.responseJSON.message;
+                    }
+                    showToast(errorMsg, 'danger');
+                    setButtonLoading(bulkBtn, false);
+                }
+            });
+        });
+
+        // Edit Bed - Setup modal
+        $(document).on('click', '.edit-btn', function() {
+            const btn = $(this);
+            
+            $('#edit-id').val(btn.data('id'));
+            
+            // Store values
+            const hostelId = btn.data('hostel-id');
+            const roomId = btn.data('room-id');
+            const bedNumber = btn.data('bed-number');
+            const bedType = btn.data('bed-type');
+            const isOccupied = btn.data('is-occupied') === 'true';
+            
+            // Show modal first
+            $('#editBedModal').modal('show');
+            
+            // Set values after modal is shown
+            setTimeout(function() {
+                $('#edit-hostel').val(hostelId).trigger('change');
+                
+                // Store current room ID for later selection
+                $('#edit-room').data('current-room-id', roomId);
+                
+                $('#edit-bed_number').val(bedNumber);
+                $('#edit-bed_type').val(bedType);
+                
+                // Set checkbox states
+                $('#edit-is_occupied').prop('checked', isOccupied);
+                
+                // Update labels
+                $('#edit-occupied-label').text(isOccupied ? 'Occupied' : 'Available');
+            }, 500);
+        });
+
+        // Edit Bed Form Submit
+        $('#edit-form').on('submit', function(e) {
+            e.preventDefault();
+            
+            const updateBtn = $('#update-btn');
+            setButtonLoading(updateBtn, true);
+            
+            const formData = new FormData(this);
+            formData.append('action', 'update');
+            
+            $.ajax({
+                url: '{% url "admin_beds_crud" %}',
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCSRFToken(),
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function(data) {
+                    if (data.success) {
+                        $('#editBedModal').modal('hide');
+                        reloadPageAfterDelay(data.message, 'success');
+                    } else {
+                        showToast(data.message, 'danger');
+                        setButtonLoading(updateBtn, false);
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error:', error);
+                    let errorMsg = 'An error occurred while updating. Please try again.';
+                    if (xhr.responseJSON && xhr.responseJSON.message) {
+                        errorMsg = xhr.responseJSON.message;
+                    }
+                    showToast(errorMsg, 'danger');
+                    setButtonLoading(updateBtn, false);
+                }
+            });
+        });
+
+        // Toggle Occupancy
+        $(document).on('click', '.toggle-occupancy-btn', function() {
+            const btn = $(this);
+            const bedId = btn.data('id');
+            const bedNumber = btn.data('bed');
+            const roomNumber = btn.data('room');
+            const currentStatus = btn.data('current-status');
+            const actionText = currentStatus === 'occupied' ? 'vacant' : 'occupied';
+            
+            if (confirm(`Mark Bed ${bedNumber} in Room ${roomNumber} as ${actionText}?`)) {
+                setButtonLoading(btn, true);
+                
+                $.ajax({
+                    url: '{% url "admin_beds_crud" %}',
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': getCSRFToken(),
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    data: {
+                        'action': 'toggle_occupancy',
+                        'id': bedId,
+                        'csrfmiddlewaretoken': getCSRFToken()
+                    },
+                    success: function(data) {
+                        if (data.success) {
+                            showToast(data.message, 'success');
+                            setTimeout(function() {
+                                location.reload();
+                            }, 1500);
+                        } else {
+                            showToast(data.message, 'danger');
+                            setButtonLoading(btn, false);
+                        }
+                    },
+                    error: function(xhr, status, error) {
+                        console.error('Error:', error);
+                        let errorMsg = 'An error occurred while updating occupancy.';
+                        if (xhr.responseJSON && xhr.responseJSON.message) {
+                            errorMsg = xhr.responseJSON.message;
+                        }
+                        showToast(errorMsg, 'danger');
+                        setButtonLoading(btn, false);
+                    }
+                });
+            }
+        });
+
+        // Delete Bed - Setup modal
+        let bedToDelete = null;
+        
+        $(document).on('click', '.delete-btn', function() {
+            const btn = $(this);
+            
+            bedToDelete = {
+                id: btn.data('id'),
+                bed: btn.data('bed'),
+                room: btn.data('room'),
+                hostel: btn.data('hostel')
+            };
+            
+            $('#delete-bed-number').text(`Bed ${btn.data('bed')}`);
+            $('#delete-room-info').text(`Room ${btn.data('room')} (${btn.data('hostel')})`);
+            $('#deleteBedModal').modal('show');
+        });
+
+        // Delete Bed - Confirm
+        $('#confirm-delete-btn').on('click', function() {
+            if (!bedToDelete) return;
+            
+            const deleteBtn = $(this);
+            setButtonLoading(deleteBtn, true);
+            
+            $.ajax({
+                url: '{% url "admin_beds_crud" %}',
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCSRFToken(),
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                data: {
+                    'action': 'delete',
+                    'id': bedToDelete.id,
+                    'csrfmiddlewaretoken': getCSRFToken()
+                },
+                success: function(data) {
+                    if (data.success) {
+                        $('#deleteBedModal').modal('hide');
+                        reloadPageAfterDelay(data.message, 'success');
+                    } else {
+                        showToast(data.message, 'danger');
+                        setButtonLoading(deleteBtn, false);
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error:', error);
+                    let errorMsg = 'An error occurred while deleting.';
+                    if (xhr.responseJSON && xhr.responseJSON.message) {
+                        errorMsg = xhr.responseJSON.message;
+                    }
+                    showToast(errorMsg, 'danger');
+                    setButtonLoading(deleteBtn, false);
+                }
+            });
+        });
+
+       // Reinitialize Select2 when modals are shown
+        $('#addBedModal, #bulkAddBedsModal, #editBedModal').on('shown.bs.modal', function() {
+            $(this).find('.select2bs4').select2({
+                theme: 'bootstrap4',
+                dropdownParent: $(this),
+                width: '100%',
+                placeholder: 'Select an option',
+                allowClear: false
+            });
+        });
+
+        // Destroy Select2 when modals are hidden to prevent duplicates
+        $('#addBedModal, #bulkAddBedsModal, #editBedModal').on('hidden.bs.modal', function() {
+            $(this).find('.select2bs4').select2('destroy');
+        });
+
+        // Form validation
+        $('#add-form, #edit-form, #bulk-form').on('submit', function(e) {
+            const isBulk = $(this).attr('id') === 'bulk-form';
+            
+            if (!isBulk) {
+                const bedNumber = $(this).find('#bed_number, #edit-bed_number').val();
+                
+                // Validate bed number format (alphanumeric with optional hyphen)
+                if (bedNumber && !/^[A-Za-z0-9-]+$/.test(bedNumber)) {
+                    e.preventDefault();
+                    showToast('Bed number can only contain letters, numbers, and hyphens.', 'danger');
+                    return false;
+                }
+            } else {
+                // Validate bed range for bulk
+                const startBed = $('#start_bed').val();
+                const endBed = $('#end_bed').val();
+                
+                if (startBed && endBed && !isNaN(startBed) && !isNaN(endBed)) {
+                    const start = parseInt(startBed);
+                    const end = parseInt(endBed);
+                    
+                    if (start > end) {
+                        e.preventDefault();
+                        showToast('Start bed number must be less than or equal to end bed number.', 'danger');
+                        return false;
+                    }
+                    
+                    if (end - start > 20) {
+                        e.preventDefault();
+                        showToast('Cannot create more than 20 beds at once.', 'danger');
+                        return false;
+                    }
+                }
+            }
+            
+            return true;
+        });
+    });
+</script>
+{% endblock extra_js %}

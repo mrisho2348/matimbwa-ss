@@ -89,6 +89,22 @@
                     <i class="bi bi-people-fill"></i>
                     <span>Department</span>
                 </a>
+                <a class="nav-link" href="{% url 'admin_hostels_list' %}">
+                    <i class="bi bi-people-fill"></i>
+                    <span>Hostel</span>
+                </a>
+                <a class="nav-link" href="{% url 'admin_hostel_rooms_list' %}">
+                    <i class="bi bi-people-fill"></i>
+                    <span>Hostel Rooms</span>
+                </a>
+                <a class="nav-link" href="{% url 'admin_beds_list' %}">
+                    <i class="bi bi-people-fill"></i>
+                    <span>Hostel Room Bed</span>
+                </a>
+                <a class="nav-link" href="{% url 'admin_student_allocations_list' %}">
+                    <i class="bi bi-people-fill"></i>
+                    <span>Hostel Allocation</span>
+                </a>
             </div>
         </div>
 
@@ -107,6 +123,10 @@
                 <a class="nav-link" href="{% url 'admin_students_add' %}">
                     <i class="bi bi-person-plus"></i>
                     <span>Add Student</span>
+                </a>
+                <a class="nav-link" href="{% url 'admin_student_promotion' %}">
+                    <i class="bi bi-person-plus"></i>
+                    <span>Promote Student</span>
                 </a>
                 <a class="nav-link" href="{% url 'admin_student_combinations_list' %}">
                     <i class="bi bi-person-plus"></i>

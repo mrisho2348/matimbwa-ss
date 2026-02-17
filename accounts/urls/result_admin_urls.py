@@ -68,4 +68,6 @@ urlpatterns = [
     
     path('exam-session/<int:exam_session_id>/subject-matrix-analysis/pdf/',  session_subject_matrix_analysis_pdf,  name='session_subject_matrix_analysis_pdf'),
 
+    path('student/<int:student_id>/sessions/export/', student_sessions_export_excel, name='student_sessions_export_excel'),
+
 ]

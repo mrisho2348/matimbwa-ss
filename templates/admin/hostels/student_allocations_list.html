@@ -1,0 +1,1770 @@
+{% extends 'admin/base.html' %}
+{% load static %}
+{% block title %} Student Hostel Allocations {% endblock title %}
+
+{% block breadcrumb %}
+    <div class="btn-group">
+        <button type="button" class="btn btn-primary" data-toggle="modal" data-target="#addAllocationModal">
+            <i class="fas fa-plus"></i> New Allocation
+        </button>
+        <button type="button" class="btn btn-success" data-toggle="modal" data-target="#bulkAllocationModal">
+            <i class="fas fa-layer-group"></i> Bulk Allocate
+        </button>
+    </div>
+{% endblock breadcrumb %}
+
+{% block extra_css %}
+<style>
+    .table th {
+        font-weight: 600;
+        border-bottom-width: 2px;
+    }
+    .table td {
+        vertical-align: middle;
+    }
+    .badge {
+        font-size: 0.85em;
+        padding: 0.4em 0.8em;
+    }
+    .modal-header {
+        border-radius: 0;
+    }
+    .btn-group .btn {
+        margin: 0 2px;
+    }
+    /* DataTable Styles */
+    .dataTables_wrapper .dataTables_filter {
+        float: right;
+        text-align: right;
+    }
+    .dataTables_wrapper .dataTables_length {
+        float: left;
+    }
+    .dataTables_wrapper .dataTables_paginate {
+        float: right;
+        margin-top: 10px;
+    }
+    .success-toast, .error-toast {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 1056;
+        min-width: 300px;
+    }
+    /* Stats cards */
+    .stat-card {
+        background: linear-gradient(45deg, #4e73df 0%, #224abe 100%);
+        color: white;
+        border-radius: 10px;
+        padding: 20px;
+        margin-bottom: 20px;
+        position: relative;
+        overflow: hidden;
+    }
+    .stat-card.allocated {
+        background: linear-gradient(45deg, #1cc88a 0%, #13855c 100%);
+    }
+    .stat-card.available {
+        background: linear-gradient(45deg, #36b9cc 0%, #258391 100%);
+    }
+    .stat-card.hostels {
+        background: linear-gradient(45deg, #f6c23e 0%, #b48a1c 100%);
+    }
+    .stat-icon {
+        font-size: 3rem;
+        opacity: 0.3;
+        position: absolute;
+        right: 20px;
+        top: 20px;
+    }
+    /* Quick action buttons */
+    .quick-actions {
+        display: flex;
+        gap: 4px;
+        justify-content: center;
+        align-items: center;
+    }
+    .quick-action-btn {
+        width: 28px;
+        height: 28px;
+        padding: 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        border: none;
+        transition: all 0.2s ease;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+    }
+    .quick-action-btn i {
+        font-size: 0.75rem;
+        color: #ffffff !important;
+    }
+    .quick-action-btn:hover {
+        transform: scale(1.1);
+        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        filter: brightness(1.05);
+    }
+    /* Select2 in modal */
+    .select2-container {
+        z-index: 1056 !important;
+    }
+    .select2-dropdown {
+        z-index: 1057 !important;
+    }
+    /* Allocation hierarchy */
+    .allocation-details {
+        background-color: #f8f9fa;
+        border-radius: 5px;
+        padding: 10px;
+        margin-top: 5px;
+    }
+    .allocation-path {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        font-size: 0.9rem;
+    }
+    .path-separator {
+        color: #6c757d;
+        font-size: 0.8rem;
+    }
+    /* Occupancy progress */
+    .occupancy-progress {
+        height: 6px;
+        border-radius: 3px;
+    }
+    .hostel-occupancy-card {
+        border-left: 4px solid #4e73df;
+    }
+    /* Filter section */
+    .filter-section {
+        background-color: #f8f9fc;
+        border-radius: 10px;
+        padding: 15px;
+        margin-bottom: 20px;
+    }
+</style>
+{% endblock extra_css %}
+
+{% block content %}
+<section class="content">
+    <div class="container-fluid"> 
+        <!-- Toast Notifications -->
+        <div id="success-toast" class="alert alert-success alert-dismissible fade success-toast" style="display: none;" role="alert">
+            <strong><i class="fas fa-check-circle"></i> Success!</strong> 
+            <span id="success-message"></span>
+            <button type="button" class="close" onclick="$('#success-toast').fadeOut()" data-dismiss="alert" aria-label="Close">
+                <span aria-hidden="true">&times;</span>
+            </button>
+        </div>
+
+        <div id="error-toast" class="alert alert-danger alert-dismissible fade error-toast" style="display: none;" role="alert">
+            <strong><i class="fas fa-exclamation-circle"></i> Error!</strong> 
+            <span id="error-message"></span>
+            <button type="button" class="close" onclick="$('#error-toast').fadeOut()" data-dismiss="alert" aria-label="Close">
+                <span aria-hidden="true">&times;</span>
+            </button>
+        </div>
+
+        <!-- Statistics Cards -->
+        <div class="row">
+            <div class="col-xl-3 col-md-6">
+                <div class="stat-card">
+                    <div class="stat-icon">
+                        <i class="fas fa-users"></i>
+                    </div>
+                    <h6 class="text-uppercase font-weight-bold">Total Allocations</h6>
+                    <h2 class="font-weight-bold mb-0" id="total-allocations">{{ total_allocations }}</h2>
+                    <small>All time</small>
+                </div>
+            </div>
+            <div class="col-xl-3 col-md-6">
+                <div class="stat-card allocated">
+                    <div class="stat-icon">
+                        <i class="fas fa-check-circle"></i>
+                    </div>
+                    <h6 class="text-uppercase font-weight-bold">Active Allocations</h6>
+                    <h2 class="font-weight-bold mb-0" id="active-allocations">{{ active_allocations }}</h2>
+                    <small>Currently allocated</small>
+                </div>
+            </div>
+            <div class="col-xl-3 col-md-6">
+                <div class="stat-card available">
+                    <div class="stat-icon">
+                        <i class="fas fa-user-plus"></i>
+                    </div>
+                    <h6 class="text-uppercase font-weight-bold">Available Students</h6>
+                    <h2 class="font-weight-bold mb-0">{{ available_students }}</h2>
+                    <small>Not allocated</small>
+                </div>
+            </div>
+            <div class="col-xl-3 col-md-6">
+                <div class="stat-card hostels">
+                    <div class="stat-icon">
+                        <i class="fas fa-hotel"></i>
+                    </div>
+                    <h6 class="text-uppercase font-weight-bold">Active Hostels</h6>
+                    <h2 class="font-weight-bold mb-0">{{ hostels.count }}</h2>
+                      <small>Total capacity: {{ total_capacity|default:0 }}</small>
+                </div>
+            </div>
+        </div>
+
+        <!-- Hostel Occupancy Overview -->
+        <div class="row mb-4">
+            <div class="col-lg-12">
+                <div class="card">
+                    <div class="card-header bg-primary text-white">
+                        <h6 class="mb-0"><i class="fas fa-chart-pie"></i> Hostel Occupancy Overview</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            {% for stat in hostel_stats %}
+                            <div class="col-md-3 mb-3">
+                                <div class="card hostel-occupancy-card">
+                                    <div class="card-body">
+                                        <h6 class="card-title">{{ stat.hostel.name }}</h6>
+                                        <div class="d-flex justify-content-between mb-2">
+                                            <span>Allocated:</span>
+                                            <span class="font-weight-bold">{{ stat.allocated }}/{{ stat.capacity }}</span>
+                                        </div>
+                                        <div class="progress occupancy-progress mb-2">
+                                            <div class="progress-bar bg-success" style="width: {{ stat.occupancy_rate }}%"></div>
+                                        </div>
+                                        <div class="d-flex justify-content-between text-muted small">
+                                            <span>Available: {{ stat.available }}</span>
+                                            <span>{{ stat.occupancy_rate }}%</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            {% empty %}
+                            <div class="col-12 text-center py-4">
+                                <i class="fas fa-hotel fa-3x mb-3 text-muted"></i>
+                                <p class="text-muted">No hostels found.</p>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Filter Section -->
+        <div class="row">
+            <div class="col-lg-12">
+                <div class="filter-section">
+                    <form id="filter-form" class="form-inline justify-content-between">
+                        <div class="form-group mb-2">
+                            <label for="filter-hostel" class="mr-2">Hostel:</label>
+                            <select class="form-control form-control-sm" id="filter-hostel" style="min-width: 150px;">
+                                <option value="">All Hostels</option>
+                                {% for hostel in hostels %}
+                                <option value="{{ hostel.id }}">{{ hostel.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="form-group mb-2">
+                            <label for="filter-status" class="mr-2">Status:</label>
+                            <select class="form-control form-control-sm" id="filter-status">
+                                <option value="">All</option>
+                                <option value="active">Active</option>
+                                <option value="inactive">Inactive</option>
+                            </select>
+                        </div>
+                        <div class="form-group mb-2">
+                            <label for="filter-academic-year" class="mr-2">Academic Year:</label>
+                            <select class="form-control form-control-sm" id="filter-academic-year">
+                                <option value="">All Years</option>
+                                {% for year in academic_years %}
+                                <option value="{{ year.id }}" {% if year.is_active %}selected{% endif %}>{{ year }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <button type="button" class="btn btn-sm btn-primary mb-2" id="apply-filters">
+                            <i class="fas fa-filter"></i> Apply
+                        </button>
+                        <button type="button" class="btn btn-sm btn-secondary mb-2" id="reset-filters">
+                            <i class="fas fa-undo"></i> Reset
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Card -->
+        <div class="row">
+            <div class="col-lg-12">
+                <div class="card shadow-lg">
+                    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                        <h6 class="header-title mb-0 text-uppercase">
+                            <i class="fas fa-door-open"></i> Student Hostel Allocations
+                        </h6>
+                        <div class="d-flex align-items-center">
+                            <span class="badge badge-success mr-2">
+                                <i class="fas fa-check-circle"></i> Active: <span id="active-count">{{ active_allocations }}</span>
+                            </span>
+                            <span class="badge badge-light">
+                                Total: <span id="total-count">{{ total_allocations }}</span>
+                            </span>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover text-nowrap table-responsive-sm table-bordered table-striped table-sm display" id="allocations-table">
+                                <thead class="bg-light">
+                                    <tr>
+                                        <th>Student</th>
+                                        <th>Registration #</th>
+                                        <th>Hostel</th>
+                                        <th>Room/Bed</th>
+                                        <th>Academic Year</th>
+                                        <th>Start Date</th>
+                                        <th>End Date</th>
+                                        <th>Status</th>
+                                        <th class="text-center">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for allocation in allocations %}
+                                    <tr id="row-{{ allocation.id }}">
+                                        <td>
+                                            <strong>{{ allocation.student.full_name }}</strong>
+                                            <br>
+                                            <small class="text-muted">{{ allocation.student.class_level.name|default:"N/A" }} - {{ allocation.student.stream_class.name|default:"" }}</small>
+                                        </td>
+                                        <td>
+                                            <code>{{ allocation.student.registration_number }}</code>
+                                        </td>
+                                        <td>
+                                            <span class="badge badge-secondary">
+                                                <i class="fas fa-hotel"></i> {{ allocation.hostel.name }}
+                                            </span>
+                                            <br>
+                                            <small class="text-muted">{{ allocation.hostel.code }}</small>
+                                        </td>
+                                        <td>
+                                            {% if allocation.room %}
+                                                <span class="badge badge-info">Room {{ allocation.room.room_number }}</span>
+                                                {% if allocation.bed %}
+                                                    <br>
+                                                    <span class="badge badge-primary">Bed {{ allocation.bed.bed_number }}</span>
+                                                {% endif %}
+                                            {% else %}
+                                                <span class="badge badge-secondary">Not assigned</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {{ allocation.academic_year }}
+                                        </td>
+                                        <td>{{ allocation.start_date|date:"d/m/Y" }}</td>
+                                        <td>
+                                            {% if allocation.end_date %}
+                                                {{ allocation.end_date|date:"d/m/Y" }}
+                                            {% else %}
+                                                <span class="text-muted">-</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if allocation.is_active %}
+                                                <span class="badge badge-success" id="status-badge-{{ allocation.id }}">
+                                                    <i class="fas fa-check-circle"></i> Active
+                                                </span>
+                                            {% else %}
+                                                <span class="badge badge-secondary" id="status-badge-{{ allocation.id }}">
+                                                    <i class="fas fa-times-circle"></i> Inactive
+                                                </span>
+                                            {% endif %}
+                                        </td>
+                                        <td class="text-center">
+                                            <div class="quick-actions">
+                                                <!-- View Details -->
+                                                <button class="btn btn-sm btn-info quick-action-btn view-details-btn" 
+                                                        data-id="{{ allocation.id }}"
+                                                        title="View Details">
+                                                    <i class="fas fa-eye"></i>
+                                                </button>
+                                                
+                                                <!-- Quick Status Toggle / Vacate -->
+                                                {% if allocation.is_active %}
+                                                <button class="btn btn-sm btn-warning quick-action-btn vacate-btn" 
+                                                        data-id="{{ allocation.id }}"
+                                                        data-student="{{ allocation.student.full_name }}"
+                                                        title="Vacate Student">
+                                                    <i class="fas fa-door-open"></i>
+                                                </button>
+                                                {% else %}
+                                                <button class="btn btn-sm btn-success quick-action-btn toggle-status-btn" 
+                                                        data-id="{{ allocation.id }}"
+                                                        data-student="{{ allocation.student.full_name }}"
+                                                        data-current-status="inactive"
+                                                        title="Reactivate Allocation">
+                                                    <i class="fas fa-toggle-on"></i>
+                                                </button>
+                                                {% endif %}
+                                                
+                                                <!-- Edit Button -->
+                                                <button class="btn btn-sm btn-primary quick-action-btn edit-btn" 
+                                                        data-id="{{ allocation.id }}"
+                                                        data-student-id="{{ allocation.student.id }}"
+                                                        data-student-name="{{ allocation.student.full_name }}"
+                                                        data-hostel-id="{{ allocation.hostel.id }}"
+                                                        data-hostel-name="{{ allocation.hostel.name }}"
+                                                        data-room-id="{{ allocation.room.id|default:'' }}"
+                                                        data-room-number="{{ allocation.room.room_number|default:'' }}"
+                                                        data-bed-id="{{ allocation.bed.id|default:'' }}"
+                                                        data-bed-number="{{ allocation.bed.bed_number|default:'' }}"
+                                                        data-academic-year-id="{{ allocation.academic_year.id }}"
+                                                        data-start-date="{{ allocation.start_date|date:'Y-m-d' }}"
+                                                        data-end-date="{{ allocation.end_date|date:'Y-m-d'|default:'' }}"
+                                                        data-is-active="{{ allocation.is_active|yesno:'true,false' }}"
+                                                        title="Edit Allocation">
+                                                    <i class="fas fa-edit"></i>
+                                                </button>
+                                                
+                                                <!-- Delete Button -->
+                                                <button class="btn btn-sm btn-danger quick-action-btn delete-btn" 
+                                                        data-id="{{ allocation.id }}"
+                                                        data-student="{{ allocation.student.full_name }}"
+                                                        data-hostel="{{ allocation.hostel.name }}"
+                                                        title="Delete Allocation">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Add Allocation Modal -->
+<div class="modal fade" id="addAllocationModal" tabindex="-1" role="dialog" aria-labelledby="addModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="addModalLabel">
+                    <i class="fas fa-plus-circle"></i> New Student Allocation
+                </h5>
+                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <form id="add-form">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i>
+                        Allocate a student to a hostel. You can optionally assign a specific room and bed.
+                    </div>
+                    
+                    <!-- Student Selection -->
+                    <div class="row">
+                        <div class="col-md-12">
+                            <div class="form-group">
+                                <label for="student">Select Student <span class="text-danger">*</span></label>
+                                <select class="form-control select2bs4" id="student" name="student" required style="width: 100%;">
+                                    <option value="">Search for a student...</option>
+                                </select>
+                                <small class="form-text text-muted">Type to search by name or registration number</small>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Academic Year and Dates -->
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="academic_year">Academic Year <span class="text-danger">*</span></label>
+                                <select class="form-control" id="academic_year" name="academic_year" required>
+                                    <option value="">Select Academic Year</option>
+                                    {% for year in academic_years %}
+                                    <option value="{{ year.id }}" {% if year.is_active %}selected{% endif %}>{{ year }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="form-group">
+                                <label for="start_date">Start Date <span class="text-danger">*</span></label>
+                                <input type="date" class="form-control" id="start_date" name="start_date" required 
+                                       value="{% now 'Y-m-d' %}">
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="form-group">
+                                <label for="end_date">End Date</label>
+                                <input type="date" class="form-control" id="end_date" name="end_date">
+                                <small class="form-text text-muted">Leave empty for academic year end</small>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Hostel Selection -->
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="add-hostel">Select Hostel <span class="text-danger">*</span></label>
+                                <select class="form-control select2bs4" id="add-hostel" name="hostel" required style="width: 100%;">
+                                    <option value="">Choose Hostel</option>
+                                    {% for hostel in hostels %}
+                                        <option value="{{ hostel.id }}" data-gender="{{ hostel.hostel_type }}">
+                                            {{ hostel.name }} ({{ hostel.code }}) - Capacity: {{ hostel.max_students }}
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                                <small class="form-text text-muted" id="hostel-capacity-info"></small>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="add-room">Select Room (Optional)</label>
+                                <select class="form-control select2bs4" id="add-room" name="room" style="width: 100%;">
+                                    <option value="">First select a hostel</option>
+                                </select>
+                                <small class="form-text text-muted" id="room-capacity-info"></small>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Bed Selection -->
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="add-bed">Select Bed (Optional)</label>
+                                <select class="form-control select2bs4" id="add-bed" name="bed" style="width: 100%;">
+                                    <option value="">First select a room</option>
+                                </select>
+                                <small class="form-text text-muted" id="bed-info"></small>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label>Allocation Status</label>
+                                <div class="custom-control custom-switch mt-2">
+                                    <input type="checkbox" class="custom-control-input" id="add-is_active" name="is_active" checked>
+                                    <label class="custom-control-label" for="add-is_active">
+                                        <span id="active-label">Active</span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Availability Check -->
+                    <div class="row">
+                        <div class="col-md-12">
+                            <div class="alert alert-warning" id="availability-warning" style="display: none;">
+                                <i class="fas fa-exclamation-triangle"></i>
+                                <span id="availability-message"></span>
+                            </div>
+                            <div class="alert alert-success" id="availability-success" style="display: none;">
+                                <i class="fas fa-check-circle"></i>
+                                <span id="availability-success-message"></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="save-btn">
+                        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="display: none;"></span>
+                        Create Allocation
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Bulk Allocation Modal -->
+<div class="modal fade" id="bulkAllocationModal" tabindex="-1" role="dialog" aria-labelledby="bulkModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title" id="bulkModalLabel">
+                    <i class="fas fa-layer-group"></i> Bulk Allocate Students
+                </h5>
+                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <form id="bulk-form">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <strong>Note:</strong> This will allocate multiple students to the same hostel without specific room/bed assignments.
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="bulk-hostel">Select Hostel <span class="text-danger">*</span></label>
+                                <select class="form-control select2bs4" id="bulk-hostel" name="hostel" required style="width: 100%;">
+                                    <option value="">Choose Hostel</option>
+                                    {% for hostel in hostels %}
+                                        <option value="{{ hostel.id }}">{{ hostel.name }} ({{ hostel.code }}) - Capacity: {{ hostel.max_students }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="bulk-academic_year">Academic Year <span class="text-danger">*</span></label>
+                                <select class="form-control" id="bulk-academic_year" name="academic_year" required>
+                                    <option value="">Select Academic Year</option>
+                                    {% for year in academic_years %}
+                                    <option value="{{ year.id }}" {% if year.is_active %}selected{% endif %}>{{ year }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="bulk-start_date">Start Date <span class="text-danger">*</span></label>
+                                <input type="date" class="form-control" id="bulk-start_date" name="start_date" required 
+                                       value="{% now 'Y-m-d' %}">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label>Available Slots</label>
+                                <div class="form-control-plaintext" id="available-slots">Select a hostel</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-12">
+                            <div class="form-group">
+                                <label for="student-search">Search Students</label>
+                                <input type="text" class="form-control" id="student-search" placeholder="Type to search students...">
+                                <small class="form-text text-muted">Search by name or registration number</small>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-12">
+                            <div class="form-group">
+                                <label>Select Students to Allocate</label>
+                                <div class="border rounded p-3" style="max-height: 300px; overflow-y: auto;">
+                                    <div id="student-list">
+                                        <p class="text-muted text-center">Use search to find students</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-12">
+                            <div class="alert alert-info">
+                                <i class="fas fa-calculator"></i>
+                                Selected: <span id="selected-count">0</span> students
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-success" id="bulk-save-btn">
+                        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="display: none;"></span>
+                        Allocate Selected
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Allocation Modal -->
+<div class="modal fade" id="editAllocationModal" tabindex="-1" role="dialog" aria-labelledby="editModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-warning text-dark">
+                <h5 class="modal-title" id="editModalLabel">
+                    <i class="fas fa-edit"></i> Edit Allocation
+                </h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <form id="edit-form">
+                {% csrf_token %}
+                <input type="hidden" id="edit-id" name="id">
+                <div class="modal-body">
+                    <div class="alert alert-info">
+                        <strong id="edit-student-name"></strong> - <span id="edit-hostel-name"></span>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="edit-room">Room</label>
+                                <select class="form-control select2bs4" id="edit-room" name="room" style="width: 100%;">
+                                    <option value="">No specific room</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="edit-bed">Bed</label>
+                                <select class="form-control select2bs4" id="edit-bed" name="bed" style="width: 100%;">
+                                    <option value="">No specific bed</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="edit-end_date">End Date</label>
+                                <input type="date" class="form-control" id="edit-end_date" name="end_date">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label>Status</label>
+                                <div class="custom-control custom-switch mt-2">
+                                    <input type="checkbox" class="custom-control-input" id="edit-is_active" name="is_active">
+                                    <label class="custom-control-label" for="edit-is_active">
+                                        <span id="edit-active-label">Inactive</span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-warning" id="update-btn">
+                        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="display: none;"></span>
+                        Update Allocation
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- View Details Modal -->
+<div class="modal fade" id="viewDetailsModal" tabindex="-1" role="dialog" aria-labelledby="viewModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-info text-white">
+                <h5 class="modal-title" id="viewModalLabel">
+                    <i class="fas fa-info-circle"></i> Allocation Details
+                </h5>
+                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div id="details-loading" class="text-center py-4">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="sr-only">Loading...</span>
+                    </div>
+                </div>
+                <div id="details-content" style="display: none;">
+                    <!-- Student Info -->
+                    <div class="card mb-3">
+                        <div class="card-header bg-light">
+                            <h6 class="mb-0"><i class="fas fa-user-graduate"></i> Student Information</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <p><strong>Name:</strong> <span id="detail-student-name"></span></p>
+                                    <p><strong>Registration #:</strong> <span id="detail-reg-number"></span></p>
+                                </div>
+                                <div class="col-md-6">
+                                    <p><strong>Class:</strong> <span id="detail-class"></span></p>
+                                    <p><strong>Gender:</strong> <span id="detail-gender"></span></p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Allocation Info -->
+                    <div class="card mb-3">
+                        <div class="card-header bg-light">
+                            <h6 class="mb-0"><i class="fas fa-door-open"></i> Allocation Details</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <p><strong>Hostel:</strong> <span id="detail-hostel"></span></p>
+                                    <p><strong>Room:</strong> <span id="detail-room"></span></p>
+                                    <p><strong>Bed:</strong> <span id="detail-bed"></span></p>
+                                </div>
+                                <div class="col-md-6">
+                                    <p><strong>Academic Year:</strong> <span id="detail-academic-year"></span></p>
+                                    <p><strong>Start Date:</strong> <span id="detail-start-date"></span></p>
+                                    <p><strong>End Date:</strong> <span id="detail-end-date"></span></p>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-12">
+                                    <p><strong>Status:</strong> <span id="detail-status" class="badge"></span></p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Financial Info -->
+                    <div class="card">
+                        <div class="card-header bg-light">
+                            <h6 class="mb-0"><i class="fas fa-money-bill"></i> Financial Summary</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <p><strong>Total Fee:</strong> TSh <span id="detail-total-fee"></span></p>
+                                </div>
+                                <div class="col-md-4">
+                                    <p><strong>Total Paid:</strong> TSh <span id="detail-total-paid"></span></p>
+                                </div>
+                                <div class="col-md-4">
+                                    <p><strong>Balance:</strong> TSh <span id="detail-balance"></span></p>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-12">
+                                    <p><strong>Payment Status:</strong> <span id="detail-payment-status" class="badge"></span></p>
+                                </div>
+                            </div>
+                            
+                            <!-- Recent Payments -->
+                            <div id="recent-payments" style="display: none;">
+                                <hr>
+                                <h6>Recent Payments</h6>
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-bordered">
+                                        <thead>
+                                            <tr>
+                                                <th>Receipt #</th>
+                                                <th>Date</th>
+                                                <th>Amount</th>
+                                                <th>Status</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="payments-list">
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Vacate Confirmation Modal -->
+<div class="modal fade" id="vacateModal" tabindex="-1" role="dialog" aria-labelledby="vacateModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-warning text-dark">
+                <h5 class="modal-title" id="vacateModalLabel">
+                    <i class="fas fa-door-open"></i> Vacate Student
+                </h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to vacate <strong id="vacate-student-name"></strong> from their hostel?</p>
+                <p class="text-warning"><small>This will mark the allocation as inactive and free up the bed.</small></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-warning" id="confirm-vacate-btn">
+                    <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="display: none;"></span>
+                    Vacate
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="deleteModal" tabindex="-1" role="dialog" aria-labelledby="deleteModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="deleteModalLabel">
+                    <i class="fas fa-exclamation-triangle"></i> Confirm Deletion
+                </h5>
+                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete allocation for <strong id="delete-student-name"></strong>?</p>
+                <p class="text-danger"><small>This action cannot be undone. All associated payments will be affected.</small></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirm-delete-btn">
+                    <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="display: none;"></span>
+                    Delete
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+<script>
+    $(document).ready(function() {
+        // Toggle switch label updates
+        $('#add-is_active').on('change', function() {
+            $('#active-label').text($(this).is(':checked') ? 'Active' : 'Inactive');
+        });
+        
+        $('#edit-is_active').on('change', function() {
+            $('#edit-active-label').text($(this).is(':checked') ? 'Active' : 'Inactive');
+        });
+
+        // Initialize Select2
+        function initializeSelect2() {
+            $('.select2bs4').select2({
+                theme: 'bootstrap4',
+                dropdownParent: $('.modal:visible'),
+                width: '100%',
+                placeholder: 'Select an option',
+                allowClear: true
+            });
+        }
+        
+        // Initialize on page load
+        initializeSelect2();
+
+        // Initialize DataTable
+        var table = $('#allocations-table').DataTable({
+            "dom": "<'row'<'col-sm-12 col-md-6'l><'col-sm-12 col-md-6'f>>" +
+                   "<'row'<'col-sm-12'tr>>" +
+                   "<'row'<'col-sm-12 col-md-5'i><'col-sm-12 col-md-7'p>>",
+            "lengthMenu": [[10, 25, 50, -1], [10, 25, 50, "All"]],
+            "pageLength": 10,
+            "responsive": true,
+            "autoWidth": false,
+            "ordering": true,
+            "order": [[5, 'desc']], // Sort by start date
+            "columnDefs": [
+                { 
+                    "targets": 8, // Actions column
+                    "orderable": false,
+                    "searchable": false
+                }
+            ],
+            "language": {
+                "emptyTable": "<div class='text-center py-4'><i class='fas fa-door-open fa-2x mb-2'></i><br>No allocations found. Click \"New Allocation\" to create one.</div>",
+                "search": "_INPUT_",
+                "searchPlaceholder": "Search allocations...",
+                "lengthMenu": "_MENU_ allocations per page",
+                "info": "Showing _START_ to _END_ of _TOTAL_ allocations",
+                "infoEmpty": "Showing 0 to 0 of 0 allocations",
+                "infoFiltered": "(filtered from _MAX_ total allocations)",
+                "paginate": {
+                    "first": "First",
+                    "last": "Last",
+                    "next": "Next",
+                    "previous": "Previous"
+                }
+            },
+            "drawCallback": function(settings) {
+                var api = this.api();
+                var total = api.rows().count();
+                $('#total-count').text(total);
+                
+                // Count active allocations
+                var activeCount = 0;
+                api.rows().every(function() {
+                    var data = this.data();
+                    var statusText = $(data[7]).text().toLowerCase();
+                    if (statusText.includes('active')) {
+                        activeCount++;
+                    }
+                });
+                $('#active-count').text(activeCount);
+            }
+        });
+
+        // CSRF token function
+        function getCSRFToken() {
+            return $('input[name="csrfmiddlewaretoken"]').val();
+        }
+
+        // Show toast function
+        function showToast(message, type = 'success') {
+            const toastId = type === 'success' ? '#success-toast' : '#error-toast';
+            const messageId = type === 'success' ? '#success-message' : '#error-message';
+            
+            $(messageId).text(message);
+            $(toastId).addClass('show').fadeIn();
+            
+            setTimeout(function() {
+                $(toastId).fadeOut(function() {
+                    $(this).removeClass('show');
+                });
+            }, type === 'success' ? 3000 : 5000);
+        }
+
+        // Reload page after delay
+        function reloadPageAfterDelay(message, type = 'success') {
+            showToast(message, type);
+            setTimeout(function() {
+                location.reload();
+            }, 2000);
+        }
+
+        // Set button loading state
+        function setButtonLoading(btn, isLoading) {
+            const spinner = btn.find('.spinner-border');
+            if (isLoading) {
+                btn.data('original-text', btn.html());
+                btn.prop('disabled', true);
+                spinner.show();
+                btn.html('Processing...');
+            } else {
+                btn.prop('disabled', false);
+                spinner.hide();
+                btn.html(btn.data('original-text'));
+            }
+        }
+
+        // ============================================
+        // Student Search for Add Modal
+        // ============================================
+       $('#student').select2({
+            theme: 'bootstrap4',
+            dropdownParent: $('#addAllocationModal'),
+            placeholder: 'Search for a student...',
+            allowClear: true,
+            minimumInputLength: 2,
+            ajax: {
+                url: '{% url "admin_get_available_students" %}',
+                dataType: 'json',
+                delay: 300,
+                data: function(params) {
+                    return {
+                        search: params.term
+                    };
+                },
+                processResults: function(data) {
+                    return {
+                        results: data.results || []
+                    };
+                },
+                cache: true
+            },
+            templateResult: formatStudentResult,
+            templateSelection: formatStudentSelection
+        });
+            // Format the dropdown results
+            function formatStudentResult(student) {
+                if (student.loading) {
+                    return student.text;
+                }
+                return $('<span>' + student.text + '</span>');
+            }
+
+            // Format the selected item
+            function formatStudentSelection(student) {
+                return student.text || student.id;
+            }
+        // ============================================
+        // Load Rooms based on Hostel Selection
+        // ============================================
+        function loadRoomsForAllocation(hostelSelect, roomSelect, bedSelect, callback) {
+            const hostelId = hostelSelect.val();
+            const roomField = roomSelect;
+            const bedField = bedSelect;
+            
+            roomField.empty().append('<option value="">Loading rooms...</option>').prop('disabled', true);
+            if (bedField) bedField.empty().append('<option value="">Select room first</option>').prop('disabled', true);
+            
+            if (hostelId) {
+                const url = '{% url "admin_get_available_rooms" 0 %}'.replace('0', hostelId);
+                
+                $.ajax({
+                    url: url,
+                    method: 'GET',
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                    success: function(data) {
+                        roomField.empty().append('<option value="">Select Room (Optional)</option>').prop('disabled', false);
+                        
+                        if (data.success && data.rooms && data.rooms.length > 0) {
+                            $.each(data.rooms, function(index, room) {
+                                const option = $('<option>', {
+                                    value: room.id,
+                                    text: room.display,
+                                    'data-available-spaces': room.available_spaces
+                                });
+                                
+                                if (room.available_spaces === 0) {
+                                    option.prop('disabled', true).text(room.display + ' (Full)');
+                                }
+                                
+                                roomField.append(option);
+                            });
+                        } else {
+                            roomField.append('<option value="">No rooms available</option>');
+                        }
+                        
+                        if (callback) callback(data);
+                    },
+                    error: function() {
+                        roomField.empty().append('<option value="">Error loading rooms</option>').prop('disabled', false);
+                    }
+                });
+            } else {
+                roomField.empty().append('<option value="">First select a hostel</option>').prop('disabled', false);
+            }
+        }
+
+        // ============================================
+        // Load Beds based on Room Selection
+        // ============================================
+        function loadBedsForAllocation(roomSelect, bedSelect) {
+            const roomId = roomSelect.val();
+            const bedField = bedSelect;
+            
+            bedField.empty().append('<option value="">Loading beds...</option>').prop('disabled', true);
+            
+            if (roomId) {
+                const url = '{% url "admin_get_available_beds" 0 %}'.replace('0', roomId);
+                
+                $.ajax({
+                    url: url,
+                    method: 'GET',
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                    success: function(data) {
+                        bedField.empty().append('<option value="">Select Bed (Optional)</option>').prop('disabled', false);
+                        
+                        if (data.success && data.beds && data.beds.length > 0) {
+                            $.each(data.beds, function(index, bed) {
+                                bedField.append($('<option>', {
+                                    value: bed.id,
+                                    text: bed.display
+                                }));
+                            });
+                            
+                            $('#bed-info').text(`${data.beds.length} beds available`);
+                        } else {
+                            bedField.append('<option value="">No beds available</option>');
+                            $('#bed-info').text('No beds available in this room');
+                        }
+                    },
+                    error: function() {
+                        bedField.empty().append('<option value="">Error loading beds</option>').prop('disabled', false);
+                    }
+                });
+            } else {
+                bedField.empty().append('<option value="">Select a room first</option>').prop('disabled', false);
+            }
+        }
+
+        // Add modal room loading
+        $('#add-hostel').on('change', function() {
+            loadRoomsForAllocation($(this), $('#add-room'), $('#add-bed'));
+        });
+
+        $('#add-room').on('change', function() {
+            loadBedsForAllocation($(this), $('#add-bed'));
+        });
+
+        // ============================================
+        // Check Availability
+        // ============================================
+        function checkAvailability() {
+            const hostelId = $('#add-hostel').val();
+            const roomId = $('#add-room').val();
+            const bedId = $('#add-bed').val();
+            
+            if (!hostelId) return;
+            
+            $.ajax({
+                url: '{% url "admin_check_availability" %}',
+                method: 'GET',
+                data: {
+                    hostel_id: hostelId,
+                    room_id: roomId,
+                    bed_id: bedId
+                },
+                success: function(data) {
+                    if (data.success) {
+                        if (data.available) {
+                            $('#availability-warning').hide();
+                            $('#availability-success').show()
+                                .find('#availability-success-message').text('Selection is available');
+                        } else {
+                            $('#availability-success').hide();
+                            $('#availability-warning').show()
+                                .find('#availability-message').text(data.messages.join(', '));
+                        }
+                    }
+                }
+            });
+        }
+
+        $('#add-hostel, #add-room, #add-bed').on('change', checkAvailability);
+
+        // ============================================
+        // Add Allocation Form Submit
+        // ============================================
+        $('#add-form').on('submit', function(e) {
+            e.preventDefault();
+            
+            const saveBtn = $('#save-btn');
+            setButtonLoading(saveBtn, true);
+            
+            const formData = new FormData(this);
+            formData.append('action', 'create');
+            
+            $.ajax({
+                url: '{% url "admin_student_allocations_crud" %}',
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCSRFToken(),
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function(data) {
+                    if (data.success) {
+                        $('#addAllocationModal').modal('hide');
+                        reloadPageAfterDelay(data.message, 'success');
+                    } else {
+                        showToast(data.message, 'danger');
+                        setButtonLoading(saveBtn, false);
+                    }
+                },
+                error: function(xhr) {
+                    let errorMsg = 'An error occurred';
+                    if (xhr.responseJSON && xhr.responseJSON.message) {
+                        errorMsg = xhr.responseJSON.message;
+                    }
+                    showToast(errorMsg, 'danger');
+                    setButtonLoading(saveBtn, false);
+                }
+            });
+        });
+
+        // ============================================
+        // Edit Allocation - Setup
+        // ============================================
+        $(document).on('click', '.edit-btn', function() {
+            const btn = $(this);
+            
+            $('#edit-id').val(btn.data('id'));
+            $('#edit-student-name').text(btn.data('student-name'));
+            $('#edit-hostel-name').text(btn.data('hostel-name'));
+            
+            // Store current values
+            const roomId = btn.data('room-id');
+            const bedId = btn.data('bed-id');
+            const endDate = btn.data('end-date');
+            const isActive = btn.data('is-active') === 'true';
+            
+            $('#edit-end_date').val(endDate || '');
+            $('#edit-is_active').prop('checked', isActive);
+            $('#edit-active-label').text(isActive ? 'Active' : 'Inactive');
+            
+            // Load rooms for this hostel
+            const hostelId = btn.data('hostel-id');
+            $('#edit-hostel').val(hostelId).trigger('change');
+            
+            // Store room and bed IDs for later selection
+            $('#edit-room').data('current-room-id', roomId);
+            $('#edit-bed').data('current-bed-id', bedId);
+            
+            $('#editAllocationModal').modal('show');
+        });
+
+        // Load rooms for edit modal
+        $('#edit-hostel').on('change', function() {
+            const roomSelect = $('#edit-room');
+            const bedSelect = $('#edit-bed');
+            const currentRoomId = roomSelect.data('current-room-id');
+            
+            loadRoomsForAllocation($(this), roomSelect, bedSelect, function() {
+                if (currentRoomId) {
+                    roomSelect.val(currentRoomId).trigger('change');
+                }
+            });
+        });
+
+        $('#edit-room').on('change', function() {
+            const bedSelect = $('#edit-bed');
+            const currentBedId = bedSelect.data('current-bed-id');
+            
+            loadBedsForAllocation($(this), bedSelect);
+            
+            setTimeout(function() {
+                if (currentBedId) {
+                    bedSelect.val(currentBedId);
+                }
+            }, 500);
+        });
+
+        // ============================================
+        // Edit Allocation Form Submit
+        // ============================================
+        $('#edit-form').on('submit', function(e) {
+            e.preventDefault();
+            
+            const updateBtn = $('#update-btn');
+            setButtonLoading(updateBtn, true);
+            
+            const formData = new FormData(this);
+            formData.append('action', 'update');
+            
+            $.ajax({
+                url: '{% url "admin_student_allocations_crud" %}',
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCSRFToken(),
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function(data) {
+                    if (data.success) {
+                        $('#editAllocationModal').modal('hide');
+                        reloadPageAfterDelay(data.message, 'success');
+                    } else {
+                        showToast(data.message, 'danger');
+                        setButtonLoading(updateBtn, false);
+                    }
+                },
+                error: function(xhr) {
+                    let errorMsg = 'An error occurred';
+                    if (xhr.responseJSON && xhr.responseJSON.message) {
+                        errorMsg = xhr.responseJSON.message;
+                    }
+                    showToast(errorMsg, 'danger');
+                    setButtonLoading(updateBtn, false);
+                }
+            });
+        });
+
+        // ============================================
+        // View Details
+        // ============================================
+        $(document).on('click', '.view-details-btn', function() {
+            const allocationId = $(this).data('id');
+            
+            $('#details-loading').show();
+            $('#details-content').hide();
+            $('#viewDetailsModal').modal('show');
+            
+            $.ajax({
+                url: '{% url "admin_allocation_details" 0 %}'.replace('0', allocationId),
+                method: 'GET',
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                success: function(data) {
+                    if (data.success) {
+                        const alloc = data.allocation;
+                        
+                        // Student Info
+                        $('#detail-student-name').text(alloc.student.full_name);
+                        $('#detail-reg-number').text(alloc.student.registration_number);
+                        $('#detail-class').text(alloc.student.class_level || 'N/A');
+                        $('#detail-gender').text(alloc.student.gender);
+                        
+                        // Allocation Info
+                        $('#detail-hostel').text(`${alloc.hostel.name} (${alloc.hostel.code})`);
+                        $('#detail-room').text(alloc.room ? alloc.room.room_number : 'Not assigned');
+                        $('#detail-bed').text(alloc.bed ? `${alloc.bed.bed_number} (${alloc.bed.bed_type})` : 'Not assigned');
+                        $('#detail-academic-year').text(alloc.academic_year);
+                        $('#detail-start-date').text(alloc.start_date);
+                        $('#detail-end-date').text(alloc.end_date || 'Not set');
+                        
+                        const statusBadge = alloc.is_active ? 
+                            '<span class="badge badge-success">Active</span>' : 
+                            '<span class="badge badge-secondary">Inactive</span>';
+                        $('#detail-status').html(statusBadge);
+                        
+                        // Financial Info
+                        $('#detail-total-fee').text(alloc.financial.total_fee.toLocaleString());
+                        $('#detail-total-paid').text(alloc.financial.total_paid.toLocaleString());
+                        $('#detail-balance').text(alloc.financial.balance.toLocaleString());
+                        
+                        let paymentStatusBadge = '';
+                        if (alloc.financial.payment_status === 'Paid') {
+                            paymentStatusBadge = '<span class="badge badge-success">Paid</span>';
+                        } else if (alloc.financial.payment_status === 'Partial') {
+                            paymentStatusBadge = '<span class="badge badge-warning">Partial</span>';
+                        } else {
+                            paymentStatusBadge = '<span class="badge badge-danger">Unpaid</span>';
+                        }
+                        $('#detail-payment-status').html(paymentStatusBadge);
+                        
+                        // Payments
+                        if (alloc.payments && alloc.payments.length > 0) {
+                            $('#recent-payments').show();
+                            const paymentsList = $('#payments-list');
+                            paymentsList.empty();
+                            
+                            alloc.payments.slice(0, 5).forEach(function(payment) {
+                                paymentsList.append(`
+                                    <tr>
+                                        <td>${payment.receipt_number}</td>
+                                        <td>${payment.payment_date}</td>
+                                        <td>TSh ${payment.amount_paid.toLocaleString()}</td>
+                                        <td><span class="badge badge-${payment.status === 'paid' ? 'success' : 'warning'}">${payment.status}</span></td>
+                                    </tr>
+                                `);
+                            });
+                        } else {
+                            $('#recent-payments').hide();
+                        }
+                        
+                        $('#details-loading').hide();
+                        $('#details-content').show();
+                    } else {
+                        showToast('Failed to load details', 'danger');
+                        $('#viewDetailsModal').modal('hide');
+                    }
+                },
+                error: function() {
+                    showToast('Error loading details', 'danger');
+                    $('#viewDetailsModal').modal('hide');
+                }
+            });
+        });
+
+        // ============================================
+        // Vacate Student
+        // ============================================
+        let allocationToVacate = null;
+        
+        $(document).on('click', '.vacate-btn', function() {
+            allocationToVacate = {
+                id: $(this).data('id'),
+                student: $(this).data('student')
+            };
+            
+            $('#vacate-student-name').text(allocationToVacate.student);
+            $('#vacateModal').modal('show');
+        });
+
+        $('#confirm-vacate-btn').on('click', function() {
+            if (!allocationToVacate) return;
+            
+            const vacateBtn = $(this);
+            setButtonLoading(vacateBtn, true);
+            
+            $.ajax({
+                url: '{% url "admin_student_allocations_crud" %}',
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCSRFToken(),
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                data: {
+                    'action': 'vacate',
+                    'id': allocationToVacate.id
+                },
+                success: function(data) {
+                    if (data.success) {
+                        $('#vacateModal').modal('hide');
+                        reloadPageAfterDelay(data.message, 'success');
+                    } else {
+                        showToast(data.message, 'danger');
+                        setButtonLoading(vacateBtn, false);
+                    }
+                },
+                error: function(xhr) {
+                    let errorMsg = 'An error occurred';
+                    if (xhr.responseJSON && xhr.responseJSON.message) {
+                        errorMsg = xhr.responseJSON.message;
+                    }
+                    showToast(errorMsg, 'danger');
+                    setButtonLoading(vacateBtn, false);
+                }
+            });
+        });
+
+        // ============================================
+        // Delete Allocation
+        // ============================================
+        let allocationToDelete = null;
+        
+        $(document).on('click', '.delete-btn', function() {
+            allocationToDelete = {
+                id: $(this).data('id'),
+                student: $(this).data('student'),
+                hostel: $(this).data('hostel')
+            };
+            
+            $('#delete-student-name').text(`${allocationToDelete.student} (${allocationToDelete.hostel})`);
+            $('#deleteModal').modal('show');
+        });
+
+        $('#confirm-delete-btn').on('click', function() {
+            if (!allocationToDelete) return;
+            
+            const deleteBtn = $(this);
+            setButtonLoading(deleteBtn, true);
+            
+            $.ajax({
+                url: '{% url "admin_student_allocations_crud" %}',
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCSRFToken(),
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                data: {
+                    'action': 'delete',
+                    'id': allocationToDelete.id
+                },
+                success: function(data) {
+                    if (data.success) {
+                        $('#deleteModal').modal('hide');
+                        reloadPageAfterDelay(data.message, 'success');
+                    } else {
+                        showToast(data.message, 'danger');
+                        setButtonLoading(deleteBtn, false);
+                    }
+                },
+                error: function(xhr) {
+                    let errorMsg = 'An error occurred';
+                    if (xhr.responseJSON && xhr.responseJSON.message) {
+                        errorMsg = xhr.responseJSON.message;
+                    }
+                    showToast(errorMsg, 'danger');
+                    setButtonLoading(deleteBtn, false);
+                }
+            });
+        });
+
+        // ============================================
+        // Bulk Allocation - Student Search
+        // ============================================
+        $('#bulk-hostel').on('change', function() {
+            const hostelId = $(this).val();
+            if (hostelId) {
+                // Get hostel capacity info
+                const selected = $(this).find('option:selected');
+                const capacityText = selected.text().match(/Capacity: (\d+)/);
+                if (capacityText) {
+                    $('#available-slots').text('Calculating...');
+                }
+            } else {
+                $('#available-slots').text('Select a hostel');
+            }
+        });
+
+       // ============================================
+// Bulk Allocation - Student Search - FIXED VERSION
+// ============================================
+let searchTimeout;
+$('#student-search').on('input', function() {
+    clearTimeout(searchTimeout);
+    const search = $(this).val();
+    const studentList = $('#student-list');
+    
+    if (search.length < 2) {
+        studentList.html('<p class="text-muted text-center">Type at least 2 characters to search</p>');
+        return;
+    }
+    
+    // Show loading
+    studentList.html('<p class="text-center"><i class="fas fa-spinner fa-spin"></i> Searching...</p>');
+    
+    searchTimeout = setTimeout(function() {
+        $.ajax({
+            url: '{% url "admin_get_available_students" %}',
+            method: 'GET',
+            data: { search: search },
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            success: function(data) {
+                if (data.results && data.results.length > 0) {
+                    let html = '<div class="student-checkbox-list">';
+                    data.results.forEach(function(student) {
+                        html += `
+                            <div class="form-check mb-2">
+                                <input class="form-check-input student-checkbox" type="checkbox" 
+                                       value="${student.id}" id="student-${student.id}">
+                                <label class="form-check-label" for="student-${student.id}">
+                                    ${student.text}
+                                </label>
+                            </div>
+                        `;
+                    });
+                    html += '</div>';
+                    studentList.html(html);
+                    updateSelectedCount();
+                } else {
+                    studentList.html('<p class="text-muted text-center">No students found</p>');
+                }
+            },
+            error: function(xhr, status, error) {
+                console.error('Search error:', error);
+                studentList.html('<p class="text-danger text-center">Error loading students. Please try again.</p>');
+            }
+        });
+    }, 500); // Wait 500ms after user stops typing
+});
+
+        $(document).on('change', '.student-checkbox', updateSelectedCount);
+
+        function updateSelectedCount() {
+            const count = $('.student-checkbox:checked').length;
+            $('#selected-count').text(count);
+        }
+
+        // Bulk Allocation Form Submit
+        $('#bulk-form').on('submit', function(e) {
+            e.preventDefault();
+            
+            const selectedStudents = $('.student-checkbox:checked').map(function() {
+                return $(this).val();
+            }).get();
+            
+            if (selectedStudents.length === 0) {
+                showToast('Please select at least one student', 'danger');
+                return;
+            }
+            
+            const bulkBtn = $('#bulk-save-btn');
+            setButtonLoading(bulkBtn, true);
+            
+            const formData = new FormData(this);
+            formData.append('action', 'bulk_create');
+            
+            selectedStudents.forEach(function(id) {
+                formData.append('students[]', id);
+            });
+            
+            $.ajax({
+                url: '{% url "admin_student_allocations_crud" %}',
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCSRFToken(),
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function(data) {
+                    if (data.success) {
+                        $('#bulkAllocationModal').modal('hide');
+                        reloadPageAfterDelay(data.message, 'success');
+                    } else {
+                        showToast(data.message, 'danger');
+                        setButtonLoading(bulkBtn, false);
+                    }
+                },
+                error: function(xhr) {
+                    let errorMsg = 'An error occurred';
+                    if (xhr.responseJSON && xhr.responseJSON.message) {
+                        errorMsg = xhr.responseJSON.message;
+                    }
+                    showToast(errorMsg, 'danger');
+                    setButtonLoading(bulkBtn, false);
+                }
+            });
+        });
+
+        // ============================================
+        // Filtering
+        // ============================================
+        $('#apply-filters').on('click', function() {
+            const hostel = $('#filter-hostel').val();
+            const status = $('#filter-status').val();
+            const year = $('#filter-academic-year').val();
+            
+            // Apply filters to DataTable
+            $.fn.dataTable.ext.search = [];
+            
+            if (hostel) {
+                $.fn.dataTable.ext.search.push(
+                    function(settings, data, dataIndex) {
+                        return data[2].includes($('#filter-hostel option:selected').text());
+                    }
+                );
+            }
+            
+            if (status) {
+                $.fn.dataTable.ext.search.push(
+                    function(settings, data, dataIndex) {
+                        const statusText = data[7].toLowerCase();
+                        return status === 'active' ? statusText.includes('active') : statusText.includes('inactive');
+                    }
+                );
+            }
+            
+            table.draw();
+        });
+
+        $('#reset-filters').on('click', function() {
+            $('#filter-hostel').val('');
+            $('#filter-status').val('');
+            $('#filter-academic-year').val('');
+            $.fn.dataTable.ext.search = [];
+            table.draw();
+        });
+
+        // ============================================
+        // Modal Cleanup
+        // ============================================
+        $('.modal').on('hidden.bs.modal', function() {
+            $(this).find('form')[0]?.reset();
+            $(this).find('.select2bs4').val('').trigger('change');
+            setButtonLoading($(this).find('button[type="submit"]'), false);
+            
+            if ($(this).attr('id') === 'deleteModal') {
+                allocationToDelete = null;
+            }
+            if ($(this).attr('id') === 'vacateModal') {
+                allocationToVacate = null;
+            }
+            
+            // Hide alerts
+            $('#availability-warning, #availability-success').hide();
+        });
+
+        // Reinitialize Select2 when modals are shown
+        $('#addAllocationModal, #bulkAllocationModal, #editAllocationModal').on('shown.bs.modal', function() {
+            $(this).find('.select2bs4').select2({
+                theme: 'bootstrap4',
+                dropdownParent: $(this),
+                width: '100%',
+                placeholder: 'Select an option',
+                allowClear: true
+            });
+        });
+
+        // Destroy Select2 when modals are hidden
+        $('#addAllocationModal, #bulkAllocationModal, #editAllocationModal').on('hidden.bs.modal', function() {
+            $(this).find('.select2bs4').select2('destroy');
+        });
+    });
+</script>
+{% endblock extra_js %}

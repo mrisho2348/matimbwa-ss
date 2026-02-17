@@ -3804,6 +3804,7 @@ def export_students_excel(request):
     """
     Export students to Excel using openpyxl
     Supports filtering based on current filters
+    Includes school header and filtering details section
     """
     try:
         # Get filter parameters from request
@@ -3850,24 +3851,184 @@ def export_students_excel(request):
                 Q(parents__full_name__icontains=search_query)
             ).distinct()
         
+        # Get filter display names for header section
+        filter_details = {}
+        if class_level_id:
+            class_level = ClassLevel.objects.get(id=class_level_id)
+            filter_details['Class Level'] = f"{class_level.name} ({class_level.educational_level.name})"
+        if stream_id:
+            stream = StreamClass.objects.get(id=stream_id)
+            filter_details['Stream'] = f"{stream.class_level.name}{stream.stream_letter}"
+        if academic_year_id:
+            year = AcademicYear.objects.get(id=academic_year_id)
+            filter_details['Academic Year'] = year.name
+        if status_filter:
+            filter_details['Status'] = dict(STATUS_CHOICES).get(status_filter, status_filter)
+        if gender_filter:
+            filter_details['Gender'] = dict(GENDER_CHOICES).get(gender_filter, gender_filter)
+        if search_query:
+            filter_details['Search'] = search_query
+        
+        # Get statistics
+        total_students = students.count()
+        male_count = students.filter(gender='male').count()
+        female_count = students.filter(gender='female').count()
+        active_count = students.filter(status='active').count()
+        
         # Create a new workbook
         wb = openpyxl.Workbook()
         ws = wb.active
         ws.title = "Students List"
         
         # Define styles
+        title_font = Font(name='Calibri', size=16, bold=True, color='1F4E79')
+        school_font = Font(name='Calibri', size=14, bold=True, color='2E75B5')
+        subtitle_font = Font(name='Calibri', size=12, bold=True, color='44546A')
         header_font = Font(name='Calibri', size=12, bold=True, color='FFFFFF')
-        header_fill = PatternFill(start_color='4F81BD', end_color='4F81BD', fill_type='solid')
-        header_alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
         
-        cell_font = Font(name='Calibri', size=11)
-        cell_alignment = Alignment(horizontal='left', vertical='center', wrap_text=True)
-        cell_border = Border(
-            left=Side(style='thin', color='000000'),
-            right=Side(style='thin', color='000000'),
-            top=Side(style='thin', color='000000'),
-            bottom=Side(style='thin', color='000000')
+        header_fill = PatternFill(start_color='4F81BD', end_color='4F81BD', fill_type='solid')
+        info_fill = PatternFill(start_color='DEEAF6', end_color='DEEAF6', fill_type='solid')
+        filter_fill = PatternFill(start_color='F2F2F2', end_color='F2F2F2', fill_type='solid')
+        
+        center_alignment = Alignment(horizontal='center', vertical='center')
+        left_alignment = Alignment(horizontal='left', vertical='center')
+        wrap_alignment = Alignment(horizontal='left', vertical='center', wrap_text=True)
+        
+        header_border = Border(
+            left=Side(style='medium', color='4F81BD'),
+            right=Side(style='medium', color='4F81BD'),
+            top=Side(style='medium', color='4F81BD'),
+            bottom=Side(style='medium', color='4F81BD')
         )
+        
+        cell_border = Border(
+            left=Side(style='thin', color='B8CCE4'),
+            right=Side(style='thin', color='B8CCE4'),
+            top=Side(style='thin', color='B8CCE4'),
+            bottom=Side(style='thin', color='B8CCE4')
+        )
+        
+        # Merge cells for header sections
+        ws.merge_cells('A1:Q1')
+        ws.merge_cells('A2:Q2')
+        ws.merge_cells('A3:Q3')
+        ws.merge_cells('A4:Q4')
+        ws.merge_cells('A5:Q5')
+        ws.merge_cells('A6:Q6')
+        ws.merge_cells('A7:Q7')
+        
+        # ============================================
+        # SCHOOL HEADER SECTION
+        # ============================================
+        
+        # Row 1: School Name
+        school_cell = ws.cell(row=1, column=1)
+        school_cell.value = "SCHOOL MANAGEMENT SYSTEM"
+        school_cell.font = title_font
+        school_cell.alignment = center_alignment
+        school_cell.border = header_border
+        
+        # Row 2: School Details
+        school_details = ws.cell(row=2, column=1)
+        school_details.value = " Excellence in Education | Quality Learning for All"
+        school_details.font = school_font
+        school_details.alignment = center_alignment
+        school_details.border = header_border
+        
+        # Row 3: Address
+        address_cell = ws.cell(row=3, column=1)
+        address_cell.value = "P.O. Box 12345, Dar es Salaam, Tanzania | Tel: +255 123 456 789 | Email: info@school.ac.tz"
+        address_cell.font = Font(name='Calibri', size=11, italic=True)
+        address_cell.alignment = center_alignment
+        address_cell.border = header_border
+        
+        # Row 4: Report Title
+        title_cell = ws.cell(row=4, column=1)
+        title_cell.value = "STUDENTS LIST REPORT"
+        title_cell.font = Font(name='Calibri', size=14, bold=True, color='C00000')
+        title_cell.alignment = center_alignment
+        title_cell.border = header_border
+        
+        # ============================================
+        # FILTER INFORMATION SECTION
+        # ============================================
+        
+        # Row 5: Filter Section Title
+        filter_title = ws.cell(row=5, column=1)
+        filter_title.value = "FILTER INFORMATION"
+        filter_title.font = Font(name='Calibri', size=12, bold=True, color='44546A')
+        filter_title.alignment = center_alignment
+        filter_title.fill = PatternFill(start_color='F2F2F2', end_color='F2F2F2', fill_type='solid')
+        filter_title.border = header_border
+        
+        # Row 6: Applied Filters
+        filter_text = []
+        if filter_details:
+            for key, value in filter_details.items():
+                filter_text.append(f"{key}: {value}")
+        else:
+            filter_text.append("No filters applied - Showing all students")
+        
+        filter_cell = ws.cell(row=6, column=1)
+        filter_cell.value = " | ".join(filter_text)
+        filter_cell.font = Font(name='Calibri', size=11, italic=True)
+        filter_cell.alignment = center_alignment
+        filter_cell.fill = PatternFill(start_color='FCE4D6', end_color='FCE4D6', fill_type='solid')
+        filter_cell.border = header_border
+        
+        # Row 7: Generation Information
+        gen_info = f"Generated on: {timezone.now().strftime('%d-%m-%Y %H:%M:%S')} | Generated by: {request.user.get_full_name() or request.user.username}"
+        gen_cell = ws.cell(row=7, column=1)
+        gen_cell.value = gen_info
+        gen_cell.font = Font(name='Calibri', size=10, bold=True)
+        gen_cell.alignment = center_alignment
+        gen_cell.border = header_border
+        
+        # ============================================
+        # STATISTICS SECTION
+        # ============================================
+        
+        # Row 8: Statistics Title
+        stats_title_row = 8
+        ws.merge_cells(f'A{stats_title_row}:Q{stats_title_row}')
+        stats_title = ws.cell(row=stats_title_row, column=1)
+        stats_title.value = "STATISTICS SUMMARY"
+        stats_title.font = Font(name='Calibri', size=12, bold=True, color='1F4E79')
+        stats_title.alignment = center_alignment
+        stats_title.fill = PatternFill(start_color='DEEAF6', end_color='DEEAF6', fill_type='solid')
+        
+        # Row 9: Statistics Values
+        stats_row = 9
+        # Total Students
+        ws.cell(row=stats_row, column=1, value="Total Students:").font = Font(bold=True)
+        ws.cell(row=stats_row, column=2, value=total_students)
+        # Active Students
+        ws.cell(row=stats_row, column=4, value="Active:").font = Font(bold=True)
+        ws.cell(row=stats_row, column=5, value=active_count)
+        # Male Students
+        ws.cell(row=stats_row, column=7, value="Male:").font = Font(bold=True)
+        ws.cell(row=stats_row, column=8, value=male_count)
+        # Female Students
+        ws.cell(row=stats_row, column=10, value="Female:").font = Font(bold=True)
+        ws.cell(row=stats_row, column=11, value=female_count)
+        
+        # Apply borders to statistics row
+        for col in range(1, 12):
+            cell = ws.cell(row=stats_row, column=col)
+            cell.border = cell_border
+            if col in [1, 4, 7, 10]:
+                cell.fill = PatternFill(start_color='F2F2F2', end_color='F2F2F2', fill_type='solid')
+        
+        # ============================================
+        # EMPTY ROW BEFORE TABLE
+        # ============================================
+        empty_row = 10
+        ws.row_dimensions[empty_row].height = 10
+        
+        # ============================================
+        # TABLE HEADERS (Start from row 11)
+        # ============================================
+        header_row = 11
         
         # Define headers
         headers = [
@@ -3879,20 +4040,24 @@ def export_students_excel(request):
         
         # Write headers
         for col_num, header in enumerate(headers, 1):
-            cell = ws.cell(row=1, column=col_num)
+            cell = ws.cell(row=header_row, column=col_num)
             cell.value = header
             cell.font = header_font
             cell.fill = header_fill
-            cell.alignment = header_alignment
+            cell.alignment = center_alignment
             cell.border = cell_border
         
-        # Write data rows
-        for row_num, student in enumerate(students, 2):
+        # ============================================
+        # DATA ROWS
+        # ============================================
+        current_row = header_row + 1
+        
+        for row_num, student in enumerate(students, 1):
             primary_parent = student.parents.first()
             
             # Row data
             row_data = [
-                row_num - 1,  # S/N
+                row_num,  # S/N
                 student.registration_number or 'N/A',
                 student.full_name,
                 student.get_gender_display() if student.gender else 'N/A',
@@ -3911,15 +4076,63 @@ def export_students_excel(request):
                 student.examination_number or 'N/A',
             ]
             
-            # Write cells
+            # Write cells with alternating row colors
             for col_num, value in enumerate(row_data, 1):
-                cell = ws.cell(row=row_num, column=col_num)
+                cell = ws.cell(row=current_row, column=col_num)
                 cell.value = value
-                cell.font = cell_font
-                cell.alignment = cell_alignment
+                cell.font = Font(name='Calibri', size=10)
+                cell.alignment = left_alignment if col_num not in [1, 4] else center_alignment
                 cell.border = cell_border
+                
+                # Alternate row colors
+                if row_num % 2 == 0:
+                    cell.fill = PatternFill(start_color='F9F9F9', end_color='F9F9F9', fill_type='solid')
+            
+            # Color code status cells
+            status_cell = ws.cell(row=current_row, column=15)  # Status column
+            if student.status == 'active':
+                status_cell.fill = PatternFill(start_color='C6EFCE', end_color='C6EFCE', fill_type='solid')
+            elif student.status == 'suspended':
+                status_cell.fill = PatternFill(start_color='FFEB9C', end_color='FFEB9C', fill_type='solid')
+            elif student.status == 'withdrawn':
+                status_cell.fill = PatternFill(start_color='FFC7CE', end_color='FFC7CE', fill_type='solid')
+            elif student.status == 'completed':
+                status_cell.fill = PatternFill(start_color='BDD7EE', end_color='BDD7EE', fill_type='solid')
+            
+            current_row += 1
         
-        # Auto-adjust column widths
+        # ============================================
+        # FOOTER SECTION
+        # ============================================
+        footer_row = current_row + 1
+        
+        # Total row
+        ws.merge_cells(f'A{footer_row}:D{footer_row}')
+        total_cell = ws.cell(row=footer_row, column=1)
+        total_cell.value = f"TOTAL STUDENTS: {len(students)}"
+        total_cell.font = Font(name='Calibri', size=12, bold=True)
+        total_cell.fill = PatternFill(start_color='DEEAF6', end_color='DEEAF6', fill_type='solid')
+        total_cell.border = cell_border
+        total_cell.alignment = left_alignment
+        
+        # Generation footer
+        footer_row += 2
+        ws.merge_cells(f'A{footer_row}:Q{footer_row}')
+        footer_cell = ws.cell(row=footer_row, column=1)
+        footer_cell.value = "This is a computer-generated report. No signature is required."
+        footer_cell.font = Font(name='Calibri', size=9, italic=True)
+        footer_cell.alignment = center_alignment
+        
+        footer_row += 1
+        ws.merge_cells(f'A{footer_row}:Q{footer_row}')
+        copyright_cell = ws.cell(row=footer_row, column=1)
+        copyright_cell.value = f"© {timezone.now().year} School Management System. All rights reserved."
+        copyright_cell.font = Font(name='Calibri', size=8, italic=True)
+        copyright_cell.alignment = center_alignment
+        
+        # ============================================
+        # AUTO-ADJUST COLUMN WIDTHS
+        # ============================================
         for col_num in range(1, len(headers) + 1):
             column_letter = get_column_letter(col_num)
             max_length = 0
@@ -3928,28 +4141,49 @@ def export_students_excel(request):
             if len(headers[col_num-1]) > max_length:
                 max_length = len(headers[col_num-1])
             
-            # Check data length in this column
-            for row_num in range(2, len(students) + 2):
+            # Check data length in this column (from header row to footer)
+            for row_num in range(header_row, current_row):
                 cell_value = ws.cell(row=row_num, column=col_num).value
                 if cell_value and len(str(cell_value)) > max_length:
                     max_length = len(str(cell_value))
             
+            # Check footer text
+            if col_num == 1:
+                footer_text = f"TOTAL STUDENTS: {len(students)}"
+                if len(footer_text) > max_length:
+                    max_length = len(footer_text)
+            
             # Set column width (with some padding)
-            adjusted_width = min(max_length + 5, 50)  # Max width 50
+            adjusted_width = min(max_length + 5, 60)  # Max width 60
             ws.column_dimensions[column_letter].width = adjusted_width
         
-        # Add summary row
-        summary_row = len(students) + 3
-        ws.cell(row=summary_row, column=1, value=f"Total Students: {len(students)}")
-        ws.cell(row=summary_row, column=1).font = Font(bold=True)
+        # Set row heights
+        ws.row_dimensions[1].height = 30
+        ws.row_dimensions[2].height = 25
+        ws.row_dimensions[3].height = 20
+        ws.row_dimensions[4].height = 25
+        ws.row_dimensions[5].height = 20
+        ws.row_dimensions[6].height = 25
+        ws.row_dimensions[7].height = 20
+        ws.row_dimensions[8].height = 20
+        ws.row_dimensions[9].height = 20
+        ws.row_dimensions[header_row].height = 30
         
-        # Create the HttpResponse
+        # Freeze panes to keep headers visible
+        ws.freeze_panes = f'A{header_row + 1}'
+        
+        # Add filter to headers
+        ws.auto_filter.ref = f'A{header_row}:Q{current_row - 1}'
+        
+        # ============================================
+        # CREATE RESPONSE
+        # ============================================
         response = HttpResponse(
             content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
         )
         
         # Generate filename with filters
-        filename = 'students_list'
+        filename = 'students_report'
         if class_level_id:
             class_name = ClassLevel.objects.get(id=class_level_id).name
             filename += f'_{class_name}'
@@ -3964,6 +4198,21 @@ def export_students_excel(request):
         
         return response
         
+    except ClassLevel.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'message': 'Selected class level not found.'
+        }, status=400)
+    except StreamClass.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'message': 'Selected stream not found.'
+        }, status=400)
+    except AcademicYear.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'message': 'Selected academic year not found.'
+        }, status=400)
     except Exception as e:
         return JsonResponse({
             'success': False,
@@ -4598,42 +4847,1105 @@ def remove_student_from_parent(request, parent_id, student_id):
 
 @login_required
 def student_status(request):
-    """Manage student statuses"""
-    students = Student.objects.select_related('class_level', 'stream_class').all()
+    """
+    Manage student statuses with DataTable client-side filtering
+    """
+    # Get all students (no filtering in view)
+    students = Student.objects.select_related(
+        'class_level', 'stream_class'
+    ).prefetch_related('parents').order_by('first_name', 'last_name')
     
-    # Filters
-    status_filter = request.GET.get('status', '')
-    if status_filter:
-        students = students.filter(status=status_filter)
-    
-    # Status statistics
-    status_stats = Student.objects.values('status').annotate(
-        count=Count('id')
-    ).order_by('status')
+    # Get statistics from entire database
+    total_status_stats = Student.objects.values('status').annotate(count=Count('id'))
+    status_counts = {stat['status']: stat['count'] for stat in total_status_stats}
     
     # Calculate age statistics
     today = date.today()
     age_stats = {
-        'under_10': students.filter(date_of_birth__isnull=False).filter(
+        'under_10': Student.objects.filter(
+            date_of_birth__isnull=False,
             date_of_birth__gte=date(today.year - 10, today.month, today.day)
         ).count(),
-        '10_15': students.filter(date_of_birth__isnull=False).filter(
+        '10_15': Student.objects.filter(
+            date_of_birth__isnull=False,
             date_of_birth__lt=date(today.year - 10, today.month, today.day),
             date_of_birth__gte=date(today.year - 15, today.month, today.day)
         ).count(),
-        'over_15': students.filter(date_of_birth__isnull=False).filter(
+        'over_15': Student.objects.filter(
+            date_of_birth__isnull=False,
             date_of_birth__lt=date(today.year - 15, today.month, today.day)
         ).count(),
     }
     
+    # Get gender counts
+    male_students = Student.objects.filter(gender='male').count()
+    female_students = Student.objects.filter(gender='female').count()
+    
+    # Get class levels for filter dropdown
+    class_levels = ClassLevel.objects.filter(is_active=True).order_by('order')
+    
+    # Serialize students to JSON
+    students_data = []
+    for student in students:
+        students_data.append({
+            'id': student.id,
+            'full_name': student.full_name,
+            'first_name': student.first_name,
+            'last_name': student.last_name,
+            'profile_pic': student.profile_pic.url if student.profile_pic else None,
+            'registration_number': student.registration_number or '',
+            'class_level': student.class_level.name if student.class_level else 'N/A',
+            'stream': student.stream_class.stream_letter if student.stream_class else '',
+            'gender': student.gender,
+            'gender_display': student.get_gender_display() if student.gender else 'N/A',
+            'age': student.age,
+            'date_of_birth_display': student.date_of_birth.strftime('%d %b %Y') if student.date_of_birth else 'N/A',
+            'status': student.status,
+            'status_display': student.get_status_display(),
+            'is_active': student.is_active,
+            'parents_count': student.parents.count(),
+            'primary_parent': {
+                'name': student.parents.first().full_name if student.parents.first() else None,
+            } if student.parents.exists() else None,
+        })
+    
     context = {
-        'students': students,
-        'status_stats': status_stats,
+        'students_json': json.dumps(students_data),
+        'total_students': Student.objects.count(),
+        'active_students': status_counts.get('active', 0),
+        'completed_students': status_counts.get('completed', 0),
+        'suspended_students': status_counts.get('suspended', 0),
+        'withdrawn_students': status_counts.get('withdrawn', 0),
+        'transferred_students': status_counts.get('transferred', 0),
+        'male_students': male_students,
+        'female_students': female_students,
         'age_stats': age_stats,
         'status_choices': STATUS_CHOICES,
-        'status_filter': status_filter,
+        'gender_choices': GENDER_CHOICES,
+        'class_levels': class_levels,
+        'page_title': 'Student Status Management',
     }
+    
     return render(request, 'admin/students/student_status.html', context)
+
+
+@login_required
+@require_POST
+def student_status_change(request):
+    """
+    AJAX endpoint to change individual student status
+    """
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        student_id = request.POST.get('student_id')
+        new_status = request.POST.get('status')
+        
+        if not student_id or not new_status:
+            return JsonResponse({
+                'success': False,
+                'message': 'Student ID and status are required.'
+            })
+        
+        # Validate status
+        valid_statuses = [status[0] for status in STATUS_CHOICES]
+        if new_status not in valid_statuses:
+            return JsonResponse({
+                'success': False,
+                'message': 'Invalid status selected.'
+            })
+        
+        try:
+            student = Student.objects.get(id=student_id)
+            old_status = student.status
+            student.status = new_status
+            student.is_active = (new_status == 'active')  # Auto-update is_active
+            student.save()
+            
+            # Log the action
+            SystemLog.objects.create(
+                user=request.user,
+                log_type='update',
+                description=f'Changed student {student.full_name} status from {old_status} to {new_status}',
+                ip_address=request.META.get('REMOTE_ADDR')
+            )
+            
+            return JsonResponse({
+                'success': True,
+                'message': f'Status for {student.full_name} changed to {dict(STATUS_CHOICES).get(new_status)} successfully.',
+                'student_id': student.id,
+                'new_status': new_status,
+                'status_display': dict(STATUS_CHOICES).get(new_status),
+                'is_active': student.is_active
+            })
+            
+        except Student.DoesNotExist:
+            return JsonResponse({
+                'success': False,
+                'message': 'Student not found.'
+            })
+        except Exception as e:
+            return JsonResponse({
+                'success': False,
+                'message': f'Error changing status: {str(e)}'
+            })
+    
+    return JsonResponse({
+        'success': False,
+        'message': 'Invalid request method.'
+    })
+
+
+@login_required
+@require_POST
+def student_toggle_active(request):
+    """
+    AJAX endpoint to toggle student active status
+    """
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        student_id = request.POST.get('student_id')
+        
+        if not student_id:
+            return JsonResponse({
+                'success': False,
+                'message': 'Student ID is required.'
+            })
+        
+        try:
+            student = Student.objects.get(id=student_id)
+            student.is_active = not student.is_active
+            student.save()
+            
+            action = 'activated' if student.is_active else 'deactivated'
+            
+            # Log the action
+            SystemLog.objects.create(
+                user=request.user,
+                log_type='update',
+                description=f'{action.capitalize()} student {student.full_name}',
+                ip_address=request.META.get('REMOTE_ADDR')
+            )
+            
+            return JsonResponse({
+                'success': True,
+                'message': f'Student {student.full_name} {action} successfully.',
+                'student_id': student.id,
+                'is_active': student.is_active
+            })
+            
+        except Student.DoesNotExist:
+            return JsonResponse({
+                'success': False,
+                'message': 'Student not found.'
+            })
+        except Exception as e:
+            return JsonResponse({
+                'success': False,
+                'message': f'Error toggling status: {str(e)}'
+            })
+    
+    return JsonResponse({
+        'success': False,
+        'message': 'Invalid request method.'
+    })
+
+
+@login_required
+@require_POST
+def student_bulk_status_update(request):
+    """
+    AJAX endpoint for bulk status update
+    """
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        try:
+            student_ids = json.loads(request.POST.get('student_ids', '[]'))
+            new_status = request.POST.get('status')
+            
+            if not student_ids:
+                return JsonResponse({
+                    'success': False,
+                    'message': 'No students selected.'
+                })
+            
+            if not new_status:
+                return JsonResponse({
+                    'success': False,
+                    'message': 'Status is required.'
+                })
+            
+            # Validate status
+            valid_statuses = [status[0] for status in STATUS_CHOICES]
+            if new_status not in valid_statuses:
+                return JsonResponse({
+                    'success': False,
+                    'message': 'Invalid status selected.'
+                })
+            
+            # Update students
+            updated_count = Student.objects.filter(
+                id__in=student_ids
+            ).update(
+                status=new_status,
+                is_active=(new_status == 'active'),
+                updated_at=timezone.now()
+            )
+            
+            # Log the action
+            SystemLog.objects.create(
+                user=request.user,
+                log_type='bulk_update',
+                description=f'Bulk updated status to {new_status} for {updated_count} students',
+                ip_address=request.META.get('REMOTE_ADDR')
+            )
+            
+            return JsonResponse({
+                'success': True,
+                'message': f'Successfully updated status for {updated_count} student(s).',
+                'updated_count': updated_count,
+                'new_status': new_status
+            })
+            
+        except json.JSONDecodeError:
+            return JsonResponse({
+                'success': False,
+                'message': 'Invalid data format.'
+            })
+        except Exception as e:
+            return JsonResponse({
+                'success': False,
+                'message': f'Error during bulk update: {str(e)}'
+            })
+    
+    return JsonResponse({
+        'success': False,
+        'message': 'Invalid request method.'
+    })
+
+
+@login_required
+def export_students_status_excel(request):
+    """
+    Export filtered students to Excel based on status filters
+    Includes school header and filtering details section
+    """
+    try:
+        # Get filter parameters
+        status_filter = request.GET.get('status', '')
+        gender_filter = request.GET.get('gender', '')
+        class_filter = request.GET.get('class', '')
+        active_filter = request.GET.get('active', '')
+        search_query = request.GET.get('search', '')
+        
+        # Base queryset
+        students = Student.objects.select_related(
+            'class_level', 'stream_class'
+        ).prefetch_related('parents').order_by('first_name', 'last_name')
+        
+        # Apply filters
+        if status_filter:
+            students = students.filter(status=status_filter)
+        
+        if gender_filter:
+            students = students.filter(gender=gender_filter)
+        
+        if class_filter:
+            students = students.filter(class_level__name=class_filter)
+        
+        if active_filter:
+            if active_filter == 'Active':
+                students = students.filter(is_active=True)
+            elif active_filter == 'Inactive':
+                students = students.filter(is_active=False)
+        
+        if search_query:
+            students = students.filter(
+                Q(first_name__icontains=search_query) |
+                Q(last_name__icontains=search_query) |
+                Q(registration_number__icontains=search_query) |
+                Q(examination_number__icontains=search_query)
+            )
+        
+        # Get filter display names for header section
+        filter_details = {}
+        if status_filter:
+            filter_details['Status'] = dict(STATUS_CHOICES).get(status_filter, status_filter)
+        if gender_filter:
+            filter_details['Gender'] = dict(GENDER_CHOICES).get(gender_filter, gender_filter)
+        if class_filter:
+            filter_details['Class'] = class_filter
+        if active_filter:
+            filter_details['Active Status'] = active_filter
+        if search_query:
+            filter_details['Search'] = search_query
+        
+        # Get statistics
+        total_students = students.count()
+        active_count = students.filter(status='active').count()
+        male_count = students.filter(gender='male').count()
+        female_count = students.filter(gender='female').count()
+        
+        # Create a new workbook
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "Student Status Report"
+        
+        # Define styles
+        title_font = Font(name='Calibri', size=16, bold=True, color='1F4E79')
+        school_font = Font(name='Calibri', size=14, bold=True, color='2E75B5')
+        header_font = Font(name='Calibri', size=12, bold=True, color='FFFFFF')
+        
+        header_fill = PatternFill(start_color='4F81BD', end_color='4F81BD', fill_type='solid')
+        filter_fill = PatternFill(start_color='F2F2F2', end_color='F2F2F2', fill_type='solid')
+        stats_fill = PatternFill(start_color='DEEAF6', end_color='DEEAF6', fill_type='solid')
+        
+        center_alignment = Alignment(horizontal='center', vertical='center')
+        left_alignment = Alignment(horizontal='left', vertical='center')
+        
+        header_border = Border(
+            left=Side(style='medium', color='4F81BD'),
+            right=Side(style='medium', color='4F81BD'),
+            top=Side(style='medium', color='4F81BD'),
+            bottom=Side(style='medium', color='4F81BD')
+        )
+        
+        cell_border = Border(
+            left=Side(style='thin', color='B8CCE4'),
+            right=Side(style='thin', color='B8CCE4'),
+            top=Side(style='thin', color='B8CCE4'),
+            bottom=Side(style='thin', color='B8CCE4')
+        )
+        
+        # ============================================
+        # SCHOOL HEADER SECTION (Rows 1-7)
+        # ============================================
+        
+        # Merge cells for header sections (assuming up to column M - 13 columns)
+        for row in range(1, 8):
+            ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=13)
+        
+        # Row 1: School Name
+        school_cell = ws.cell(row=1, column=1)
+        school_cell.value = "SCHOOL MANAGEMENT SYSTEM"
+        school_cell.font = title_font
+        school_cell.alignment = center_alignment
+        school_cell.border = header_border
+        
+        # Row 2: School Details
+        school_details = ws.cell(row=2, column=1)
+        school_details.value = "Excellence in Education | Quality Learning for All"
+        school_details.font = school_font
+        school_details.alignment = center_alignment
+        school_details.border = header_border
+        
+        # Row 3: Address
+        address_cell = ws.cell(row=3, column=1)
+        address_cell.value = "P.O. Box 12345, Dar es Salaam, Tanzania | Tel: +255 123 456 789 | Email: info@school.ac.tz"
+        address_cell.font = Font(name='Calibri', size=11, italic=True)
+        address_cell.alignment = center_alignment
+        address_cell.border = header_border
+        
+        # Row 4: Report Title
+        title_cell = ws.cell(row=4, column=1)
+        title_cell.value = "STUDENT STATUS REPORT"
+        title_cell.font = Font(name='Calibri', size=14, bold=True, color='C00000')
+        title_cell.alignment = center_alignment
+        title_cell.border = header_border
+        
+        # ============================================
+        # FILTER INFORMATION SECTION
+        # ============================================
+        
+        # Row 5: Filter Section Title
+        filter_title = ws.cell(row=5, column=1)
+        filter_title.value = "FILTER INFORMATION"
+        filter_title.font = Font(name='Calibri', size=12, bold=True, color='44546A')
+        filter_title.alignment = center_alignment
+        filter_title.fill = PatternFill(start_color='F2F2F2', end_color='F2F2F2', fill_type='solid')
+        filter_title.border = header_border
+        
+        # Row 6: Applied Filters
+        filter_text = []
+        if filter_details:
+            for key, value in filter_details.items():
+                filter_text.append(f"{key}: {value}")
+        else:
+            filter_text.append("No filters applied - Showing all students")
+        
+        filter_cell = ws.cell(row=6, column=1)
+        filter_cell.value = " | ".join(filter_text)
+        filter_cell.font = Font(name='Calibri', size=11, italic=True)
+        filter_cell.alignment = center_alignment
+        filter_cell.fill = PatternFill(start_color='FCE4D6', end_color='FCE4D6', fill_type='solid')
+        filter_cell.border = header_border
+        
+        # Row 7: Generation Information
+        gen_info = f"Generated on: {timezone.now().strftime('%d-%m-%Y %H:%M:%S')} | Generated by: {request.user.get_full_name() or request.user.username}"
+        gen_cell = ws.cell(row=7, column=1)
+        gen_cell.value = gen_info
+        gen_cell.font = Font(name='Calibri', size=10, bold=True)
+        gen_cell.alignment = center_alignment
+        gen_cell.border = header_border
+        
+        # ============================================
+        # STATISTICS SECTION
+        # ============================================
+        
+        # Row 8: Statistics Title
+        stats_title_row = 8
+        ws.merge_cells(start_row=stats_title_row, start_column=1, end_row=stats_title_row, end_column=13)
+        stats_title = ws.cell(row=stats_title_row, column=1)
+        stats_title.value = "STATISTICS SUMMARY"
+        stats_title.font = Font(name='Calibri', size=12, bold=True, color='1F4E79')
+        stats_title.alignment = center_alignment
+        stats_title.fill = PatternFill(start_color='DEEAF6', end_color='DEEAF6', fill_type='solid')
+        
+        # Row 9: Statistics Values
+        stats_row = 9
+        
+        # Total Students
+        ws.cell(row=stats_row, column=1, value="Total Students:").font = Font(bold=True)
+        ws.cell(row=stats_row, column=2, value=total_students)
+        
+        # Active Students
+        ws.cell(row=stats_row, column=4, value="Active:").font = Font(bold=True)
+        ws.cell(row=stats_row, column=5, value=active_count)
+        
+        # Male Students
+        ws.cell(row=stats_row, column=7, value="Male:").font = Font(bold=True)
+        ws.cell(row=stats_row, column=8, value=male_count)
+        
+        # Female Students
+        ws.cell(row=stats_row, column=10, value="Female:").font = Font(bold=True)
+        ws.cell(row=stats_row, column=11, value=female_count)
+        
+        # Apply borders to statistics row
+        for col in range(1, 13):
+            cell = ws.cell(row=stats_row, column=col)
+            cell.border = cell_border
+            if col in [1, 4, 7, 10]:
+                cell.fill = PatternFill(start_color='F2F2F2', end_color='F2F2F2', fill_type='solid')
+        
+        # ============================================
+        # EMPTY ROW BEFORE TABLE
+        # ============================================
+        empty_row = 10
+        ws.row_dimensions[empty_row].height = 10
+        
+        # ============================================
+        # TABLE HEADERS (Start from row 11)
+        # ============================================
+        header_row = 11
+        
+        # Define headers (expanded for better detail)
+        headers = [
+            'S/N', 'Registration No.', 'Full Name', 'Gender', 'Age',
+            'Class', 'Stream', 'Status', 'Active', 'Parents Count',
+            'Admission Year', 'Date of Birth', 'Examination No.'
+        ]
+        
+        # Write headers
+        for col_num, header in enumerate(headers, 1):
+            cell = ws.cell(row=header_row, column=col_num)
+            cell.value = header
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.alignment = center_alignment
+            cell.border = cell_border
+        
+        # ============================================
+        # DATA ROWS
+        # ============================================
+        current_row = header_row + 1
+        
+        for row_num, student in enumerate(students, 1):
+            # Get primary parent for additional info
+            primary_parent = student.parents.first()
+            
+            # Row data
+            row_data = [
+                row_num,  # S/N
+                student.registration_number or 'N/A',
+                student.full_name,
+                student.get_gender_display() or 'N/A',
+                student.age or 'N/A',
+                student.class_level.name if student.class_level else 'N/A',
+                student.stream_class.stream_letter if student.stream_class else 'N/A',
+                student.get_status_display(),
+                'Yes' if student.is_active else 'No',
+                student.parents.count(),
+                student.admission_year or 'N/A',
+                student.date_of_birth.strftime('%d-%m-%Y') if student.date_of_birth else 'N/A',
+                student.examination_number or 'N/A',
+            ]
+            
+            # Write cells with alternating row colors
+            for col_num, value in enumerate(row_data, 1):
+                cell = ws.cell(row=current_row, column=col_num)
+                cell.value = value
+                cell.font = Font(name='Calibri', size=10)
+                cell.alignment = left_alignment if col_num not in [1, 9] else center_alignment
+                cell.border = cell_border
+                
+                # Alternate row colors for better readability
+                if row_num % 2 == 0:
+                    cell.fill = PatternFill(start_color='F9F9F9', end_color='F9F9F9', fill_type='solid')
+            
+            # Color code status cells (Status column is column 8)
+            status_cell = ws.cell(row=current_row, column=8)
+            if student.status == 'active':
+                status_cell.fill = PatternFill(start_color='C6EFCE', end_color='C6EFCE', fill_type='solid')
+            elif student.status == 'completed':
+                status_cell.fill = PatternFill(start_color='BDD7EE', end_color='BDD7EE', fill_type='solid')
+            elif student.status == 'suspended':
+                status_cell.fill = PatternFill(start_color='FFEB9C', end_color='FFEB9C', fill_type='solid')
+            elif student.status == 'withdrawn':
+                status_cell.fill = PatternFill(start_color='FFC7CE', end_color='FFC7CE', fill_type='solid')
+            elif student.status == 'transferred':
+                status_cell.fill = PatternFill(start_color='E0E7FF', end_color='E0E7FF', fill_type='solid')
+            
+            # Color code active status (Active column is column 9)
+            active_cell = ws.cell(row=current_row, column=9)
+            if student.is_active:
+                active_cell.fill = PatternFill(start_color='C6EFCE', end_color='C6EFCE', fill_type='solid')
+            else:
+                active_cell.fill = PatternFill(start_color='F2F2F2', end_color='F2F2F2', fill_type='solid')
+            
+            current_row += 1
+        
+        # ============================================
+        # FOOTER SECTION
+        # ============================================
+        footer_row = current_row + 1
+        
+        # Total row
+        ws.merge_cells(start_row=footer_row, start_column=1, end_row=footer_row, end_column=4)
+        total_cell = ws.cell(row=footer_row, column=1)
+        total_cell.value = f"TOTAL STUDENTS: {len(students)}"
+        total_cell.font = Font(name='Calibri', size=12, bold=True)
+        total_cell.fill = PatternFill(start_color='DEEAF6', end_color='DEEAF6', fill_type='solid')
+        total_cell.border = cell_border
+        total_cell.alignment = left_alignment
+        
+        # Generation footer
+        footer_row += 2
+        ws.merge_cells(start_row=footer_row, start_column=1, end_row=footer_row, end_column=13)
+        footer_cell = ws.cell(row=footer_row, column=1)
+        footer_cell.value = "This is a computer-generated report. No signature is required."
+        footer_cell.font = Font(name='Calibri', size=9, italic=True)
+        footer_cell.alignment = center_alignment
+        
+        footer_row += 1
+        ws.merge_cells(start_row=footer_row, start_column=1, end_row=footer_row, end_column=13)
+        copyright_cell = ws.cell(row=footer_row, column=1)
+        copyright_cell.value = f"© {timezone.now().year} School Management System. All rights reserved."
+        copyright_cell.font = Font(name='Calibri', size=8, italic=True)
+        copyright_cell.alignment = center_alignment
+        
+        # ============================================
+        # AUTO-ADJUST COLUMN WIDTHS
+        # ============================================
+        for col_num in range(1, len(headers) + 1):
+            column_letter = get_column_letter(col_num)
+            max_length = 0
+            
+            # Check header length
+            if len(headers[col_num-1]) > max_length:
+                max_length = len(headers[col_num-1])
+            
+            # Check data length in this column (from header row to footer)
+            for row_num in range(header_row, current_row):
+                cell_value = ws.cell(row=row_num, column=col_num).value
+                if cell_value and len(str(cell_value)) > max_length:
+                    max_length = len(str(cell_value))
+            
+            # Check statistics and filter text
+            if col_num == 1:
+                for check_row in [6, 7, 9]:
+                    cell_value = ws.cell(row=check_row, column=col_num).value
+                    if cell_value and len(str(cell_value)) > max_length:
+                        max_length = len(str(cell_value))
+            
+            # Set column width (with some padding)
+            adjusted_width = min(max_length + 5, 60)  # Max width 60
+            ws.column_dimensions[column_letter].width = adjusted_width
+        
+        # Set row heights
+        ws.row_dimensions[1].height = 30
+        ws.row_dimensions[2].height = 25
+        ws.row_dimensions[3].height = 20
+        ws.row_dimensions[4].height = 25
+        ws.row_dimensions[5].height = 20
+        ws.row_dimensions[6].height = 25
+        ws.row_dimensions[7].height = 20
+        ws.row_dimensions[8].height = 20
+        ws.row_dimensions[9].height = 20
+        ws.row_dimensions[header_row].height = 30
+        
+        # Freeze panes to keep headers visible
+        ws.freeze_panes = f'A{header_row + 1}'
+        
+        # Add filter to headers
+        ws.auto_filter.ref = f'A{header_row}:{get_column_letter(len(headers))}{current_row - 1}'
+        
+        # ============================================
+        # CREATE RESPONSE
+        # ============================================
+        response = HttpResponse(
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        
+        # Generate filename with filters
+        filename = 'student_status_report'
+        if status_filter:
+            filename += f'_{status_filter}'
+        if gender_filter:
+            filename += f'_{gender_filter}'
+        if class_filter:
+            filename += f'_{class_filter.replace(" ", "_")}'
+        filename += f'_{timezone.now().strftime("%Y%m%d_%H%M%S")}.xlsx'
+        
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        
+        # Save workbook to response
+        wb.save(response)
+        
+        return response
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'Error generating Excel file: {str(e)}'
+        }, status=500)
+
+
+@login_required
+def export_students_status_pdf(request):
+    """
+    Export filtered students to PDF based on status filters
+    """
+    try:
+        # Get filter parameters
+        status_filter = request.GET.get('status', '')
+        gender_filter = request.GET.get('gender', '')
+        class_filter = request.GET.get('class', '')
+        active_filter = request.GET.get('active', '')
+        search_query = request.GET.get('search', '')
+        
+        # Base queryset
+        students = Student.objects.select_related(
+            'class_level', 'stream_class'
+        ).prefetch_related('parents').order_by('first_name', 'last_name')
+        
+        # Apply filters
+        if status_filter:
+            students = students.filter(status=status_filter)
+        
+        if gender_filter:
+            students = students.filter(gender=gender_filter)
+        
+        if class_filter:
+            students = students.filter(class_level__name=class_filter)
+        
+        if active_filter:
+            if active_filter == 'Active':
+                students = students.filter(is_active=True)
+            elif active_filter == 'Inactive':
+                students = students.filter(is_active=False)
+        
+        if search_query:
+            students = students.filter(
+                Q(first_name__icontains=search_query) |
+                Q(last_name__icontains=search_query) |
+                Q(registration_number__icontains=search_query)
+            )
+        
+        # Get filter info for display
+        filter_info = {}
+        if status_filter:
+            filter_info['Status'] = dict(STATUS_CHOICES).get(status_filter, status_filter)
+        if gender_filter:
+            filter_info['Gender'] = dict(GENDER_CHOICES).get(gender_filter, gender_filter)
+        if class_filter:
+            filter_info['Class'] = class_filter
+        if active_filter:
+            filter_info['Active Status'] = active_filter
+        if search_query:
+            filter_info['Search'] = search_query
+        
+        # Get statistics
+        total_students = students.count()
+        active_count = students.filter(status='active').count()
+        male_count = students.filter(gender='male').count()
+        female_count = students.filter(gender='female').count()
+        
+        # Prepare context for template
+        context = {
+            'students': students,
+            'filter_info': filter_info,
+            'total_students': total_students,
+            'active_count': active_count,
+            'male_count': male_count,
+            'female_count': female_count,
+            'generated_date': timezone.now(),
+            'generated_by': request.user.get_full_name() or request.user.username,
+            'request': request,
+        }
+        
+        # Render HTML template
+        html_string = render_to_string('admin/students/student_status_pdf.html', context)
+        
+        # Create PDF
+        font_config = FontConfiguration()
+        html = HTML(string=html_string, base_url=request.build_absolute_uri())
+        pdf_file = html.write_pdf(font_config=font_config)
+        
+        # Create response
+        response = HttpResponse(pdf_file, content_type='application/pdf')
+        filename = f'student_status_report_{timezone.now().strftime("%Y%m%d_%H%M%S")}.pdf'
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        
+        return response
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'Error generating PDF file: {str(e)}'
+        }, status=500)
+
+# accounts/views/admin_views.py
+
+@login_required
+def student_promotion(request):
+    """
+    View for promoting/moving students between classes
+    """
+    # Get current academic year
+    current_academic_year = AcademicYear.objects.filter(is_active=True).first()
+    
+    # Get all active class levels with student counts
+    class_levels = ClassLevel.objects.filter(
+        is_active=True
+    ).select_related('educational_level').annotate(
+        student_count=Count('students', filter=Q(students__is_active=True))
+    ).order_by('educational_level__code', 'order')
+    
+    # Build next class mapping (for promotion hints)
+    next_class_map = {}
+    for i, class_level in enumerate(class_levels):
+        if i < len(class_levels) - 1:
+            next_class_map[class_level.id] = class_levels[i + 1].id
+    
+    # Get all academic years
+    academic_years = AcademicYear.objects.all().order_by('-start_date')
+    
+    # Calculate statistics
+    total_students = Student.objects.filter(is_active=True).count()
+    active_classes = class_levels.count()
+    
+    # Students eligible for promotion (active students in classes that have a next class)
+    eligible_for_promotion = 0
+    for class_level in class_levels:
+        if class_level.id in next_class_map:
+            eligible_for_promotion += Student.objects.filter(
+                class_level=class_level,
+                is_active=True
+            ).count()
+    
+    # Recent promotions (last 30 days)
+    recent_promotions = Student.objects.filter(
+        updated_at__gte=timezone.now() - timedelta(days=30)
+    ).exclude(
+        class_level__isnull=True
+    ).count()
+    
+    context = {
+        'current_academic_year': current_academic_year,
+        'class_levels': class_levels,
+        'academic_years': academic_years,
+        'next_class_map': json.dumps(next_class_map),
+        'total_students': total_students,
+        'active_classes': active_classes,
+        'eligible_for_promotion': eligible_for_promotion,
+        'recent_promotions': recent_promotions,
+        'page_title': 'Student Class Promotion',
+    }
+    
+    return render(request, 'admin/students/student_promotion.html', context)
+
+
+@login_required
+@require_GET
+def get_students_for_promotion(request):
+    """
+    AJAX endpoint to get students for a specific class
+    """
+    class_id = request.GET.get('class_id')
+    
+    if not class_id:
+        return JsonResponse({
+            'success': False,
+            'message': 'Class ID is required'
+        })
+    
+    try:
+        class_level = ClassLevel.objects.get(id=class_id, is_active=True)
+        
+        # Get all students in this class
+        students = Student.objects.filter(
+            class_level=class_level,
+            is_active=True
+        ).select_related('stream_class').order_by('first_name', 'last_name')
+        
+        students_data = []
+        for student in students:
+            students_data.append({
+                'id': student.id,
+                'full_name': student.full_name,
+                'first_name': student.first_name,
+                'last_name': student.last_name,
+                'profile_pic': student.profile_pic.url if student.profile_pic else None,
+                'registration_number': student.registration_number or '',
+                'class_level': class_level.name,
+                'class_level_id': class_level.id,
+                'stream': student.stream_class.stream_letter if student.stream_class else None,
+                'stream_id': student.stream_class.id if student.stream_class else None,
+                'gender': student.gender,
+                'gender_display': student.get_gender_display(),
+                'status': student.status,
+                'status_display': student.get_status_display(),
+                'is_active': student.is_active,
+                'age': student.age,
+                'date_of_birth': student.date_of_birth.strftime('%Y-%m-%d') if student.date_of_birth else None,
+            })
+        
+        return JsonResponse({
+            'success': True,
+            'students': students_data,
+            'count': len(students_data)
+        })
+        
+    except ClassLevel.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'message': 'Class not found'
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'Error: {str(e)}'
+        })
+
+
+@login_required
+@require_POST
+def execute_promotion(request):
+    """
+    AJAX endpoint to execute promotion/move operations
+    """
+    try:
+        # Get parameters
+        action = request.POST.get('action', 'promote')
+        student_ids_json = request.POST.get('student_ids', '[]')
+        destination_class_id = request.POST.get('destination_class', '')
+        destination_stream_id = request.POST.get('destination_stream', '') or None
+        keep_stream = request.POST.get('keep_stream') == 'true'
+        academic_year_id = request.POST.get('academic_year', '')
+        update_year = request.POST.get('update_year') == 'true'
+        promote_all = request.POST.get('promote_all') == 'true'
+        
+        # Parse student IDs
+        try:
+            student_ids = json.loads(student_ids_json)
+        except json.JSONDecodeError:
+            return JsonResponse({
+                'success': False,
+                'message': 'Invalid student IDs format'
+            })
+        
+        if not student_ids:
+            return JsonResponse({
+                'success': False,
+                'message': 'No students selected'
+            })
+        
+        # Get base queryset
+        students_query = Student.objects.filter(id__in=student_ids)
+        
+        # Apply promote_all filter if not selected
+        if not promote_all:
+            students_query = students_query.filter(is_active=True)
+        
+        # Get destination objects
+        destination_class = None
+        if destination_class_id and action != 'remove':
+            try:
+                destination_class = ClassLevel.objects.get(id=destination_class_id, is_active=True)
+            except ClassLevel.DoesNotExist:
+                return JsonResponse({
+                    'success': False,
+                    'message': 'Destination class not found'
+                })
+        
+        destination_stream = None
+        if destination_stream_id and action != 'remove':
+            try:
+                destination_stream = StreamClass.objects.get(id=destination_stream_id, is_active=True)
+            except StreamClass.DoesNotExist:
+                return JsonResponse({
+                    'success': False,
+                    'message': 'Destination stream not found'
+                })
+        
+        academic_year = None
+        if academic_year_id and update_year:
+            try:
+                academic_year = AcademicYear.objects.get(id=academic_year_id)
+            except AcademicYear.DoesNotExist:
+                return JsonResponse({
+                    'success': False,
+                    'message': 'Academic year not found'
+                })
+        
+        # Perform the action
+        updated_count = 0
+        failed_students = []
+        
+        with transaction.atomic():
+            for student in students_query:
+                try:
+                    # Store old values for logging
+                    old_class = student.class_level.name if student.class_level else 'None'
+                    old_stream = student.stream_class.stream_letter if student.stream_class else 'None'
+                    
+                    if action == 'remove':
+                        # Remove from class
+                        student.class_level = None
+                        student.stream_class = None
+                    else:
+                        # Promote or move
+                        student.class_level = destination_class
+                        
+                        # Handle stream
+                        if keep_stream and student.stream_class and destination_class:
+                            # Check if the stream exists in destination class
+                            try:
+                                new_stream = StreamClass.objects.get(
+                                    class_level=destination_class,
+                                    stream_letter=student.stream_class.stream_letter
+                                )
+                                student.stream_class = new_stream
+                            except StreamClass.DoesNotExist:
+                                # Stream doesn't exist in destination class
+                                student.stream_class = destination_stream
+                        else:
+                            student.stream_class = destination_stream
+                    
+                    # Update academic year if requested
+                    if update_year and academic_year:
+                        student.academic_year = academic_year
+                    
+                    student.save()
+                    updated_count += 1
+                    
+                    # Log the action
+                    SystemLog.objects.create(
+                        user=request.user,
+                        log_type='update',
+                        description=f'{action.capitalize()} student {student.full_name} from {old_class} to {student.class_level.name if student.class_level else "None"}',
+                        ip_address=request.META.get('REMOTE_ADDR')
+                    )
+                    
+                except Exception as e:
+                    failed_students.append(f"{student.full_name}: {str(e)}")
+        
+        # Prepare success message
+        if updated_count > 0:
+            if action == 'remove':
+                message = f'Successfully removed {updated_count} student(s) from their class'
+            else:
+                message = f'Successfully {action}d {updated_count} student(s) to {destination_class.name if destination_class else "new class"}'
+            
+            if failed_students:
+                message += f'. Failed: {len(failed_students)} student(s)'
+        else:
+            message = 'No students were updated'
+        
+        return JsonResponse({
+            'success': True,
+            'message': message,
+            'updated_count': updated_count,
+            'failed_count': len(failed_students),
+            'failed_students': failed_students
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'Error executing action: {str(e)}'
+        })
+
+
+@login_required
+@require_POST
+def remove_from_class(request):
+    """
+    AJAX endpoint to remove students from their current class
+    """
+    try:
+        student_ids_json = request.POST.get('student_ids', '[]')
+        
+        try:
+            student_ids = json.loads(student_ids_json)
+        except json.JSONDecodeError:
+            return JsonResponse({
+                'success': False,
+                'message': 'Invalid student IDs format'
+            })
+        
+        if not student_ids:
+            return JsonResponse({
+                'success': False,
+                'message': 'No students selected'
+            })
+        
+        students = Student.objects.filter(id__in=student_ids, is_active=True)
+        removed_count = 0
+        failed_students = []
+        
+        with transaction.atomic():
+            for student in students:
+                try:
+                    old_class = student.class_level.name if student.class_level else 'None'
+                    student.class_level = None
+                    student.stream_class = None
+                    student.save()
+                    removed_count += 1
+                    
+                    SystemLog.objects.create(
+                        user=request.user,
+                        log_type='update',
+                        description=f'Removed student {student.full_name} from class {old_class}',
+                        ip_address=request.META.get('REMOTE_ADDR')
+                    )
+                    
+                except Exception as e:
+                    failed_students.append(f"{student.full_name}: {str(e)}")
+        
+        message = f'Successfully removed {removed_count} student(s) from their class'
+        if failed_students:
+            message += f'. Failed: {len(failed_students)} student(s)'
+        
+        return JsonResponse({
+            'success': True,
+            'message': message,
+            'removed_count': removed_count,
+            'failed_count': len(failed_students)
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'Error: {str(e)}'
+        })
+
 
 @login_required
 def student_edit(request, student_id):

@@ -23,6 +23,7 @@ urlpatterns = [
     path('attendance/', include('accounts.urls.attendance_admin_urls')),
     path('library/', include('accounts.urls.library_admin_urls')),
     path('result/', include('accounts.urls.result_admin_urls')),
+    path('hostel/', include('accounts.urls.hostel_admin_urls')),
 ]
 
 __all__ = [

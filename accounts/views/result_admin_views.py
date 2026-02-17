@@ -32,6 +32,7 @@ from core.models import (AcademicYear, ClassLevel, EducationalLevel,
 from results.models import (DivisionScale, ExamSession, ExamType, GradingScale,
                             StudentExamMetrics, StudentExamPosition,
                             StudentResult)
+from results.utils import export_student_sessions_to_excel
 from students.models import Student
 
 
@@ -3459,9 +3460,11 @@ def download_session_excel_template(request, exam_session_id):
         ws['A2'].font = info_font
         ws.merge_cells(f'A2:{get_column_letter(3 + len(subjects))}2')
         
-        ws['A3'] = f"Class: {exam_session.class_level.name}"
+        # Build class text first, then assign to cell
+        class_text = f"Class: {exam_session.class_level.name}"
         if exam_session.stream_class:
-            ws['A3'] += f" {exam_session.stream_class.stream_letter}"
+            class_text += f" {exam_session.stream_class.stream_letter}"
+        ws['A3'] = class_text
         ws['A3'].font = info_font
         ws.merge_cells(f'A3:{get_column_letter(3 + len(subjects))}3')
         
@@ -3518,6 +3521,20 @@ def download_session_excel_template(request, exam_session_id):
         # Add student data
         data_start_row = header_row + 1
         
+        # Get existing results for all students at once to avoid N+1 queries
+        student_ids = students.values_list('id', flat=True)
+        existing_results = StudentResult.objects.filter(
+            exam_session=exam_session,
+            student_id__in=student_ids
+        ).select_related('subject')
+        
+        # Organize results by student
+        results_by_student = {}
+        for result in existing_results:
+            if result.student_id not in results_by_student:
+                results_by_student[result.student_id] = {}
+            results_by_student[result.student_id][result.subject_id] = result.marks_obtained
+        
         for i, student in enumerate(students, start=data_start_row):
             # Student ID
             ws.cell(row=i, column=1, value=student.id)
@@ -3534,17 +3551,12 @@ def download_session_excel_template(request, exam_session_id):
             ws.cell(row=i, column=3).border = cell_border
             ws.cell(row=i, column=3).alignment = left_alignment
             
-            # Get existing results for this student
-            existing_results = StudentResult.objects.filter(
-                exam_session=exam_session,
-                student=student
-            ).select_related('subject')
-            
-            results_dict = {r.subject_id: r.marks_obtained for r in existing_results}
+            # Get results for this student
+            student_results = results_by_student.get(student.id, {})
             
             # Add marks columns for each subject
             for col_num, subject in enumerate(subjects, start=4):
-                existing_marks = results_dict.get(subject.id)
+                existing_marks = student_results.get(subject.id)
                 cell = ws.cell(row=i, column=col_num, value=existing_marks)
                 cell.border = cell_border
                 cell.alignment = center_alignment
@@ -3577,6 +3589,7 @@ def download_session_excel_template(request, exam_session_id):
         
     except Exception as e:
         return HttpResponse(f"Error generating template: {str(e)}", status=500)
+    
 
 @login_required
 @require_POST
@@ -3802,9 +3815,10 @@ def download_session_excel_report(request, exam_session_id):
         ws_main['A2'].font = info_font
         ws_main.merge_cells(f'A2:{get_column_letter(7 + len(subjects))}2')
         
-        ws_main['A3'] = f"Class: {exam_session.class_level.name}"
+        class_text = f"Class: {exam_session.class_level.name}"
         if exam_session.stream_class:
-            ws_main['A3'] += f" {exam_session.stream_class.stream_letter}"
+            class_text += f" {exam_session.stream_class.stream_letter}"
+        ws_main['A3'] = class_text
         ws_main['A3'].font = info_font
         ws_main.merge_cells(f'A3:{get_column_letter(7 + len(subjects))}3')
         
@@ -3867,9 +3881,12 @@ def download_session_excel_report(request, exam_session_id):
                 if result and result.marks_obtained is not None:
                     marks = result.marks_obtained
                     grade = result.grade or ""
-                    cell_value = f"{marks:.1f}"
+                    
+                    # FIXED: Create string value first, then assign to cell
                     if grade:
-                        cell_value += f" ({grade})"
+                        cell_value = f"{marks:.1f} ({grade})"
+                    else:
+                        cell_value = f"{marks:.1f}"
                     
                     ws_main.cell(row=i, column=col_num, value=cell_value)
                     
@@ -4183,6 +4200,8 @@ def download_session_excel_report(request, exam_session_id):
         return response
         
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         return HttpResponse(f"Error generating Excel report: {str(e)}", status=500)
     
 
@@ -4216,25 +4235,27 @@ def download_session_summary(request, exam_session_id):
         return HttpResponse(f"Error generating summary: {str(e)}", status=500)
 
 
-# Add this view function
 @login_required
 def student_sessions_list(request, student_id):
     """Display all exam sessions for a specific student where they have results"""
     try:
+        # Get the student with related fields
         student = get_object_or_404(
             Student.objects.select_related(
                 'class_level',
                 'class_level__educational_level',
-                'stream_class'
+                'stream_class',
+                'academic_year'
             ),
-            id=student_id,
-            is_active=True
+            id=student_id
         )
 
+        # Get all exam sessions where this student has results
         sessions_with_results = ExamSession.objects.filter(
             results__student=student
         ).distinct()
 
+        # Annotate sessions with student's data and total students count
         exam_sessions = sessions_with_results.select_related(
             'exam_type',
             'academic_year',
@@ -4246,15 +4267,17 @@ def student_sessions_list(request, student_id):
             total_subjects=Count('results', filter=Q(results__student=student)),
             average_marks=Avg('results__marks_obtained', filter=Q(results__student=student)),
             average_percentage=Avg('results__percentage', filter=Q(results__student=student)),
-            total_marks=Sum('results__marks_obtained', filter=Q(results__student=student))
+            total_marks=Sum('results__marks_obtained', filter=Q(results__student=student)),
+            total_students_in_session=Count('results__student', distinct=True)
         ).order_by('-exam_date', '-created_at')
 
+        # Get metrics and positions for each session
         session_metrics = {}
         for session in exam_sessions:
             metrics = StudentExamMetrics.objects.filter(
                 student=student,
                 exam_session=session
-            ).first()
+            ).select_related('division').first()
 
             positions = StudentExamPosition.objects.filter(
                 student=student,
@@ -4266,6 +4289,14 @@ def student_sessions_list(request, student_id):
                 'positions': positions
             }
 
+        # Get filter options for export modal
+        filter_options = {
+            'class_levels': exam_sessions.values_list('class_level__id', 'class_level__name').distinct().order_by('class_level__name'),
+            'academic_years': exam_sessions.values_list('academic_year__id', 'academic_year__name').distinct().order_by('-academic_year__name'),
+            'terms': exam_sessions.values_list('term__id', 'term__term_number').distinct().order_by('term__term_number'),
+        }
+
+        # Get current class information
         current_class_info = {
             'class_level': student.class_level.name if student.class_level else 'Not Assigned',
             'stream': student.stream_class.stream_letter if student.stream_class else 'N/A',
@@ -4278,6 +4309,7 @@ def student_sessions_list(request, student_id):
             'exam_sessions': exam_sessions,
             'session_metrics': session_metrics,
             'current_class_info': current_class_info,
+            'filter_options': filter_options,
             'total_sessions': exam_sessions.count(),
             'page_title': f'{student.full_name} - Exam Sessions',
             'breadcrumb_title': 'Student Exam History',
@@ -4290,6 +4322,148 @@ def student_sessions_list(request, student_id):
         return redirect('admin_students_list')
 
 
+
+@login_required
+def student_sessions_export_excel(request, student_id):
+    """Export student exam sessions to Excel with filters"""
+    try:
+        print(f"\n{'='*50}")
+        print(f"[EXPORT_EXCEL] Starting export for student_id: {student_id}")
+        print(f"[EXPORT_EXCEL] Request GET params: {dict(request.GET)}")
+        
+        # Get student
+        student = get_object_or_404(Student, id=student_id)
+        print(f"[EXPORT_EXCEL] Found student: {student.full_name} (Reg: {student.registration_number})")
+        
+        # Get filter parameters from request
+        class_level_id = request.GET.get('class_level')
+        academic_year_id = request.GET.get('academic_year')
+        term_id = request.GET.get('term')
+        date_from = request.GET.get('date_from')
+        date_to = request.GET.get('date_to')
+        session_ids = request.GET.getlist('sessions')  # For multiple session selection
+        
+        print(f"[EXPORT_EXCEL] Filters - ClassLevel: {class_level_id}, AcademicYear: {academic_year_id}, Term: {term_id}")
+        print(f"[EXPORT_EXCEL] Filters - DateFrom: {date_from}, DateTo: {date_to}")
+        print(f"[EXPORT_EXCEL] Session IDs: {session_ids}")
+        
+        # Base queryset
+        sessions_query = ExamSession.objects.filter(
+            results__student=student
+        ).distinct()
+        print(f"[EXPORT_EXCEL] Base sessions count: {sessions_query.count()}")
+        
+        # Apply filters
+        filters_applied = {}
+        
+        if class_level_id:
+            sessions_query = sessions_query.filter(class_level_id=class_level_id)
+            filters_applied['class_level'] = class_level_id
+            print(f"[EXPORT_EXCEL] Applied class_level filter: {class_level_id}")
+            
+        if academic_year_id:
+            sessions_query = sessions_query.filter(academic_year_id=academic_year_id)
+            filters_applied['academic_year'] = academic_year_id
+            print(f"[EXPORT_EXCEL] Applied academic_year filter: {academic_year_id}")
+            
+        if term_id:
+            sessions_query = sessions_query.filter(term_id=term_id)
+            filters_applied['term'] = term_id
+            print(f"[EXPORT_EXCEL] Applied term filter: {term_id}")
+            
+        if date_from:
+            sessions_query = sessions_query.filter(exam_date__gte=date_from)
+            filters_applied['date_from'] = date_from
+            print(f"[EXPORT_EXCEL] Applied date_from filter: {date_from}")
+            
+        if date_to:
+            sessions_query = sessions_query.filter(exam_date__lte=date_to)
+            filters_applied['date_to'] = date_to
+            print(f"[EXPORT_EXCEL] Applied date_to filter: {date_to}")
+            
+        if session_ids:
+            sessions_query = sessions_query.filter(id__in=session_ids)
+            filters_applied['sessions'] = session_ids
+            print(f"[EXPORT_EXCEL] Applied session_ids filter, count: {len(session_ids)}")
+        
+        print(f"[EXPORT_EXCEL] Sessions after filters: {sessions_query.count()}")
+        
+        # Get annotated sessions
+        exam_sessions = sessions_query.select_related(
+            'exam_type',
+            'academic_year',
+            'term',
+            'class_level',
+            'class_level__educational_level',
+            'stream_class'
+        ).annotate(
+            total_subjects=Count('results', filter=Q(results__student=student)),
+            average_marks=Avg('results__marks_obtained', filter=Q(results__student=student)),
+            average_percentage=Avg('results__percentage', filter=Q(results__student=student)),
+            total_marks=Sum('results__marks_obtained', filter=Q(results__student=student)),
+            total_students_in_session=Count('results__student', distinct=True)
+        ).order_by('-exam_date', '-created_at')
+        
+        print(f"[EXPORT_EXCEL] Annotated sessions count: {exam_sessions.count()}")
+        
+        # Get metrics and positions
+        session_metrics = {}
+        for session in exam_sessions:
+            print(f"[EXPORT_EXCEL] Processing session: {session.id} - {session.name}")
+            
+            metrics = StudentExamMetrics.objects.filter(
+                student=student,
+                exam_session=session
+            ).select_related('division').first()
+            
+            positions = StudentExamPosition.objects.filter(
+                student=student,
+                exam_session=session
+            ).first()
+            
+            session_metrics[session.id] = {
+                'metrics': metrics,
+                'positions': positions
+            }
+            
+            print(f"[EXPORT_EXCEL]   Metrics found: {metrics is not None}, Positions found: {positions is not None}")
+
+        print(f"[EXPORT_EXCEL] Calling export_student_sessions_to_excel...")
+        wb = export_student_sessions_to_excel(student, exam_sessions, session_metrics, filters_applied)
+        print(f"[EXPORT_EXCEL] Workbook created successfully")
+        
+        # Create response
+        response = HttpResponse(
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        
+        # Generate filename
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = f"{student.full_name}_{student.registration_number}_results_{timestamp}.xlsx"
+        filename = filename.replace(' ', '_')
+        
+        print(f"[EXPORT_EXCEL] Filename: {filename}")
+        
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        
+        # Save workbook to response
+        print(f"[EXPORT_EXCEL] Saving workbook to response...")
+        wb.save(response)
+        print(f"[EXPORT_EXCEL] Export completed successfully")
+        print(f"{'='*50}\n")
+        
+        return response
+        
+    except Exception as e:
+        print(f"\n{'='*50}")
+        print(f"[EXPORT_EXCEL][ERROR] Exception occurred: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        print(f"{'='*50}\n")
+        
+        messages.error(request, f"Error exporting data: {str(e)}")
+        return redirect('student_sessions_list', student_id=student_id)
+    
 
 @login_required
 def student_session_results(request, student_id, exam_session_id):

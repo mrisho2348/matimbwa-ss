@@ -1,0 +1,1113 @@
+{% extends 'admin/base.html' %}
+{% load static %}
+{% block title %} Hostel Management {% endblock title %}
+
+{% block breadcrumb %}
+    <button type="button" class="btn btn-primary" data-toggle="modal" data-target="#addHostelModal">
+        <i class="fas fa-plus"></i> Add Hostel
+    </button>
+{% endblock breadcrumb %}
+
+{% block extra_css %}
+<style>
+    .table th {
+        font-weight: 600;
+        border-bottom-width: 2px;
+    }
+    .table td {
+        vertical-align: middle;
+    }
+    .badge {
+        font-size: 0.85em;
+        padding: 0.4em 0.8em;
+    }
+    .modal-header {
+        border-radius: 0;
+    }
+    .btn-group .btn {
+        margin: 0 2px;
+    }
+    /* DataTable Styles */
+    .dataTables_wrapper .dataTables_filter {
+        float: right;
+        text-align: right;
+    }
+    .dataTables_wrapper .dataTables_length {
+        float: left;
+    }
+    .dataTables_wrapper .dataTables_paginate {
+        float: right;
+        margin-top: 10px;
+    }
+    .success-toast, .error-toast {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 1056;
+        min-width: 300px;
+    }
+    /* Hostel type badges */
+    .hostel-badge-boys {
+        background-color: #007bff;
+        color: white;
+    }
+    .hostel-badge-girls {
+        background-color: #e83e8c;
+        color: white;
+    }
+    .hostel-badge-mixed {
+        background-color: #6f42c1;
+        color: white;
+    }
+    /* Payment mode badges */
+    .payment-yearly {
+        background-color: #28a745;
+        color: white;
+    }
+    .payment-monthly {
+        background-color: #fd7e14;
+        color: white;
+    }
+    .payment-installments {
+        background-color: #17a2b8;
+        color: white;
+    }
+    /* Stats cards */
+    .stat-card {
+        background: linear-gradient(45deg, #4e73df 0%, #224abe 100%);
+        color: white;
+        border-radius: 10px;
+        padding: 20px;
+        margin-bottom: 20px;
+    }
+    .stat-card.boys {
+        background: linear-gradient(45deg, #007bff 0%, #0056b3 100%);
+    }
+    .stat-card.girls {
+        background: linear-gradient(45deg, #e83e8c 0%, #b1316e 100%);
+    }
+    .stat-card.mixed {
+        background: linear-gradient(45deg, #6f42c1 0%, #523691 100%);
+    }
+    .stat-icon {
+        font-size: 3rem;
+        opacity: 0.3;
+        position: absolute;
+        right: 20px;
+        top: 20px;
+    }
+    /* Quick action buttons */
+    .quick-actions {
+        display: flex;
+        gap: 4px;
+        justify-content: center;
+        align-items: center;
+    }
+    .quick-action-btn {
+        width: 28px;
+        height: 28px;
+        padding: 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        border: none;
+        transition: all 0.2s ease;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+    }
+    .quick-action-btn i {
+        font-size: 0.75rem;
+        color: #ffffff !important;
+    }
+    .quick-action-btn:hover {
+        transform: scale(1.1);
+        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        filter: brightness(1.05);
+    }
+    .btn-warning.quick-action-btn i {
+        color: #212529 !important;
+    }
+    /* Select2 in modal */
+    .select2-container {
+        z-index: 1056 !important;
+    }
+    .select2-dropdown {
+        z-index: 1057 !important;
+    }
+    .currency-input-group {
+        position: relative;
+    }
+    .currency-input-group:before {
+        content: "TSh";
+        position: absolute;
+        left: 10px;
+        top: 8px;
+        color: #666;
+        z-index: 1;
+    }
+    .currency-input-group input {
+        padding-left: 50px;
+    }
+</style>
+{% endblock extra_css %}
+
+{% block content %}
+<section class="content">
+    <div class="container-fluid"> 
+        <!-- Toast Notifications -->
+        <div id="success-toast" class="alert alert-success alert-dismissible fade success-toast" style="display: none;" role="alert">
+            <strong><i class="fas fa-check-circle"></i> Success!</strong> 
+            <span id="success-message"></span>
+            <button type="button" class="close" onclick="$('#success-toast').fadeOut()" data-dismiss="alert" aria-label="Close">
+                <span aria-hidden="true">&times;</span>
+            </button>
+        </div>
+
+        <div id="error-toast" class="alert alert-danger alert-dismissible fade error-toast" style="display: none;" role="alert">
+            <strong><i class="fas fa-exclamation-circle"></i> Error!</strong> 
+            <span id="error-message"></span>
+            <button type="button" class="close" onclick="$('#error-toast').fadeOut()" data-dismiss="alert" aria-label="Close">
+                <span aria-hidden="true">&times;</span>
+            </button>
+        </div>
+
+        <!-- Statistics Cards -->
+        <div class="row">
+            <div class="col-xl-3 col-md-6">
+                <div class="stat-card">
+                    <div class="stat-icon">
+                        <i class="fas fa-hotel"></i>
+                    </div>
+                    <h6 class="text-uppercase font-weight-bold">Total Hostels</h6>
+                    <h2 class="font-weight-bold mb-0" id="total-hostels">{{ total_hostels }}</h2>
+                    <small>Active: <span id="active-hostels">{{ active_hostels }}</span></small>
+                </div>
+            </div>
+            <div class="col-xl-3 col-md-6">
+                <div class="stat-card boys">
+                    <div class="stat-icon">
+                        <i class="fas fa-mars"></i>
+                    </div>
+                    <h6 class="text-uppercase font-weight-bold">Boys Hostels</h6>
+                    <h2 class="font-weight-bold mb-0">{{ boys_hostels }}</h2>
+                </div>
+            </div>
+            <div class="col-xl-3 col-md-6">
+                <div class="stat-card girls">
+                    <div class="stat-icon">
+                        <i class="fas fa-venus"></i>
+                    </div>
+                    <h6 class="text-uppercase font-weight-bold">Girls Hostels</h6>
+                    <h2 class="font-weight-bold mb-0">{{ girls_hostels }}</h2>
+                </div>
+            </div>
+            <div class="col-xl-3 col-md-6">
+                <div class="stat-card mixed">
+                    <div class="stat-icon">
+                        <i class="fas fa-users"></i>
+                    </div>
+                    <h6 class="text-uppercase font-weight-bold">Total Capacity</h6>
+                    <h2 class="font-weight-bold mb-0">{{ total_capacity }}</h2>
+                    <small>Students</small>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Card -->
+        <div class="row">
+            <div class="col-lg-12">
+                <div class="card shadow-lg">
+                    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                        <h6 class="header-title mb-0 text-uppercase">
+                            <i class="fas fa-hotel"></i> Hostel Management
+                        </h6>
+                        <div class="d-flex align-items-center">
+                            <span class="badge badge-success mr-2">
+                                <i class="fas fa-check-circle"></i> Active: <span id="active-count">{{ active_hostels }}</span>
+                            </span>
+                            <span class="badge badge-light">
+                                Total: <span id="total-count">{{ total_hostels }}</span>
+                            </span>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover text-nowrap table-responsive-sm table-bordered table-striped table-sm display" id="hostels-table">
+                                <thead class="bg-light">
+                                    <tr>
+                                        <th>Hostel Name</th>
+                                        <th>Code</th>
+                                        <th>Type</th>
+                                        <th>Capacity</th>
+                                        <th>Total Fee</th>
+                                        <th>Payment Mode</th>
+                                        <th>Status</th>
+                                        <th class="text-center">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for hostel in hostels %}
+                                    <tr id="row-{{ hostel.id }}">
+                                        <td>
+                                            <strong>{{ hostel.name }}</strong>
+                                        </td>
+                                        <td><code>{{ hostel.code }}</code></td>
+                                        <td>
+                                            {% if hostel.hostel_type == 'boys' %}
+                                                <span class="badge hostel-badge-boys">
+                                                    <i class="fas fa-mars"></i> Boys
+                                                </span>
+                                            {% elif hostel.hostel_type == 'girls' %}
+                                                <span class="badge hostel-badge-girls">
+                                                    <i class="fas fa-venus"></i> Girls
+                                                </span>
+                                            {% else %}
+                                                <span class="badge hostel-badge-mixed">
+                                                    <i class="fas fa-venus-mars"></i> Mixed
+                                                </span>
+                                            {% endif %}
+                                        </td>
+                                        <td class="text-center">
+                                            <span class="badge badge-info">
+                                                <i class="fas fa-users"></i> {{ hostel.max_students }}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <strong>TSh {{ hostel.total_fee|floatformat:2 }}</strong>
+                                        </td>
+                                        <td>
+                                            {% if hostel.payment_mode == 'yearly' %}
+                                                <span class="badge payment-yearly">
+                                                    <i class="fas fa-calendar-alt"></i> Yearly
+                                                </span>
+                                            {% elif hostel.payment_mode == 'monthly' %}
+                                                <span class="badge payment-monthly">
+                                                    <i class="fas fa-calendar-month"></i> Monthly
+                                                </span>
+                                            {% else %}
+                                                <span class="badge payment-installments">
+                                                    <i class="fas fa-puzzle-piece"></i> Installments ({{ hostel.installments_count }})
+                                                </span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if hostel.is_active %}
+                                                <span class="badge badge-success" id="status-badge-{{ hostel.id }}">
+                                                    <i class="fas fa-check-circle"></i> Active
+                                                </span>
+                                            {% else %}
+                                                <span class="badge badge-secondary" id="status-badge-{{ hostel.id }}">
+                                                    <i class="fas fa-times-circle"></i> Inactive
+                                                </span>
+                                            {% endif %}
+                                        </td>
+                                        <td class="text-center">
+                                            <div class="quick-actions">
+                                                <!-- Quick Status Toggle -->
+                                                {% if hostel.is_active %}
+                                                <button class="btn btn-sm btn-warning quick-action-btn toggle-status-btn" 
+                                                        data-id="{{ hostel.id }}"
+                                                        data-name="{{ hostel.name }}"
+                                                        data-current-status="active"
+                                                        title="Deactivate Hostel">
+                                                    <i class="fas fa-toggle-off"></i>
+                                                </button>
+                                                {% else %}
+                                                <button class="btn btn-sm btn-success quick-action-btn toggle-status-btn" 
+                                                        data-id="{{ hostel.id }}"
+                                                        data-name="{{ hostel.name }}"
+                                                        data-current-status="inactive"
+                                                        title="Activate Hostel">
+                                                    <i class="fas fa-toggle-on"></i>
+                                                </button>
+                                                {% endif %}
+                                                
+                                                <!-- Edit Button -->
+                                                <button class="btn btn-sm btn-primary quick-action-btn edit-btn" 
+                                                        data-id="{{ hostel.id }}"
+                                                        data-name="{{ hostel.name }}"
+                                                        data-code="{{ hostel.code }}"
+                                                        data-hostel-type="{{ hostel.hostel_type }}"
+                                                        data-max-students="{{ hostel.max_students }}"
+                                                        data-total-fee="{{ hostel.total_fee }}"
+                                                        data-payment-mode="{{ hostel.payment_mode }}"
+                                                        data-installments-count="{{ hostel.installments_count }}"
+                                                        data-is-active="{{ hostel.is_active|yesno:'true,false' }}"
+                                                        title="Edit Hostel">
+                                                    <i class="fas fa-edit"></i>
+                                                </button>
+                                                
+                                                <!-- Delete Button -->
+                                                <button class="btn btn-sm btn-danger quick-action-btn delete-btn" 
+                                                        data-id="{{ hostel.id }}"
+                                                        data-name="{{ hostel.name }}"
+                                                        title="Delete Hostel">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Add Hostel Modal -->
+<div class="modal fade" id="addHostelModal" tabindex="-1" role="dialog" aria-labelledby="addModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="addModalLabel">
+                    <i class="fas fa-plus-circle"></i> Add New Hostel
+                </h5>
+                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <form id="add-form">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="name">Hostel Name <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="name" name="name" required 
+                                       placeholder="e.g., Kambarage Hall" maxlength="100">
+                                <small class="form-text text-muted">Full name of the hostel</small>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="code">Hostel Code <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="code" name="code" required 
+                                       placeholder="e.g., KAMB" maxlength="20">
+                                <small class="form-text text-muted">Unique code for the hostel</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="hostel_type">Hostel Type <span class="text-danger">*</span></label>
+                                <select class="form-control select2bs4" id="hostel_type" name="hostel_type" required style="width: 100%;">
+                                    <option value="">Select Type</option>
+                                    {% for type in hostel_types %}
+                                        <option value="{{ type.0 }}">{{ type.1 }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="max_students">Maximum Students <span class="text-danger">*</span></label>
+                                <input type="number" class="form-control" id="max_students" name="max_students" required 
+                                       min="1" max="1000" value="50">
+                                <small class="form-text text-muted">Total capacity of the hostel</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="total_fee">Total Fee (TSh) <span class="text-danger">*</span></label>
+                                <div class="currency-input-group">
+                                    <input type="number" class="form-control" id="total_fee" name="total_fee" required 
+                                           min="0" max="9999999.99" step="0.01" value="0.00">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="payment_mode">Payment Mode <span class="text-danger">*</span></label>
+                                <select class="form-control select2bs4" id="payment_mode" name="payment_mode" required style="width: 100%;">
+                                    <option value="">Select Payment Mode</option>
+                                    {% for mode in payment_modes %}
+                                        <option value="{{ mode.0 }}">{{ mode.1 }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row" id="installments-row" style="display: none;">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="installments_count">Number of Installments</label>
+                                <input type="number" class="form-control" id="installments_count" name="installments_count" 
+                                       min="1" max="12" value="1">
+                                <small class="form-text text-muted">How many installments?</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label>Status</label>
+                                <div class="custom-control custom-switch mt-2">
+                                    <input type="checkbox" class="custom-control-input" id="is_active" name="is_active" checked>
+                                    <label class="custom-control-label" for="is_active">
+                                        <span id="active-label">Active</span>
+                                    </label>
+                                    <small class="form-text text-muted d-block">Toggle to activate/deactivate</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal" id="cancel-add-btn">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="save-btn">
+                        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="display: none;"></span>
+                        Save Hostel
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Hostel Modal -->
+<div class="modal fade" id="editHostelModal" tabindex="-1" role="dialog" aria-labelledby="editModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-warning text-dark">
+                <h5 class="modal-title" id="editModalLabel">
+                    <i class="fas fa-edit"></i> Edit Hostel
+                </h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <form id="edit-form">
+                {% csrf_token %}
+                <input type="hidden" id="edit-id" name="id">
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="edit-name">Hostel Name <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="edit-name" name="name" required 
+                                       placeholder="e.g., Kambarage Hall" maxlength="100">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="edit-code">Hostel Code <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="edit-code" name="code" required 
+                                       placeholder="e.g., KAMB" maxlength="20">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="edit-hostel_type">Hostel Type <span class="text-danger">*</span></label>
+                                <select class="form-control select2bs4" id="edit-hostel_type" name="hostel_type" required style="width: 100%;">
+                                    <option value="">Select Type</option>
+                                    {% for type in hostel_types %}
+                                        <option value="{{ type.0 }}">{{ type.1 }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="edit-max_students">Maximum Students <span class="text-danger">*</span></label>
+                                <input type="number" class="form-control" id="edit-max_students" name="max_students" required 
+                                       min="1" max="1000" value="50">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="edit-total_fee">Total Fee (TSh) <span class="text-danger">*</span></label>
+                                <div class="currency-input-group">
+                                    <input type="number" class="form-control" id="edit-total_fee" name="total_fee" required 
+                                           min="0" max="9999999.99" step="0.01">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="edit-payment_mode">Payment Mode <span class="text-danger">*</span></label>
+                                <select class="form-control select2bs4" id="edit-payment_mode" name="payment_mode" required style="width: 100%;">
+                                    <option value="">Select Payment Mode</option>
+                                    {% for mode in payment_modes %}
+                                        <option value="{{ mode.0 }}">{{ mode.1 }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row" id="edit-installments-row" style="display: none;">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="edit-installments_count">Number of Installments</label>
+                                <input type="number" class="form-control" id="edit-installments_count" name="installments_count" 
+                                       min="1" max="12" value="1">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label>Status</label>
+                                <div class="custom-control custom-switch mt-2">
+                                    <input type="checkbox" class="custom-control-input" id="edit-is_active" name="is_active">
+                                    <label class="custom-control-label" for="edit-is_active">
+                                        <span id="edit-active-label">Inactive</span>
+                                    </label>
+                                    <small class="form-text text-muted d-block">Toggle to activate/deactivate</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal" id="cancel-edit-btn">Cancel</button>
+                    <button type="submit" class="btn btn-warning" id="update-btn">
+                        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="display: none;"></span>
+                        Update Hostel
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Hostel Modal -->
+<div class="modal fade" id="deleteHostelModal" tabindex="-1" role="dialog" aria-labelledby="deleteModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="deleteModalLabel">
+                    <i class="fas fa-exclamation-triangle"></i> Confirm Deletion
+                </h5>
+                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete the hostel <strong id="delete-hostel-name"></strong>?</p>
+                <p class="text-danger"><small>This action cannot be undone. All associated rooms and allocations might be affected.</small></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal" id="cancel-delete-btn">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirm-delete-btn">
+                    <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="display: none;"></span>
+                    Delete
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+<script>
+    $(document).ready(function() {
+        // Toggle switch label updates
+        $('#is_active').on('change', function() {
+            $('#active-label').text($(this).is(':checked') ? 'Active' : 'Inactive');
+        });
+        
+        $('#edit-is_active').on('change', function() {
+            $('#edit-active-label').text($(this).is(':checked') ? 'Active' : 'Inactive');
+        });
+
+        // Show/hide installments field based on payment mode selection
+        function toggleInstallmentsField() {
+            if ($('#payment_mode').val() === 'installments') {
+                $('#installments-row').slideDown();
+            } else {
+                $('#installments-row').slideUp();
+                $('#installments_count').val('1');
+            }
+        }
+
+        function toggleEditInstallmentsField() {
+            if ($('#edit-payment_mode').val() === 'installments') {
+                $('#edit-installments-row').slideDown();
+            } else {
+                $('#edit-installments-row').slideUp();
+                $('#edit-installments_count').val('1');
+            }
+        }
+
+        $('#payment_mode').on('change', toggleInstallmentsField);
+        $('#edit-payment_mode').on('change', toggleEditInstallmentsField);
+
+        // Initialize Select2
+        function initializeSelect2() {
+            $('.select2bs4').select2({
+                theme: 'bootstrap4',
+                dropdownParent: $('.modal:visible'),
+                width: '100%',
+                placeholder: 'Select an option',
+                allowClear: false
+            });
+        }
+        
+        // Initialize on page load
+        initializeSelect2();
+
+        // Reinitialize when modals are shown
+        $('#addHostelModal').on('shown.bs.modal', function() {
+            $('#hostel_type, #payment_mode').select2({
+                theme: 'bootstrap4',
+                dropdownParent: $('#addHostelModal'),
+                width: '100%',
+                placeholder: 'Select an option',
+                allowClear: false
+            });
+        });
+
+        $('#editHostelModal').on('shown.bs.modal', function() {
+            $('#edit-hostel_type, #edit-payment_mode').select2({
+                theme: 'bootstrap4',
+                dropdownParent: $('#editHostelModal'),
+                width: '100%',
+                placeholder: 'Select an option',
+                allowClear: false
+            });
+        });
+
+        // Destroy Select2 when modals are hidden
+        $('#addHostelModal').on('hidden.bs.modal', function() {
+            $('#hostel_type, #payment_mode').select2('destroy');
+            $('#add-form')[0].reset();
+            $('#active-label').text('Active');
+            $('#installments-row').hide();
+        });
+
+        $('#editHostelModal').on('hidden.bs.modal', function() {
+            $('#edit-hostel_type, #edit-payment_mode').select2('destroy');
+        });
+
+        // Initialize DataTable
+        var table = $('#hostels-table').DataTable({
+            "dom": "<'row'<'col-sm-12 col-md-6'l><'col-sm-12 col-md-6'f>>" +
+                   "<'row'<'col-sm-12'tr>>" +
+                   "<'row'<'col-sm-12 col-md-5'i><'col-sm-12 col-md-7'p>>",
+            "lengthMenu": [[10, 25, 50, -1], [10, 25, 50, "All"]],
+            "pageLength": 10,
+            "responsive": true,
+            "autoWidth": false,
+            "ordering": true,
+            "order": [[0, 'asc']],
+            
+            "destroy": true,
+            "retrieve": true,
+            "deferRender": true,
+            
+            "columnDefs": [
+                { 
+                    "targets": 7, // Actions column
+                    "orderable": false,
+                    "searchable": false
+                }
+            ],
+            
+            "language": {
+                "emptyTable": "<div class='text-center py-4'><i class='fas fa-hotel fa-2x mb-2'></i><br>No hostels found. Click \"Add Hostel\" to create one.</div>",
+                "search": "_INPUT_",
+                "searchPlaceholder": "Search hostels...",
+                "lengthMenu": "_MENU_ hostels per page",
+                "info": "Showing _START_ to _END_ of _TOTAL_ hostels",
+                "infoEmpty": "Showing 0 to 0 of 0 hostels",
+                "infoFiltered": "(filtered from _MAX_ total hostels)",
+                "paginate": {
+                    "first": "First",
+                    "last": "Last",
+                    "next": "Next",
+                    "previous": "Previous"
+                }
+            },
+            "drawCallback": function(settings) {
+                var api = this.api();
+                var total = api.rows().count();
+                $('#total-count').text(total);
+                
+                // Count active hostels
+                var activeCount = 0;
+                api.rows().every(function() {
+                    var data = this.data();
+                    var statusText = $(data[6]).text().toLowerCase();
+                    if (statusText.includes('active')) {
+                        activeCount++;
+                    }
+                });
+                $('#active-count').text(activeCount);
+                $('#active-hostels').text(activeCount);
+            }
+        });
+
+        // CSRF token for AJAX requests
+        function getCSRFToken() {
+            return $('input[name="csrfmiddlewaretoken"]').val();
+        }
+
+        // Show toast message
+        function showToast(message, type = 'success') {
+            const toastId = type === 'success' ? '#success-toast' : '#error-toast';
+            const messageId = type === 'success' ? '#success-message' : '#error-message';
+            
+            $(messageId).text(message);
+            $(toastId).addClass('show').fadeIn();
+            
+            setTimeout(function() {
+                $(toastId).fadeOut(function() {
+                    $(this).removeClass('show');
+                });
+            }, type === 'success' ? 3000 : 5000);
+        }
+
+        // Function to reload page after delay
+        function reloadPageAfterDelay(message, type = 'success') {
+            showToast(message, type);
+            var delay = type === 'success' ? 2000 : 3000;
+            setTimeout(function() {
+                location.reload();
+            }, delay);
+        }
+
+        // Function to update UI without reload
+        function updateHostelUI(hostelId, data) {
+            // Update status badge
+            const statusBadge = $('#status-badge-' + hostelId);
+            const statusBtn = $('.toggle-status-btn[data-id="' + hostelId + '"]');
+            
+            if (data.hasOwnProperty('is_active')) {
+                if (data.is_active) {
+                    statusBadge.removeClass('badge-secondary').addClass('badge-success')
+                        .html('<i class="fas fa-check-circle"></i> Active');
+                    statusBtn.removeClass('btn-success').addClass('btn-warning')
+                        .attr('title', 'Deactivate Hostel')
+                        .html('<i class="fas fa-toggle-off"></i>')
+                        .attr('data-current-status', 'active');
+                } else {
+                    statusBadge.removeClass('badge-success').addClass('badge-secondary')
+                        .html('<i class="fas fa-times-circle"></i> Inactive');
+                    statusBtn.removeClass('btn-warning').addClass('btn-success')
+                        .attr('title', 'Activate Hostel')
+                        .html('<i class="fas fa-toggle-on"></i>')
+                        .attr('data-current-status', 'inactive');
+                }
+                
+                // Update active count
+                var currentActive = parseInt($('#active-count').text());
+                if (data.is_active) {
+                    $('#active-count').text(currentActive + 1);
+                    $('#active-hostels').text(currentActive + 1);
+                } else {
+                    $('#active-count').text(currentActive - 1);
+                    $('#active-hostels').text(currentActive - 1);
+                }
+            }
+        }
+
+        // Handle modal close/cancel buttons
+        $(document).on('click', '[data-dismiss="modal"]', function(e) {
+            e.preventDefault();
+            $(this).closest('.modal').modal('hide');
+        });
+
+        // Handle cancel buttons
+        $('#cancel-add-btn, #cancel-edit-btn, #cancel-delete-btn').on('click', function(e) {
+            e.preventDefault();
+            $(this).closest('.modal').modal('hide');
+        });
+
+        // Helper function to handle button loading state
+        function setButtonLoading(btn, isLoading) {
+            const spinner = btn.find('.spinner-border');
+            if (isLoading) {
+                btn.data('original-text', btn.html());
+                btn.prop('disabled', true);
+                spinner.show();
+                btn.html('Processing...');
+            } else {
+                btn.prop('disabled', false);
+                spinner.hide();
+                btn.html(btn.data('original-text'));
+            }
+        }
+        
+        // Add Hostel
+        $('#add-form').on('submit', function(e) {
+            e.preventDefault();
+            
+            const saveBtn = $('#save-btn');
+            setButtonLoading(saveBtn, true);
+            
+            const formData = new FormData(this);
+            formData.append('action', 'create');
+            
+            $.ajax({
+                url: '{% url "admin_hostels_crud" %}',
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCSRFToken(),
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function(data) {
+                    if (data.success) {
+                        $('#addHostelModal').modal('hide');
+                        reloadPageAfterDelay(data.message, 'success');
+                    } else {
+                        showToast(data.message, 'danger');
+                        setButtonLoading(saveBtn, false);
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error:', error);
+                    showToast('An error occurred while saving. Please try again.', 'danger');
+                    setButtonLoading(saveBtn, false);
+                }
+            });
+        });
+
+        // Edit Hostel - Setup modal
+        $(document).on('click', '.edit-btn', function() {
+            const btn = $(this);
+            
+            $('#edit-id').val(btn.data('id'));
+            
+            // Store values
+            const name = btn.data('name');
+            const code = btn.data('code');
+            const hostelType = btn.data('hostel-type');
+            const maxStudents = btn.data('max-students');
+            const totalFee = btn.data('total-fee');
+            const paymentMode = btn.data('payment-mode');
+            const installmentsCount = btn.data('installments-count');
+            const isActive = btn.data('is-active') === 'true';
+            
+            // Show modal first
+            $('#editHostelModal').modal('show');
+            
+            // Set values after modal is shown
+            setTimeout(function() {
+                $('#edit-name').val(name);
+                $('#edit-code').val(code);
+                $('#edit-hostel_type').val(hostelType).trigger('change');
+                $('#edit-max_students').val(maxStudents);
+                $('#edit-total_fee').val(totalFee);
+                $('#edit-payment_mode').val(paymentMode).trigger('change');
+                $('#edit-installments_count').val(installmentsCount);
+                
+                // Show/hide installments field based on payment mode
+                if (paymentMode === 'installments') {
+                    $('#edit-installments-row').show();
+                } else {
+                    $('#edit-installments-row').hide();
+                }
+                
+                // Set checkbox states
+                $('#edit-is_active').prop('checked', isActive);
+                
+                // Update labels
+                $('#edit-active-label').text(isActive ? 'Active' : 'Inactive');
+            }, 500);
+        });
+
+        // Edit Hostel - Submit form
+        $('#edit-form').on('submit', function(e) {
+            e.preventDefault();
+            
+            const updateBtn = $('#update-btn');
+            setButtonLoading(updateBtn, true);
+            
+            const formData = new FormData(this);
+            formData.append('action', 'update');
+            
+            $.ajax({
+                url: '{% url "admin_hostels_crud" %}',
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCSRFToken(),
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function(data) {
+                    if (data.success) {
+                        $('#editHostelModal').modal('hide');
+                        reloadPageAfterDelay(data.message, 'success');
+                    } else {
+                        showToast(data.message, 'danger');
+                        setButtonLoading(updateBtn, false);
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error:', error);
+                    showToast('An error occurred while updating. Please try again.', 'danger');
+                    setButtonLoading(updateBtn, false);
+                }
+            });
+        });
+
+        // Toggle Hostel Status (Activate/Deactivate)
+        $(document).on('click', '.toggle-status-btn', function() {
+            const btn = $(this);
+            const hostelId = btn.data('id');
+            const hostelName = btn.data('name');
+            const currentStatus = btn.data('current-status');
+            const actionText = currentStatus === 'active' ? 'deactivate' : 'activate';
+            
+            if (confirm(`Are you sure you want to ${actionText} "${hostelName}"?`)) {
+                setButtonLoading(btn, true);
+                
+                $.ajax({
+                    url: '{% url "admin_hostels_crud" %}',
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': getCSRFToken(),
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    data: {
+                        'action': 'toggle_status',
+                        'id': hostelId,
+                        'csrfmiddlewaretoken': getCSRFToken()
+                    },
+                    success: function(data) {
+                        if (data.success) {
+                            updateHostelUI(hostelId, { is_active: data.is_active });
+                            showToast(data.message, 'success');
+                        } else {
+                            showToast(data.message, 'danger');
+                        }
+                        setButtonLoading(btn, false);
+                    },
+                    error: function(xhr, status, error) {
+                        console.error('Error:', error);
+                        showToast('An error occurred while updating status. Please try again.', 'danger');
+                        setButtonLoading(btn, false);
+                    }
+                });
+            }
+        });
+
+        // Delete Hostel - Setup modal
+        let hostelToDelete = null;
+        
+        $(document).on('click', '.delete-btn', function() {
+            const btn = $(this);
+            
+            hostelToDelete = {
+                id: btn.data('id'),
+                name: btn.data('name')
+            };
+            
+            $('#delete-hostel-name').text(btn.data('name'));
+            $('#deleteHostelModal').modal('show');
+        });
+
+        // Delete Hostel - Confirm
+        $('#confirm-delete-btn').on('click', function() {
+            if (!hostelToDelete) return;
+            
+            const deleteBtn = $(this);
+            setButtonLoading(deleteBtn, true);
+            
+            $.ajax({
+                url: '{% url "admin_hostels_crud" %}',
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCSRFToken(),
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                data: {
+                    'action': 'delete',
+                    'id': hostelToDelete.id,
+                    'csrfmiddlewaretoken': getCSRFToken()
+                },
+                success: function(data) {
+                    if (data.success) {
+                        $('#deleteHostelModal').modal('hide');
+                        reloadPageAfterDelay(data.message, 'success');
+                    } else {
+                        showToast(data.message, 'danger');
+                        setButtonLoading(deleteBtn, false);
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error:', error);
+                    showToast('An error occurred while deleting. Please try again.', 'danger');
+                    setButtonLoading(deleteBtn, false);
+                }
+            });
+        });
+
+        // Clear form and reset button state on modal close
+        $('#addHostelModal').on('hidden.bs.modal', function() {
+            $('#add-form')[0].reset();
+            setButtonLoading($('#save-btn'), false);
+            $('#installments-row').hide();
+        });
+        
+        $('#editHostelModal').on('hidden.bs.modal', function() {
+            setButtonLoading($('#update-btn'), false);
+            $('#edit-installments-row').hide();
+        });
+        
+        $('#deleteHostelModal').on('hidden.bs.modal', function() {
+            hostelToDelete = null;
+            setButtonLoading($('#confirm-delete-btn'), false);
+        });
+
+        // Form validation
+        $('#add-form, #edit-form').on('submit', function(e) {
+            const isAddForm = $(this).attr('id') === 'add-form';
+            const codeInput = isAddForm ? '#code' : '#edit-code';
+            const nameInput = isAddForm ? '#name' : '#edit-name';
+            const maxStudentsInput = isAddForm ? '#max_students' : '#edit-max_students';
+            
+            const code = $(codeInput).val().trim();
+            const name = $(nameInput).val().trim();
+            const maxStudents = $(maxStudentsInput).val();
+            
+            // Validate code format (alphanumeric with optional underscores)
+            if (!/^[A-Za-z0-9_]+$/.test(code)) {
+                e.preventDefault();
+                showToast('Hostel code can only contain letters, numbers, and underscores.', 'danger');
+                $(codeInput).addClass('is-invalid');
+                return false;
+            }
+            
+            // Validate name length
+            if (name.length < 2) {
+                e.preventDefault();
+                showToast('Hostel name must be at least 2 characters long.', 'danger');
+                $(nameInput).addClass('is-invalid');
+                return false;
+            }
+            
+            // Validate max students
+            if (parseInt(maxStudents) < 1) {
+                e.preventDefault();
+                showToast('Maximum students must be at least 1.', 'danger');
+                $(maxStudentsInput).addClass('is-invalid');
+                return false;
+            }
+            
+            return true;
+        });
+
+        // Remove validation classes on input
+        $('#code, #edit-code, #name, #edit-name, #max_students, #edit-max_students').on('input', function() {
+            $(this).removeClass('is-invalid');
+        });
+    });
+</script>
+{% endblock extra_js %}

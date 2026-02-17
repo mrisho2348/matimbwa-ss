@@ -1,0 +1,1200 @@
+{% extends 'admin/base.html' %}
+{% load static %}
+{% block title %} Hostel Rooms Management {% endblock title %}
+
+{% block breadcrumb %}
+    <div class="btn-group">
+        <button type="button" class="btn btn-primary" data-toggle="modal" data-target="#addRoomModal">
+            <i class="fas fa-plus"></i> Add Room
+        </button>
+        <button type="button" class="btn btn-success" data-toggle="modal" data-target="#bulkAddRoomsModal">
+            <i class="fas fa-layer-group"></i> Bulk Add Rooms
+        </button>
+    </div>
+{% endblock breadcrumb %}
+
+{% block extra_css %}
+<style>
+    .table th {
+        font-weight: 600;
+        border-bottom-width: 2px;
+    }
+    .table td {
+        vertical-align: middle;
+    }
+    .badge {
+        font-size: 0.85em;
+        padding: 0.4em 0.8em;
+    }
+    .modal-header {
+        border-radius: 0;
+    }
+    .btn-group .btn {
+        margin: 0 2px;
+    }
+    /* DataTable Styles */
+    .dataTables_wrapper .dataTables_filter {
+        float: right;
+        text-align: right;
+    }
+    .dataTables_wrapper .dataTables_length {
+        float: left;
+    }
+    .dataTables_wrapper .dataTables_paginate {
+        float: right;
+        margin-top: 10px;
+    }
+    .success-toast, .error-toast {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 1056;
+        min-width: 300px;
+    }
+    /* Stats cards */
+    .stat-card {
+        background: linear-gradient(45deg, #20c997 0%, #0f8b6d 100%);
+        color: white;
+        border-radius: 10px;
+        padding: 20px;
+        margin-bottom: 20px;
+        position: relative;
+        overflow: hidden;
+    }
+    .stat-card.rooms {
+        background: linear-gradient(45deg, #007bff 0%, #0056b3 100%);
+    }
+    .stat-card.capacity {
+        background: linear-gradient(45deg, #fd7e14 0%, #c05c0b 100%);
+    }
+    .stat-card.active {
+        background: linear-gradient(45deg, #28a745 0%, #1e7e34 100%);
+    }
+    .stat-icon {
+        font-size: 3rem;
+        opacity: 0.3;
+        position: absolute;
+        right: 20px;
+        top: 20px;
+    }
+    /* Quick action buttons */
+    .quick-actions {
+        display: flex;
+        gap: 4px;
+        justify-content: center;
+        align-items: center;
+    }
+    .quick-action-btn {
+        width: 28px;
+        height: 28px;
+        padding: 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        border: none;
+        transition: all 0.2s ease;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+    }
+    .quick-action-btn i {
+        font-size: 0.75rem;
+        color: #ffffff !important;
+    }
+    .quick-action-btn:hover {
+        transform: scale(1.1);
+        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        filter: brightness(1.05);
+    }
+    .btn-warning.quick-action-btn i {
+        color: #212529 !important;
+    }
+    /* Hostel badges */
+    .hostel-badge {
+        background-color: #6c757d;
+        color: white;
+        padding: 3px 8px;
+        border-radius: 4px;
+        font-size: 0.8em;
+    }
+    /* Capacity indicator */
+    .capacity-indicator {
+        width: 100%;
+        height: 6px;
+        background-color: #e9ecef;
+        border-radius: 3px;
+        margin-top: 5px;
+    }
+    .capacity-fill {
+        height: 100%;
+        background-color: #28a745;
+        border-radius: 3px;
+    }
+    /* Select2 in modal */
+    .select2-container {
+        z-index: 1056 !important;
+    }
+    .select2-dropdown {
+        z-index: 1057 !important;
+    }
+    /* Per hostel card */
+    .hostel-card {
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        padding: 15px;
+        margin-bottom: 15px;
+        background-color: #f8f9fa;
+    }
+    .hostel-card .hostel-name {
+        font-weight: bold;
+        color: #007bff;
+    }
+    .hostel-card .room-count {
+        font-size: 1.2em;
+        font-weight: bold;
+        color: #28a745;
+    }
+</style>
+{% endblock extra_css %}
+
+{% block content %}
+<section class="content">
+    <div class="container-fluid"> 
+        <!-- Toast Notifications -->
+        <div id="success-toast" class="alert alert-success alert-dismissible fade success-toast" style="display: none;" role="alert">
+            <strong><i class="fas fa-check-circle"></i> Success!</strong> 
+            <span id="success-message"></span>
+            <button type="button" class="close" onclick="$('#success-toast').fadeOut()" data-dismiss="alert" aria-label="Close">
+                <span aria-hidden="true">&times;</span>
+            </button>
+        </div>
+
+        <div id="error-toast" class="alert alert-danger alert-dismissible fade error-toast" style="display: none;" role="alert">
+            <strong><i class="fas fa-exclamation-circle"></i> Error!</strong> 
+            <span id="error-message"></span>
+            <button type="button" class="close" onclick="$('#error-toast').fadeOut()" data-dismiss="alert" aria-label="Close">
+                <span aria-hidden="true">&times;</span>
+            </button>
+        </div>
+
+        <!-- Statistics Cards -->
+        <div class="row">
+            <div class="col-xl-3 col-md-6">
+                <div class="stat-card rooms">
+                    <div class="stat-icon">
+                        <i class="fas fa-door-open"></i>
+                    </div>
+                    <h6 class="text-uppercase font-weight-bold">Total Rooms</h6>
+                    <h2 class="font-weight-bold mb-0" id="total-rooms">{{ total_rooms }}</h2>
+                    <small>Across all hostels</small>
+                </div>
+            </div>
+            <div class="col-xl-3 col-md-6">
+                <div class="stat-card active">
+                    <div class="stat-icon">
+                        <i class="fas fa-check-circle"></i>
+                    </div>
+                    <h6 class="text-uppercase font-weight-bold">Active Rooms</h6>
+                    <h2 class="font-weight-bold mb-0" id="active-rooms">{{ active_rooms }}</h2>
+                    <small>Currently available</small>
+                </div>
+            </div>
+            <div class="col-xl-3 col-md-6">
+                <div class="stat-card capacity">
+                    <div class="stat-icon">
+                        <i class="fas fa-users"></i>
+                    </div>
+                    <h6 class="text-uppercase font-weight-bold">Total Capacity</h6>
+                    <h2 class="font-weight-bold mb-0">{{ total_capacity }}</h2>
+                    <small>Student beds</small>
+                </div>
+            </div>
+            <div class="col-xl-3 col-md-6">
+                <div class="stat-card" style="background: linear-gradient(45deg, #6f42c1 0%, #523691 100%);">
+                    <div class="stat-icon">
+                        <i class="fas fa-bed"></i>
+                    </div>
+                    <h6 class="text-uppercase font-weight-bold">Occupied</h6>
+                    <h2 class="font-weight-bold mb-0">{{ occupied_rooms }}</h2>
+                    <small>Currently occupied</small>
+                </div>
+            </div>
+        </div>
+
+        <!-- Rooms by Hostel (Summary) -->
+        <div class="row">
+            <div class="col-lg-12">
+                <div class="card mb-4">
+                    <div class="card-header bg-info text-white">
+                        <h6 class="mb-0"><i class="fas fa-hotel"></i> Rooms per Hostel</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            {% for hostel in rooms_per_hostel %}
+                            <div class="col-md-3">
+                                <div class="hostel-card">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <span class="hostel-name">{{ hostel.name }}</span>
+                                        <span class="badge badge-info">{{ hostel.code }}</span>
+                                    </div>
+                                    <div class="mt-2">
+                                        <span class="room-count">{{ hostel.room_count }}</span> Rooms
+                                    </div>
+                                    <div class="mt-1">
+                                        <small>Capacity: {{ hostel.total_capacity|default:0 }} students</small>
+                                    </div>
+                                    <div class="capacity-indicator mt-2">
+                                        {% widthratio hostel.room_count total_rooms 100 as percentage %}
+                                        <div class="capacity-fill" style="width: {{ percentage }}%;"></div>
+                                    </div>
+                                </div>
+                            </div>
+                            {% empty %}
+                            <div class="col-12 text-center py-4">
+                                <i class="fas fa-door-open fa-3x mb-3 text-muted"></i>
+                                <p class="text-muted">No rooms found in any hostel.</p>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Card -->
+        <div class="row">
+            <div class="col-lg-12">
+                <div class="card shadow-lg">
+                    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                        <h6 class="header-title mb-0 text-uppercase">
+                            <i class="fas fa-door-open"></i> Hostel Rooms Management
+                        </h6>
+                        <div class="d-flex align-items-center">
+                            <span class="badge badge-success mr-2">
+                                <i class="fas fa-check-circle"></i> Active: <span id="active-count">{{ active_rooms }}</span>
+                            </span>
+                            <span class="badge badge-light">
+                                Total: <span id="total-count">{{ total_rooms }}</span>
+                            </span>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover text-nowrap table-responsive-sm table-bordered table-striped table-sm display" id="rooms-table">
+                                <thead class="bg-light">
+                                    <tr>
+                                        <th>Hostel</th>
+                                        <th>Room Number</th>
+                                        <th>Capacity</th>
+                                        <th>Status</th>
+                                        <th class="text-center">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for room in rooms %}
+                                    <tr id="row-{{ room.id }}">
+                                        <td>
+                                            <span class="hostel-badge">
+                                                <i class="fas fa-hotel"></i> {{ room.hostel.name }} ({{ room.hostel.code }})
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <strong>Room {{ room.room_number }}</strong>
+                                        </td>
+                                        <td>
+                                            <span class="badge badge-info">
+                                                <i class="fas fa-users"></i> {{ room.capacity }} students
+                                            </span>
+                                        </td>
+                                        <td>
+                                            {% if room.is_active %}
+                                                <span class="badge badge-success" id="status-badge-{{ room.id }}">
+                                                    <i class="fas fa-check-circle"></i> Active
+                                                </span>
+                                            {% else %}
+                                                <span class="badge badge-secondary" id="status-badge-{{ room.id }}">
+                                                    <i class="fas fa-times-circle"></i> Inactive
+                                                </span>
+                                            {% endif %}
+                                        </td>
+                                        <td class="text-center">
+                                            <div class="quick-actions">
+                                                <!-- Quick Status Toggle -->
+                                                {% if room.is_active %}
+                                                <button class="btn btn-sm btn-warning quick-action-btn toggle-status-btn" 
+                                                        data-id="{{ room.id }}"
+                                                        data-room="{{ room.room_number }}"
+                                                        data-hostel="{{ room.hostel.name }}"
+                                                        data-current-status="active"
+                                                        title="Deactivate Room">
+                                                    <i class="fas fa-toggle-off"></i>
+                                                </button>
+                                                {% else %}
+                                                <button class="btn btn-sm btn-success quick-action-btn toggle-status-btn" 
+                                                        data-id="{{ room.id }}"
+                                                        data-room="{{ room.room_number }}"
+                                                        data-hostel="{{ room.hostel.name }}"
+                                                        data-current-status="inactive"
+                                                        title="Activate Room">
+                                                    <i class="fas fa-toggle-on"></i>
+                                                </button>
+                                                {% endif %}
+                                                
+                                                <!-- Edit Button -->
+                                                <button class="btn btn-sm btn-primary quick-action-btn edit-btn" 
+                                                        data-id="{{ room.id }}"
+                                                        data-hostel-id="{{ room.hostel.id }}"
+                                                        data-hostel-name="{{ room.hostel.name }}"
+                                                        data-room-number="{{ room.room_number }}"
+                                                        data-capacity="{{ room.capacity }}"
+                                                        data-is-active="{{ room.is_active|yesno:'true,false' }}"
+                                                        title="Edit Room">
+                                                    <i class="fas fa-edit"></i>
+                                                </button>
+                                                
+                                                <!-- Delete Button -->
+                                                <button class="btn btn-sm btn-danger quick-action-btn delete-btn" 
+                                                        data-id="{{ room.id }}"
+                                                        data-room="{{ room.room_number }}"
+                                                        data-hostel="{{ room.hostel.name }}"
+                                                        title="Delete Room">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Add Room Modal -->
+<div class="modal fade" id="addRoomModal" tabindex="-1" role="dialog" aria-labelledby="addModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="addModalLabel">
+                    <i class="fas fa-plus-circle"></i> Add New Room
+                </h5>
+                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <form id="add-form">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="hostel">Select Hostel <span class="text-danger">*</span></label>
+                                <select class="form-control select2bs4" id="hostel" name="hostel" required style="width: 100%;">
+                                    <option value="">Choose Hostel</option>
+                                    {% for hostel in hostels %}
+                                        <option value="{{ hostel.id }}">{{ hostel.name }} ({{ hostel.code }}) - Capacity: {{ hostel.max_students }}</option>
+                                    {% endfor %}
+                                </select>
+                                <small class="form-text text-muted">Select the hostel for this room</small>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="room_number">Room Number <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="room_number" name="room_number" required 
+                                       placeholder="e.g., 101, A1, B2" maxlength="20">
+                                <small class="form-text text-muted">Unique room number within the hostel</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="capacity">Capacity <span class="text-danger">*</span></label>
+                                <input type="number" class="form-control" id="capacity" name="capacity" required 
+                                       min="1" max="20" value="4">
+                                <small class="form-text text-muted">How many students can this room hold? (Max 20)</small>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label>Status</label>
+                                <div class="custom-control custom-switch mt-2">
+                                    <input type="checkbox" class="custom-control-input" id="is_active" name="is_active" checked>
+                                    <label class="custom-control-label" for="is_active">
+                                        <span id="active-label">Active</span>
+                                    </label>
+                                    <small class="form-text text-muted d-block">Toggle to activate/deactivate</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-12">
+                            <div class="alert alert-info" id="hostel-capacity-info" style="display: none;">
+                                <i class="fas fa-info-circle"></i> 
+                                <span id="capacity-info-text"></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal" id="cancel-add-btn">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="save-btn">
+                        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="display: none;"></span>
+                        Save Room
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Bulk Add Rooms Modal -->
+<div class="modal fade" id="bulkAddRoomsModal" tabindex="-1" role="dialog" aria-labelledby="bulkModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title" id="bulkModalLabel">
+                    <i class="fas fa-layer-group"></i> Bulk Add Rooms
+                </h5>
+                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <form id="bulk-form">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <strong>Note:</strong> This will create multiple rooms at once. All rooms will have the same capacity.
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="bulk-hostel">Select Hostel <span class="text-danger">*</span></label>
+                                <select class="form-control select2bs4" id="bulk-hostel" name="hostel" required style="width: 100%;">
+                                    <option value="">Choose Hostel</option>
+                                    {% for hostel in hostels %}
+                                        <option value="{{ hostel.id }}">{{ hostel.name }} ({{ hostel.code }})</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="bulk-capacity">Capacity per Room <span class="text-danger">*</span></label>
+                                <input type="number" class="form-control" id="bulk-capacity" name="capacity" required 
+                                       min="1" max="20" value="4">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="start_room">Start Room Number <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="start_room" name="start_room" required 
+                                       placeholder="e.g., 101">
+                                <small class="form-text text-muted">First room number</small>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="end_room">End Room Number <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="end_room" name="end_room" required 
+                                       placeholder="e.g., 110">
+                                <small class="form-text text-muted">Last room number</small>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-12">
+                            <div class="alert alert-info" id="bulk-preview">
+                                <i class="fas fa-calculator"></i> 
+                                <span id="preview-text">Select hostel and enter room range to see preview</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-success" id="bulk-save-btn">
+                        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="display: none;"></span>
+                        Create Rooms
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Room Modal -->
+<div class="modal fade" id="editRoomModal" tabindex="-1" role="dialog" aria-labelledby="editModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-warning text-dark">
+                <h5 class="modal-title" id="editModalLabel">
+                    <i class="fas fa-edit"></i> Edit Room
+                </h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <form id="edit-form">
+                {% csrf_token %}
+                <input type="hidden" id="edit-id" name="id">
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="edit-hostel">Hostel <span class="text-danger">*</span></label>
+                                <select class="form-control select2bs4" id="edit-hostel" name="hostel" required style="width: 100%;">
+                                    <option value="">Choose Hostel</option>
+                                    {% for hostel in hostels %}
+                                        <option value="{{ hostel.id }}">{{ hostel.name }} ({{ hostel.code }})</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="edit-room_number">Room Number <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="edit-room_number" name="room_number" required 
+                                       placeholder="e.g., 101" maxlength="20">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="edit-capacity">Capacity <span class="text-danger">*</span></label>
+                                <input type="number" class="form-control" id="edit-capacity" name="capacity" required 
+                                       min="1" max="20">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label>Status</label>
+                                <div class="custom-control custom-switch mt-2">
+                                    <input type="checkbox" class="custom-control-input" id="edit-is_active" name="is_active">
+                                    <label class="custom-control-label" for="edit-is_active">
+                                        <span id="edit-active-label">Inactive</span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal" id="cancel-edit-btn">Cancel</button>
+                    <button type="submit" class="btn btn-warning" id="update-btn">
+                        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="display: none;"></span>
+                        Update Room
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Room Modal -->
+<div class="modal fade" id="deleteRoomModal" tabindex="-1" role="dialog" aria-labelledby="deleteModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="deleteModalLabel">
+                    <i class="fas fa-exclamation-triangle"></i> Confirm Deletion
+                </h5>
+                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete room <strong id="delete-room-number"></strong> in <strong id="delete-hostel-name"></strong>?</p>
+                <p class="text-danger"><small>This action cannot be undone. All associated beds and allocations will be affected.</small></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal" id="cancel-delete-btn">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirm-delete-btn">
+                    <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="display: none;"></span>
+                    Delete
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+<script>
+    $(document).ready(function() {
+        // Toggle switch label updates
+        $('#is_active').on('change', function() {
+            $('#active-label').text($(this).is(':checked') ? 'Active' : 'Inactive');
+        });
+        
+        $('#edit-is_active').on('change', function() {
+            $('#edit-active-label').text($(this).is(':checked') ? 'Active' : 'Inactive');
+        });
+
+        // Initialize Select2
+        function initializeSelect2() {
+            $('.select2bs4').select2({
+                theme: 'bootstrap4',
+                dropdownParent: $('.modal:visible'),
+                width: '100%',
+                placeholder: 'Select an option',
+                allowClear: false
+            });
+        }
+        
+        // Initialize on page load
+        initializeSelect2();
+
+        // Reinitialize when modals are shown
+        $('#addRoomModal').on('shown.bs.modal', function() {
+            $('#hostel').select2({
+                theme: 'bootstrap4',
+                dropdownParent: $('#addRoomModal'),
+                width: '100%',
+                placeholder: 'Select Hostel',
+                allowClear: false
+            });
+        });
+
+        $('#bulkAddRoomsModal').on('shown.bs.modal', function() {
+            $('#bulk-hostel').select2({
+                theme: 'bootstrap4',
+                dropdownParent: $('#bulkAddRoomsModal'),
+                width: '100%',
+                placeholder: 'Select Hostel',
+                allowClear: false
+            });
+        });
+
+        $('#editRoomModal').on('shown.bs.modal', function() {
+            $('#edit-hostel').select2({
+                theme: 'bootstrap4',
+                dropdownParent: $('#editRoomModal'),
+                width: '100%',
+                placeholder: 'Select Hostel',
+                allowClear: false
+            });
+        });
+
+        // Destroy Select2 when modals are hidden
+        $('#addRoomModal').on('hidden.bs.modal', function() {
+            $('#hostel').select2('destroy');
+            $('#add-form')[0].reset();
+            $('#active-label').text('Active');
+            $('#hostel-capacity-info').hide();
+        });
+
+        $('#bulkAddRoomsModal').on('hidden.bs.modal', function() {
+            $('#bulk-hostel').select2('destroy');
+            $('#bulk-form')[0].reset();
+            $('#preview-text').text('Select hostel and enter room range to see preview');
+        });
+
+        $('#editRoomModal').on('hidden.bs.modal', function() {
+            $('#edit-hostel').select2('destroy');
+        });
+
+        // Initialize DataTable
+        var table = $('#rooms-table').DataTable({
+            "dom": "<'row'<'col-sm-12 col-md-6'l><'col-sm-12 col-md-6'f>>" +
+                   "<'row'<'col-sm-12'tr>>" +
+                   "<'row'<'col-sm-12 col-md-5'i><'col-sm-12 col-md-7'p>>",
+            "lengthMenu": [[10, 25, 50, -1], [10, 25, 50, "All"]],
+            "pageLength": 10,
+            "responsive": true,
+            "autoWidth": false,
+            "ordering": true,
+            "order": [[0, 'asc'], [1, 'asc']],
+            
+            "destroy": true,
+            "retrieve": true,
+            "deferRender": true,
+            
+            "columnDefs": [
+                { 
+                    "targets": 4, // Actions column
+                    "orderable": false,
+                    "searchable": false
+                }
+            ],
+            
+            "language": {
+                "emptyTable": "<div class='text-center py-4'><i class='fas fa-door-open fa-2x mb-2'></i><br>No rooms found. Click \"Add Room\" to create one.</div>",
+                "search": "_INPUT_",
+                "searchPlaceholder": "Search rooms...",
+                "lengthMenu": "_MENU_ rooms per page",
+                "info": "Showing _START_ to _END_ of _TOTAL_ rooms",
+                "infoEmpty": "Showing 0 to 0 of 0 rooms",
+                "infoFiltered": "(filtered from _MAX_ total rooms)",
+                "paginate": {
+                    "first": "First",
+                    "last": "Last",
+                    "next": "Next",
+                    "previous": "Previous"
+                }
+            },
+            "drawCallback": function(settings) {
+                var api = this.api();
+                var total = api.rows().count();
+                $('#total-count').text(total);
+                $('#total-rooms').text(total);
+                
+                // Count active rooms
+                var activeCount = 0;
+                api.rows().every(function() {
+                    var data = this.data();
+                    var statusText = $(data[3]).text().toLowerCase();
+                    if (statusText.includes('active')) {
+                        activeCount++;
+                    }
+                });
+                $('#active-count').text(activeCount);
+                $('#active-rooms').text(activeCount);
+            }
+        });
+
+        // CSRF token for AJAX requests
+        function getCSRFToken() {
+            return $('input[name="csrfmiddlewaretoken"]').val();
+        }
+
+        // Show toast message
+        function showToast(message, type = 'success') {
+            const toastId = type === 'success' ? '#success-toast' : '#error-toast';
+            const messageId = type === 'success' ? '#success-message' : '#error-message';
+            
+            $(messageId).text(message);
+            $(toastId).addClass('show').fadeIn();
+            
+            setTimeout(function() {
+                $(toastId).fadeOut(function() {
+                    $(this).removeClass('show');
+                });
+            }, type === 'success' ? 3000 : 5000);
+        }
+
+        // Function to reload page after delay
+        function reloadPageAfterDelay(message, type = 'success') {
+            showToast(message, type);
+            var delay = type === 'success' ? 2000 : 3000;
+            setTimeout(function() {
+                location.reload();
+            }, delay);
+        }
+
+        // Function to update UI without reload
+        function updateRoomUI(roomId, data) {
+            // Update status badge
+            const statusBadge = $('#status-badge-' + roomId);
+            const statusBtn = $('.toggle-status-btn[data-id="' + roomId + '"]');
+            
+            if (data.hasOwnProperty('is_active')) {
+                if (data.is_active) {
+                    statusBadge.removeClass('badge-secondary').addClass('badge-success')
+                        .html('<i class="fas fa-check-circle"></i> Active');
+                    statusBtn.removeClass('btn-success').addClass('btn-warning')
+                        .attr('title', 'Deactivate Room')
+                        .html('<i class="fas fa-toggle-off"></i>')
+                        .attr('data-current-status', 'active');
+                } else {
+                    statusBadge.removeClass('badge-success').addClass('badge-secondary')
+                        .html('<i class="fas fa-times-circle"></i> Inactive');
+                    statusBtn.removeClass('btn-warning').addClass('btn-success')
+                        .attr('title', 'Activate Room')
+                        .html('<i class="fas fa-toggle-on"></i>')
+                        .attr('data-current-status', 'inactive');
+                }
+                
+                // Update active count
+                var currentActive = parseInt($('#active-count').text());
+                if (data.is_active) {
+                    $('#active-count').text(currentActive + 1);
+                    $('#active-rooms').text(currentActive + 1);
+                } else {
+                    $('#active-count').text(currentActive - 1);
+                    $('#active-rooms').text(currentActive - 1);
+                }
+            }
+        }
+
+        // Handle modal close/cancel buttons
+        $(document).on('click', '[data-dismiss="modal"]', function(e) {
+            e.preventDefault();
+            $(this).closest('.modal').modal('hide');
+        });
+
+        // Handle cancel buttons
+        $('#cancel-add-btn, #cancel-edit-btn, #cancel-delete-btn').on('click', function(e) {
+            e.preventDefault();
+            $(this).closest('.modal').modal('hide');
+        });
+
+        // Helper function to handle button loading state
+        function setButtonLoading(btn, isLoading) {
+            const spinner = btn.find('.spinner-border');
+            if (isLoading) {
+                btn.data('original-text', btn.html());
+                btn.prop('disabled', true);
+                spinner.show();
+                btn.html('Processing...');
+            } else {
+                btn.prop('disabled', false);
+                spinner.hide();
+                btn.html(btn.data('original-text'));
+            }
+        }
+
+        // Check hostel capacity on hostel selection
+        $('#hostel').on('change', function() {
+            const hostelId = $(this).val();
+            const capacity = $('#capacity').val();
+            
+            if (hostelId && capacity) {
+                $.ajax({
+                    url: '{% url "admin_hostel_rooms_by_hostel" 0 %}'.replace('0', hostelId),
+                    method: 'GET',
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    success: function(data) {
+                        if (data.success) {
+                            // Calculate total capacity
+                            let totalCapacity = 0;
+                            data.rooms.forEach(room => {
+                                totalCapacity += room.capacity;
+                            });
+                            
+                            const remaining = parseInt('{{ hostel.max_students|default:0 }}') - totalCapacity;
+                            $('#capacity-info-text').text(
+                                `This hostel currently has ${data.rooms.length} rooms with total capacity of ${totalCapacity} students. ` +
+                                `Remaining capacity: ${remaining} students.`
+                            );
+                            $('#hostel-capacity-info').show();
+                        }
+                    }
+                });
+            }
+        });
+
+        // Bulk preview
+        function updateBulkPreview() {
+            const hostelId = $('#bulk-hostel').val();
+            const startRoom = $('#start_room').val();
+            const endRoom = $('#end_room').val();
+            const capacity = $('#bulk-capacity').val();
+            
+            if (hostelId && startRoom && endRoom && capacity) {
+                if (startRoom.isDigit && endRoom.isDigit) {
+                    const start = parseInt(startRoom);
+                    const end = parseInt(endRoom);
+                    if (start <= end) {
+                        const count = end - start + 1;
+                        const totalCapacity = count * parseInt(capacity);
+                        $('#preview-text').text(
+                            `Will create ${count} rooms from ${startRoom} to ${endRoom} with total capacity of ${totalCapacity} students.`
+                        );
+                    } else {
+                        $('#preview-text').text('Start room must be less than or equal to end room.');
+                    }
+                } else {
+                    $('#preview-text').text('Will create rooms: ' + startRoom + ' and ' + endRoom);
+                }
+            }
+        }
+
+        $('#bulk-hostel, #start_room, #end_room, #bulk-capacity').on('change keyup', updateBulkPreview);
+        
+        // Add Room
+        $('#add-form').on('submit', function(e) {
+            e.preventDefault();
+            
+            const saveBtn = $('#save-btn');
+            setButtonLoading(saveBtn, true);
+            
+            const formData = new FormData(this);
+            formData.append('action', 'create');
+            
+            $.ajax({
+                url: '{% url "admin_hostel_rooms_crud" %}',
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCSRFToken(),
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function(data) {
+                    if (data.success) {
+                        $('#addRoomModal').modal('hide');
+                        reloadPageAfterDelay(data.message, 'success');
+                    } else {
+                        showToast(data.message, 'danger');
+                        setButtonLoading(saveBtn, false);
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error:', error);
+                    showToast('An error occurred while saving. Please try again.', 'danger');
+                    setButtonLoading(saveBtn, false);
+                }
+            });
+        });
+
+        // Bulk Add Rooms
+        $('#bulk-form').on('submit', function(e) {
+            e.preventDefault();
+            
+            const saveBtn = $('#bulk-save-btn');
+            setButtonLoading(saveBtn, true);
+            
+            const formData = new FormData(this);
+            formData.append('action', 'bulk_create');
+            
+            $.ajax({
+                url: '{% url "admin_hostel_rooms_crud" %}',
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCSRFToken(),
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function(data) {
+                    if (data.success) {
+                        $('#bulkAddRoomsModal').modal('hide');
+                        reloadPageAfterDelay(data.message, 'success');
+                    } else {
+                        showToast(data.message, 'danger');
+                        setButtonLoading(saveBtn, false);
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error:', error);
+                    showToast('An error occurred while creating rooms. Please try again.', 'danger');
+                    setButtonLoading(saveBtn, false);
+                }
+            });
+        });
+
+        // Edit Room - Setup modal
+        $(document).on('click', '.edit-btn', function() {
+            const btn = $(this);
+            
+            $('#edit-id').val(btn.data('id'));
+            
+            // Store values
+            const hostelId = btn.data('hostel-id');
+            const roomNumber = btn.data('room-number');
+            const capacity = btn.data('capacity');
+            const isActive = btn.data('is-active') === 'true';
+            
+            // Show modal first
+            $('#editRoomModal').modal('show');
+            
+            // Set values after modal is shown
+            setTimeout(function() {
+                $('#edit-hostel').val(hostelId).trigger('change');
+                $('#edit-room_number').val(roomNumber);
+                $('#edit-capacity').val(capacity);
+                
+                // Set checkbox states
+                $('#edit-is_active').prop('checked', isActive);
+                
+                // Update labels
+                $('#edit-active-label').text(isActive ? 'Active' : 'Inactive');
+            }, 500);
+        });
+
+        // Edit Room - Submit form
+        $('#edit-form').on('submit', function(e) {
+            e.preventDefault();
+            
+            const updateBtn = $('#update-btn');
+            setButtonLoading(updateBtn, true);
+            
+            const formData = new FormData(this);
+            formData.append('action', 'update');
+            
+            $.ajax({
+                url: '{% url "admin_hostel_rooms_crud" %}',
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCSRFToken(),
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function(data) {
+                    if (data.success) {
+                        $('#editRoomModal').modal('hide');
+                        reloadPageAfterDelay(data.message, 'success');
+                    } else {
+                        showToast(data.message, 'danger');
+                        setButtonLoading(updateBtn, false);
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error:', error);
+                    showToast('An error occurred while updating. Please try again.', 'danger');
+                    setButtonLoading(updateBtn, false);
+                }
+            });
+        });
+
+        // Toggle Room Status (Activate/Deactivate)
+        $(document).on('click', '.toggle-status-btn', function() {
+            const btn = $(this);
+            const roomId = btn.data('id');
+            const roomNumber = btn.data('room');
+            const hostelName = btn.data('hostel');
+            const currentStatus = btn.data('current-status');
+            const actionText = currentStatus === 'active' ? 'deactivate' : 'activate';
+            
+            if (confirm(`Are you sure you want to ${actionText} Room ${roomNumber} in ${hostelName}?`)) {
+                setButtonLoading(btn, true);
+                
+                $.ajax({
+                    url: '{% url "admin_hostel_rooms_crud" %}',
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': getCSRFToken(),
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    data: {
+                        'action': 'toggle_status',
+                        'id': roomId,
+                        'csrfmiddlewaretoken': getCSRFToken()
+                    },
+                    success: function(data) {
+                        if (data.success) {
+                            updateRoomUI(roomId, { is_active: data.is_active });
+                            showToast(data.message, 'success');
+                        } else {
+                            showToast(data.message, 'danger');
+                        }
+                        setButtonLoading(btn, false);
+                    },
+                    error: function(xhr, status, error) {
+                        console.error('Error:', error);
+                        showToast('An error occurred while updating status. Please try again.', 'danger');
+                        setButtonLoading(btn, false);
+                    }
+                });
+            }
+        });
+
+        // Delete Room - Setup modal
+        let roomToDelete = null;
+        
+        $(document).on('click', '.delete-btn', function() {
+            const btn = $(this);
+            
+            roomToDelete = {
+                id: btn.data('id'),
+                room: btn.data('room'),
+                hostel: btn.data('hostel')
+            };
+            
+            $('#delete-room-number').text(btn.data('room'));
+            $('#delete-hostel-name').text(btn.data('hostel'));
+            $('#deleteRoomModal').modal('show');
+        });
+
+        // Delete Room - Confirm
+        $('#confirm-delete-btn').on('click', function() {
+            if (!roomToDelete) return;
+            
+            const deleteBtn = $(this);
+            setButtonLoading(deleteBtn, true);
+            
+            $.ajax({
+                url: '{% url "admin_hostel_rooms_crud" %}',
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCSRFToken(),
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                data: {
+                    'action': 'delete',
+                    'id': roomToDelete.id,
+                    'csrfmiddlewaretoken': getCSRFToken()
+                },
+                success: function(data) {
+                    if (data.success) {
+                        $('#deleteRoomModal').modal('hide');
+                        reloadPageAfterDelay(data.message, 'success');
+                    } else {
+                        showToast(data.message, 'danger');
+                        setButtonLoading(deleteBtn, false);
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error:', error);
+                    showToast('An error occurred while deleting. Please try again.', 'danger');
+                    setButtonLoading(deleteBtn, false);
+                }
+            });
+        });
+
+        // Clear form and reset button state on modal close
+        $('#addRoomModal').on('hidden.bs.modal', function() {
+            $('#add-form')[0].reset();
+            setButtonLoading($('#save-btn'), false);
+            $('#hostel-capacity-info').hide();
+        });
+        
+        $('#bulkAddRoomsModal').on('hidden.bs.modal', function() {
+            $('#bulk-form')[0].reset();
+            setButtonLoading($('#bulk-save-btn'), false);
+            $('#preview-text').text('Select hostel and enter room range to see preview');
+        });
+        
+        $('#editRoomModal').on('hidden.bs.modal', function() {
+            setButtonLoading($('#update-btn'), false);
+        });
+        
+        $('#deleteRoomModal').on('hidden.bs.modal', function() {
+            roomToDelete = null;
+            setButtonLoading($('#confirm-delete-btn'), false);
+        });
+
+        // Form validation
+        $('#add-form, #edit-form').on('submit', function(e) {
+            const isAddForm = $(this).attr('id') === 'add-form';
+            const roomNumberInput = isAddForm ? '#room_number' : '#edit-room_number';
+            
+            const roomNumber = $(roomNumberInput).val().trim();
+            
+            // Validate room number format (alphanumeric)
+            if (!/^[A-Za-z0-9-]+$/.test(roomNumber)) {
+                e.preventDefault();
+                showToast('Room number can only contain letters, numbers, and hyphens.', 'danger');
+                $(roomNumberInput).addClass('is-invalid');
+                return false;
+            }
+            
+            return true;
+        });
+
+        // Remove validation classes on input
+        $('#room_number, #edit-room_number, #capacity, #edit-capacity').on('input', function() {
+            $(this).removeClass('is-invalid');
+        });
+    });
+</script>
+{% endblock extra_js %}

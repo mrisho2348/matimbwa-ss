@@ -1,111 +1,1314 @@
 {% extends 'admin/base.html' %}
 {% load static %}
+{% load custom_filters %}
 
-{% block title %}Student Status{% endblock %}
+{% block title %} Student Status Management {% endblock title %}
+
+{% block breadcrumb %}
+    <button type="button" class="btn btn-info" onclick="location.reload()">
+        <i class="fas fa-sync-alt"></i> Refresh
+    </button>
+{% endblock breadcrumb %}
+
+{% block extra_css %}
+<style>
+    /* Status badges - keep existing styles */
+    .status-badge {
+        padding: 4px 8px;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: 600;
+        display: inline-block;
+    }
+    .status-active {
+        background-color: #d1fae5;
+        color: #065f46;
+        border: 1px solid #a7f3d0;
+    }
+    .status-completed {
+        background-color: #dbeafe;
+        color: #1e40af;
+        border: 1px solid #bfdbfe;
+    }
+    .status-suspended {
+        background-color: #fef3c7;
+        color: #92400e;
+        border: 1px solid #fde68a;
+    }
+    .status-withdrawn {
+        background-color: #fee2e2;
+        color: #991b1b;
+        border: 1px solid #fecaca;
+    }
+    .status-transferred {
+        background-color: #e0e7ff;
+        color: #3730a3;
+        border: 1px solid #c7d2fe;
+    }
+    .status-inactive {
+        background-color: #f3f4f6;
+        color: #374151;
+        border: 1px solid #d1d5db;
+    }
+
+    /* Statistics cards */
+    .stat-card {
+        border-radius: 8px;
+        padding: 16px;
+        margin-bottom: 16px;
+        transition: all 0.3s ease;
+        cursor: pointer;
+    }
+    .stat-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+    .stat-card-primary {
+        background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+        color: white;
+    }
+    .stat-card-success {
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        color: white;
+    }
+    .stat-card-warning {
+        background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+        color: white;
+    }
+    .stat-card-danger {
+        background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+        color: white;
+    }
+    .stat-card-info {
+        background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+        color: white;
+    }
+    .stat-card-secondary {
+        background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%);
+        color: white;
+    }
+
+    /* Bulk actions bar */
+    .bulk-actions-bar {
+        background: white;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        padding: 16px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+        margin-bottom: 20px;
+        display: none;
+    }
+
+    /* DataTable custom styling */
+    .table thead th {
+        background-color: #f8f9fa;
+        border-bottom: 2px solid #dee2e6;
+        color: #495057;
+        font-weight: 600;
+    }
+    
+    .table td {
+        vertical-align: middle;
+    }
+    
+    .student-avatar-sm {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        object-fit: cover;
+    }
+    
+    .student-avatar-initials {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background-color: #3b82f6;
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        font-size: 16px;
+    }
+    
+    .action-dropdown .dropdown-toggle {
+        padding: 4px 8px;
+        font-size: 12px;
+    }
+    
+    .action-dropdown .dropdown-menu {
+        min-width: 180px;
+    }
+    
+    /* Filter section styling */
+    .filter-section {
+        background: white;
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    }
+    
+    /* Select2 customization */
+    .select2-container--bootstrap4 .select2-selection--single {
+        height: calc(2.25rem + 2px) !important;
+    }
+    
+    .select2-container--bootstrap4 .select2-selection--single .select2-selection__rendered {
+        line-height: calc(2.25rem) !important;
+    }
+    
+    /* Loading overlay */
+    .loading-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: rgba(255, 255, 255, 0.9);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+        display: none;
+    }
+    .loading-spinner {
+        width: 50px;
+        height: 50px;
+        border: 5px solid #f3f4f6;
+        border-top: 5px solid #3b82f6;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+    }
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+    
+    /* Age distribution progress bars */
+    .age-progress {
+        height: 8px;
+        border-radius: 4px;
+    }
+    
+    /* Filter badges */
+    .filter-badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 4px 10px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: 500;
+        margin-right: 8px;
+        margin-bottom: 8px;
+        background-color: #e9ecef;
+        color: #495057;
+    }
+    .filter-badge .remove-filter {
+        margin-left: 6px;
+        cursor: pointer;
+        font-size: 14px;
+    }
+    .filter-badge .remove-filter:hover {
+        color: #dc3545;
+    }
+    
+    /* Export buttons */
+    .export-buttons {
+        display: flex;
+        gap: 10px;
+        margin-left: auto;
+    }
+    
+    .btn-export {
+        padding: 8px 16px;
+        border-radius: 6px;
+        font-weight: 500;
+        font-size: 0.9rem;
+        display: inline-flex;
+        align-items: center;
+        transition: all 0.3s ease;
+        border: none;
+        cursor: pointer;
+        color: white;
+    }
+    
+    .btn-export i {
+        margin-right: 8px;
+    }
+    
+    .btn-export-excel {
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    }
+    
+    .btn-export-pdf {
+        background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+    }
+    
+    .btn-export:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+    
+    /* Card header with export buttons */
+    .card-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+
+    /* Allow the dropdown to overflow the table cells and container */
+        .dataTables_wrapper, 
+        .table-responsive {
+            overflow: visible !important;
+        }
+
+        #students-table td {
+            position: relative; /* Ensure dropdown calculates position correctly */
+        }
+
+        /* If you are using a fixed height container, ensure it can show the menu */
+        .card-body {
+            overflow: visible !important;
+        }
+</style>
+{% endblock extra_css %}
 
 {% block content %}
-<div class="container-xxl flex-grow-1 container-p-y">
-    <div class="row">
-        <div class="col-md-12">
-            <div class="card">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5 class="card-title mb-0">Student Status Management</h5>
-                </div>
+<section class="content">
+    <div class="container-fluid">
+        <!-- Loading Overlay -->       
+        <div class="loading-overlay" id="loadingOverlay">
+            <div class="spinner"></div>
+            <p class="text-primary fw-bold mt-3" id="loadingText">Loading data...</p>
+        </div>
 
-                <!-- Status Statistics -->
-                <div class="card-body">
-                    <div class="row mb-4">
-                        {% for stat in status_stats %}
-                        <div class="col-md-3 mb-3">
-                            <div class="card bg-light">
-                                <div class="card-body">
-                                    <h6 class="card-title text-uppercase">{{ stat.status }}</h6>
-                                    <h3 class="card-subtitle">{{ stat.count }}</h3>
-                                </div>
+        <!-- Success/Error Toasts -->
+        <div id="success-toast" class="alert alert-success alert-dismissible fade success-toast" style="display: none; position: fixed; top: 20px; right: 20px; z-index: 9999;" role="alert">
+            <strong><i class="fas fa-check-circle"></i> Success!</strong> 
+            <span id="success-message"></span>
+            <button type="button" class="close" onclick="$('#success-toast').fadeOut()" aria-label="Close">
+                <span aria-hidden="true">&times;</span>
+            </button>
+        </div>
+
+        <div id="error-toast" class="alert alert-danger alert-dismissible fade error-toast" style="display: none; position: fixed; top: 20px; right: 20px; z-index: 9999;" role="alert">
+            <strong><i class="fas fa-exclamation-circle"></i> Error!</strong> 
+            <span id="error-message"></span>
+            <button type="button" class="close" onclick="$('#error-toast').fadeOut()" aria-label="Close">
+                <span aria-hidden="true">&times;</span>
+            </button>
+        </div>
+
+        <!-- Page Header -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card bg-gradient-info">
+                    <div class="card-body py-4">
+                        <div class="row align-items-center">
+                            <div class="col-md-8">
+                                <h2 class="text-white mb-2">
+                                    <i class="fas fa-user-tag"></i> Student Status Management
+                                </h2>
+                                <p class="text-white mb-0">
+                                    Manage student enrollment statuses including active, suspended, withdrawn, completed, and transferred.
+                                </p>
+                            </div>
+                            <div class="col-md-4 text-right">
+                                <span class="badge badge-light badge-pill px-3 py-2">
+                                    <i class="fas fa-users"></i> {{ total_students }} Total Students
+                                </span>
                             </div>
                         </div>
-                        {% endfor %}
-                    </div>
-                </div>
-
-                <hr class="m-0">
-
-                <!-- Filters -->
-                <div class="card-body border-bottom">
-                    <form method="get" class="row g-3">
-                        <div class="col-md-4">
-                            <select name="status" class="form-control" onchange="this.form.submit();">
-                                <option value="">All Statuses</option>
-                                {% for value, label in status_choices %}
-                                <option value="{{ value }}" {% if status_filter == value %}selected{% endif %}>
-                                    {{ label }}
-                                </option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                    </form>
-                </div>
-
-                <!-- Students Table -->
-                <div class="card-body">
-                    <div class="table-responsive">
-                        <table class="table table-hover">
-                            <thead>
-                                <tr>
-                                    <th>#</th>
-                                    <th>Name</th>
-                                    <th>Registration No.</th>
-                                    <th>Class</th>
-                                    <th>Current Status</th>
-                                    <th>Active</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for student in students %}
-                                <tr>
-                                    <td>{{ forloop.counter }}</td>
-                                    <td>{{ student.full_name }}</td>
-                                    <td><span class="badge bg-info">{{ student.registration_number }}</span></td>
-                                    <td>{{ student.class_level.name|default:"N/A" }}</td>
-                                    <td>
-                                        <span class="badge bg-{% if student.status == 'active' %}success{% elif student.status == 'suspended' %}warning{% elif student.status == 'withdrawn' %}danger{% else %}secondary{% endif %}">
-                                            {{ student.get_status_display }}
-                                        </span>
-                                    </td>
-                                    <td>
-                                        <span class="badge bg-{% if student.is_active %}success{% else %}danger{% endif %}">
-                                            {% if student.is_active %}Active{% else %}Inactive{% endif %}
-                                        </span>
-                                    </td>
-                                    <td>
-                                        <form method="post" style="display: inline;">
-                                            {% csrf_token %}
-                                            <input type="hidden" name="student_id" value="{{ student.id }}">
-                                            <select name="status" class="form-select form-select-sm" style="width: auto; display: inline-block;">
-                                                {% for value, label in status_choices %}
-                                                <option value="{{ value }}" {% if student.status == value %}selected{% endif %}>
-                                                    {{ label }}
-                                                </option>
-                                                {% endfor %}
-                                            </select>
-                                            <button type="submit" class="btn btn-sm btn-primary">Update</button>
-                                        </form>
-                                    </td>
-                                </tr>
-                                {% empty %}
-                                <tr>
-                                    <td colspan="7" class="text-center text-muted py-4">
-                                        No students found
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
                     </div>
                 </div>
             </div>
         </div>
+
+        <!-- Statistics Cards Row -->
+        <div class="row mb-4">
+            <div class="col-lg-2 col-md-4 col-6 mb-3">
+                <div class="stat-card stat-card-success" onclick="filterByStatus('active')">
+                    <div class="d-flex align-items-center">
+                        <div>
+                            <h4 class="font-weight-bold mb-0">{{ active_students }}</h4>
+                            <small>Active</small>
+                        </div>
+                        <div class="ml-auto">
+                            <i class="fas fa-user-check fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-2 col-md-4 col-6 mb-3">
+                <div class="stat-card stat-card-primary" onclick="filterByStatus('completed')">
+                    <div class="d-flex align-items-center">
+                        <div>
+                            <h4 class="font-weight-bold mb-0">{{ completed_students }}</h4>
+                            <small>Completed</small>
+                        </div>
+                        <div class="ml-auto">
+                            <i class="fas fa-graduation-cap fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-2 col-md-4 col-6 mb-3">
+                <div class="stat-card stat-card-warning" onclick="filterByStatus('suspended')">
+                    <div class="d-flex align-items-center">
+                        <div>
+                            <h4 class="font-weight-bold mb-0">{{ suspended_students }}</h4>
+                            <small>Suspended</small>
+                        </div>
+                        <div class="ml-auto">
+                            <i class="fas fa-pause-circle fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-2 col-md-4 col-6 mb-3">
+                <div class="stat-card stat-card-danger" onclick="filterByStatus('withdrawn')">
+                    <div class="d-flex align-items-center">
+                        <div>
+                            <h4 class="font-weight-bold mb-0">{{ withdrawn_students }}</h4>
+                            <small>Withdrawn</small>
+                        </div>
+                        <div class="ml-auto">
+                            <i class="fas fa-user-minus fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-2 col-md-4 col-6 mb-3">
+                <div class="stat-card stat-card-info" onclick="filterByStatus('transferred')">
+                    <div class="d-flex align-items-center">
+                        <div>
+                            <h4 class="font-weight-bold mb-0">{{ transferred_students }}</h4>
+                            <small>Transferred</small>
+                        </div>
+                        <div class="ml-auto">
+                            <i class="fas fa-exchange-alt fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-2 col-md-4 col-6 mb-3">
+                <div class="stat-card stat-card-secondary">
+                    <div class="d-flex align-items-center">
+                        <div>
+                            <h4 class="font-weight-bold mb-0">{{ male_students }} | {{ female_students }}</h4>
+                            <small>M / F</small>
+                        </div>
+                        <div class="ml-auto">
+                            <i class="fas fa-venus-mars fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Age Distribution Row -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header bg-light">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-chart-pie"></i> Age Distribution
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-4 mb-2">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <span>Under 10 years</span>
+                                    <span class="badge badge-info">{{ age_stats.under_10 }} students</span>
+                                </div>
+                                <div class="progress age-progress mt-1">
+                                    <div class="progress-bar bg-info" role="progressbar" 
+                                         style="width: {% widthratio age_stats.under_10 total_students 100 %}%"></div>
+                                </div>
+                            </div>
+                            <div class="col-md-4 mb-2">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <span>10 - 15 years</span>
+                                    <span class="badge badge-success">{{ age_stats.10_15 }} students</span>
+                                </div>
+                                <div class="progress age-progress mt-1">
+                                    <div class="progress-bar bg-success" role="progressbar" 
+                                         style="width: {% widthratio age_stats.10_15 total_students 100 %}%"></div>
+                                </div>
+                            </div>
+                            <div class="col-md-4 mb-2">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <span>Over 15 years</span>
+                                    <span class="badge badge-warning">{{ age_stats.over_15 }} students</span>
+                                </div>
+                                <div class="progress age-progress mt-1">
+                                    <div class="progress-bar bg-warning" role="progressbar" 
+                                         style="width: {% widthratio age_stats.over_15 total_students 100 %}%"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Filter Section -->
+        <div class="filter-section">
+            <div class="row">
+                <div class="col-md-3">
+                    <div class="form-group">
+                        <label for="status-filter"><i class="fas fa-tag"></i> Status</label>
+                        <select id="status-filter" class="form-control select2">
+                            <option value="">All Statuses</option>
+                            {% for value, label in status_choices %}
+                            <option value="{{ value }}">{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="form-group">
+                        <label for="gender-filter"><i class="fas fa-venus-mars"></i> Gender</label>
+                        <select id="gender-filter" class="form-control select2">
+                            <option value="">All Genders</option>
+                            {% for value, label in gender_choices %}
+                            <option value="{{ value }}">{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="form-group">
+                        <label for="class-filter"><i class="fas fa-school"></i> Class</label>
+                        <select id="class-filter" class="form-control select2">
+                            <option value="">All Classes</option>
+                            {% for class in class_levels %}
+                            <option value="{{ class.name }}">{{ class.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="form-group">
+                        <label for="active-filter"><i class="fas fa-power-off"></i> Active Status</label>
+                        <select id="active-filter" class="form-control select2">
+                            <option value="">All</option>
+                            <option value="Active">Active Only</option>
+                            <option value="Inactive">Inactive Only</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="row mt-3">
+                <div class="col-12">
+                    <div class="d-flex align-items-center">
+                        <button class="btn btn-primary mr-2" onclick="applyDataTableFilters()">
+                            <i class="fas fa-filter"></i> Apply Filters
+                        </button>
+                        <button class="btn btn-secondary mr-2" onclick="clearDataTableFilters()">
+                            <i class="fas fa-times"></i> Clear Filters
+                        </button>
+                        <div class="ml-3" id="active-filters"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bulk Actions Bar -->
+        <div class="bulk-actions-bar" id="bulk-actions-bar">
+            <div class="row align-items-center">
+                <div class="col-md-6">
+                    <span class="font-weight-bold" id="selected-count">0</span> student(s) selected
+                </div>
+                <div class="col-md-6 text-right">
+                    <div class="btn-group">
+                        <button class="btn btn-sm btn-success" onclick="bulkUpdateStatus('active')">
+                            <i class="fas fa-check-circle"></i> Active
+                        </button>
+                        <button class="btn btn-sm btn-primary" onclick="bulkUpdateStatus('completed')">
+                            <i class="fas fa-graduation-cap"></i> Complete
+                        </button>
+                        <button class="btn btn-sm btn-warning" onclick="bulkUpdateStatus('suspended')">
+                            <i class="fas fa-pause-circle"></i> Suspend
+                        </button>
+                        <button class="btn btn-sm btn-danger" onclick="bulkUpdateStatus('withdrawn')">
+                            <i class="fas fa-user-minus"></i> Withdraw
+                        </button>
+                        <button class="btn btn-sm btn-info" onclick="bulkUpdateStatus('transferred')">
+                            <i class="fas fa-exchange-alt"></i> Transfer
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Students Table -->
+        <div class="card">
+            <div class="card-header bg-light">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-user-graduate"></i> Students List
+                </h5>
+                <div class="export-buttons">
+                    <button class="btn-export btn-export-excel" onclick="exportToExcel()">
+                        <i class="fas fa-file-excel"></i> Export to Excel
+                    </button>
+                    <button class="btn-export btn-export-pdf" onclick="exportToPDF()">
+                        <i class="fas fa-file-pdf"></i> Export to PDF
+                    </button>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover table-striped" id="students-table" style="width:100%">
+                        <thead>
+                            <tr>
+                                <th width="30">
+                                    <input type="checkbox" id="select-all">
+                                </th>
+                                <th>#</th>
+                                <th>Student</th>
+                                <th>Registration No.</th>
+                                <th>Class/Stream</th>
+                                <th>Gender</th>
+                                <th>Age</th>
+                                <th>Status</th>
+                                <th>Active</th>
+                                <th>Parents</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- DataTable will populate this via JSON -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Status Change Modal -->
+<div class="modal fade" id="statusChangeModal" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title">
+                    <i class="fas fa-exchange-alt"></i> Change Student Status
+                </h5>
+                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to change the status of <strong id="status-student-name"></strong> to <strong id="new-status-display"></strong>?</p>
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle"></i> This action will update the student's enrollment status.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="confirm-status-change-btn">
+                    <i class="fas fa-check"></i> Yes, Change Status
+                </button>
+            </div>
+        </div>
     </div>
 </div>
-{% endblock %}
+
+<!-- Bulk Action Modal -->
+<div class="modal fade" id="bulkActionModal" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-warning text-white">
+                <h5 class="modal-title">
+                    <i class="fas fa-tasks"></i> Bulk Status Update
+                </h5>
+                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to change the status of <strong id="bulk-count"></strong> selected student(s) to <strong id="bulk-status-display"></strong>?</p>
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-triangle"></i> This action cannot be undone.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-warning" id="confirm-bulk-action-btn">
+                    <i class="fas fa-check"></i> Yes, Update
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Hidden inputs -->
+<input type="hidden" id="csrf-token" value="{{ csrf_token }}">
+<input type="hidden" id="students-data" value='{{ students_json|safe }}'>
+{% endblock content %}
+
+{% block extra_js %}
+<script>
+    $(document).ready(function() {
+        // Global variables
+        let selectedStudentId = null;
+        let selectedNewStatus = null;
+        let selectedStudentName = null;
+        let isUpdating = false;
+        let bulkSelectedIds = [];
+        let dataTable;
+
+        // Parse students data from hidden input
+        let studentsData = [];
+        try {
+            const studentsDataStr = document.getElementById('students-data').value;
+            if (studentsDataStr) {
+                studentsData = JSON.parse(studentsDataStr);
+                console.log('Loaded', studentsData.length, 'students');
+            }
+        } catch (e) {
+            console.error('Error parsing students data:', e);
+        }
+
+        // Initialize Select2
+        $('.select2').select2({
+            theme: 'bootstrap4',
+            width: '100%'
+        });
+
+        // Initialize DataTable
+        dataTable = $('#students-table').DataTable({
+            data: studentsData,
+            columns: [
+                {
+                    data: null,
+                    render: function(data, type, row) {
+                        return '<input type="checkbox" class="student-checkbox" value="' + row.id + '">';
+                    },
+                    orderable: false,
+                    searchable: false
+                },
+                {
+                    data: null,
+                    render: function(data, type, row, meta) {
+                        return meta.row + 1;
+                    },
+                    orderable: false,
+                    searchable: false
+                },
+                {
+                    data: null,
+                    render: function(data, type, row) {
+                        let profileHtml = '';
+                        if (row.profile_pic) {
+                            profileHtml = `<img src="${row.profile_pic}" class="student-avatar-sm mr-2" alt="Profile">`;
+                        } else {
+                            profileHtml = `<div class="student-avatar-initials mr-2">${row.first_name.charAt(0)}${row.last_name.charAt(0)}</div>`;
+                        }
+                        
+                        let dobHtml = '';
+                        if (row.date_of_birth_display) {
+                            dobHtml = `<br><small class="text-muted">DOB: ${row.date_of_birth_display}</small>`;
+                        }
+                        
+                        return `<div class="d-flex align-items-center">
+                            ${profileHtml}
+                            <div>
+                                <strong>${row.full_name}</strong>
+                                ${dobHtml}
+                            </div>
+                        </div>`;
+                    }
+                },
+                {
+                    data: 'registration_number',
+                    render: function(data) {
+                        return `<span class="badge badge-info">${data || 'N/A'}</span>`;
+                    }
+                },
+                {
+                    data: null,
+                    render: function(data, type, row) {
+                        let streamHtml = '';
+                        if (row.stream) {
+                            streamHtml = `<br><small class="text-muted">Stream ${row.stream}</small>`;
+                        }
+                        return `${row.class_level}${streamHtml}`;
+                    }
+                },
+                {
+                    data: 'gender_display'
+                },
+                {
+                    data: 'age',
+                    render: function(data) {
+                        return data || 'N/A';
+                    }
+                },
+                {
+                    data: null,
+                    render: function(data, type, row) {
+                        let icon = '';
+                        switch(row.status) {
+                            case 'active': icon = 'check-circle'; break;
+                            case 'completed': icon = 'graduation-cap'; break;
+                            case 'suspended': icon = 'pause-circle'; break;
+                            case 'withdrawn': icon = 'minus-circle'; break;
+                            case 'transferred': icon = 'exchange-alt'; break;
+                            default: icon = 'circle';
+                        }
+                        return `<span class="status-badge status-${row.status}">
+                            <i class="fas fa-${icon}"></i> ${row.status_display}
+                        </span>`;
+                    }
+                },
+                {
+                    data: null,
+                    render: function(data, type, row) {
+                        const badgeClass = row.is_active ? 'success' : 'secondary';
+                        const icon = row.is_active ? 'toggle-on' : 'toggle-off';
+                        const text = row.is_active ? 'Active' : 'Inactive';
+                        return `<span class="badge badge-${badgeClass}">
+                            <i class="fas fa-${icon}"></i> ${text}
+                        </span>`;
+                    }
+                },
+                {
+                    data: 'parents_count',
+                    render: function(data, type, row) {
+                        if (data > 0) {
+                            return `<span class="badge badge-info" title="${row.primary_parent ? row.primary_parent.name : ''}">
+                                <i class="fas fa-user-friends"></i> ${data}
+                            </span>`;
+                        } else {
+                            return `<span class="badge badge-secondary">None</span>`;
+                        }
+                    }
+                },
+                {
+                    data: null,
+                    render: function(data, type, row) {
+                    let dropClass = (studentsData.length < 3) ? 'btn-group dropup' : 'btn-group';
+                        return `<div class="${dropClass} action-dropdown">
+                            <button type="button" class="btn btn-sm btn-primary dropdown-toggle" data-toggle="dropdown" data-boundary="window">
+                                <i class="fas fa-cog"></i>
+                            </button>
+                            <div class="dropdown-menu dropdown-menu-right">
+                                <h6 class="dropdown-header">Quick Actions</h6>
+                                <a class="dropdown-item" href="#" onclick="window.viewStudent(${row.id})">
+                                    <i class="fas fa-eye text-info"></i> View Details
+                                </a>
+                                <a class="dropdown-item" href="#" onclick="window.editStudent(${row.id})">
+                                    <i class="fas fa-edit text-primary"></i> Edit Student
+                                </a>
+                                <div class="dropdown-divider"></div>
+                                <h6 class="dropdown-header">Change Status</h6>
+                                <a class="dropdown-item" href="#" onclick="window.changeStatus(${row.id}, 'active')">
+                                    <i class="fas fa-check-circle text-success"></i> Active
+                                </a>
+                                <a class="dropdown-item" href="#" onclick="window.changeStatus(${row.id}, 'completed')">
+                                    <i class="fas fa-graduation-cap text-primary"></i> Completed
+                                </a>
+                                <a class="dropdown-item" href="#" onclick="window.changeStatus(${row.id}, 'suspended')">
+                                    <i class="fas fa-pause-circle text-warning"></i> Suspended
+                                </a>
+                                <a class="dropdown-item" href="#" onclick="window.changeStatus(${row.id}, 'withdrawn')">
+                                    <i class="fas fa-user-minus text-danger"></i> Withdrawn
+                                </a>
+                                <a class="dropdown-item" href="#" onclick="window.changeStatus(${row.id}, 'transferred')">
+                                    <i class="fas fa-exchange-alt text-info"></i> Transferred
+                                </a>
+                                <div class="dropdown-divider"></div>
+                                <a class="dropdown-item" href="#" onclick="window.toggleActive(${row.id})">
+                                    <i class="fas fa-power-off"></i>
+                                    ${row.is_active ? 'Deactivate' : 'Activate'}
+                                </a>
+                            </div>
+                        </div>`;
+                    },
+                    orderable: false,
+                    searchable: false
+                }
+            ],
+            pageLength: 25,
+            lengthMenu: [[10, 25, 50, -1], [10, 25, 50, "All"]],
+            ordering: true,
+            info: true,
+            searching: true,
+            language: {
+                emptyTable: "No students found",
+                info: "Showing _START_ to _END_ of _TOTAL_ students",
+                infoEmpty: "Showing 0 to 0 of 0 students",
+                infoFiltered: "(filtered from _MAX_ total students)",
+                lengthMenu: "Show _MENU_ students",
+                search: "Search:",
+                paginate: {
+                    first: "First",
+                    last: "Last",
+                    next: "Next",
+                    previous: "Previous"
+                }
+            },
+            drawCallback: function() {
+                // Re-attach checkbox event handlers after draw
+                updateBulkActions();
+                updateActiveFiltersDisplay();
+            }
+        });
+
+        // Initialize page
+        initializePage();
+
+        // Initialize functions
+        function initializePage() {
+            setupEventListeners();
+            updateBulkActions();
+        }
+
+        // Setup event listeners
+        function setupEventListeners() {
+            // Select all checkbox
+            $('#select-all').on('change', function() {
+                $('.student-checkbox').prop('checked', $(this).is(':checked'));
+                updateBulkActions();
+            });
+
+            // Individual checkboxes - Use event delegation
+            $(document).on('change', '.student-checkbox', function() {
+                updateBulkActions();
+                
+                // Update select-all checkbox
+                const totalCheckboxes = $('.student-checkbox').length;
+                const checkedCheckboxes = $('.student-checkbox:checked').length;
+                
+                $('#select-all').prop('checked', totalCheckboxes > 0 && totalCheckboxes === checkedCheckboxes);
+            });
+
+            // Confirm status change
+            $('#confirm-status-change-btn').on('click', function() {
+                changeStudentStatus();
+            });
+
+            // Confirm bulk action
+            $('#confirm-bulk-action-btn').on('click', function() {
+                executeBulkUpdate();
+            });
+
+            // Filter change events
+            $('#status-filter, #gender-filter, #class-filter, #active-filter').on('change', function() {
+                applyDataTableFilters();
+            });
+        }
+
+        // Apply DataTable filters
+        window.applyDataTableFilters = function() {
+            const statusFilter = $('#status-filter').val();
+            const genderFilter = $('#gender-filter').val();
+            const classFilter = $('#class-filter').val();
+            const activeFilter = $('#active-filter').val();
+            
+            // Apply filters using DataTable's search API
+            dataTable.draw();
+            
+            // Update active filters display
+            updateActiveFiltersDisplay();
+        };
+
+        // Custom filtering function for DataTable
+        $.fn.dataTable.ext.search.push(
+            function(settings, data, dataIndex) {
+                const rowData = dataTable.row(dataIndex).data();
+                if (!rowData) return true;
+                
+                const statusFilter = $('#status-filter').val();
+                const genderFilter = $('#gender-filter').val();
+                const classFilter = $('#class-filter').val();
+                const activeFilter = $('#active-filter').val();
+                
+                // Status filter
+                if (statusFilter && rowData.status !== statusFilter) {
+                    return false;
+                }
+                
+                // Gender filter
+                if (genderFilter && rowData.gender !== genderFilter) {
+                    return false;
+                }
+                
+                // Class filter
+                if (classFilter && rowData.class_level !== classFilter) {
+                    return false;
+                }
+                
+                // Active status filter
+                if (activeFilter) {
+                    const isActive = rowData.is_active ? 'Active' : 'Inactive';
+                    if (isActive !== activeFilter) {
+                        return false;
+                    }
+                }
+                
+                return true;
+            }
+        );
+
+        // Filter by status (from statistics cards)
+        window.filterByStatus = function(status) {
+            $('#status-filter').val(status).trigger('change.select2');
+            applyDataTableFilters();
+        };
+
+        // Clear all filters
+        window.clearDataTableFilters = function() {
+            $('#status-filter').val('').trigger('change.select2');
+            $('#gender-filter').val('').trigger('change.select2');
+            $('#class-filter').val('').trigger('change.select2');
+            $('#active-filter').val('').trigger('change.select2');
+            applyDataTableFilters();
+        };
+
+        // Update active filters display
+        function updateActiveFiltersDisplay() {
+            const statusFilter = $('#status-filter').val();
+            const genderFilter = $('#gender-filter').val();
+            const classFilter = $('#class-filter').val();
+            const activeFilter = $('#active-filter').val();
+            
+            let html = '';
+            
+            if (statusFilter) {
+                const statusLabel = $('#status-filter option:selected').text();
+                html += `<span class="filter-badge">
+                    Status: ${statusLabel}
+                    <span class="remove-filter" onclick="$('#status-filter').val('').trigger('change.select2'); applyDataTableFilters();">&times;</span>
+                </span>`;
+            }
+            
+            if (genderFilter) {
+                const genderLabel = $('#gender-filter option:selected').text();
+                html += `<span class="filter-badge">
+                    Gender: ${genderLabel}
+                    <span class="remove-filter" onclick="$('#gender-filter').val('').trigger('change.select2'); applyDataTableFilters();">&times;</span>
+                </span>`;
+            }
+            
+            if (classFilter) {
+                const classLabel = $('#class-filter option:selected').text();
+                html += `<span class="filter-badge">
+                    Class: ${classLabel}
+                    <span class="remove-filter" onclick="$('#class-filter').val('').trigger('change.select2'); applyDataTableFilters();">&times;</span>
+                </span>`;
+            }
+            
+            if (activeFilter) {
+                html += `<span class="filter-badge">
+                    Active: ${activeFilter}
+                    <span class="remove-filter" onclick="$('#active-filter').val('').trigger('change.select2'); applyDataTableFilters();">&times;</span>
+                </span>`;
+            }
+            
+            $('#active-filters').html(html);
+        }
+
+        // Update bulk actions bar
+        function updateBulkActions() {
+            bulkSelectedIds = [];
+            $('.student-checkbox:checked').each(function() {
+                bulkSelectedIds.push($(this).val());
+            });
+
+            const selectedCount = bulkSelectedIds.length;
+
+            if (selectedCount > 0) {
+                $('#selected-count').text(selectedCount);
+                $('#bulk-actions-bar').slideDown();
+            } else {
+                $('#bulk-actions-bar').slideUp();
+            }
+        }
+
+        // Change individual student status
+        window.changeStatus = function(studentId, newStatus) {
+            selectedStudentId = studentId;
+            selectedNewStatus = newStatus;
+
+            // Find student in data
+            const student = studentsData.find(s => s.id == studentId);
+            if (student) {
+                selectedStudentName = student.full_name;
+                $('#status-student-name').text(student.full_name);
+            }
+
+            let statusDisplay = {
+                'active': 'Active',
+                'completed': 'Completed',
+                'suspended': 'Suspended',
+                'withdrawn': 'Withdrawn',
+                'transferred': 'Transferred'
+            }[newStatus] || newStatus;
+            
+            $('#new-status-display').text(statusDisplay);
+
+            // Show modal
+            $('#statusChangeModal').modal('show');
+        };
+
+        // Execute individual status change
+        function changeStudentStatus() {
+            if (!selectedStudentId || !selectedNewStatus || isUpdating) return;
+
+            isUpdating = true;
+            $('#loading-overlay').show();
+
+            $.ajax({
+                url: '{% url "admin_student_status_change" %}',
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCSRFToken(),
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                data: {
+                    'student_id': selectedStudentId,
+                    'status': selectedNewStatus
+                },
+                success: function(data) {
+                    if (data.success) {
+                        $('#statusChangeModal').modal('hide');
+                        showToast(data.message, 'success');
+                        
+                        // Reload page to show updated data
+                        setTimeout(function() {
+                            location.reload();
+                        }, 1500);
+                    } else {
+                        showToast(data.message, 'danger');
+                        $('#statusChangeModal').modal('hide');
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error:', error);
+                    showToast('An error occurred while changing status. Please try again.', 'danger');
+                    $('#statusChangeModal').modal('hide');
+                },
+                complete: function() {
+                    isUpdating = false;
+                    $('#loading-overlay').hide();
+                }
+            });
+        }
+
+        // Toggle active status
+        window.toggleActive = function(studentId) {
+            if (isUpdating) return;
+
+            isUpdating = true;
+            $('#loading-overlay').show();
+
+            $.ajax({
+                url: '{% url "admin_student_toggle_active" %}',
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCSRFToken(),
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                data: {
+                    'student_id': studentId
+                },
+                success: function(data) {
+                    if (data.success) {
+                        showToast(data.message, 'success');
+                        
+                        // Reload after delay
+                        setTimeout(function() {
+                            location.reload();
+                        }, 1500);
+                    } else {
+                        showToast(data.message, 'danger');
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error:', error);
+                    showToast('An error occurred. Please try again.', 'danger');
+                },
+                complete: function() {
+                    isUpdating = false;
+                    $('#loading-overlay').hide();
+                }
+            });
+        };
+
+        // Bulk update status
+        window.bulkUpdateStatus = function(newStatus) {
+            if (bulkSelectedIds.length === 0) return;
+
+            selectedNewStatus = newStatus;
+
+            let statusDisplay = {
+                'active': 'Active',
+                'completed': 'Completed',
+                'suspended': 'Suspended',
+                'withdrawn': 'Withdrawn',
+                'transferred': 'Transferred'
+            }[newStatus] || newStatus;
+
+            $('#bulk-count').text(bulkSelectedIds.length);
+            $('#bulk-status-display').text(statusDisplay);
+
+            $('#bulkActionModal').modal('show');
+        };
+
+        // Execute bulk update
+        function executeBulkUpdate() {
+            if (bulkSelectedIds.length === 0 || !selectedNewStatus || isUpdating) return;
+
+            isUpdating = true;
+            $('#loading-overlay').show();
+
+            $.ajax({
+                url: '{% url "admin_student_bulk_status_update" %}',
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCSRFToken(),
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                data: {
+                    'student_ids': JSON.stringify(bulkSelectedIds),
+                    'status': selectedNewStatus
+                },
+                success: function(data) {
+                    if (data.success) {
+                        $('#bulkActionModal').modal('hide');
+                        showToast(data.message, 'success');
+                        
+                        // Reload after delay
+                        setTimeout(function() {
+                            location.reload();
+                        }, 1500);
+                    } else {
+                        showToast(data.message, 'danger');
+                        $('#bulkActionModal').modal('hide');
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error:', error);
+                    showToast('An error occurred during bulk update. Please try again.', 'danger');
+                    $('#bulkActionModal').modal('hide');
+                },
+                complete: function() {
+                    isUpdating = false;
+                    $('#loading-overlay').hide();
+                }
+            });
+        }
+
+        // View student details
+        window.viewStudent = function(studentId) {
+            window.location.href = `/admin/students/${studentId}/detail/`;
+        };
+
+        // Edit student
+        window.editStudent = function(studentId) {
+            window.location.href = `/admin/students/${studentId}/edit/`;
+        };
+
+        // Get CSRF token
+        function getCSRFToken() {
+            return document.getElementById('csrf-token').value;
+        }
+
+        // Show toast message
+        function showToast(message, type = 'success') {
+            const toastId = type === 'success' ? '#success-toast' : '#error-toast';
+            const messageId = type === 'success' ? '#success-message' : '#error-message';
+            
+            $(messageId).text(message);
+            $(toastId).addClass('show').fadeIn();
+            
+            setTimeout(function() {
+                $(toastId).fadeOut();
+            }, type === 'success' ? 3000 : 5000);
+        }
+
+        // Update DataTable when window is resized
+        $(window).on('resize', function() {
+            if (dataTable) {
+                dataTable.columns.adjust().draw();
+            }
+        });
+
+        // ============================================
+        // EXPORT FUNCTIONALITY (Added without modifying existing logic)
+        // ============================================
+        // Show loading overlay
+            function showLoading(message = 'Loading...') {
+                $('#loadingText').text(message);
+                $('#loadingOverlay').fadeIn(300);
+            }
+        // Export to Excel
+        window.exportToExcel = function() {
+            showLoading('Generating Excel file...');
+            
+            // Get current filter values
+            const statusFilter = $('#status-filter').val() || '';
+            const genderFilter = $('#gender-filter').val() || '';
+            const classFilter = $('#class-filter').val() || '';
+            const activeFilter = $('#active-filter').val() || '';
+            const search = $('div.dataTables_filter input').val() || '';
+            
+            // Build URL with filter parameters
+            let url = '{% url "admin_export_students_status_excel" %}?';
+            const params = new URLSearchParams({
+                status: statusFilter,
+                gender: genderFilter,
+                class: classFilter,
+                active: activeFilter,
+                search: search
+            });
+            
+            // Redirect to export URL
+            window.location.href = url + params.toString();
+            
+            // Hide loading after a short delay
+            setTimeout(() => {
+                hideLoading();
+            }, 2000);
+        };
+            // Hide loading overlay
+            function hideLoading() {
+                $('#loadingOverlay').fadeOut(300);
+            }
+        // Export to PDF
+        window.exportToPDF = function() {
+            showLoading('Generating PDF file...');
+            
+            // Get current filter values
+            const statusFilter = $('#status-filter').val() || '';
+            const genderFilter = $('#gender-filter').val() || '';
+            const classFilter = $('#class-filter').val() || '';
+            const activeFilter = $('#active-filter').val() || '';
+            const search = $('div.dataTables_filter input').val() || '';
+            
+            // Build URL with filter parameters
+            let url = '{% url "admin_export_students_status_pdf" %}?';
+            const params = new URLSearchParams({
+                status: statusFilter,
+                gender: genderFilter,
+                class: classFilter,
+                active: activeFilter,
+                search: search
+            });
+            
+            // Redirect to export URL
+            window.location.href = url + params.toString();
+            
+            // Hide loading after a short delay
+            setTimeout(() => {
+                hideLoading();
+            }, 2000);
+        };
+    });
+</script>
+{% endblock extra_js %}

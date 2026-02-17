@@ -138,4 +138,22 @@ urlpatterns = [
 
      path('combination/<int:combination_id>/students/', combination_students, name='admin_combination_students'),
      path('combinations/<int:combination_id>/pdf-report/', combination_pdf_report, name='admin_combination_pdf_report'),
+
+        # Student Status Management
+    path('students/status/', student_status, name='admin_student_status'),
+    path('students/status/change/', student_status_change, name='admin_student_status_change'),
+    path('students/status/toggle/', student_toggle_active, name='admin_student_toggle_active'),
+    path('students/status/bulk-update/', student_bulk_status_update, name='admin_student_bulk_status_update'),
+
+    path('students/status/export/excel/', export_students_status_excel, name='admin_export_students_status_excel'),
+    path('students/status/export/pdf/', export_students_status_pdf, name='admin_export_students_status_pdf'),
+
+      # Student Promotion Management
+    path('students/promotion/', student_promotion, name='admin_student_promotion'),
+    path('students/promotion/get-students/', get_students_for_promotion, name='get_students_for_promotion'),
+    path('students/promotion/execute/', execute_promotion, name='admin_execute_promotion'),
+    path('students/promotion/remove-from-class/', remove_from_class, name='admin_remove_from_class'),
+
+    
+
 ]

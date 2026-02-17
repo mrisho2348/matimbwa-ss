@@ -6,192 +6,456 @@
 
 {% block breadcrumb %}
 <nav aria-label="breadcrumb">
-    <ol class="breadcrumb">
-        <li class="breadcrumb-item"><a href="{% url 'admin_students_list' %}">Students</a></li>
-        <li class="breadcrumb-item"><a href="{% url 'admin_exam_sessions_list' %}">Exam Sessions</a></li>
+    <ol class="breadcrumb bg-transparent mb-0">
+        <li class="breadcrumb-item"><a href="{% url 'admin_students_list' %}"><i class="fas fa-users mr-1"></i>Students</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'admin_exam_sessions_list' %}"><i class="fas fa-calendar-alt mr-1"></i>Exam Sessions</a></li>
         <li class="breadcrumb-item active" aria-current="page">{{ breadcrumb_title }}</li>
     </ol>
 </nav>
 {% endblock breadcrumb %}
 
 {% block extra_css %}
+
 <style>
+    /* Student Header Styles */
     .student-header {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         color: white;
-        border-radius: 10px;
-        padding: 20px;
-        margin-bottom: 20px;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        border-radius: 15px;
+        padding: 25px;
+        margin-bottom: 25px;
+        box-shadow: 0 10px 30px rgba(102, 126, 234, 0.3);
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .student-header::before {
+        content: '';
+        position: absolute;
+        top: -50%;
+        right: -50%;
+        width: 200%;
+        height: 200%;
+        background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+        transform: rotate(30deg);
     }
     
     .student-avatar {
-        width: 80px;
-        height: 80px;
+        width: 100px;
+        height: 100px;
         border-radius: 50%;
-        border: 4px solid white;
+        border: 4px solid rgba(255,255,255,0.3);
         object-fit: cover;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        transition: transform 0.3s ease;
     }
     
-    .info-card {
-        background: white;
-        border-radius: 8px;
-        padding: 15px;
-        margin-bottom: 15px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-        border-left: 4px solid #4CAF50;
+    .student-avatar:hover {
+        transform: scale(1.05);
     }
     
-    .info-card h6 {
-        color: #6c757d;
-        font-size: 0.85rem;
-        margin-bottom: 5px;
-    }
-    
-    .info-card p {
-        font-size: 1.1rem;
-        font-weight: 600;
-        margin-bottom: 0;
-        color: #343a40;
-    }
-    
-    .session-card {
-        transition: transform 0.2s, box-shadow 0.2s;
-        border: none;
-        border-radius: 10px;
-        overflow: hidden;
-        margin-bottom: 15px;
-    }
-    
-    .session-card:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 8px 20px rgba(0,0,0,0.15);
-    }
-    
-    .session-header {
-        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-        color: white;
-        padding: 15px;
+    .student-avatar-placeholder {
+        width: 100px;
+        height: 100px;
+        border-radius: 50%;
+        background: rgba(255,255,255,0.2);
+        border: 4px solid rgba(255,255,255,0.3);
         display: flex;
-        justify-content: space-between;
         align-items: center;
+        justify-content: center;
+        margin: 0 auto;
     }
     
-    .session-header h5 {
-        margin: 0;
-        font-size: 1.1rem;
+    .student-stat-card {
+        background: rgba(255,255,255,0.15);
+        border-radius: 10px;
+        padding: 12px;
+        backdrop-filter: blur(5px);
+        transition: transform 0.3s ease;
     }
     
-    .session-body {
-        padding: 15px;
+    .student-stat-card:hover {
+        transform: translateY(-3px);
+        background: rgba(255,255,255,0.2);
     }
     
-    .session-stat {
-        display: flex;
-        justify-content: space-between;
-        margin-bottom: 8px;
-        padding-bottom: 8px;
-        border-bottom: 1px solid #f0f0f0;
-    }
-    
-    .session-stat:last-child {
-        border-bottom: none;
-        margin-bottom: 0;
-        padding-bottom: 0;
-    }
-    
-    .stat-label {
-        color: #6c757d;
-        font-size: 0.9rem;
-    }
-    
-    .stat-value {
-        font-weight: 600;
-        color: #343a40;
-    }
-    
-    .status-badge {
-        padding: 4px 12px;
-        border-radius: 20px;
+    .student-stat-card small {
+        color: rgba(255,255,255,0.8);
         font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    .student-stat-card p {
+        font-size: 1.2rem;
+        font-weight: 700;
+        margin-bottom: 0;
+        color: white;
+        text-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+    
+    /* Status Badge Styles */
+    .status-badge {
+        padding: 6px 12px;
+        border-radius: 30px;
+        font-size: 0.7rem;
         font-weight: 600;
         text-transform: uppercase;
+        letter-spacing: 0.5px;
+        white-space: nowrap;
+        display: inline-block;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
     
-    .status-draft { background-color: #6c757d; color: white; }
-    .status-submitted { background-color: #ffc107; color: #212529; }
-    .status-verified { background-color: #17a2b8; color: white; }
-    .status-published { background-color: #28a745; color: white; }
-    
-    .no-sessions {
-        text-align: center;
-        padding: 50px 20px;
-        color: #6c757d;
+    .status-draft { 
+        background: linear-gradient(135deg, #6c757d 0%, #5a6268 100%);
+        color: white; 
+    }
+    .status-submitted { 
+        background: linear-gradient(135deg, #ffc107 0%, #e0a800 100%);
+        color: #212529; 
+    }
+    .status-verified { 
+        background: linear-gradient(135deg, #17a2b8 0%, #138496 100%);
+        color: white; 
+    }
+    .status-published { 
+        background: linear-gradient(135deg, #28a745 0%, #218838 100%);
+        color: white; 
     }
     
-    .no-sessions i {
-        font-size: 4rem;
-        margin-bottom: 20px;
-        color: #dee2e6;
+    /* Division Badge Styles */
+    .division-badge {
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        display: inline-block;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
     
-    .action-btn {
-        padding: 8px 16px;
-        font-size: 0.875rem;
-        border-radius: 6px;
-        text-decoration: none;
-        display: inline-flex;
-        align-items: center;
-        gap: 5px;
-        transition: all 0.2s;
+    .division-I { 
+        background: linear-gradient(135deg, #28a745 0%, #218838 100%);
+        color: white; 
+    }
+    .division-II { 
+        background: linear-gradient(135deg, #17a2b8 0%, #138496 100%);
+        color: white; 
+    }
+    .division-III { 
+        background: linear-gradient(135deg, #ffc107 0%, #e0a800 100%);
+        color: #212529; 
+    }
+    .division-IV { 
+        background: linear-gradient(135deg, #fd7e14 0%, #dc6b12 100%);
+        color: white; 
+    }
+    .division-0 { 
+        background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+        color: white; 
     }
     
-    .action-btn:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    /* Grade Badge Styles */
+    .grade-badge {
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        background: linear-gradient(135deg, #6f42c1 0%, #5e34b0 100%);
+        color: white;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
     
+    /* Action Button Styles */
     .btn-view {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         color: white;
         border: none;
+        padding: 6px 12px;
+        border-radius: 6px;
+        font-size: 0.8rem;
+        transition: all 0.3s ease;
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        text-decoration: none;
+        box-shadow: 0 4px 6px rgba(102, 126, 234, 0.2);
     }
     
     .btn-view:hover {
         background: linear-gradient(135deg, #5a67d8 0%, #6b46c1 100%);
         color: white;
+        transform: translateY(-2px);
+        box-shadow: 0 6px 12px rgba(102, 126, 234, 0.3);
+        text-decoration: none;
     }
     
-    .back-btn {
-        background: #6c757d;
+    .btn-download {
+        background: linear-gradient(135deg, #28a745 0%, #218838 100%);
+        box-shadow: 0 4px 6px rgba(40, 167, 69, 0.2);
+    }
+    
+    .btn-download:hover {
+        background: linear-gradient(135deg, #218838 0%, #1e7e34 100%);
+    }
+    
+    /* Table Styles */
+    .table thead th {
+        background: linear-gradient(135deg, #f8f9fc 0%, #e9ecef 100%);
+        color: #4e73df;
+        font-weight: 700;
+        font-size: 0.8rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        border-bottom: 2px solid #4e73df;
+        padding: 15px 10px;
+    }
+    
+    .table tbody tr {
+        transition: all 0.3s ease;
+    }
+    
+    .table tbody tr:hover {
+        background: linear-gradient(135deg, #f8f9fc 0%, #e9ecef 100%);
+        transform: scale(1.01);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.05);
+    }
+    
+    .session-info {
+        display: flex;
+        flex-direction: column;
+    }
+    
+    .session-name {
+        font-weight: 700;
+        color: #2c3e50;
+        margin-bottom: 4px;
+        font-size: 0.95rem;
+    }
+    
+    .session-meta {
+        font-size: 0.75rem;
+        color: #6c757d;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+    }
+    
+    .session-meta i {
+        width: 14px;
+        color: #4e73df;
+    }
+    
+    /* Academic Info Styles */
+    .academic-year {
+        background: linear-gradient(135deg, #e8f4fd 0%, #d1e7ff 100%);
+        padding: 4px 10px;
+        border-radius: 20px;
+        color: #0369a1;
+        font-weight: 600;
+        font-size: 0.75rem;
+        display: inline-block;
+    }
+    
+    .term-badge {
+        background: linear-gradient(135deg, #f3e8ff 0%, #e5d5ff 100%);
+        padding: 4px 10px;
+        border-radius: 20px;
+        color: #6b21a8;
+        font-weight: 600;
+        font-size: 0.75rem;
+        display: inline-block;
+    }
+    
+    /* Position Styles */
+    .position-cell {
+        font-weight: 700;
+        color: #b45309;
+        font-size: 0.95rem;
+    }
+    
+    /* Marks and Percentage Styles */
+    .marks-cell {
+        font-weight: 600;
+        color: #2c3e50;
+    }
+    
+    .percentage-high { color: #28a745; font-weight: 700; }
+    .percentage-medium { color: #17a2b8; font-weight: 700; }
+    .percentage-low { color: #ffc107; font-weight: 700; }
+    .percentage-fail { color: #dc3545; font-weight: 700; }
+    
+    /* No Sessions Styles */
+    .no-sessions {
+        text-align: center;
+        padding: 60px 20px;
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        border-radius: 15px;
+        margin: 20px 0;
+    }
+    
+    .no-sessions i {
+        font-size: 5rem;
+        margin-bottom: 20px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        opacity: 0.5;
+    }
+    
+    /* Export Modal Styles */
+    .modal-content {
+        border: none;
+        border-radius: 15px;
+        overflow: hidden;
+    }
+    
+    .modal-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         color: white;
         border: none;
+        padding: 20px 25px;
     }
     
-    .back-btn:hover {
-        background: #5a6268;
+    .modal-header .close {
         color: white;
+        opacity: 0.8;
+        text-shadow: none;
     }
     
+    .modal-header .close:hover {
+        opacity: 1;
+    }
+    
+    .modal-body {
+        padding: 25px;
+    }
+    
+    .modal-footer {
+        border-top: 1px solid #e9ecef;
+        padding: 15px 25px;
+    }
+    
+    .filter-section {
+        background: #f8f9fa;
+        border-radius: 10px;
+        padding: 20px;
+        margin-bottom: 20px;
+        border-left: 4px solid #4e73df;
+    }
+    
+    .session-checkbox-container {
+        max-height: 250px;
+        overflow-y: auto;
+        border: 1px solid #e9ecef;
+        border-radius: 10px;
+        padding: 15px;
+        background: #f8f9fa;
+    }
+    
+    .session-checkbox-container::-webkit-scrollbar {
+        width: 8px;
+    }
+    
+    .session-checkbox-container::-webkit-scrollbar-track {
+        background: #f1f1f1;
+        border-radius: 10px;
+    }
+    
+    .session-checkbox-container::-webkit-scrollbar-thumb {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 10px;
+    }
+    
+    .custom-checkbox {
+        margin-bottom: 10px;
+        padding: 8px;
+        border-radius: 6px;
+        transition: background 0.3s ease;
+    }
+    
+    .custom-checkbox:hover {
+        background: white;
+    }
+    
+    .custom-control-label {
+        font-size: 0.9rem;
+        cursor: pointer;
+    }
+    
+    .custom-control-input:checked ~ .custom-control-label::before {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-color: #667eea;
+    }
+    
+    /* Select2 Custom Styles */
+    .select2-container--bootstrap4 .select2-selection {
+        border-radius: 8px;
+        border-color: #ced4da;
+        min-height: 38px;
+    }
+    
+    .select2-container--bootstrap4 .select2-selection--single .select2-selection__rendered {
+        line-height: 36px;
+        padding-left: 15px;
+    }
+    
+    /* Card Header Styles */
+    .card-header {
+        background: white;
+        border-bottom: 2px solid #f0f0f0;
+        padding: 20px 25px;
+    }
+    
+    .header-title {
+        color: #4e73df;
+        font-size: 1.1rem;
+        letter-spacing: 1px;
+        position: relative;
+        padding-left: 15px;
+    }
+    
+    .header-title::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 5px;
+        height: 20px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 3px;
+    }
+    
+    /* Responsive Styles */
     @media (max-width: 768px) {
         .student-header {
             text-align: center;
-            padding: 15px;
+            padding: 20px;
         }
         
-        .student-avatar {
-            width: 60px;
-            height: 60px;
+        .student-avatar, .student-avatar-placeholder {
+            width: 80px;
+            height: 80px;
+            margin-bottom: 15px;
+        }
+        
+        .student-stat-card {
             margin-bottom: 10px;
         }
         
-        .session-stat {
+        .table-actions {
             flex-direction: column;
             gap: 5px;
         }
         
-        .stat-value {
-            text-align: right;
+        .btn-view {
+            width: 100%;
+            justify-content: center;
+        }
+        
+        .btn-group {
+            margin-bottom: 10px;
         }
     }
 </style>
@@ -203,160 +467,407 @@
         <!-- Student Information Header -->
         <div class="student-header">
             <div class="row align-items-center">
-                <div class="col-md-2 text-center">
+                <div class="col-lg-2 col-md-3 text-center">
                     {% if student.profile_pic %}
                         <img src="{{ student.profile_pic.url }}" alt="{{ student.full_name }}" class="student-avatar">
                     {% else %}
-                        <div class="student-avatar bg-white d-flex align-items-center justify-content-center">
-                            <i class="fas fa-user-graduate fa-2x text-primary"></i>
+                        <div class="student-avatar-placeholder">
+                            <i class="fas fa-user-graduate fa-3x text-white"></i>
                         </div>
                     {% endif %}
                 </div>
-                <div class="col-md-10">
-                    <h3 class="mb-1">{{ student.full_name }}</h3>
-                    <p class="mb-2">{{ student.registration_number }}</p>
-                    <div class="row mt-3">
-                        <div class="col-md-3">
-                            <small><i class="fas fa-venus-mars"></i> Gender</small>
-                            <p class="mb-0">{{ student.get_gender_display }}</p>
+                <div class="col-lg-10 col-md-9">
+                    <div class="row">
+                        <div class="col-12 mb-3">
+                            <h2 class="mb-1 font-weight-bold">{{ student.full_name }}</h2>
+                            <p class="mb-0 opacity-75">
+                                <i class="fas fa-id-card mr-2"></i>{{ student.registration_number }}
+                            </p>
                         </div>
-                        <div class="col-md-3">
-                            <small><i class="fas fa-graduation-cap"></i> Current Class</small>
-                            <p class="mb-0">{{ current_class_info.class_level }} {{ current_class_info.stream }}</p>
+                    </div>
+                    <div class="row">
+                        <div class="col-lg-3 col-md-6 col-6 mb-3">
+                            <div class="student-stat-card">
+                                <small><i class="fas fa-venus-mars mr-1"></i> Gender</small>
+                                <p>{{ student.get_gender_display }}</p>
+                            </div>
                         </div>
-                        <div class="col-md-3">
-                            <small><i class="fas fa-calendar"></i> Academic Year</small>
-                            <p class="mb-0">{{ current_class_info.academic_year }}</p>
+                        <div class="col-lg-3 col-md-6 col-6 mb-3">
+                            <div class="student-stat-card">
+                                <small><i class="fas fa-graduation-cap mr-1"></i> Current Class</small>
+                                <p>{{ current_class_info.class_level }} {{ current_class_info.stream }}</p>
+                            </div>
                         </div>
-                        <div class="col-md-3">
-                            <small><i class="fas fa-history"></i> Exam Sessions</small>
-                            <p class="mb-0">{{ total_sessions }} completed</p>
+                        <div class="col-lg-3 col-md-6 col-6 mb-3">
+                            <div class="student-stat-card">
+                                <small><i class="fas fa-calendar mr-1"></i> Academic Year</small>
+                                <p>{{ current_class_info.academic_year }}</p>
+                            </div>
+                        </div>
+                        <div class="col-lg-3 col-md-6 col-6 mb-3">
+                            <div class="student-stat-card">
+                                <small><i class="fas fa-history mr-1"></i> Exam Sessions</small>
+                                <p>{{ total_sessions }}</p>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Exam Sessions -->
+        <!-- Export Filter Modal -->
+        <div class="modal fade" id="exportFilterModal" tabindex="-1" role="dialog" aria-labelledby="exportFilterModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-lg" role="document">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="exportFilterModalLabel">
+                            <i class="fas fa-filter mr-2"></i>Export Exam Results
+                        </h5>
+                        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                    <form id="exportForm" method="GET" action="{% url 'student_sessions_export_excel' student.id %}">
+                        <div class="modal-body">
+                            <div class="filter-section">
+                                <h6 class="mb-3"><i class="fas fa-sliders-h mr-2"></i>Filter Options</h6>
+                                <div class="row">
+                                    <div class="col-md-4">
+                                        <div class="form-group">
+                                            <label for="class_level" class="font-weight-bold">
+                                                <i class="fas fa-layer-group mr-1"></i>Class Level:
+                                            </label>
+                                            <select name="class_level" id="class_level" class="form-control select2">
+                                                <option value="">All Classes</option>
+                                                {% for class_id, class_name in filter_options.class_levels %}
+                                                    <option value="{{ class_id }}">{{ class_name }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="form-group">
+                                            <label for="academic_year" class="font-weight-bold">
+                                                <i class="fas fa-calendar-alt mr-1"></i>Academic Year:
+                                            </label>
+                                            <select name="academic_year" id="academic_year" class="form-control select2">
+                                                <option value="">All Years</option>
+                                                {% for year_id, year_name in filter_options.academic_years %}
+                                                    <option value="{{ year_id }}">{{ year_name }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="form-group">
+                                            <label for="term" class="font-weight-bold">
+                                                <i class="fas fa-chart-pie mr-1"></i>Term:
+                                            </label>
+                                            <select name="term" id="term" class="form-control select2">
+                                                <option value="">All Terms</option>
+                                                {% for term_id, term_num in filter_options.terms %}
+                                                    <option value="{{ term_id }}">Term {{ term_num }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="filter-section">
+                                <h6 class="mb-3"><i class="fas fa-check-square mr-2"></i>Select Specific Sessions</h6>
+                                <div class="session-checkbox-container">
+                                    {% for session in exam_sessions %}
+                                        <div class="custom-control custom-checkbox">
+                                            <input type="checkbox" 
+                                                   class="custom-control-input session-checkbox" 
+                                                   name="sessions" 
+                                                   value="{{ session.id }}" 
+                                                   id="session_{{ session.id }}">
+                                            <label class="custom-control-label" for="session_{{ session.id }}">
+                                                <strong>{{ session.name }}</strong> - 
+                                                {{ session.exam_date|date:"M d, Y" }}
+                                                <br>
+                                                <small class="text-muted">
+                                                    {{ session.class_level.name }} | 
+                                                    Term {{ session.term.term_number }} {{ session.academic_year.name }}
+                                                </small>
+                                            </label>
+                                        </div>
+                                    {% endfor %}
+                                </div>
+                                <div class="mt-3 text-right">
+                                    <button type="button" class="btn btn-sm btn-info" id="selectAllSessions">
+                                        <i class="fas fa-check-double mr-1"></i>Select All
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-secondary" id="deselectAllSessions">
+                                        <i class="fas fa-times mr-1"></i>Deselect All
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="alert alert-info">
+                                <i class="fas fa-info-circle mr-2"></i>
+                                <strong>Export Information:</strong>
+                                <ul class="mb-0 mt-2">
+                                    <li>Leave filters empty to export all {{ total_sessions }} sessions</li>
+                                    <li>Selected sessions override filter options</li>
+                                    <li>Filter by Class Level, Academic Year, or Term</li>
+                                    <li>Excel file includes student info and summary statistics</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-outline-secondary" data-dismiss="modal">
+                                <i class="fas fa-times mr-1"></i>Cancel
+                            </button>
+                            <button type="submit" class="btn btn-success">
+                                <i class="fas fa-file-excel mr-1"></i>Export to Excel
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Exam Sessions Table Card -->
         <div class="row">
             <div class="col-lg-12">
-                <div class="card shadow-sm">
-                    <div class="card-header bg-white d-flex justify-content-between align-items-center">
-                        <h6 class="header-title mb-0 text-uppercase">
-                            <i class="fas fa-clipboard-list"></i> Exam Sessions History
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-white d-flex flex-wrap justify-content-between align-items-center">
+                        <h6 class="header-title mb-0">
+                            <i class="fas fa-clipboard-list text-primary mr-2"></i>
+                            Exam Sessions History
                         </h6>
-                        <div class="d-flex align-items-center">
-                            <span class="badge badge-info mr-2">
-                                {{ total_sessions }} session{{ total_sessions|pluralize }}
-                            </span>
-                            <a href="{% url 'admin_exam_sessions_list' %}" class="btn btn-sm btn-secondary">
-                                <i class="fas fa-arrow-left"></i> Back to All Sessions
+                        <div class="d-flex align-items-center flex-wrap">
+                            <div class="btn-group mr-2 mb-2 mb-sm-0">
+                                <button type="button" class="btn btn-success btn-sm" data-toggle="modal" data-target="#exportFilterModal">
+                                    <i class="fas fa-file-excel mr-1"></i>Export Results
+                                </button>
+                                <button type="button" class="btn btn-success btn-sm dropdown-toggle dropdown-toggle-split" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                                    <span class="sr-only">Toggle Dropdown</span>
+                                </button>
+                                <div class="dropdown-menu dropdown-menu-right">
+                                    <h6 class="dropdown-header">Quick Export</h6>
+                                    <a class="dropdown-item" href="{% url 'student_sessions_export_excel' student.id %}?export=all">
+                                        <i class="fas fa-file-excel mr-2 text-success"></i>All Sessions
+                                    </a>
+                                    {% if student.class_level %}
+                                    <a class="dropdown-item" href="{% url 'student_sessions_export_excel' student.id %}?class_level={{ student.class_level.id }}">
+                                        <i class="fas fa-layer-group mr-2 text-info"></i>Current Class Only
+                                    </a>
+                                    {% endif %}
+                                    {% if student.academic_year %}
+                                    <a class="dropdown-item" href="{% url 'student_sessions_export_excel' student.id %}?academic_year={{ student.academic_year.id }}">
+                                        <i class="fas fa-calendar-alt mr-2 text-primary"></i>Current Year Only
+                                    </a>
+                                    {% endif %}
+                                    <a class="dropdown-item" href="{% url 'student_sessions_export_excel' student.id %}?limit=10">
+                                        <i class="fas fa-clock mr-2 text-warning"></i>Latest 10 Sessions
+                                    </a>
+                                    <div class="dropdown-divider"></div>
+                                    <a class="dropdown-item" href="#" data-toggle="modal" data-target="#exportFilterModal">
+                                        <i class="fas fa-filter mr-2 text-primary"></i>Custom Filter...
+                                    </a>
+                                </div>
+                            </div>
+                            <a href="{% url 'admin_exam_sessions_list' %}" class="btn btn-sm btn-outline-secondary">
+                                <i class="fas fa-arrow-left mr-1"></i>Back
                             </a>
                         </div>
                     </div>
-                    <div class="card-body">
+                    <div class="card-body p-3">
                         {% if exam_sessions %}
-                            <div class="row">
-                                {% for session in exam_sessions %}
-                                    {% with metrics=session_metrics|get_item:session.id|get_item:"metrics" positions=session_metrics|get_item:session.id|get_item:"positions" %}
-                                    <div class="col-lg-6 col-xl-4">
-                                        <div class="card session-card">
-                                            <div class="session-header">
-                                                <h5 title="{{ session.name }}">{{ session.name|truncatechars:40 }}</h5>
-                                                <span class="status-badge status-{{ session.status }}">
-                                                    {{ session.get_status_display }}
-                                                </span>
-                                            </div>
-                                            <div class="session-body">
-                                                <div class="session-stat">
-                                                    <span class="stat-label">
-                                                        <i class="fas fa-calendar-alt"></i> Exam Date
-                                                    </span>
-                                                    <span class="stat-value">
-                                                        {{ session.exam_date|date:"M d, Y" }}
-                                                    </span>
-                                                </div>
-                                                
-                                                <div class="session-stat">
-                                                    <span class="stat-label">
-                                                        <i class="fas fa-book"></i> Subjects Taken
-                                                    </span>
-                                                    <span class="stat-value">
-                                                        {{ session.total_subjects }}
-                                                    </span>
-                                                </div>
-                                                
-                                                <div class="session-stat">
-                                                    <span class="stat-label">
-                                                        <i class="fas fa-chart-line"></i> Total Marks
-                                                    </span>
-                                                    <span class="stat-value">
-                                                        {{ session.total_marks|default:"-"|floatformat:1 }}
-                                                    </span>
-                                                </div>
-                                                
-                                                <div class="session-stat">
-                                                    <span class="stat-label">
-                                                        <i class="fas fa-percentage"></i> Average %
-                                                    </span>
-                                                    <span class="stat-value">
-                                                        {{ session.average_percentage|default:"-"|floatformat:1 }}%
-                                                    </span>
-                                                </div>
-                                                
-                                                {% if metrics %}
-                                                <div class="session-stat">
-                                                    <span class="stat-label">
-                                                        <i class="fas fa-award"></i> Division
-                                                    </span>
-                                                    <span class="stat-value">
-                                                        {{ metrics.division.division|default:"-" }}
-                                                    </span>
-                                                </div>
-                                                {% endif %}
-                                                
-                                                {% if positions and positions.class_position %}
-                                                <div class="session-stat">
-                                                    <span class="stat-label">
-                                                        <i class="fas fa-trophy"></i> Class Position
-                                                    </span>
-                                                    <span class="stat-value">
-                                                        {{ positions.class_position|ordinal }}
-                                                    </span>
-                                                </div>
-                                                {% endif %}
-                                                
-                                                <hr>
-                                                
-                                                <div class="d-flex justify-content-between">
-                                                    <div>
-                                                        <small class="text-muted">
-                                                            <i class="fas fa-graduation-cap"></i> 
+                            <div class="table-responsive">
+                                <table id="examSessionsTable" class="table table-hover table-bordered w-100">
+                                    <thead>
+                                        <tr>
+                                            <th>Session Details</th>
+                                            <th>Academic Period</th>
+                                            <th class="text-center">Subjects</th>
+                                            <th class="text-right">Total Marks</th>
+                                            <th class="text-right">Average %</th>
+                                            <th class="text-center">
+                                                {% with first_session=exam_sessions|first %}
+                                                    {% if first_session.class_level.educational_level.level_type|lower in 'primary,nursery,pre-primary,kindergarten' %}
+                                                        Average Grade
+                                                    {% else %}
+                                                        Division
+                                                    {% endif %}
+                                                {% endwith %}
+                                            </th>
+                                            <th class="text-center">Class Position</th>
+                                            <th class="text-center">Status</th>
+                                            <th class="text-center">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for session in exam_sessions %}
+                                            {% with metrics=session_metrics|get_item:session.id|get_item:"metrics" positions=session_metrics|get_item:session.id|get_item:"positions" %}
+                                            <tr>
+                                                <td>
+                                                    <div class="session-info">
+                                                        <span class="session-name" title="{{ session.name }}">
+                                                            {{ session.name|truncatechars:40 }}
+                                                        </span>
+                                                        <span class="session-meta">
+                                                            <i class="fas fa-calendar-alt"></i>
+                                                            {{ session.exam_date|date:"M d, Y" }}
+                                                        </span>
+                                                        <span class="session-meta">
+                                                            <i class="fas fa-clock"></i>
+                                                            {{ session.exam_type.name|default:"Standard Exam" }}
+                                                        </span>
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    <div class="academic-info">
+                                                        <span class="academic-year mb-1 d-inline-block">
+                                                            <i class="fas fa-calendar"></i>
+                                                            {{ session.academic_year.name }}
+                                                        </span>
+                                                        <span class="term-badge ml-1 d-inline-block">
+                                                            <i class="fas fa-chart-pie"></i>
+                                                            Term {{ session.term.term_number }}
+                                                        </span>
+                                                        {% if session.class_level %}
+                                                        <div class="mt-2 small text-muted">
+                                                            <i class="fas fa-users"></i>
                                                             {{ session.class_level.name }}
                                                             {% if session.stream_class %}
                                                                 - {{ session.stream_class.stream_letter }}
                                                             {% endif %}
-                                                        </small>
+                                                        </div>
+                                                        {% endif %}
                                                     </div>
-                                                    <div>
-                                                        <small class="text-muted">
-                                                            {{ session.academic_year.name }} - Term {{ session.term.term_number }}
-                                                        </small>
+                                                </td>
+                                                <td class="text-center align-middle">
+                                                    <span class="badge badge-pill badge-info px-3 py-2">
+                                                        {{ session.total_subjects|default:"0" }}
+                                                    </span>
+                                                </td>
+                                                <td class="text-right align-middle font-weight-bold">
+                                                    {{ session.total_marks|default:"-"|floatformat:1 }}
+                                                </td>
+                                                <td class="text-right align-middle">
+                                                    {% if session.average_percentage %}
+                                                        <span class="{% if session.average_percentage >= 75 %}percentage-high
+                                                                   {% elif session.average_percentage >= 50 %}percentage-medium
+                                                                   {% elif session.average_percentage >= 35 %}percentage-low
+                                                                   {% else %}percentage-fail{% endif %}">
+                                                            {{ session.average_percentage|floatformat:1 }}%
+                                                        </span>
+                                                    {% else %}
+                                                        -
+                                                    {% endif %}
+                                                </td>
+                                                <td class="text-center align-middle">
+                                                    {% if session.class_level.educational_level.level_type|lower in 'primary,nursery,pre-primary,kindergarten' %}
+                                                        {% if metrics and metrics.average_grade %}
+                                                            <span class="grade-badge">
+                                                                {{ metrics.average_grade }}
+                                                            </span>
+                                                        {% else %}
+                                                            <span class="text-muted">-</span>
+                                                        {% endif %}
+                                                    {% else %}
+                                                        {% if metrics and metrics.division %}
+                                                            <span class="division-badge division-{{ metrics.division.division }}">
+                                                                {{ metrics.division.division }}
+                                                            </span>
+                                                        {% else %}
+                                                            <span class="text-muted">-</span>
+                                                        {% endif %}
+                                                    {% endif %}
+                                                </td>
+                                                <td class="text-center align-middle position-cell">
+                                                    {% if positions and positions.class_position %}
+                                                        {{ positions.class_position|ordinal }}
+                                                        {% if session.total_students_in_session %}
+                                                            <small class="text-muted d-block">
+                                                                of {{ session.total_students_in_session }}
+                                                            </small>
+                                                        {% endif %}
+                                                    {% else %}
+                                                        <span class="text-muted">-</span>
+                                                    {% endif %}
+                                                </td>
+                                                <td class="text-center align-middle">
+                                                    <span class="status-badge status-{{ session.status }}">
+                                                        {{ session.get_status_display }}
+                                                    </span>
+                                                </td>
+                                                <td class="text-center align-middle">
+                                                    <div class="table-actions">
+                                                        <a href="{% url 'student_session_results' student.id session.id %}" 
+                                                           class="btn-view" title="View Detailed Results">
+                                                            <i class="fas fa-eye"></i>
+                                                        </a>
+                                                        {% if session.status == 'published' %}
+                                                        <a href="{% url 'generate_student_report_card' student.id session.id %}" 
+                                                           class="btn-view btn-download" title="Download Report Card">
+                                                            <i class="fas fa-download"></i>
+                                                        </a>
+                                                        {% endif %}
                                                     </div>
-                                                </div>
-                                                
-                                                <div class="mt-3 text-center">
-                                                    <a href="{% url 'student_session_results' student.id session.id %}" 
-                                                       class="btn btn-sm btn-view action-btn w-100">
-                                                        <i class="fas fa-eye"></i> View Full Results
-                                                    </a>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    {% endwith %}
-                                {% endfor %}
+                                                </td>
+                                            </tr>
+                                            {% endwith %}
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
                             </div>
+
+                            <!-- Session Statistics Summary -->
+                            <div class="row mt-4">
+                                <div class="col-md-3">
+                                    <div class="info-card">
+                                        <h6><i class="fas fa-chart-line mr-2"></i>Average Performance</h6>
+                                        {% with avg=exam_sessions|dictsortreversed:"average_percentage"|first %}
+                                            {% if avg.average_percentage %}
+                                                <p class="h4">{{ avg.average_percentage|floatformat:1 }}%</p>
+                                                <small class="text-muted">Best score across sessions</small>
+                                            {% else %}
+                                                <p class="h4">-</p>
+                                            {% endif %}
+                                        {% endwith %}
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="info-card" style="border-left-color: #17a2b8;">
+                                        <h6><i class="fas fa-trophy mr-2"></i>Best Position</h6>
+                                        {% with best_pos=session_metrics.values|dictsort:"positions.class_position"|first %}
+                                            {% if best_pos.positions and best_pos.positions.class_position %}
+                                                <p class="h4">{{ best_pos.positions.class_position|ordinal }}</p>
+                                                <small class="text-muted">Highest class rank achieved</small>
+                                            {% else %}
+                                                <p class="h4">-</p>
+                                            {% endif %}
+                                        {% endwith %}
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="info-card" style="border-left-color: #ffc107;">
+                                        <h6><i class="fas fa-calendar-check mr-2"></i>Total Sessions</h6>
+                                        <p class="h4">{{ total_sessions }}</p>
+                                        <small class="text-muted">Exam sessions attended</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="info-card" style="border-left-color: #dc3545;">
+                                        <h6><i class="fas fa-book-open mr-2"></i>Subjects Coverage</h6>
+                                        {% with max_subj=exam_sessions|dictsortreversed:"total_subjects"|first %}
+                                            {% if max_subj.total_subjects %}
+                                                <p class="h4">{{ max_subj.total_subjects }}</p>
+                                                <small class="text-muted">Most subjects in one session</small>
+                                            {% else %}
+                                                <p class="h4">-</p>
+                                            {% endif %}
+                                        {% endwith %}
+                                    </div>
+                                </div>
+                            </div>
+
                         {% else %}
                             <div class="no-sessions">
                                 <i class="fas fa-inbox"></i>
@@ -365,7 +876,7 @@
                                     This student has not participated in any exam sessions yet.
                                 </p>
                                 <a href="{% url 'admin_exam_sessions_list' %}" class="btn btn-primary mt-3">
-                                    <i class="fas fa-clipboard-list"></i> Browse All Sessions
+                                    <i class="fas fa-clipboard-list mr-2"></i> Browse All Sessions
                                 </a>
                             </div>
                         {% endif %}
@@ -380,8 +891,119 @@
 {% block extra_js %}
 <script>
 $(document).ready(function() {
-    // Add any JavaScript functionality if needed
-    console.log('Student sessions page loaded');
+    // Initialize DataTable
+    if ($('#examSessionsTable').length) {
+        try {
+            var table = $('#examSessionsTable').DataTable({
+                "responsive": true,
+                "autoWidth": false,
+                "order": [[0, 'desc']],
+                "pageLength": 25,
+                "lengthMenu": [[10, 25, 50, 100, -1], [10, 25, 50, 100, "All"]],
+                "columnDefs": [
+                    { "orderable": false, "targets": [8] },
+                    { "className": "text-center", "targets": [2, 5, 6, 7, 8] },
+                    { "className": "text-right", "targets": [3, 4] }
+                ],
+                "language": {
+                    "search": "<i class='fas fa-search mr-2'></i>Search:",
+                    "lengthMenu": "Show _MENU_ entries",
+                    "info": "Showing _START_ to _END_ of _TOTAL_ sessions",
+                    "infoEmpty": "Showing 0 to 0 of 0 sessions",
+                    "infoFiltered": "(filtered from _MAX_ total)",
+                    "zeroRecords": "No matching sessions found",
+                    "paginate": {
+                        "first": '<i class="fas fa-angle-double-left"></i>',
+                        "last": '<i class="fas fa-angle-double-right"></i>',
+                        "next": '<i class="fas fa-angle-right"></i>',
+                        "previous": '<i class="fas fa-angle-left"></i>'
+                    }
+                },
+                "initComplete": function() {
+                    $('.dataTables_filter input').addClass('form-control-sm');
+                }
+            });
+
+            // Add custom status filter
+            var statusFilter = $(
+                '<select class="form-control form-control-sm ml-2" style="width: auto; min-width: 120px;">' +
+                '<option value="">All Statuses</option>' +
+                '<option value="draft">Draft</option>' +
+                '<option value="submitted">Submitted</option>' +
+                '<option value="verified">Verified</option>' +
+                '<option value="published">Published</option>' +
+                '</select>'
+            );
+            
+            statusFilter.appendTo($('.dataTables_filter')).on('change', function() {
+                table.column(7).search(this.value).draw();
+            });
+
+            // Style filter container
+            $('.dataTables_filter').css({
+                'display': 'flex',
+                'justify-content': 'flex-end',
+                'align-items': 'center',
+                'flex-wrap': 'wrap',
+                'gap': '10px'
+            });
+
+        } catch (error) {
+            console.error("DataTable initialization error:", error);
+        }
+    }
+
+    // Initialize Select2
+    if ($.fn.select2) {
+        $('.select2').select2({
+            theme: 'bootstrap4',
+            width: '100%',
+            dropdownParent: $('#exportFilterModal')
+        });
+    }
+
+    // Export modal functionality
+    $('#selectAllSessions').click(function() {
+        $('.session-checkbox').prop('checked', true);
+    });
+    
+    $('#deselectAllSessions').click(function() {
+        $('.session-checkbox').prop('checked', false);
+    });
+    
+    $('#exportForm').submit(function(e) {
+        var selected = $('.session-checkbox:checked').length;
+        var total = $('.session-checkbox').length;
+        
+        if (selected > 0) {
+            if (!confirm(`Export ${selected} selected session${selected > 1 ? 's' : ''}?`)) {
+                e.preventDefault();
+            }
+        } else if (total > 0) {
+            var filtersActive = $('#class_level').val() || $('#academic_year').val() || $('#term').val();
+            
+            if (filtersActive) {
+                if (!confirm('Export sessions matching current filters?')) {
+                    e.preventDefault();
+                }
+            } else {
+                if (!confirm(`Export ALL ${total} sessions? This may take a moment.`)) {
+                    e.preventDefault();
+                }
+            }
+        }
+    });
+    
+    $('#exportFilterModal').on('hidden.bs.modal', function() {
+        $('#exportForm')[0].reset();
+        $('.session-checkbox').prop('checked', false);
+        if ($.fn.select2) {
+            $('.select2').val('').trigger('change');
+        }
+    });
+
+    // Initialize tooltips
+    $('[title]').tooltip({ container: 'body' });
 });
 </script>
 {% endblock extra_js %}

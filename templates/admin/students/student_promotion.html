@@ -1,0 +1,1303 @@
+{% extends 'admin/base.html' %}
+{% load static %}
+{% load custom_filters %}
+
+{% block title %} Student Class Promotion {% endblock title %}
+
+{% block breadcrumb %}
+    <button type="button" class="btn btn-info" onclick="location.reload()">
+        <i class="fas fa-sync-alt"></i> Refresh
+    </button>
+{% endblock breadcrumb %}
+
+{% block extra_css %}
+<style>
+    /* Promotion cards */
+    .promotion-card {
+        border: 2px solid #e5e7eb;
+        border-radius: 12px;
+        transition: all 0.3s ease;
+        background: white;
+        position: relative;
+        overflow: hidden;
+        margin-bottom: 20px;
+        height: 100%;
+    }
+    .promotion-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+        border-color: #3b82f6;
+    }
+    .promotion-card.selected {
+        border-color: #10b981;
+        background-color: #f0fdf4;
+    }
+    .promotion-card-header {
+        padding: 15px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 10px 10px 0 0;
+    }
+    .promotion-card-body {
+        padding: 20px;
+    }
+    
+    /* Statistics cards */
+    .stat-card {
+        border-radius: 8px;
+        padding: 16px;
+        margin-bottom: 16px;
+        transition: all 0.3s ease;
+        cursor: pointer;
+    }
+    .stat-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+    .stat-card-primary {
+        background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+        color: white;
+    }
+    .stat-card-success {
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        color: white;
+    }
+    .stat-card-warning {
+        background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+        color: white;
+    }
+    .stat-card-info {
+        background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+        color: white;
+    }
+    
+    /* Student cards for promotion */
+    .student-promo-card {
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        padding: 12px;
+        margin-bottom: 10px;
+        transition: all 0.2s ease;
+        background: white;
+        display: flex;
+        align-items: center;
+        cursor: pointer;
+    }
+    .student-promo-card:hover {
+        background: #f9fafb;
+        border-color: #3b82f6;
+    }
+    .student-promo-card.selected {
+        background: #eff6ff;
+        border-color: #3b82f6;
+        border-width: 2px;
+    }
+    .student-avatar-sm {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        object-fit: cover;
+        margin-right: 12px;
+    }
+    .student-avatar-initials {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background-color: #3b82f6;
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        font-size: 16px;
+        margin-right: 12px;
+    }
+    
+    /* Selection summary */
+    .selection-summary {
+        background: #f8fafc;
+        border-radius: 8px;
+        padding: 15px;
+        margin-top: 15px;
+        border: 1px solid #e2e8f0;
+    }
+    .selected-student-item {
+        display: inline-flex;
+        align-items: center;
+        background: white;
+        border-radius: 20px;
+        padding: 4px 12px;
+        margin: 0 5px 5px 0;
+        border: 1px solid #e2e8f0;
+        font-size: 12px;
+    }
+    .selected-student-item .remove-student {
+        margin-left: 6px;
+        cursor: pointer;
+        color: #ef4444;
+    }
+    .selected-student-item .remove-student:hover {
+        color: #dc2626;
+    }
+    
+    /* Action buttons */
+    .action-btn {
+        padding: 10px 20px;
+        border-radius: 8px;
+        font-weight: 600;
+        transition: all 0.2s ease;
+        border: none;
+        cursor: pointer;
+    }
+    .action-btn-primary {
+        background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+        color: white;
+    }
+    .action-btn-success {
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        color: white;
+    }
+    .action-btn-danger {
+        background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+        color: white;
+    }
+    .action-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+    
+    /* Progress steps */
+    .progress-steps {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 30px;
+        position: relative;
+    }
+    .progress-steps::before {
+        content: '';
+        position: absolute;
+        top: 20px;
+        left: 0;
+        right: 0;
+        height: 2px;
+        background: #e5e7eb;
+        z-index: 1;
+    }
+    .step {
+        position: relative;
+        z-index: 2;
+        background: white;
+        padding: 0 10px;
+        text-align: center;
+        flex: 1;
+    }
+    .step-number {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: #e5e7eb;
+        color: #6b7280;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        margin: 0 auto 10px;
+        border: 2px solid white;
+    }
+    .step.active .step-number {
+        background: #3b82f6;
+        color: white;
+    }
+    .step.completed .step-number {
+        background: #10b981;
+        color: white;
+    }
+    .step-title {
+        font-size: 14px;
+        font-weight: 600;
+        color: #4b5563;
+    }
+    .step.active .step-title {
+        color: #3b82f6;
+    }
+    
+    /* Loading overlay */
+    .loading-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: rgba(255, 255, 255, 0.9);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+        display: none;
+    }
+    .loading-spinner {
+        width: 50px;
+        height: 50px;
+        border: 5px solid #f3f4f6;
+        border-top: 5px solid #3b82f6;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+    }
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+    
+    /* Responsive */
+    @media (max-width: 768px) {
+        .progress-steps {
+            flex-direction: column;
+            gap: 15px;
+        }
+        .progress-steps::before {
+            display: none;
+        }
+        .step {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            text-align: left;
+        }
+        .step-number {
+            margin: 0;
+        }
+    }
+</style>
+{% endblock extra_css %}
+
+{% block content %}
+<section class="content">
+    <div class="container-fluid">
+        <!-- Loading Overlay -->
+        <div class="loading-overlay" id="loadingOverlay">
+            <div class="loading-spinner"></div>
+            <p class="text-primary fw-bold mt-3" id="loadingText">Processing...</p>
+        </div>
+
+        <!-- Success/Error Toasts -->
+        <div id="success-toast" class="alert alert-success alert-dismissible fade success-toast" style="display: none; position: fixed; top: 20px; right: 20px; z-index: 9999;" role="alert">
+            <strong><i class="fas fa-check-circle"></i> Success!</strong> 
+            <span id="success-message"></span>
+            <button type="button" class="close" onclick="$('#success-toast').fadeOut()" aria-label="Close">
+                <span aria-hidden="true">&times;</span>
+            </button>
+        </div>
+
+        <div id="error-toast" class="alert alert-danger alert-dismissible fade error-toast" style="display: none; position: fixed; top: 20px; right: 20px; z-index: 9999;" role="alert">
+            <strong><i class="fas fa-exclamation-circle"></i> Error!</strong> 
+            <span id="error-message"></span>
+            <button type="button" class="close" onclick="$('#error-toast').fadeOut()" aria-label="Close">
+                <span aria-hidden="true">&times;</span>
+            </button>
+        </div>
+
+        <!-- Page Header -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card bg-gradient-primary">
+                    <div class="card-body py-4">
+                        <div class="row align-items-center">
+                            <div class="col-md-8">
+                                <h2 class="text-white mb-2">
+                                    <i class="fas fa-arrow-up"></i> Student Class Promotion
+                                </h2>
+                                <p class="text-white mb-0">
+                                    Promote students to higher classes or move them between classes. You can also remove students from their current class.
+                                </p>
+                            </div>
+                            <div class="col-md-4 text-right">
+                                <span class="badge badge-light badge-pill px-3 py-2">
+                                    <i class="fas fa-calendar-alt"></i> Academic Year: {{ current_academic_year.name|default:"Not Set" }}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Progress Steps -->
+        <div class="progress-steps mb-4">
+            <div class="step active" id="step1">
+                <div class="step-number">1</div>
+                <div class="step-title">Select Source Class</div>
+            </div>
+            <div class="step" id="step2">
+                <div class="step-number">2</div>
+                <div class="step-title">Select Students</div>
+            </div>
+            <div class="step" id="step3">
+                <div class="step-number">3</div>
+                <div class="step-title">Choose Action</div>
+            </div>
+            <div class="step" id="step4">
+                <div class="step-number">4</div>
+                <div class="step-title">Confirm & Execute</div>
+            </div>
+        </div>
+
+        <!-- Statistics Cards Row -->
+        <div class="row mb-4">
+            <div class="col-lg-3 col-md-6 mb-3">
+                <div class="stat-card stat-card-primary">
+                    <div class="d-flex align-items-center">
+                        <div>
+                            <h4 class="font-weight-bold mb-0">{{ total_students }}</h4>
+                            <small>Total Students</small>
+                        </div>
+                        <div class="ml-auto">
+                            <i class="fas fa-users fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-3 col-md-6 mb-3">
+                <div class="stat-card stat-card-success">
+                    <div class="d-flex align-items-center">
+                        <div>
+                            <h4 class="font-weight-bold mb-0">{{ active_classes }}</h4>
+                            <small>Active Classes</small>
+                        </div>
+                        <div class="ml-auto">
+                            <i class="fas fa-layer-group fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-3 col-md-6 mb-3">
+                <div class="stat-card stat-card-warning">
+                    <div class="d-flex align-items-center">
+                        <div>
+                            <h4 class="font-weight-bold mb-0">{{ eligible_for_promotion }}</h4>
+                            <small>Eligible for Promotion</small>
+                        </div>
+                        <div class="ml-auto">
+                            <i class="fas fa-arrow-up fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-3 col-md-6 mb-3">
+                <div class="stat-card stat-card-info">
+                    <div class="d-flex align-items-center">
+                        <div>
+                            <h4 class="font-weight-bold mb-0">{{ recent_promotions }}</h4>
+                            <small>Recent Promotions</small>
+                        </div>
+                        <div class="ml-auto">
+                            <i class="fas fa-history fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="row">
+            <!-- Left Column - Class Selection & Students -->
+            <div class="col-lg-8">
+                <!-- Source Class Selection -->
+                <div class="card mb-4">
+                    <div class="card-header bg-light">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-school"></i> Step 1: Select Source Class
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-8">
+                                <div class="form-group">
+                                    <label for="source-class"><strong>Select Class Level</strong></label>
+                                    <select id="source-class" class="form-control select2">
+                                        <option value="">-- Choose a class --</option>
+                                        {% for class in class_levels %}
+                                        <option value="{{ class.id }}" data-student-count="{{ class.student_count }}">
+                                            {{ class.name }} ({{ class.educational_level.name }}) - {{ class.student_count }} students
+                                        </option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="form-group">
+                                    <label><strong>Stream Filter</strong></label>
+                                    <select id="stream-filter" class="form-control select2">
+                                        <option value="">All Streams</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row mt-3">
+                            <div class="col-12">
+                                <button class="btn btn-primary" onclick="loadStudents()">
+                                    <i class="fas fa-search"></i> Load Students
+                                </button>
+                                <button class="btn btn-secondary" onclick="resetSelection()">
+                                    <i class="fas fa-redo"></i> Reset
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Students List -->
+                <div class="card mb-4">
+                    <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-user-graduate"></i> Step 2: Select Students to Promote/Move
+                        </h5>
+                        <div>
+                            <span class="mr-3">
+                                <i class="fas fa-check-square text-success"></i>
+                                <span id="selected-count-badge">0</span> selected
+                            </span>
+                            <button class="btn btn-sm btn-outline-primary" onclick="selectAllStudents()">
+                                <i class="fas fa-check-double"></i> Select All
+                            </button>
+                            <button class="btn btn-sm btn-outline-secondary" onclick="deselectAllStudents()">
+                                <i class="fas fa-times"></i> Deselect All
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <input type="text" class="form-control" id="student-search" placeholder="Search students...">
+                            </div>
+                            <div class="col-md-6">
+                                <select class="form-control" id="student-status-filter">
+                                    <option value="">All Statuses</option>
+                                    <option value="active">Active Only</option>
+                                    <option value="completed">Completed</option>
+                                    <option value="suspended">Suspended</option>
+                                    <option value="withdrawn">Withdrawn</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div id="students-list-container" style="max-height: 400px; overflow-y: auto;">
+                            <!-- Students will be loaded here via AJAX -->
+                            <div class="text-center text-muted py-5">
+                                <i class="fas fa-arrow-left fa-3x mb-3"></i>
+                                <p>Select a source class above to load students</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Column - Action Selection & Summary -->
+            <div class="col-lg-4">
+                <!-- Action Selection -->
+                <div class="card mb-4">
+                    <div class="card-header bg-light">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-cog"></i> Step 3: Choose Action
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="form-group">
+                            <label><strong>Action Type</strong></label>
+                            <div class="custom-control custom-radio mb-2">
+                                <input type="radio" id="action-promote" name="action-type" class="custom-control-input" value="promote" checked>
+                                <label class="custom-control-label" for="action-promote">
+                                    <i class="fas fa-arrow-up text-success"></i> Promote to Next Class
+                                    <small class="d-block text-muted">Move students to the next class level (e.g., Form 1 → Form 2)</small>
+                                </label>
+                            </div>
+                            <div class="custom-control custom-radio mb-2">
+                                <input type="radio" id="action-move" name="action-type" class="custom-control-input" value="move">
+                                <label class="custom-control-label" for="action-move">
+                                    <i class="fas fa-exchange-alt text-primary"></i> Move to Another Class
+                                    <small class="d-block text-muted">Move students to a specific class level (same or different)</small>
+                                </label>
+                            </div>
+                            <div class="custom-control custom-radio mb-2">
+                                <input type="radio" id="action-remove" name="action-type" class="custom-control-input" value="remove">
+                                <label class="custom-control-label" for="action-remove">
+                                    <i class="fas fa-user-minus text-danger"></i> Remove from Class
+                                    <small class="d-block text-muted">Remove students from their current class (set class to NULL)</small>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Destination Class (for promote/move) -->
+                        <div id="destination-section" style="display: block;">
+                            <hr>
+                            <div class="form-group">
+                                <label for="destination-class"><strong>Destination Class</strong></label>
+                                <select id="destination-class" class="form-control select2">
+                                    <option value="">-- Select destination class --</option>
+                                    {% for class in class_levels %}
+                                    <option value="{{ class.id }}" data-next-class="{{ class.next_class_id|default:'' }}">
+                                        {{ class.name }} ({{ class.educational_level.name }})
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                                <small class="text-muted" id="next-class-hint"></small>
+                            </div>
+                            
+                            <div class="form-group" id="stream-section">
+                                <label for="destination-stream">Stream (Optional)</label>
+                                <select id="destination-stream" class="form-control select2">
+                                    <option value="">-- No specific stream --</option>
+                                </select>
+                                <small class="text-muted">Leave empty to keep current stream or assign none</small>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="academic-year">Academic Year</label>
+                                <select id="academic-year" class="form-control select2">
+                                    {% for year in academic_years %}
+                                    <option value="{{ year.id }}" {% if year.is_active %}selected{% endif %}>
+                                        {{ year.name }} {% if year.is_active %}(Active){% endif %}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Options -->
+                        <hr>
+                        <div class="form-group">
+                            <div class="custom-control custom-checkbox">
+                                <input type="checkbox" class="custom-control-input" id="keep-stream" checked>
+                                <label class="custom-control-label" for="keep-stream">
+                                    Keep stream assignment if available
+                                </label>
+                            </div>
+                            <div class="custom-control custom-checkbox">
+                                <input type="checkbox" class="custom-control-input" id="update-academic-year">
+                                <label class="custom-control-label" for="update-academic-year">
+                                    Update academic year to selected year
+                                </label>
+                            </div>
+                            <div class="custom-control custom-checkbox">
+                                <input type="checkbox" class="custom-control-input" id="promote-all">
+                                <label class="custom-control-label" for="promote-all">
+                                    Apply to all students (including inactive)
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Selection Summary -->
+                <div class="card mb-4">
+                    <div class="card-header bg-light">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-list"></i> Selection Summary
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="selection-summary">
+                            <p><strong>Source Class:</strong> <span id="summary-source">Not selected</span></p>
+                            <p><strong>Selected Students:</strong> <span id="summary-count">0</span></p>
+                            <p><strong>Action:</strong> <span id="summary-action">Promote</span></p>
+                            <p><strong>Destination:</strong> <span id="summary-destination">Not selected</span></p>
+                            <p><strong>Academic Year:</strong> <span id="summary-year">{{ current_academic_year.name|default:"Not selected" }}</span></p>
+                        </div>
+
+                        <div id="selected-students-list" class="mt-3">
+                            <!-- Selected students will appear here -->
+                        </div>
+
+                        <hr>
+                        
+                        <!-- Action Buttons -->
+                        <button class="btn btn-block action-btn action-btn-primary mb-2" onclick="previewChanges()" id="preview-btn">
+                            <i class="fas fa-eye"></i> Preview Changes
+                        </button>
+                        <button class="btn btn-block action-btn action-btn-success mb-2" onclick="executeAction()" id="execute-btn" disabled>
+                            <i class="fas fa-check"></i> Execute Action
+                        </button>
+                        <button class="btn btn-block action-btn action-btn-danger" onclick="removeFromClass()" id="remove-btn" style="display: none;">
+                            <i class="fas fa-user-minus"></i> Remove Selected from Class
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Preview Modal -->
+<div class="modal fade" id="previewModal" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title">
+                    <i class="fas fa-eye"></i> Preview Changes
+                </h5>
+                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle"></i> Review the changes below before confirming.
+                </div>
+                
+                <div class="table-responsive">
+                    <table class="table table-sm table-bordered">
+                        <thead class="bg-light">
+                            <tr>
+                                <th>#</th>
+                                <th>Student</th>
+                                <th>Current Class</th>
+                                <th>Current Stream</th>
+                                <th>New Class</th>
+                                <th>New Stream</th>
+                            </tr>
+                        </thead>
+                        <tbody id="preview-table-body">
+                            <!-- Preview rows will be inserted here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="confirmExecution()">
+                    <i class="fas fa-check"></i> Confirm & Execute
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Hidden inputs -->
+<input type="hidden" id="csrf-token" value="{{ csrf_token }}">
+<input type="hidden" id="next-class-map" value='{{ next_class_map|safe }}'>
+{% endblock content %}
+
+{% block extra_js %}
+<script>
+    $(document).ready(function() {
+        // Global variables
+        let selectedStudents = [];
+        let currentClassStudents = [];
+        let dataTable;
+        let nextClassMap = {};
+
+        // Parse next class map
+        try {
+            nextClassMap = JSON.parse(document.getElementById('next-class-map').value || '{}');
+        } catch (e) {
+            console.error('Error parsing next class map:', e);
+        }
+
+        // Initialize Select2
+        $('.select2').select2({
+            theme: 'bootstrap4',
+            width: '100%'
+        });
+
+        // Initialize page
+        initializePage();
+
+        // Initialize functions
+        function initializePage() {
+            setupEventListeners();
+            updateSummary();
+            updateActionUI();
+        }
+
+        // Setup event listeners
+        function setupEventListeners() {
+            // Source class change
+            $('#source-class').on('change', function() {
+                const classId = $(this).val();
+                if (classId) {
+                    loadStreams(classId);
+                } else {
+                    $('#stream-filter').empty().append('<option value="">All Streams</option>').trigger('change');
+                }
+                updateSummary();
+            });
+
+            // Action type change
+            $('input[name="action-type"]').on('change', function() {
+                updateActionUI();
+                updateSummary();
+            });
+
+            // Destination class change
+            $('#destination-class').on('change', function() {
+                const classId = $(this).val();
+                if (classId) {
+                    loadDestinationStreams(classId);
+                    showNextClassHint(classId);
+                } else {
+                    $('#destination-stream').empty().append('<option value="">-- No specific stream --</option>').trigger('change');
+                }
+                updateSummary();
+            });
+
+            // Academic year change
+            $('#academic-year').on('change', function() {
+                const yearName = $(this).find('option:selected').text();
+                $('#summary-year').text(yearName);
+            });
+
+            // Student search
+            $('#student-search').on('keyup', function() {
+                filterStudents();
+            });
+
+            // Student status filter
+            $('#student-status-filter').on('change', function() {
+                filterStudents();
+            });
+
+            // Stream filter
+            $('#stream-filter').on('change', function() {
+                filterStudents();
+            });
+        }
+
+        // Load streams for source class
+        function loadStreams(classId) {
+            showLoading('Loading streams...');
+            
+            $.ajax({
+                url: '{% url "admin_get_streams_for_class" %}',
+                method: 'GET',
+                data: { class_level_id: classId },
+                success: function(response) {
+                    const streamSelect = $('#stream-filter');
+                    streamSelect.empty().append('<option value="">All Streams</option>');
+                    
+                    if (response.success && response.streams) {
+                        response.streams.forEach(function(stream) {
+                            streamSelect.append(new Option(stream.name, stream.id));
+                        });
+                    }
+                    
+                    streamSelect.trigger('change');
+                    hideLoading();
+                },
+                error: function() {
+                    hideLoading();
+                    showToast('Failed to load streams', 'danger');
+                }
+            });
+        }
+
+        // Load destination streams
+        function loadDestinationStreams(classId) {
+            $.ajax({
+                url: '{% url "admin_get_streams_for_class" %}',
+                method: 'GET',
+                data: { class_level_id: classId },
+                success: function(response) {
+                    const streamSelect = $('#destination-stream');
+                    streamSelect.empty().append('<option value="">-- No specific stream --</option>');
+                    
+                    if (response.success && response.streams) {
+                        response.streams.forEach(function(stream) {
+                            streamSelect.append(new Option(stream.name, stream.id));
+                        });
+                    }
+                    
+                    streamSelect.trigger('change');
+                },
+                error: function() {
+                    showToast('Failed to load streams', 'danger');
+                }
+            });
+        }
+
+        // Show next class hint
+        function showNextClassHint(classId) {
+            const nextClassId = nextClassMap[classId];
+            if (nextClassId) {
+                const nextClassName = $('#destination-class option[value="' + nextClassId + '"]').text();
+                $('#next-class-hint').text('Next class in sequence: ' + nextClassName);
+            } else {
+                $('#next-class-hint').text('');
+            }
+        }
+
+        // Load students
+        window.loadStudents = function() {
+            const classId = $('#source-class').val();
+            if (!classId) {
+                showToast('Please select a source class', 'warning');
+                return;
+            }
+
+            showLoading('Loading students...');
+
+            $.ajax({
+                url: '{% url "get_students_for_promotion" %}',
+                method: 'GET',
+                data: { class_id: classId },
+                success: function(response) {
+                    if (response.success) {
+                        currentClassStudents = response.students;
+                        displayStudents(currentClassStudents);
+                        
+                        // Update summary
+                        $('#summary-source').text($('#source-class option:selected').text().split('(')[0].trim());
+                        
+                        // Enable step 2
+                        $('#step2').addClass('active');
+                        $('#step1').removeClass('active').addClass('completed');
+                        
+                        hideLoading();
+                    } else {
+                        showToast(response.message || 'Failed to load students', 'danger');
+                        hideLoading();
+                    }
+                },
+                error: function() {
+                    hideLoading();
+                    showToast('Failed to load students', 'danger');
+                }
+            });
+        };
+
+        // Display students
+        function displayStudents(students) {
+            const container = $('#students-list-container');
+            
+            if (!students || students.length === 0) {
+                container.html(`
+                    <div class="text-center text-muted py-5">
+                        <i class="fas fa-user-slash fa-3x mb-3"></i>
+                        <p>No students found in this class</p>
+                    </div>
+                `);
+                return;
+            }
+
+            let html = '';
+            students.forEach(function(student) {
+                const isSelected = selectedStudents.includes(student.id);
+                const selectedClass = isSelected ? 'selected' : '';
+                
+                let avatarHtml = '';
+                if (student.profile_pic) {
+                    avatarHtml = `<img src="${student.profile_pic}" class="student-avatar-sm" alt="${student.full_name}">`;
+                } else {
+                    avatarHtml = `<div class="student-avatar-initials">${student.first_name.charAt(0)}${student.last_name.charAt(0)}</div>`;
+                }
+
+                html += `
+                    <div class="student-promo-card ${selectedClass}" data-student-id="${student.id}" onclick="toggleStudent(${student.id})">
+                        ${avatarHtml}
+                        <div style="flex: 1;">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div>
+                                    <strong>${student.full_name}</strong>
+                                    <small class="d-block text-muted">Reg: ${student.registration_number || 'N/A'}</small>
+                                </div>
+                                <div>
+                                    <span class="badge badge-${student.status === 'active' ? 'success' : 'secondary'}">
+                                        ${student.status_display}
+                                    </span>
+                                    ${student.stream ? `<span class="badge badge-info ml-1">${student.stream}</span>` : ''}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            container.html(html);
+        }
+
+        // Filter students
+        function filterStudents() {
+            const searchTerm = $('#student-search').val().toLowerCase();
+            const statusFilter = $('#student-status-filter').val();
+            const streamFilter = $('#stream-filter').val();
+
+            const filtered = currentClassStudents.filter(function(student) {
+                // Search filter
+                if (searchTerm) {
+                    const fullName = student.full_name.toLowerCase();
+                    const regNo = (student.registration_number || '').toLowerCase();
+                    if (!fullName.includes(searchTerm) && !regNo.includes(searchTerm)) {
+                        return false;
+                    }
+                }
+
+                // Status filter
+                if (statusFilter && student.status !== statusFilter) {
+                    return false;
+                }
+
+                // Stream filter
+                if (streamFilter && student.stream_id != streamFilter) {
+                    return false;
+                }
+
+                return true;
+            });
+
+            displayStudents(filtered);
+        }
+
+        // Toggle student selection
+        window.toggleStudent = function(studentId) {
+            const index = selectedStudents.indexOf(studentId);
+            if (index === -1) {
+                selectedStudents.push(studentId);
+            } else {
+                selectedStudents.splice(index, 1);
+            }
+
+            // Update UI
+            $(`.student-promo-card[data-student-id="${studentId}"]`).toggleClass('selected');
+            
+            // Update counts and summary
+            updateSelectedCount();
+            updateSelectedStudentsList();
+            updateSummary();
+            
+            // Enable/disable execute button
+            updateExecuteButton();
+        };
+
+        // Select all students
+        window.selectAllStudents = function() {
+            const visibleStudents = $('.student-promo-card').map(function() {
+                return $(this).data('student-id');
+            }).get();
+
+            visibleStudents.forEach(function(studentId) {
+                if (!selectedStudents.includes(studentId)) {
+                    selectedStudents.push(studentId);
+                    $(`.student-promo-card[data-student-id="${studentId}"]`).addClass('selected');
+                }
+            });
+
+            updateSelectedCount();
+            updateSelectedStudentsList();
+            updateSummary();
+            updateExecuteButton();
+        };
+
+        // Deselect all students
+        window.deselectAllStudents = function() {
+            selectedStudents.forEach(function(studentId) {
+                $(`.student-promo-card[data-student-id="${studentId}"]`).removeClass('selected');
+            });
+            selectedStudents = [];
+            
+            updateSelectedCount();
+            updateSelectedStudentsList();
+            updateSummary();
+            updateExecuteButton();
+        };
+
+        // Update selected count
+        function updateSelectedCount() {
+            $('#selected-count-badge').text(selectedStudents.length);
+        }
+
+        // Update selected students list
+        function updateSelectedStudentsList() {
+            const container = $('#selected-students-list');
+            
+            if (selectedStudents.length === 0) {
+                container.html('<p class="text-muted text-center">No students selected</p>');
+                return;
+            }
+
+            let html = '<div class="selected-students">';
+            selectedStudents.forEach(function(studentId) {
+                const student = currentClassStudents.find(s => s.id == studentId);
+                if (student) {
+                    html += `
+                        <span class="selected-student-item">
+                            ${student.full_name}
+                            <span class="remove-student" onclick="toggleStudent(${studentId})">
+                                <i class="fas fa-times"></i>
+                            </span>
+                        </span>
+                    `;
+                }
+            });
+            html += '</div>';
+            
+            container.html(html);
+        }
+
+        // Update summary
+        function updateSummary() {
+            // Source class
+            const sourceClass = $('#source-class option:selected').text();
+            $('#summary-source').text(sourceClass ? sourceClass.split('(')[0].trim() : 'Not selected');
+
+            // Selected count
+            $('#summary-count').text(selectedStudents.length);
+
+            // Action
+            const action = $('input[name="action-type"]:checked').val();
+            let actionText = 'Promote';
+            if (action === 'move') actionText = 'Move';
+            if (action === 'remove') actionText = 'Remove from Class';
+            $('#summary-action').text(actionText);
+
+            // Destination
+            if (action === 'remove') {
+                $('#summary-destination').text('N/A');
+            } else {
+                const destClass = $('#destination-class option:selected').text();
+                $('#summary-destination').text(destClass || 'Not selected');
+            }
+        }
+
+        // Update action UI based on selected action
+        function updateActionUI() {
+            const action = $('input[name="action-type"]:checked').val();
+            
+            if (action === 'remove') {
+                $('#destination-section').hide();
+                $('#execute-btn').hide();
+                $('#remove-btn').show();
+            } else {
+                $('#destination-section').show();
+                $('#execute-btn').show();
+                $('#remove-btn').hide();
+            }
+            
+            updateExecuteButton();
+        }
+
+        // Update execute button state
+        function updateExecuteButton() {
+            const action = $('input[name="action-type"]:checked').val();
+            const hasStudents = selectedStudents.length > 0;
+            
+            if (action === 'remove') {
+                $('#remove-btn').prop('disabled', !hasStudents);
+            } else {
+                const hasDestination = $('#destination-class').val() ? true : false;
+                $('#execute-btn').prop('disabled', !(hasStudents && hasDestination));
+            }
+        }
+
+        // Preview changes
+        window.previewChanges = function() {
+            if (!validateSelection()) return;
+
+            const action = $('input[name="action-type"]:checked').val();
+            const destClassId = $('#destination-class').val();
+            const destStreamId = $('#destination-stream').val();
+            const keepStream = $('#keep-stream').is(':checked');
+            const academicYearId = $('#academic-year').val();
+            const updateYear = $('#update-academic-year').is(':checked');
+
+            // Get destination class name
+            const destClassName = destClassId ? $('#destination-class option:selected').text().split('(')[0].trim() : 'N/A';
+            
+            // Build preview table
+            let previewHtml = '';
+            selectedStudents.forEach(function(studentId) {
+                const student = currentClassStudents.find(s => s.id == studentId);
+                if (student) {
+                    const newStream = (keepStream && student.stream) ? student.stream : 
+                                    (destStreamId ? $('#destination-stream option:selected').text() : 'None');
+                    
+                    previewHtml += `
+                        <tr>
+                            <td>${previewHtml.length / 7 + 1}</td>
+                            <td>${student.full_name}</td>
+                            <td>${student.class_level}</td>
+                            <td>${student.stream || 'None'}</td>
+                            <td>${action === 'remove' ? 'Removed' : destClassName}</td>
+                            <td>${action === 'remove' ? 'None' : newStream}</td>
+                        </tr>
+                    `;
+                }
+            });
+
+            $('#preview-table-body').html(previewHtml);
+            $('#previewModal').modal('show');
+        };
+
+        // Validate selection
+        function validateSelection() {
+            if (selectedStudents.length === 0) {
+                showToast('Please select at least one student', 'warning');
+                return false;
+            }
+
+            const action = $('input[name="action-type"]:checked').val();
+            
+            if (action !== 'remove') {
+                if (!$('#destination-class').val()) {
+                    showToast('Please select a destination class', 'warning');
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        // Execute action
+        window.executeAction = function() {
+            if (!validateSelection()) return;
+
+            const action = $('input[name="action-type"]:checked').val();
+            const destClassId = $('#destination-class').val();
+            const destStreamId = $('#destination-stream').val() || null;
+            const keepStream = $('#keep-stream').is(':checked');
+            const academicYearId = $('#academic-year').val();
+            const updateYear = $('#update-academic-year').is(':checked');
+            const promoteAll = $('#promote-all').is(':checked');
+
+            showLoading('Processing...');
+
+            $.ajax({
+                url: '{% url "admin_execute_promotion" %}',
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCSRFToken(),
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                data: {
+                    action: action,
+                    student_ids: JSON.stringify(selectedStudents),
+                    destination_class: destClassId || '',
+                    destination_stream: destStreamId || '',
+                    keep_stream: keepStream,
+                    academic_year: academicYearId,
+                    update_year: updateYear,
+                    promote_all: promoteAll
+                },
+                success: function(data) {
+                    if (data.success) {
+                        $('#previewModal').modal('hide');
+                        showToast(data.message, 'success');
+                        
+                        // Reload after delay
+                        setTimeout(function() {
+                            location.reload();
+                        }, 2000);
+                    } else {
+                        showToast(data.message, 'danger');
+                        $('#previewModal').modal('hide');
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error:', error);
+                    showToast('An error occurred. Please try again.', 'danger');
+                    $('#previewModal').modal('hide');
+                },
+                complete: function() {
+                    hideLoading();
+                }
+            });
+        };
+
+        // Confirm execution (from preview modal)
+        window.confirmExecution = function() {
+            executeAction();
+        };
+
+        // Remove from class
+        window.removeFromClass = function() {
+            if (selectedStudents.length === 0) {
+                showToast('Please select at least one student', 'warning');
+                return;
+            }
+
+            if (!confirm(`Are you sure you want to remove ${selectedStudents.length} student(s) from their current class?`)) {
+                return;
+            }
+
+            showLoading('Removing students...');
+
+            $.ajax({
+                url: '{% url "admin_remove_from_class" %}',
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCSRFToken(),
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                data: {
+                    student_ids: JSON.stringify(selectedStudents)
+                },
+                success: function(data) {
+                    if (data.success) {
+                        showToast(data.message, 'success');
+                        
+                        // Reload after delay
+                        setTimeout(function() {
+                            location.reload();
+                        }, 2000);
+                    } else {
+                        showToast(data.message, 'danger');
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error:', error);
+                    showToast('An error occurred. Please try again.', 'danger');
+                },
+                complete: function() {
+                    hideLoading();
+                }
+            });
+        };
+
+        // Reset selection
+        window.resetSelection = function() {
+            $('#source-class').val('').trigger('change');
+            $('#stream-filter').empty().append('<option value="">All Streams</option>').trigger('change');
+            $('#students-list-container').html(`
+                <div class="text-center text-muted py-5">
+                    <i class="fas fa-arrow-left fa-3x mb-3"></i>
+                    <p>Select a source class above to load students</p>
+                </div>
+            `);
+            selectedStudents = [];
+            updateSelectedCount();
+            updateSelectedStudentsList();
+            updateSummary();
+            
+            // Reset progress steps
+            $('#step1').removeClass('completed').addClass('active');
+            $('#step2').removeClass('active');
+        };
+
+        // Show loading
+        function showLoading(message = 'Processing...') {
+            $('#loadingText').text(message);
+            $('#loadingOverlay').fadeIn(300);
+        }
+
+        // Hide loading
+        function hideLoading() {
+            $('#loadingOverlay').fadeOut(300);
+        }
+
+        // Show toast
+        function showToast(message, type = 'success') {
+            const toastId = type === 'success' ? '#success-toast' : '#error-toast';
+            const messageId = type === 'success' ? '#success-message' : '#error-message';
+            
+            $(messageId).text(message);
+            $(toastId).addClass('show').fadeIn();
+            
+            setTimeout(function() {
+                $(toastId).fadeOut();
+            }, type === 'success' ? 3000 : 5000);
+        }
+
+        // Get CSRF token
+        function getCSRFToken() {
+            return document.getElementById('csrf-token').value;
+        }
+    });
+</script>
+{% endblock extra_js %}

@@ -1,5 +1,6 @@
 from django.db import models
 from django.core.validators import RegexValidator
+from django.core.exceptions import ValidationError
 from django.utils import timezone
 from accounts.models import GENDER_CHOICES, CustomUser, Staffs
 from core.models import AcademicYear, ClassLevel, Combination, StreamClass, Subject
@@ -258,3 +259,246 @@ class StudentAttendance(models.Model):
 
     class Meta:
         unique_together = ('attendance_session', 'student')
+
+
+class Hostel(models.Model):
+    HOSTEL_TYPES = [
+        ('boys', 'Boys'),
+        ('girls', 'Girls'),
+        ('mixed', 'Mixed'),
+    ]
+
+    name = models.CharField(max_length=100, unique=True)
+    code = models.CharField(max_length=20, unique=True)
+    hostel_type = models.CharField(max_length=10, choices=HOSTEL_TYPES)
+
+    max_students = models.PositiveIntegerField(
+        help_text="Maximum students this hostel can hold"
+    )
+
+    # Fees
+    total_fee = models.DecimalField(max_digits=10, decimal_places=2)
+
+    PAYMENT_MODE = [
+        ('yearly', 'Yearly'),
+        ('monthly', 'Monthly'),
+        ('installments', 'Installments'),
+    ]
+    payment_mode = models.CharField(max_length=20, choices=PAYMENT_MODE)
+    installments_count = models.PositiveIntegerField(default=1)
+
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.name
+
+
+class HostelRoom(models.Model):
+    hostel = models.ForeignKey(
+        Hostel,
+        on_delete=models.CASCADE,
+        related_name='rooms'
+    )
+
+    room_number = models.CharField(max_length=20)
+    capacity = models.PositiveIntegerField(
+        help_text="How many students this room can hold"
+    )
+
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        unique_together = ('hostel', 'room_number')
+
+    def __str__(self):
+        return f"{self.hostel.code} - Room {self.room_number}"
+
+
+class Bed(models.Model):
+    BED_TYPES = [
+        ('single', 'Single'),
+        ('bunk_upper', 'Bunk Upper'),
+        ('bunk_lower', 'Bunk Lower'),
+    ]
+
+    room = models.ForeignKey(
+        HostelRoom,
+        on_delete=models.CASCADE,
+        related_name='beds'
+    )
+
+    bed_number = models.CharField(max_length=20)
+    bed_type = models.CharField(max_length=20, choices=BED_TYPES)
+
+    is_occupied = models.BooleanField(default=False)
+
+    class Meta:
+        unique_together = ('room', 'bed_number')
+
+    def __str__(self):
+        return f"{self.room} - Bed {self.bed_number}"
+
+
+class StudentHostelAllocation(models.Model):
+    student = models.ForeignKey(
+        Student,
+        on_delete=models.CASCADE,
+        related_name='hostel_allocations'
+    )
+
+    hostel = models.ForeignKey(
+        Hostel,
+        on_delete=models.CASCADE
+    )
+
+    # OPTIONAL (Level B)
+    room = models.ForeignKey(
+        HostelRoom,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True
+    )
+
+    # OPTIONAL (Level C)
+    bed = models.ForeignKey(
+        Bed,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True
+    )
+
+    academic_year = models.ForeignKey(
+        AcademicYear,
+        on_delete=models.CASCADE
+    )
+
+    start_date = models.DateField()
+    end_date = models.DateField(null=True, blank=True)
+
+    is_active = models.BooleanField(default=True)
+
+    @property
+    def total_fee(self):
+        return self.hostel.total_fee
+
+
+    @property
+    def total_paid(self):
+        return sum(payment.amount_paid for payment in self.payments.all())
+
+
+    @property
+    def balance(self):
+        return self.total_fee - self.total_paid
+    def __str__(self):
+        return f"{self.student} - {self.hostel}"
+
+class HostelInstallmentPlan(models.Model):
+    hostel = models.ForeignKey(
+        Hostel,
+        on_delete=models.CASCADE,
+        related_name='installment_plans'
+    )
+
+    installment_number = models.PositiveIntegerField()
+
+    amount = models.DecimalField(
+        max_digits=10,
+        decimal_places=2
+    )
+
+    # Date range (recurring yearly)
+    start_month = models.PositiveIntegerField()
+    start_day = models.PositiveIntegerField()
+
+    end_month = models.PositiveIntegerField()
+    end_day = models.PositiveIntegerField()
+
+    class Meta:
+        unique_together = ('hostel', 'installment_number')
+        ordering = ['installment_number']
+
+    def total_paid_by_student(self, allocation):
+        return sum(
+            payment.amount_paid
+            for payment in self.student_payments.filter(allocation=allocation)
+        )
+
+    def remaining_amount(self, allocation):
+        return self.amount - self.total_paid_by_student(allocation)
+    
+    def clean(self):
+        if self.installment_number > 4:
+            raise ValidationError("Maximum 4 installments allowed per hostel.")
+    
+    def __str__(self):
+        return f"{self.hostel.name} - Installment {self.installment_number}"
+
+
+
+class HostelPayment(models.Model):
+    allocation = models.ForeignKey(
+        StudentHostelAllocation,
+        on_delete=models.CASCADE,
+        related_name='payments'
+    )
+
+    installment_plan = models.ForeignKey(
+        HostelInstallmentPlan,
+        on_delete=models.CASCADE,
+        related_name='student_payments'
+    )
+
+    PAYMENT_STATUS = [
+    ('partial', 'Partial'),
+    ('paid', 'Paid'),
+]
+
+    status = models.CharField(
+        max_length=20,
+        choices=PAYMENT_STATUS,
+        default='partial'
+    )
+
+
+    amount_paid = models.DecimalField(
+        max_digits=10,
+        decimal_places=2
+    )
+
+    payment_date = models.DateField(auto_now_add=True)
+
+    receipt_number = models.CharField(
+        max_length=50,
+        unique=True
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def clean(self):
+        total_paid_for_installment = sum(
+            payment.amount_paid
+            for payment in HostelPayment.objects.filter(
+                allocation=self.allocation,
+                installment_plan=self.installment_plan
+            )
+        )
+
+        if total_paid_for_installment + self.amount_paid > self.installment_plan.amount:
+            raise ValidationError("Payment exceeds installment required amount.")
+        
+    def __str__(self):
+        return f"{self.receipt_number} - {self.amount_paid}"
+    
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+
+        remaining = self.installment_plan.remaining_amount(self.allocation)
+
+        if remaining <= 0:
+            self.status = 'paid'
+        else:
+            self.status = 'partial'
+
+        super().save(update_fields=['status'])
