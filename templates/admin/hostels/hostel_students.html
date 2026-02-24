@@ -1,0 +1,1057 @@
+{% extends 'admin/base.html' %}
+{% load static %}
+{% load humanize %}
+
+{% block title %}Students in {{ hostel.name }}{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb-wrapper">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{% url 'admin_dashboard' %}"><i class="fas fa-home"></i> Dashboard</a></li>
+                <li class="breadcrumb-item"><a href="{% url 'admin_hostels_list' %}">Hostels</a></li>
+                <li class="breadcrumb-item active" aria-current="page">{{ hostel.name }} Students</li>
+            </ol>
+        </nav>
+    </div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* ===== VARIABLES ===== */
+    :root {
+        --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        --primary-color: #4e73df;
+        --success-color: #1cc88a;
+        --info-color: #36b9cc;
+        --warning-color: #f6c23e;
+        --danger-color: #e74a3b;
+        --dark-color: #5a5c69;
+        --light-bg: #f8f9fc;
+        --border-color: #e3e6f0;
+        --card-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        --hover-shadow: 0 15px 40px rgba(78, 115, 223, 0.2);
+        --transition: all 0.3s ease;
+    }
+
+    /* ===== ACTION BAR ===== */
+    .action-bar {
+        background: white;
+        border-radius: 15px;
+        padding: 20px;
+        margin-bottom: 25px;
+        box-shadow: var(--card-shadow);
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        border: 1px solid var(--border-color);
+        transition: var(--transition);
+    }
+
+    .action-bar:hover {
+        box-shadow: var(--hover-shadow);
+    }
+
+    .action-bar-left {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        flex-wrap: wrap;
+    }
+
+    .action-bar-right {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        flex-wrap: wrap;
+    }
+
+    .action-btn {
+        padding: 10px 20px;
+        border-radius: 12px;
+        font-weight: 500;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        transition: var(--transition);
+        border: none;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        position: relative;
+        overflow: hidden;
+    }
+
+    .action-btn::before {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 0;
+        height: 0;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.3);
+        transform: translate(-50%, -50%);
+        transition: width 0.5s, height 0.5s;
+    }
+
+    .action-btn:hover::before {
+        width: 300px;
+        height: 300px;
+    }
+
+    .action-btn i {
+        font-size: 1.1rem;
+        position: relative;
+        z-index: 1;
+    }
+
+    .action-btn span {
+        position: relative;
+        z-index: 1;
+    }
+
+    .btn-back {
+        background: linear-gradient(135deg, #6c757d, #5a5c69);
+        color: white;
+    }
+
+    .btn-rooms {
+        background: linear-gradient(135deg, #4e73df, #224abe);
+        color: white;
+    }
+
+    .btn-beds {
+        background: linear-gradient(135deg, #1cc88a, #169b6b);
+        color: white;
+    }
+
+    .btn-payments {
+        background: linear-gradient(135deg, #f6c23e, #dda20a);
+        color: white;
+    }
+
+    .btn-installments {
+        background: linear-gradient(135deg, #5a5c69, #3d3e45);
+        color: white;
+    }
+
+    .btn-allocate {
+        background: linear-gradient(135deg, #28a745, #1e7e34);
+        color: white;
+    }
+
+    .btn-export {
+        background: linear-gradient(135deg, #343a40, #1d2124);
+        color: white;
+    }
+
+    /* ===== HOSTEL HEADER ===== */
+    .hostel-header {
+        background: var(--primary-gradient);
+        border-radius: 20px;
+        padding: 35px;
+        color: white;
+        margin-bottom: 30px;
+        position: relative;
+        overflow: hidden;
+        box-shadow: 0 15px 40px rgba(102, 126, 234, 0.4);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        backdrop-filter: blur(10px);
+    }
+
+    .hostel-header::before {
+        content: '';
+        position: absolute;
+        top: -50px;
+        right: -50px;
+        width: 250px;
+        height: 250px;
+        background: rgba(255, 255, 255, 0.15);
+        border-radius: 50%;
+        animation: float 6s ease-in-out infinite;
+    }
+
+    .hostel-header::after {
+        content: '';
+        position: absolute;
+        bottom: -50px;
+        left: -50px;
+        width: 200px;
+        height: 200px;
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 50%;
+        animation: float 8s ease-in-out infinite reverse;
+    }
+
+    @keyframes float {
+        0%, 100% { transform: translate(0, 0) rotate(0deg); }
+        25% { transform: translate(10px, 10px) rotate(5deg); }
+        50% { transform: translate(0, 20px) rotate(0deg); }
+        75% { transform: translate(-10px, 10px) rotate(-5deg); }
+    }
+
+    .hostel-content {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 25px;
+        position: relative;
+        z-index: 1;
+    }
+
+    .hostel-icon-wrapper {
+        width: 80px;
+        height: 80px;
+        background: rgba(255, 255, 255, 0.25);
+        backdrop-filter: blur(5px);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 2.2rem;
+        border: 3px solid white;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+        animation: pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+        0%, 100% { transform: scale(1); }
+        50% { transform: scale(1.05); }
+    }
+
+    .hostel-info {
+        flex: 1;
+    }
+
+    .hostel-name {
+        font-size: 2.2rem;
+        font-weight: 700;
+        margin-bottom: 10px;
+        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
+        letter-spacing: 1px;
+    }
+
+    .hostel-meta {
+        display: flex;
+        gap: 30px;
+        flex-wrap: wrap;
+        font-size: 1rem;
+        opacity: 0.95;
+        background: rgba(255, 255, 255, 0.15);
+        padding: 12px 20px;
+        border-radius: 50px;
+        backdrop-filter: blur(5px);
+    }
+
+    .hostel-meta span {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .hostel-meta i {
+        font-size: 1.1rem;
+    }
+
+    .created-badge {
+        background: rgba(255, 255, 255, 0.25);
+        padding: 12px 25px;
+        border-radius: 50px;
+        backdrop-filter: blur(5px);
+        font-size: 1rem;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        border: 2px solid rgba(255, 255, 255, 0.3);
+    }
+
+    /* ===== STATS GRID ===== */
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 25px;
+        margin-bottom: 30px;
+    }
+
+    .stat-card {
+        background: white;
+        border-radius: 20px;
+        padding: 25px;
+        box-shadow: 0 5px 25px rgba(0, 0, 0, 0.05);
+        position: relative;
+        overflow: hidden;
+        border-left: 5px solid transparent;
+        transition: var(--transition);
+        border: 1px solid var(--border-color);
+    }
+
+    .stat-card:hover {
+        transform: translateY(-8px);
+        box-shadow: var(--hover-shadow);
+    }
+
+    .stat-card.students { border-left-color: var(--primary-color); }
+    .stat-card.rooms { border-left-color: var(--success-color); }
+    .stat-card.beds { border-left-color: var(--info-color); }
+    .stat-card.occupancy { border-left-color: var(--warning-color); }
+
+    .stat-icon {
+        position: absolute;
+        right: 20px;
+        top: 20px;
+        font-size: 3rem;
+        opacity: 0.15;
+        transition: var(--transition);
+    }
+
+    .stat-card:hover .stat-icon {
+        transform: scale(1.2) rotate(5deg);
+        opacity: 0.25;
+    }
+
+    .stat-label {
+        font-size: 0.9rem;
+        color: #6c757d;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        margin-bottom: 10px;
+        font-weight: 600;
+    }
+
+    .stat-value {
+        font-size: 2.5rem;
+        font-weight: 800;
+        color: #2c3e50;
+        line-height: 1.2;
+        margin-bottom: 10px;
+    }
+
+    .stat-trend {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        font-size: 0.9rem;
+        color: #6c757d;
+        padding: 5px 0;
+    }
+
+    .stat-trend i {
+        font-size: 1rem;
+    }
+
+    /* ===== PROGRESS CARD ===== */
+    .progress-card {
+        background: white;
+        border-radius: 15px;
+        padding: 20px;
+        margin-bottom: 30px;
+        border: 1px solid var(--border-color);
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.03);
+    }
+
+    .progress-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 12px;
+    }
+
+    .progress-title {
+        font-weight: 700;
+        color: var(--primary-color);
+        font-size: 1rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .progress-percentage {
+        font-weight: 800;
+        color: var(--success-color);
+        font-size: 1.2rem;
+        background: rgba(28, 200, 138, 0.1);
+        padding: 5px 12px;
+        border-radius: 25px;
+    }
+
+    .progress {
+        height: 12px;
+        border-radius: 6px;
+        background: var(--border-color);
+        overflow: hidden;
+    }
+
+    .progress-bar {
+        background: linear-gradient(90deg, var(--success-color), var(--info-color));
+        border-radius: 6px;
+        position: relative;
+        animation: progress-animation 1.5s ease-out;
+    }
+
+    @keyframes progress-animation {
+        from { width: 0; }
+        to { width: var(--progress-width); }
+    }
+
+    .capacity-info {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 12px;
+        font-size: 0.9rem;
+        color: #6c757d;
+        font-weight: 500;
+    }
+
+    /* ===== STUDENT CARD ===== */
+    .student-card {
+        border-radius: 20px;
+        border: none;
+        box-shadow: 0 5px 25px rgba(0, 0, 0, 0.05);
+        overflow: hidden;
+    }
+
+    .card-header-custom {
+        background: linear-gradient(90deg, var(--primary-color), #5a5c69);
+        color: white;
+        padding: 18px 25px;
+        border-bottom: none;
+    }
+
+    .card-header-custom h6 {
+        font-size: 1.1rem;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin: 0;
+    }
+
+    .student-count-badge {
+        background: rgba(255, 255, 255, 0.25);
+        padding: 5px 15px;
+        border-radius: 50px;
+        font-size: 0.9rem;
+        font-weight: 500;
+    }
+
+    /* ===== TABLE STYLES ===== */
+    .table-student {
+        width: 100%;
+        margin: 0;
+    }
+
+    .table-student thead th {
+        background: linear-gradient(90deg, #f8f9fc, #e3e6f0);
+        color: var(--primary-color);
+        font-weight: 700;
+        font-size: 0.9rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        padding: 18px 12px;
+        border-bottom: 2px solid var(--primary-color);
+        white-space: nowrap;
+    }
+
+    .table-student tbody td {
+        vertical-align: middle;
+        padding: 16px 12px;
+        border-bottom: 1px solid var(--border-color);
+        background: white;
+    }
+
+    .table-student tbody tr {
+        transition: var(--transition);
+    }
+
+    .table-student tbody tr:hover {
+        background: rgba(78, 115, 223, 0.02);
+        transform: scale(1.01);
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+    }
+
+    /* Student Avatar */
+    .student-avatar-sm {
+        width: 40px;
+        height: 40px;
+        background: var(--primary-gradient);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-weight: 700;
+        font-size: 1rem;
+        box-shadow: 0 5px 10px rgba(102, 126, 234, 0.3);
+        border: 2px solid white;
+    }
+
+    /* Badges */
+    .room-badge {
+        background: linear-gradient(135deg, #4e73df20, #224abe20);
+        color: var(--primary-color);
+        padding: 6px 12px;
+        border-radius: 20px;
+        font-size: 0.85rem;
+        font-weight: 600;
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        border: 1px solid var(--primary-color);
+    }
+
+    .bed-badge {
+        background: linear-gradient(135deg, #1cc88a20, #169b6b20);
+        color: var(--success-color);
+        padding: 6px 12px;
+        border-radius: 20px;
+        font-size: 0.85rem;
+        font-weight: 600;
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        border: 1px solid var(--success-color);
+    }
+
+    /* Payment Status */
+    .payment-status-badge {
+        padding: 6px 15px;
+        border-radius: 50px;
+        font-size: 0.8rem;
+        font-weight: 700;
+        display: inline-block;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        min-width: 80px;
+        text-align: center;
+    }
+
+    .status-paid {
+        background: linear-gradient(135deg, #1cc88a, #169b6b);
+        color: white;
+        box-shadow: 0 4px 10px rgba(28, 200, 138, 0.3);
+    }
+
+    .status-partial {
+        background: linear-gradient(135deg, #f6c23e, #dda20a);
+        color: white;
+        box-shadow: 0 4px 10px rgba(246, 194, 62, 0.3);
+    }
+
+    .status-unpaid {
+        background: linear-gradient(135deg, #e74a3b, #c13a2d);
+        color: white;
+        box-shadow: 0 4px 10px rgba(231, 74, 59, 0.3);
+    }
+
+    /* Action Buttons */
+    .action-btn-sm {
+        width: 36px;
+        height: 36px;
+        padding: 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 10px;
+        margin: 0 3px;
+        transition: var(--transition);
+        border: none;
+        color: white;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+    }
+
+    .action-btn-sm:hover {
+        transform: translateY(-3px) scale(1.1);
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+    }
+
+    .btn-view { background: linear-gradient(135deg, #4e73df, #224abe); }
+    .btn-payment { background: linear-gradient(135deg, #36b9cc, #1e8a9e); }
+    .btn-record { background: linear-gradient(135deg, #1cc88a, #169b6b); }
+
+    /* Empty State */
+    .empty-state {
+        text-align: center;
+        padding: 60px 20px;
+        background: linear-gradient(135deg, #f8f9fc, #ffffff);
+    }
+
+    .empty-state i {
+        font-size: 4rem;
+        color: #cbd3da;
+        margin-bottom: 20px;
+        animation: bounce 2s ease-in-out infinite;
+    }
+
+    @keyframes bounce {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-10px); }
+    }
+
+    .empty-state h5 {
+        color: #2c3e50;
+        font-size: 1.5rem;
+        margin-bottom: 10px;
+        font-weight: 600;
+    }
+
+    .empty-state p {
+        color: #6c757d;
+        margin-bottom: 25px;
+    }
+
+    /* Responsive */
+    @media (max-width: 1400px) {
+        .stats-grid {
+            grid-template-columns: repeat(2, 1fr);
+        }
+    }
+
+    @media (max-width: 992px) {
+        .action-bar {
+            flex-direction: column;
+            align-items: stretch;
+            gap: 15px;
+        }
+        
+        .action-bar-left,
+        .action-bar-right {
+            justify-content: center;
+        }
+
+        .hostel-content {
+            flex-direction: column;
+            text-align: center;
+        }
+
+        .hostel-meta {
+            justify-content: center;
+        }
+    }
+
+    @media (max-width: 768px) {
+        .stats-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .hostel-name {
+            font-size: 1.8rem;
+        }
+
+        .hostel-meta {
+            flex-direction: column;
+            gap: 10px;
+            border-radius: 20px;
+        }
+
+        .created-badge {
+            width: 100%;
+            justify-content: center;
+        }
+
+        .action-btn {
+            width: 100%;
+            justify-content: center;
+        }
+    }
+
+    /* DataTables Customization */
+    .dataTables_wrapper {
+        padding: 20px;
+    }
+
+    .dataTables_wrapper .dataTables_length select,
+    .dataTables_wrapper .dataTables_filter input {
+        border: 1px solid var(--border-color);
+        border-radius: 10px;
+        padding: 8px 15px;
+        font-size: 0.9rem;
+        transition: var(--transition);
+    }
+
+    .dataTables_wrapper .dataTables_length select:focus,
+    .dataTables_wrapper .dataTables_filter input:focus {
+        border-color: var(--primary-color);
+        box-shadow: 0 0 0 3px rgba(78, 115, 223, 0.25);
+        outline: none;
+    }
+
+    .dataTables_wrapper .dataTables_paginate .paginate_button {
+        padding: 8px 15px;
+        margin: 0 3px;
+        border-radius: 10px;
+        border: 1px solid var(--border-color);
+        background: white;
+        color: var(--primary-color) !important;
+        transition: var(--transition);
+    }
+
+    .dataTables_wrapper .dataTables_paginate .paginate_button.current {
+        background: var(--primary-gradient);
+        color: white !important;
+        border-color: var(--primary-color);
+    }
+
+    .dataTables_wrapper .dataTables_paginate .paginate_button:hover {
+        background: var(--primary-color);
+        color: white !important;
+        border-color: var(--primary-color);
+        transform: translateY(-2px);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Action Bar Section -->
+    <div class="action-bar">
+        <div class="action-bar-left">
+            <a href="{% url 'admin_hostels_list' %}" class="action-btn btn-back">
+                <i class="fas fa-arrow-left"></i>
+                <span>Back to Hostels</span>
+            </a>
+            <a href="{% url 'admin_single_hostel_rooms_list' %}?hostel={{ hostel.id }}" class="action-btn btn-rooms">
+                <i class="fas fa-door-open"></i>
+                <span>View Rooms</span>
+            </a>           
+        </div>
+        <div class="action-bar-right">
+            <a href="{% url 'admin_hostel_student_payments_list' %}?hostel={{ hostel.id }}" class="action-btn btn-payments">
+                <i class="fas fa-credit-card"></i>
+                <span>View Payments</span>
+            </a>
+            <a href="{% url 'admin_hostel_installment_list' %}?hostel={{ hostel.id }}" class="action-btn btn-installments">
+                <i class="fas fa-puzzle-piece"></i>
+                <span>Installment Plans</span>
+            </a>
+            <a href="{% url 'admin_hostel_student_allocation' %}?hostel={{ hostel.id }}" class="action-btn btn-allocate">
+                <i class="fas fa-plus-circle"></i>
+                <span>Allocate Student</span>
+            </a>
+            <button class="action-btn btn-export" onclick="exportStudentList()">
+                <i class="fas fa-download"></i>
+                <span>Export List</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Hostel Header -->
+    <div class="hostel-header">
+        <div class="hostel-content">
+            <div class="hostel-icon-wrapper">
+                <i class="fas fa-hotel"></i>
+            </div>
+            <div class="hostel-info">
+                <h1 class="hostel-name">{{ hostel.name }}</h1>
+                <div class="hostel-meta">
+                    <span><i class="fas fa-code"></i> {{ hostel.code }}</span>
+                    <span><i class="fas fa-{{ hostel.hostel_type }}"></i> {{ hostel.get_hostel_type_display }}</span>
+                    <span><i class="fas fa-money-bill-wave"></i> TSh {{ hostel.total_fee|floatformat:2|intcomma }}</span>
+                    <span><i class="fas fa-credit-card"></i> {{ hostel.get_payment_mode_display }}</span>
+                </div>
+            </div>
+            <div class="created-badge">
+                <i class="fas fa-calendar-alt"></i>
+                <span>Created: {{ hostel.created_at|date:"d M, Y" }}</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Statistics Cards -->
+    <div class="stats-grid">
+        <div class="stat-card students">
+            <div class="stat-icon">
+                <i class="fas fa-user-graduate"></i>
+            </div>
+            <div class="stat-label">Total Students</div>
+            <div class="stat-value">{{ total_students }}</div>
+            <div class="stat-trend">
+                <i class="fas fa-bed text-primary"></i>
+                <span>{{ available_spaces }} spaces available</span>
+            </div>
+        </div>
+
+        <div class="stat-card rooms">
+            <div class="stat-icon">
+                <i class="fas fa-door-open"></i>
+            </div>
+            <div class="stat-label">Total Rooms</div>
+            <div class="stat-value">{{ total_rooms }}</div>
+            <div class="stat-trend">
+                <i class="fas fa-check-circle text-success"></i>
+                <span>{{ hostel.rooms.filter.is_active.count }} active</span>
+            </div>
+        </div>
+
+        <div class="stat-card beds">
+            <div class="stat-icon">
+                <i class="fas fa-bed"></i>
+            </div>
+            <div class="stat-label">Total Beds</div>
+            <div class="stat-value">{{ total_beds }}</div>
+            <div class="stat-trend">
+                <i class="fas fa-user-check text-info"></i>
+                <span>{{ total_students }} occupied</span>
+            </div>
+        </div>
+
+        <div class="stat-card occupancy">
+            <div class="stat-icon">
+                <i class="fas fa-chart-line"></i>
+            </div>
+            <div class="stat-label">Occupancy Rate</div>
+            <div class="stat-value">{{ occupancy_rate }}%</div>
+            <div class="stat-trend">
+                <i class="fas fa-arrow-up text-warning"></i>
+                <span>{{ occupancy_rate }}% filled</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Progress Card -->
+    <div class="progress-card">
+        <div class="progress-header">
+            <span class="progress-title">Capacity Utilization</span>
+            <span class="progress-percentage">{{ occupancy_rate }}%</span>
+        </div>
+        <div class="progress">
+            <div class="progress-bar" style="width: {{ occupancy_rate }}%"></div>
+        </div>
+        <div class="capacity-info">
+            <span><i class="fas fa-users mr-1"></i> Occupied: {{ total_students }} students</span>
+            <span><i class="fas fa-bed mr-1"></i> Total Capacity: {{ hostel.max_students }} students</span>
+        </div>
+    </div>
+
+    <!-- Student List Section -->
+    <div class="row">
+        <div class="col-12">
+            <div class="student-card card">
+                <div class="card-header-custom d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0">
+                        <i class="fas fa-list-ul"></i>
+                        Allocated Students
+                    </h6>
+                    <span class="student-count-badge">
+                        <i class="fas fa-users mr-1"></i>
+                        {{ allocations.count }} students
+                    </span>
+                </div>
+                <div class="card-body p-0">
+                    {% if allocations %}
+                        <div class="table-responsive">
+                            <table class="table table-student" id="students-table">
+                                <thead>
+                                    <tr>
+                                        <th>Student</th>
+                                        <th>Reg No</th>
+                                        <th>Class/Stream</th>
+                                        <th>Room</th>
+                                        <th>Bed</th>
+                                        <th>Since</th>
+                                        <th>Payment Status</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for allocation in allocations %}
+                                    <tr>
+                                        <td>
+                                            <div class="d-flex align-items-center">
+                                                <div class="student-avatar-sm mr-3">
+                                                    {{ allocation.student.first_name|first|upper }}{{ allocation.student.last_name|first|upper }}
+                                                </div>
+                                                <div>
+                                                    <strong class="text-dark">{{ allocation.student.full_name }}</strong>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <code class="bg-light p-1 rounded">{{ allocation.student.registration_number|default:"N/A" }}</code>
+                                        </td>
+                                        <td>
+                                            {% if allocation.student.class_level %}
+                                                <span class="font-weight-medium">{{ allocation.student.class_level.name }}</span>
+                                                {% if allocation.student.stream_class %}
+                                                    <br><small class="text-muted">Stream {{ allocation.student.stream_class.stream_letter }}</small>
+                                                {% endif %}
+                                            {% else %}
+                                                <span class="text-muted">—</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <span class="room-badge">
+                                                <i class="fas fa-door-open"></i>
+                                                {{ allocation.room.room_number|default:"—" }}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <span class="bed-badge">
+                                                <i class="fas fa-bed"></i>
+                                                {{ allocation.bed.bed_number|default:"—" }}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <span data-toggle="tooltip" title="{{ allocation.start_date|date:'F d, Y' }}">
+                                                {{ allocation.start_date|date:"d/m/Y" }}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            {% with balance=allocation.balance %}
+                                                {% if balance <= 0 %}
+                                                    <span class="payment-status-badge status-paid">
+                                                        <i class="fas fa-check-circle mr-1"></i> PAID
+                                                    </span>
+                                                {% elif allocation.total_paid > 0 %}
+                                                    <span class="payment-status-badge status-partial">
+                                                        <i class="fas fa-clock mr-1"></i> PARTIAL
+                                                    </span>
+                                                {% else %}
+                                                    <span class="payment-status-badge status-unpaid">
+                                                        <i class="fas fa-times-circle mr-1"></i> UNPAID
+                                                    </span>
+                                                {% endif %}
+                                            {% endwith %}
+                                        </td>
+                                        <td>
+                                            <div class="d-flex">
+                                                <a href="{% url 'admin_student_allocation_detail' allocation.id %}" 
+                                                   class="action-btn-sm btn-view" title="View Details" data-toggle="tooltip">
+                                                    <i class="fas fa-eye"></i>
+                                                </a>
+                                                <a href="{% url 'admin_allocation_payments' allocation.id %}" 
+                                                   class="action-btn-sm btn-payment" title="View Payments" data-toggle="tooltip">
+                                                    <i class="fas fa-credit-card"></i>
+                                                </a>
+                                                <a href="{% url 'admin_hostel_payment_create' %}?allocation={{ allocation.id }}" 
+                                                   class="action-btn-sm btn-record" title="Record Payment" data-toggle="tooltip">
+                                                    <i class="fas fa-plus-circle"></i>
+                                                </a>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="empty-state">
+                            <i class="fas fa-user-graduate"></i>
+                            <h5>No Students Allocated</h5>
+                            <p class="text-muted">This hostel currently has no students allocated.</p>
+                            <a href="{% url 'admin_student_allocation_create' %}?hostel={{ hostel.id }}" class="action-btn btn-allocate">
+                                <i class="fas fa-plus-circle"></i>
+                                <span>Allocate Student</span>
+                            </a>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // Initialize DataTable
+    if ($('#students-table tbody tr').length > 0) {
+        var table = $('#students-table').DataTable({
+            "dom": "<'row'<'col-sm-12 col-md-6'l><'col-sm-12 col-md-6'f>>" +
+                   "<'row'<'col-sm-12'tr>>" +
+                   "<'row'<'col-sm-12 col-md-5'i><'col-sm-12 col-md-7'p>>",
+            "pageLength": 10,
+            "lengthMenu": [[5, 10, 25, 50, -1], [5, 10, 25, 50, "All"]],
+            "responsive": true,
+            "autoWidth": false,
+            "order": [[0, 'asc']],
+            "columnDefs": [
+                { 
+                    "targets": -1, // Actions column
+                    "orderable": false,
+                    "searchable": false
+                }
+            ],
+            "language": {
+                "emptyTable": "No students found",
+                "search": "<i class='fas fa-search mr-2'></i>Search:",
+                "lengthMenu": "Show _MENU_ entries",
+                "info": "Showing _START_ to _END_ of _TOTAL_ students",
+                "infoEmpty": "Showing 0 to 0 of 0 students",
+                "infoFiltered": "(filtered from _MAX_ total students)",
+                "paginate": {
+                    "first": "<i class='fas fa-angle-double-left'></i>",
+                    "last": "<i class='fas fa-angle-double-right'></i>",
+                    "next": "<i class='fas fa-chevron-right'></i>",
+                    "previous": "<i class='fas fa-chevron-left'></i>"
+                }
+            },
+            "drawCallback": function(settings) {
+                // Reinitialize tooltips after table redraw
+                $('[data-toggle="tooltip"]').tooltip();
+            }
+        });
+    }
+
+    // Initialize tooltips
+    $('[data-toggle="tooltip"]').tooltip();
+
+    // Export function
+    window.exportStudentList = function() {
+        const hostelId = {{ hostel.id }};
+        
+        // Show loading state
+        const exportBtn = $('.btn-export');
+        const originalText = exportBtn.html();
+        exportBtn.html('<i class="fas fa-spinner fa-spin"></i> Exporting...').prop('disabled', true);
+        
+        // Perform export
+        window.location.href = `/hostel/${hostelId}/students/export/`;
+        
+        // Reset button after delay
+        setTimeout(function() {
+            exportBtn.html(originalText).prop('disabled', false);
+        }, 2000);
+    };
+
+    // Auto-hide alerts after 5 seconds
+    setTimeout(function() {
+        $('.alert').fadeOut(500);
+    }, 5000);
+
+    // Keyboard shortcuts
+    $(document).keydown(function(e) {
+        // Ctrl+E for export
+        if (e.ctrlKey && e.key === 'e') {
+            e.preventDefault();
+            exportStudentList();
+        }
+        
+        // Ctrl+A for allocate
+        if (e.ctrlKey && e.key === 'a') {
+            e.preventDefault();
+            window.location.href = "{% url 'admin_student_allocation_create' %}?hostel={{ hostel.id }}";
+        }
+        
+        // Ctrl+B for back to hostels
+        if (e.ctrlKey && e.key === 'b') {
+            e.preventDefault();
+            window.location.href = "{% url 'admin_hostels_list' %}";
+        }
+    });
+
+    // Add smooth scroll to top when pagination changes
+    $('#students-table').on('page.dt', function() {
+        $('html, body').animate({
+            scrollTop: $('.student-card').offset().top - 100
+        }, 300);
+    });
+
+    // Add CSS variable for progress bar animation
+    const progressBar = document.querySelector('.progress-bar');
+    if (progressBar) {
+        const width = progressBar.style.width;
+        progressBar.style.setProperty('--progress-width', width);
+    }
+});
+</script>
+{% endblock %}

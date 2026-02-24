@@ -1,0 +1,642 @@
+{% extends 'admin/base.html' %}
+{% load static %}
+
+{% block title %}Edit Allocation - {{ allocation.student.full_name }}{% endblock %}
+
+{% block breadcrumb %}
+    <div class="btn-group">
+        <a href="{% url 'admin_student_allocations_list' %}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i> Back to Allocations
+        </a>
+        <a href="{% url 'admin_student_allocation_detail' allocation.id %}" class="btn btn-info">
+            <i class="fas fa-eye"></i> View Details
+        </a>
+    </div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .form-card {
+        border: none;
+        box-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.15);
+    }
+    .form-card .card-header {
+        background: linear-gradient(135deg, #f6c23e 0%, #f4b619 100%);
+        border-bottom: none;
+        padding: 1.25rem;
+    }
+    .form-card .card-header h5 {
+        margin: 0;
+        font-weight: 600;
+        color: white;
+    }
+    
+    /* Student Select Styling */
+    .select2-container {
+        width: 100% !important;
+    }
+    .select2-container--default .select2-selection--single {
+        height: 38px;
+        border: 1px solid #d1d3e2;
+        border-radius: 0.35rem;
+    }
+    .select2-container--default .select2-selection--single .select2-selection__rendered {
+        line-height: 36px;
+        padding-left: 12px;
+    }
+    .select2-container--default .select2-selection--single .select2-selection__arrow {
+        height: 36px;
+    }
+    .select2-dropdown {
+        border: 1px solid #d1d3e2;
+        border-radius: 0.35rem;
+        box-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.15);
+    }
+    .select2-results__option {
+        padding: 8px 12px;
+    }
+    .select2-results__option--highlighted {
+        background: #4e73df !important;
+    }
+    
+    /* Form group styling */
+    .form-group {
+        margin-bottom: 1.5rem;
+    }
+    .form-group label {
+        font-weight: 600;
+        color: #4e73df;
+        margin-bottom: 0.5rem;
+        display: block;
+    }
+    .form-group label .text-danger {
+        color: #e74a3b;
+        margin-left: 2px;
+    }
+    
+    /* Form control styling */
+    .form-control, .custom-select {
+        border: 1px solid #d1d3e2;
+        border-radius: 0.35rem;
+        height: 38px;
+        transition: all 0.2s;
+    }
+    .form-control:focus, .custom-select:focus {
+        border-color: #4e73df;
+        box-shadow: 0 0 0 0.2rem rgba(78, 115, 223, 0.25);
+    }
+    
+    /* Info box styling */
+    .info-box {
+        background: linear-gradient(135deg, #f8f9fc 0%, #e9ecef 100%);
+        border-left: 4px solid #4e73df;
+        padding: 1.25rem;
+        margin-bottom: 2rem;
+        border-radius: 0.35rem;
+        box-shadow: 0 0.15rem 0.5rem rgba(0,0,0,0.05);
+    }
+    .info-box .row > div {
+        padding: 0.5rem 0;
+    }
+    .info-box strong {
+        color: #4e73df;
+        display: block;
+        font-size: 0.85rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 0.25rem;
+    }
+    .info-box .badge {
+        font-size: 0.9rem;
+        padding: 0.35rem 0.75rem;
+    }
+    
+    /* Availability info box */
+    #availability-info {
+        border-radius: 0.35rem;
+        padding: 1rem;
+        margin: 1.5rem 0;
+        display: flex;
+        align-items: center;
+        animation: slideDown 0.3s ease;
+    }
+    @keyframes slideDown {
+        from {
+            opacity: 0;
+            transform: translateY(-10px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+    #availability-info i {
+        font-size: 1.2rem;
+        margin-right: 10px;
+    }
+    #availability-info.alert-success {
+        background: #d4edda;
+        border-left: 4px solid #28a745;
+    }
+    #availability-info.alert-danger {
+        background: #f8d7da;
+        border-left: 4px solid #dc3545;
+    }
+    
+    /* Button styling */
+    .btn {
+        padding: 0.5rem 1.5rem;
+        font-weight: 600;
+        border-radius: 0.35rem;
+        transition: all 0.2s;
+    }
+    .btn-warning {
+        background: linear-gradient(135deg, #f6c23e 0%, #f4b619 100%);
+        border: none;
+        color: white;
+    }
+    .btn-warning:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(246, 194, 62, 0.4);
+    }
+    .btn-info {
+        background: linear-gradient(135deg, #36b9cc 0%, #258391 100%);
+        border: none;
+        color: white;
+    }
+    .btn-info:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(54, 185, 204, 0.4);
+    }
+    
+    /* Loading indicator */
+    .loading-spinner {
+        display: inline-block;
+        width: 1rem;
+        height: 1rem;
+        border: 2px solid rgba(255,255,255,0.3);
+        border-radius: 50%;
+        border-top-color: white;
+        animation: spin 0.6s linear infinite;
+        margin-right: 5px;
+    }
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+    
+    /* Status toggle styling */
+    .custom-switch .custom-control-label::before {
+        border-color: #d1d3e2;
+    }
+    .custom-switch .custom-control-input:checked ~ .custom-control-label::before {
+        background-color: #28a745;
+        border-color: #28a745;
+    }
+    
+    /* Row spacing */
+    .row {
+        margin-left: -10px;
+        margin-right: -10px;
+    }
+    .row > [class*="col-"] {
+        padding-left: 10px;
+        padding-right: 10px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="card form-card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">
+                <i class="fas fa-edit mr-2"></i> Edit Allocation: {{ allocation.student.full_name }}
+            </h5>
+            <span class="badge badge-light">
+                <i class="fas fa-hashtag mr-1"></i> ID: {{ allocation.id }}
+            </span>
+        </div>
+        <div class="card-body p-4">
+            <!-- Student Info Box - Enhanced -->
+            <div class="info-box">
+                <div class="row">
+                    <div class="col-md-3">
+                        <strong><i class="fas fa-user-graduate mr-1"></i> Student</strong>
+                        <span class="d-block font-weight-bold">{{ allocation.student.full_name }}</span>
+                    </div>
+                    <div class="col-md-3">
+                        <strong><i class="fas fa-id-card mr-1"></i> Registration</strong>
+                        <span class="d-block"><code>{{ allocation.student.registration_number }}</code></span>
+                    </div>
+                    <div class="col-md-3">
+                        <strong><i class="fas fa-hotel mr-1"></i> Hostel</strong>
+                        <span class="d-block">{{ allocation.hostel.name }} ({{ allocation.hostel.code }})</span>
+                    </div>
+                    <div class="col-md-3">
+                        <strong><i class="fas fa-info-circle mr-1"></i> Status</strong>
+                        <span class="d-block">
+                            {% if allocation.is_active %}
+                                <span class="badge badge-success"><i class="fas fa-check-circle mr-1"></i> Active</span>
+                            {% else %}
+                                <span class="badge badge-secondary"><i class="fas fa-times-circle mr-1"></i> Inactive</span>
+                            {% endif %}
+                        </span>
+                    </div>
+                </div>
+                <div class="row mt-2">
+                    <div class="col-md-3">
+                        <strong><i class="fas fa-door-open mr-1"></i> Current Room</strong>
+                        <span class="d-block">{% if allocation.room %}Room {{ allocation.room.room_number }}{% else %}Not assigned{% endif %}</span>
+                    </div>
+                    <div class="col-md-3">
+                        <strong><i class="fas fa-bed mr-1"></i> Current Bed</strong>
+                        <span class="d-block">{% if allocation.bed %}Bed {{ allocation.bed.bed_number }}{% else %}Not assigned{% endif %}</span>
+                    </div>
+                    <div class="col-md-3">
+                        <strong><i class="fas fa-calendar-alt mr-1"></i> Academic Year</strong>
+                        <span class="d-block">{{ allocation.academic_year }}</span>
+                    </div>
+                    <div class="col-md-3">
+                        <strong><i class="fas fa-calendar-check mr-1"></i> Start Date</strong>
+                        <span class="d-block">{{ allocation.start_date|date:"d/m/Y" }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <form method="post" id="edit-form" class="needs-validation" novalidate>
+                {% csrf_token %}
+                
+                <!-- Hidden fields -->
+                <input type="hidden" name="student_id" value="{{ allocation.student.id }}">
+                <input type="hidden" name="hostel_id" value="{{ allocation.hostel.id }}">
+                
+                <div class="row">
+                    <!-- Room Selection -->
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="room">
+                                <i class="fas fa-door-open mr-1"></i> Room
+                                <span class="text-muted font-weight-normal">(Optional)</span>
+                            </label>
+                            <select class="form-control select2" id="room" name="room">
+                                <option value="">-- No specific room --</option>
+                                {% for room in hostel_rooms %}
+                                    <option value="{{ room.id }}" 
+                                            {% if allocation.room and allocation.room.id == room.id %}selected{% endif %}
+                                            data-capacity="{{ room.capacity }}"
+                                            data-current="{{ room.current_allocations }}">
+                                        Room {{ room.room_number }} ({{ room.current_allocations }}/{{ room.capacity }} students)
+                                        {% if room.current_allocations >= room.capacity %} - Full{% endif %}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                            <small class="form-text text-muted" id="room-info"></small>
+                        </div>
+                    </div>
+
+                    <!-- Bed Selection -->
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="bed">
+                                <i class="fas fa-bed mr-1"></i> Bed
+                                <span class="text-muted font-weight-normal">(Optional)</span>
+                            </label>
+                            <select class="form-control select2" id="bed" name="bed">
+                                <option value="">-- No specific bed --</option>
+                                {% if allocation.bed %}
+                                    <option value="{{ allocation.bed.id }}" selected>
+                                        Bed {{ allocation.bed.bed_number }} ({{ allocation.bed.get_bed_type_display }})
+                                    </option>
+                                {% endif %}
+                            </select>
+                            <small class="form-text text-muted" id="bed-info"></small>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <!-- End Date -->
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="end_date">
+                                <i class="fas fa-stop-circle mr-1"></i> End Date
+                            </label>
+                            <input type="date" class="form-control" id="end_date" name="end_date" 
+                                   value="{{ allocation.end_date|date:'Y-m-d' }}">
+                            <small class="form-text text-muted">
+                                <i class="fas fa-info-circle mr-1"></i> Leave empty to keep current end date
+                            </small>
+                        </div>
+                    </div>
+
+                    <!-- Status Toggle -->
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label class="d-block">
+                                <i class="fas fa-toggle-on mr-1"></i> Allocation Status
+                            </label>
+                            <div class="custom-control custom-switch mt-2">
+                                <input type="checkbox" class="custom-control-input" id="is_active" name="is_active" 
+                                       {% if allocation.is_active %}checked{% endif %}>
+                                <label class="custom-control-label" for="is_active">
+                                    <span id="status-label" class="font-weight-bold">
+                                        {% if allocation.is_active %}Active{% else %}Inactive{% endif %}
+                                    </span>
+                                </label>
+                            </div>
+                            <small class="form-text text-muted">
+                                <i class="fas fa-info-circle mr-1"></i>
+                                {% if allocation.is_active %}
+                                    Deactivate to mark as vacated and free the bed
+                                {% else %}
+                                    Activate to reactivate this allocation
+                                {% endif %}
+                            </small>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Availability Alert -->
+                <div id="availability-info" class="alert" style="display: none;">
+                    <i class="fas fa-info-circle"></i>
+                    <span id="availability-message"></span>
+                </div>
+
+                <!-- Form Actions -->
+                <div class="form-group text-right mt-4">
+                    <a href="{% url 'admin_student_allocations_list' %}" class="btn btn-secondary mr-2">
+                        <i class="fas fa-times mr-1"></i> Cancel
+                    </a>
+                    <button type="submit" class="btn btn-warning" id="save-btn">
+                        <i class="fas fa-save mr-1"></i> Update Allocation
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // ============================================
+    // Initialize Select2
+    // ============================================
+    $('.select2').select2({
+        theme: 'bootstrap4',
+        width: '100%',
+        placeholder: '-- Select an option --',
+        allowClear: true,
+        minimumResultsForSearch: 10
+    });
+
+    // ============================================
+    // CSRF Token Function
+    // ============================================
+    function getCSRFToken() {
+        let csrfToken = '';
+        const csrfInput = document.querySelector('input[name="csrfmiddlewaretoken"]');
+        if (csrfInput) {
+            csrfToken = csrfInput.value;
+        }
+        return csrfToken;
+    }
+
+    // ============================================
+    // Toast Notification Function
+    // ============================================
+    function showToast(message, type = 'success') {
+        // Check if toast container exists, create if not
+        if ($('#toast-container').length === 0) {
+            $('body').append('<div id="toast-container" style="position: fixed; top: 20px; right: 20px; z-index: 9999;"></div>');
+        }
+        
+        const toastId = 'toast-' + Date.now();
+        const icon = type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle';
+        const bgColor = type === 'success' ? '#28a745' : '#dc3545';
+        
+        const toast = `
+            <div id="${toastId}" class="toast-notification alert alert-${type} alert-dismissible fade show" role="alert" 
+                 style="background: ${bgColor}; color: white; border: none; min-width: 300px; animation: slideIn 0.3s ease;">
+                <strong><i class="fas ${icon} mr-2"></i> ${type === 'success' ? 'Success!' : 'Error!'}</strong>
+                <span class="ml-2">${message}</span>
+                <button type="button" class="close" onclick="$('#${toastId}').fadeOut()" style="color: white;">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+        `;
+        
+        $('#toast-container').append(toast);
+        
+        setTimeout(function() {
+            $('#' + toastId).fadeOut(function() {
+                $(this).remove();
+            });
+        }, 3000);
+    }
+
+    // ============================================
+    // Confirmation Modal Function
+    // ============================================
+    function showConfirmationModal(title, message, onConfirm) {
+        // Create modal if it doesn't exist
+        if ($('#confirmationModal').length === 0) {
+            const modalHtml = `
+                <div class="modal fade" id="confirmationModal" tabindex="-1" role="dialog" aria-hidden="true">
+                    <div class="modal-dialog modal-dialog-centered" role="document">
+                        <div class="modal-content">
+                            <div class="modal-header bg-warning">
+                                <h5 class="modal-title text-white">
+                                    <i class="fas fa-question-circle mr-2"></i> <span id="confirmation-title"></span>
+                                </h5>
+                                <button type="button" class="close text-white" data-dismiss="modal">
+                                    <span aria-hidden="true">&times;</span>
+                                </button>
+                            </div>
+                            <div class="modal-body">
+                                <p id="confirmation-message"></p>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-dismiss="modal">
+                                    <i class="fas fa-times mr-1"></i> Cancel
+                                </button>
+                                <button type="button" class="btn btn-warning" id="confirmation-confirm-btn">
+                                    <i class="fas fa-check mr-1"></i> Confirm
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            $('body').append(modalHtml);
+        }
+        
+        $('#confirmation-title').text(title);
+        $('#confirmation-message').text(message);
+        
+        $('#confirmation-confirm-btn').off('click').on('click', function() {
+            $('#confirmationModal').modal('hide');
+            if (onConfirm) onConfirm();
+        });
+        
+        $('#confirmationModal').modal('show');
+    }
+
+    // ============================================
+    // Status toggle label update
+    // ============================================
+    $('#is_active').on('change', function() {
+        $('#status-label').text($(this).is(':checked') ? 'Active' : 'Inactive');
+    });
+
+    // ============================================
+    // Load beds when room changes
+    // ============================================
+    $('#room').on('change', function() {
+        const roomId = $(this).val();
+        const $bedSelect = $('#bed');
+        const currentBedId = '{{ allocation.bed.id|default:"" }}';
+        
+        $bedSelect.empty().append('<option value="">Loading...</option>').prop('disabled', true);
+        $('#bed-info').text('');
+        
+        if (roomId) {
+            $.ajax({
+                url: '{% url "admin_get_available_beds" 0 %}'.replace('0', roomId),
+                method: 'GET',
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                success: function(data) {
+                    $bedSelect.empty().append('<option value="">-- No specific bed --</option>');
+                    
+                    if (data.success && data.beds && data.beds.length > 0) {
+                        $.each(data.beds, function(index, bed) {
+                            const selected = bed.id == currentBedId ? 'selected' : '';
+                            $bedSelect.append(`<option value="${bed.id}" ${selected}>${bed.display}</option>`);
+                        });
+                        $('#bed-info').text(`${data.beds.length} beds available`);
+                    } else {
+                        $bedSelect.append('<option value="" disabled>No beds available</option>');
+                        $('#bed-info').text('No beds available in this room');
+                    }
+                    
+                    $bedSelect.prop('disabled', false).trigger('change');
+                },
+                error: function() {
+                    $bedSelect.empty().append('<option value="">Error loading beds</option>').prop('disabled', false);
+                    $('#bed-info').text('Failed to load beds');
+                    showToast('Failed to load beds', 'danger');
+                }
+            });
+        } else {
+            $bedSelect.empty().append('<option value="">-- No specific bed --</option>').prop('disabled', false);
+            $('#bed-info').text('');
+        }
+        
+        checkAvailability();
+    });
+
+    // ============================================
+    // Check availability on changes
+    // ============================================
+    $('#room, #bed').on('change', checkAvailability);
+
+    function checkAvailability() {
+        const roomId = $('#room').val();
+        const bedId = $('#bed').val();
+        
+        if (!roomId && !bedId) {
+            $('#availability-info').hide();
+            return;
+        }
+        
+        $.ajax({
+            url: '{% url "admin_check_availability" %}',
+            method: 'GET',
+            data: {
+                hostel_id: '{{ allocation.hostel.id }}',
+                room_id: roomId,
+                bed_id: bedId
+            },
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            success: function(data) {
+                const $info = $('#availability-info');
+                const $message = $('#availability-message');
+                
+                if (data.success && data.available) {
+                    $info.removeClass('alert-danger alert-warning').addClass('alert-success');
+                    $message.html('<i class="fas fa-check-circle mr-1"></i> Selected options are available');
+                    $info.show();
+                } else {
+                    $info.removeClass('alert-success alert-warning').addClass('alert-danger');
+                    const messages = data.messages ? data.messages.join(', ') : 'Selected options are not available';
+                    $message.html('<i class="fas fa-exclamation-circle mr-1"></i> ' + messages);
+                    $info.show();
+                }
+            },
+            error: function() {
+                $('#availability-info').hide();
+            }
+        });
+    }
+
+    // ============================================
+    // Form submission with validation
+    // ============================================
+    $('#edit-form').on('submit', function(e) {
+        e.preventDefault();
+        
+        const $btn = $('#save-btn');
+        const originalText = $btn.html();
+        
+        // Show loading state
+        $btn.prop('disabled', true).html('<span class="loading-spinner"></span> Updating...');
+        
+        $.ajax({
+            url: window.location.href,
+            method: 'POST',
+            data: $(this).serialize(),
+            headers: {
+                'X-CSRFToken': getCSRFToken(),
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            success: function(response) {
+                if (response.success) {
+                    showToast('Allocation updated successfully', 'success');
+                    setTimeout(function() {
+                        window.location.href = '{% url "admin_student_allocations_list" %}';
+                    }, 1500);
+                } else {
+                    showToast(response.message || 'Error updating allocation', 'danger');
+                    $btn.prop('disabled', false).html(originalText);
+                }
+            },
+            error: function(xhr) {
+                let errorMsg = 'An error occurred. Please try again.';
+                if (xhr.responseJSON && xhr.responseJSON.message) {
+                    errorMsg = xhr.responseJSON.message;
+                }
+                showToast(errorMsg, 'danger');
+                $btn.prop('disabled', false).html(originalText);
+            }
+        });
+    });
+
+    // ============================================
+    // Real-time validation
+    // ============================================
+    $('#room, #bed, #end_date').on('change', function() {
+        if ($(this).val()) {
+            $(this).removeClass('is-invalid').addClass('is-valid');
+        }
+    });
+
+    // ============================================
+    // Trigger initial availability check if room is selected
+    // ============================================
+    if ($('#room').val()) {
+        $('#room').trigger('change');
+    }
+});
+</script>
+{% endblock %}

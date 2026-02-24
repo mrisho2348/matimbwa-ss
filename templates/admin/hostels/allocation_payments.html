@@ -1,0 +1,1039 @@
+{% extends 'admin/base.html' %}
+{% load static %}
+{% load humanize %}
+
+{% block title %}Payments - {{ allocation.student.full_name }}{% endblock %}
+
+{% block breadcrumb %}
+    <div class="btn-group">
+        <a href="{% url 'admin_student_allocation_detail' allocation.id %}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i> Back to Allocation
+        </a>
+        <a href="{% url 'admin_hostel_payment_create' %}?allocation={{ allocation.id }}" class="btn btn-primary">
+            <i class="fas fa-plus"></i> New Payment
+        </a>
+        <button class="btn btn-info" onclick="exportPayments()">
+            <i class="fas fa-download"></i> Export
+        </button>       
+    </div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* ============================================
+       Main Container
+       ============================================ */
+    .payments-container {
+        padding: 20px 0;
+    }
+    
+    /* ============================================
+       Header Section
+       ============================================ */
+    .allocation-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 15px;
+        padding: 25px;
+        color: white;
+        margin-bottom: 25px;
+        position: relative;
+        overflow: hidden;
+        box-shadow: 0 10px 30px rgba(102, 126, 234, 0.3);
+    }
+    
+    .allocation-header::before {
+        content: '';
+        position: absolute;
+        top: -50px;
+        right: -50px;
+        width: 200px;
+        height: 200px;
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 50%;
+    }
+    
+    .allocation-header::after {
+        content: '';
+        position: absolute;
+        bottom: -50px;
+        left: -50px;
+        width: 150px;
+        height: 150px;
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 50%;
+    }
+    
+    .student-avatar {
+        width: 60px;
+        height: 60px;
+        background: rgba(255, 255, 255, 0.2);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.8rem;
+        margin-right: 20px;
+        border: 2px solid white;
+    }
+    
+    .student-name {
+        font-size: 1.8rem;
+        font-weight: 700;
+        margin-bottom: 5px;
+    }
+    
+    .student-meta {
+        display: flex;
+        gap: 20px;
+        flex-wrap: wrap;
+        font-size: 0.9rem;
+        opacity: 0.9;
+    }
+    
+    .student-meta i {
+        margin-right: 5px;
+    }
+    
+    /* ============================================
+       Stats Cards
+       ============================================ */
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 20px;
+        margin-bottom: 25px;
+    }
+    
+    .stat-card {
+        background: white;
+        border-radius: 12px;
+        padding: 20px;
+        box-shadow: 0 5px 20px rgba(0, 0, 0, 0.05);
+        transition: transform 0.3s, box-shadow 0.3s;
+        position: relative;
+        overflow: hidden;
+        border-left: 4px solid transparent;
+    }
+    
+    .stat-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+    }
+    
+    .stat-card.fee {
+        border-left-color: #4e73df;
+    }
+    
+    .stat-card.paid {
+        border-left-color: #1cc88a;
+    }
+    
+    .stat-card.balance {
+        border-left-color: #f6c23e;
+    }
+    
+    .stat-card.status {
+        border-left-color: #e74a3b;
+    }
+    
+    .stat-icon {
+        position: absolute;
+        right: 15px;
+        top: 15px;
+        font-size: 2.5rem;
+        opacity: 0.2;
+    }
+    
+    .stat-label {
+        font-size: 0.8rem;
+        color: #6c757d;
+        text-transform: uppercase;
+        margin-bottom: 5px;
+    }
+    
+    .stat-value {
+        font-size: 1.8rem;
+        font-weight: 700;
+        color: #2c3e50;
+    }
+    
+    .stat-value.small {
+        font-size: 1.2rem;
+    }
+    
+    .stat-trend {
+        margin-top: 8px;
+        font-size: 0.8rem;
+    }
+    
+    .trend-up {
+        color: #1cc88a;
+    }
+    
+    .trend-down {
+        color: #e74a3b;
+    }
+    
+    /* ============================================
+       Progress Bar
+       ============================================ */
+    .progress-card {
+        background: white;
+        border-radius: 12px;
+        padding: 20px;
+        margin-bottom: 25px;
+        box-shadow: 0 5px 20px rgba(0, 0, 0, 0.05);
+    }
+    
+    .progress-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 10px;
+    }
+    
+    .progress-title {
+        font-weight: 600;
+        color: #4e73df;
+    }
+    
+    .progress-percentage {
+        font-size: 1.2rem;
+        font-weight: 700;
+        color: #1cc88a;
+    }
+    
+    .progress {
+        height: 12px;
+        border-radius: 6px;
+        background: #e3e6f0;
+        overflow: hidden;
+    }
+    
+    .progress-bar {
+        background: linear-gradient(90deg, #1cc88a 0%, #36b9cc 100%);
+        border-radius: 6px;
+        transition: width 0.5s;
+    }
+    
+    .progress-stats {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 10px;
+        color: #6c757d;
+        font-size: 0.9rem;
+    }
+    
+    /* ============================================
+       Filter Section
+       ============================================ */
+    .filter-section {
+        background: white;
+        border-radius: 12px;
+        padding: 20px;
+        margin-bottom: 25px;
+        box-shadow: 0 5px 20px rgba(0, 0, 0, 0.05);
+    }
+    
+    .filter-title {
+        color: #4e73df;
+        font-weight: 600;
+        margin-bottom: 15px;
+    }
+    
+    .filter-title i {
+        margin-right: 8px;
+    }
+    
+    .filter-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 15px;
+    }
+    
+    .filter-actions {
+        display: flex;
+        gap: 10px;
+        justify-content: flex-end;
+        margin-top: 15px;
+    }
+    
+    /* ============================================
+       Installment Cards
+       ============================================ */
+    .installment-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 20px;
+        margin-bottom: 25px;
+    }
+    
+    .installment-card {
+        background: white;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 5px 20px rgba(0, 0, 0, 0.05);
+        transition: transform 0.3s;
+        border: 1px solid #e3e6f0;
+    }
+    
+    .installment-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+    }
+    
+    .installment-header {
+        padding: 15px;
+        background: linear-gradient(135deg, #f8f9fc 0%, #ffffff 100%);
+        border-bottom: 1px solid #e3e6f0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    
+    .installment-number {
+        font-weight: 700;
+        color: #4e73df;
+    }
+    
+    .installment-badge {
+        padding: 4px 10px;
+        border-radius: 20px;
+        font-size: 0.75rem;
+        font-weight: 600;
+    }
+    
+    .badge-paid {
+        background: #1cc88a;
+        color: white;
+    }
+    
+    .badge-partial {
+        background: #f6c23e;
+        color: white;
+    }
+    
+    .badge-unpaid {
+        background: #e74a3b;
+        color: white;
+    }
+    
+    .installment-body {
+        padding: 15px;
+    }
+    
+    .installment-row {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 10px;
+    }
+    
+    .installment-label {
+        color: #6c757d;
+        font-size: 0.85rem;
+    }
+    
+    .installment-amount {
+        font-weight: 600;
+    }
+    
+    .installment-progress {
+        height: 6px;
+        background: #e3e6f0;
+        border-radius: 3px;
+        overflow: hidden;
+        margin: 10px 0;
+    }
+    
+    .installment-progress-bar {
+        height: 100%;
+        background: linear-gradient(90deg, #1cc88a 0%, #36b9cc 100%);
+        border-radius: 3px;
+    }
+    
+    .installment-footer {
+        padding: 10px 15px;
+        background: #f8f9fc;
+        border-top: 1px solid #e3e6f0;
+        font-size: 0.85rem;
+    }
+    
+    /* ============================================
+       Timeline Transactions
+       ============================================ */
+    .timeline-container {
+        background: white;
+        border-radius: 12px;
+        padding: 20px;
+        box-shadow: 0 5px 20px rgba(0, 0, 0, 0.05);
+    }
+    
+    .timeline-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+    }
+    
+    .timeline-title {
+        color: #4e73df;
+        font-weight: 600;
+    }
+    
+    .transaction-count {
+        background: #4e73df20;
+        color: #4e73df;
+        padding: 5px 10px;
+        border-radius: 20px;
+        font-size: 0.85rem;
+    }
+    
+    .timeline {
+        position: relative;
+        padding-left: 30px;
+    }
+    
+    .timeline::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: 2px;
+        background: linear-gradient(to bottom, #4e73df, #36b9cc);
+    }
+    
+    .timeline-item {
+        position: relative;
+        padding: 20px;
+        margin-bottom: 15px;
+        background: #f8f9fc;
+        border-radius: 10px;
+        transition: transform 0.2s;
+    }
+    
+    .timeline-item:hover {
+        transform: translateX(5px);
+        background: white;
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+    }
+    
+    .timeline-item::before {
+        content: '';
+        position: absolute;
+        left: -34px;
+        top: 25px;
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        background: #4e73df;
+        border: 2px solid white;
+        box-shadow: 0 0 0 2px #4e73df20;
+    }
+    
+    .timeline-date {
+        font-size: 0.85rem;
+        color: #6c757d;
+        margin-bottom: 5px;
+    }
+    
+    .timeline-date i {
+        margin-right: 5px;
+    }
+    
+    .transaction-type {
+        display: inline-block;
+        padding: 3px 8px;
+        border-radius: 12px;
+        font-size: 0.7rem;
+        font-weight: 600;
+        margin-right: 10px;
+    }
+    
+    .type-installment {
+        background: #4e73df;
+        color: white;
+    }
+    
+    .type-monthly {
+        background: #1cc88a;
+        color: white;
+    }
+    
+    .type-yearly {
+        background: #f6c23e;
+        color: #2c3e50;
+    }
+    
+    .method-badge {
+        display: inline-block;
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-size: 0.7rem;
+        background: #e3e6f0;
+        color: #4e73df;
+    }
+    
+    .transaction-amount {
+        font-size: 1.2rem;
+        font-weight: 700;
+        color: #1cc88a;
+    }
+    
+    .receipt-link {
+        color: #4e73df;
+        text-decoration: none;
+        font-family: monospace;
+        font-weight: 600;
+    }
+    
+    .receipt-link:hover {
+        text-decoration: underline;
+    }
+    
+    /* ============================================
+       Stats Tables
+       ============================================ */
+    .stats-section {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+        margin-top: 25px;
+    }
+    
+    .stats-card {
+        background: white;
+        border-radius: 12px;
+        padding: 20px;
+        box-shadow: 0 5px 20px rgba(0, 0, 0, 0.05);
+    }
+    
+    .stats-card h6 {
+        color: #4e73df;
+        margin-bottom: 15px;
+    }
+    
+    .stats-table {
+        width: 100%;
+    }
+    
+    .stats-table td {
+        padding: 8px 0;
+        border-bottom: 1px solid #e3e6f0;
+    }
+    
+    .stats-table td:last-child {
+        text-align: right;
+        font-weight: 600;
+    }
+    
+    /* ============================================
+       Empty State
+       ============================================ */
+    .empty-state {
+        text-align: center;
+        padding: 60px 20px;
+    }
+    
+    .empty-state i {
+        font-size: 4rem;
+        color: #e3e6f0;
+        margin-bottom: 20px;
+    }
+    
+    .empty-state h5 {
+        color: #4e73df;
+        margin-bottom: 10px;
+    }
+    
+    .empty-state p {
+        color: #6c757d;
+        margin-bottom: 20px;
+    }
+    
+    /* ============================================
+       Upcoming Reminders
+       ============================================ */
+    .reminder-card {
+        background: #fff3cd;
+        border: 1px solid #ffeeba;
+        border-radius: 8px;
+        padding: 12px 15px;
+        margin-top: 15px;
+    }
+    
+    .reminder-title {
+        color: #856404;
+        font-weight: 600;
+        margin-bottom: 5px;
+    }
+    
+    .reminder-text {
+        color: #856404;
+        font-size: 0.9rem;
+    }
+    
+    /* ============================================
+       Print Styles
+       ============================================ */
+    @media print {
+        .btn-group, .filter-section, .sidebar, footer, .navbar {
+            display: none !important;
+        }
+        
+        .allocation-header {
+            background: #4e73df !important;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+        
+        .stat-card, .progress-card, .installment-card {
+            break-inside: avoid;
+            border: 1px solid #ddd !important;
+        }
+        
+        .timeline::before {
+            background: #4e73df !important;
+        }
+        
+        .timeline-item::before {
+            background: #4e73df !important;
+        }
+    }
+    
+    /* ============================================
+       Responsive Design
+       ============================================ */
+    @media (max-width: 1200px) {
+        .stats-grid {
+            grid-template-columns: repeat(2, 1fr);
+        }
+    }
+    
+    @media (max-width: 768px) {
+        .stats-grid {
+            grid-template-columns: 1fr;
+        }
+        
+        .stats-section {
+            grid-template-columns: 1fr;
+        }
+        
+        .student-meta {
+            flex-direction: column;
+            gap: 5px;
+        }
+        
+        .timeline-item .row > div {
+            margin-bottom: 10px;
+        }
+        
+        .filter-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid payments-container">
+    <!-- Allocation Header -->
+    <div class="allocation-header">
+        <div class="d-flex align-items-center">
+            <div class="student-avatar">
+                <i class="fas fa-user-graduate"></i>
+            </div>
+            <div class="flex-grow-1">
+                <div class="student-name">{{ allocation.student.full_name }}</div>
+                <div class="student-meta">
+                    <span><i class="fas fa-id-card"></i> {{ allocation.student.registration_number|default:"No Reg No" }}</span>
+                    <span><i class="fas fa-hotel"></i> {{ allocation.hostel.name }} ({{ allocation.hostel.code }})</span>
+                    <span><i class="fas fa-door-open"></i> Room {{ allocation.room.room_number|default:"N/A" }}</span>
+                    <span><i class="fas fa-bed"></i> Bed {{ allocation.bed.bed_number|default:"N/A" }}</span>
+                    <span><i class="fas fa-calendar"></i> {{ allocation.academic_year }}</span>
+                </div>
+            </div>
+            <div>
+                {% if allocation.is_active %}
+                    <span class="badge badge-success p-2">
+                        <i class="fas fa-check-circle"></i> ACTIVE
+                    </span>
+                {% else %}
+                    <span class="badge badge-secondary p-2">
+                        <i class="fas fa-times-circle"></i> INACTIVE
+                    </span>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Statistics Cards -->
+    <div class="stats-grid">
+        <div class="stat-card fee">
+            <div class="stat-icon">
+                <i class="fas fa-tag"></i>
+            </div>
+            <div class="stat-label">Total Fee</div>
+            <div class="stat-value">TSh {{ total_fee|floatformat:2|intcomma }}</div>
+            <div class="stat-trend">
+                <i class="fas fa-calendar"></i> {{ allocation.hostel.get_payment_mode_display }}
+            </div>
+        </div>
+
+        <div class="stat-card paid">
+            <div class="stat-icon">
+                <i class="fas fa-check-circle"></i>
+            </div>
+            <div class="stat-label">Total Paid</div>
+            <div class="stat-value">TSh {{ total_paid|floatformat:2|intcomma }}</div>
+            <div class="stat-trend">
+                <span class="trend-up">
+                    <i class="fas fa-arrow-up"></i> {{ transactions|length }} transactions
+                </span>
+            </div>
+        </div>
+
+        <div class="stat-card balance">
+            <div class="stat-icon">
+                <i class="fas fa-balance-scale"></i>
+            </div>
+            <div class="stat-label">Balance</div>
+            <div class="stat-value {% if balance > 0 %}text-danger{% else %}text-success{% endif %}">
+                TSh {{ balance|floatformat:2|intcomma }}
+            </div>
+            <div class="stat-trend">
+                {% if is_fully_paid %}
+                    <span class="text-success"><i class="fas fa-check"></i> Fully Paid</span>
+                {% else %}
+                    <span class="text-warning"><i class="fas fa-clock"></i> {{ payment_status }}</span>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="stat-card status">
+            <div class="stat-icon">
+                <i class="fas fa-credit-card"></i>
+            </div>
+            <div class="stat-label">Payment Status</div>
+            <div class="stat-value small">
+                <span class="badge {% if is_fully_paid %}badge-success{% elif total_paid > 0 %}badge-warning{% else %}badge-danger{% endif %} p-2">
+                    {{ payment_status|upper }}
+                </span>
+            </div>
+            <div class="stat-trend">
+                Last: {{ recent_activity.first.payment_date|date:"d/m/Y"|default:"No payments" }}
+            </div>
+        </div>
+    </div>
+
+    <!-- Progress Bar -->
+    <div class="progress-card">
+        <div class="progress-header">
+            <span class="progress-title">
+                <i class="fas fa-chart-line mr-2"></i> Payment Progress
+            </span>
+            <span class="progress-percentage">{{ payment_percentage|floatformat:1 }}%</span>
+        </div>
+        <div class="progress">
+            <div class="progress-bar" role="progressbar" style="width: {{ payment_percentage|floatformat:0 }}%"></div>
+        </div>
+        <div class="progress-stats">
+            <span><i class="fas fa-check-circle text-success mr-1"></i> Paid: TSh {{ total_paid|floatformat:2|intcomma }}</span>
+            <span><i class="fas fa-clock text-warning mr-1"></i> Remaining: TSh {{ balance|floatformat:2|intcomma }}</span>
+        </div>
+    </div>
+
+    <!-- Filter Section -->
+    <div class="filter-section">
+        <div class="filter-title">
+            <i class="fas fa-filter"></i> Filter Transactions
+        </div>
+        <form method="get" class="filter-grid">
+            <div>
+                <label class="small text-muted">Date From</label>
+                <input type="date" name="date_from" class="form-control" value="{{ filter_params.date_from }}">
+            </div>
+            <div>
+                <label class="small text-muted">Date To</label>
+                <input type="date" name="date_to" class="form-control" value="{{ filter_params.date_to }}">
+            </div>
+            <div>
+                <label class="small text-muted">Payment Type</label>
+                <select name="payment_type" class="form-control">
+                    <option value="">All Types</option>
+                    {% for type_code, type_name in HostelPaymentTransaction.PAYMENT_TYPE %}
+                        <option value="{{ type_code }}" {% if filter_params.payment_type == type_code %}selected{% endif %}>
+                            {{ type_name }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="small text-muted">Payment Method</label>
+                <select name="payment_method" class="form-control">
+                    <option value="">All Methods</option>
+                    {% for method_code, method_name in HostelPaymentTransaction.PAYMENT_METHOD %}
+                        <option value="{{ method_code }}" {% if filter_params.payment_method == method_code %}selected{% endif %}>
+                            {{ method_name }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="filter-actions">
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-search"></i> Apply Filters
+                </button>
+                <a href="{% url 'admin_allocation_payments' allocation.id %}" class="btn btn-secondary">
+                    <i class="fas fa-undo"></i> Reset
+                </a>
+            </div>
+        </form>
+    </div>
+
+    <!-- Installment Plans Section -->
+    {% if installment_payments %}
+    <h5 class="text-primary mb-3">
+        <i class="fas fa-list-ol mr-2"></i> Installment Payment Plans
+    </h5>
+    <div class="installment-grid">
+        {% for installment in installment_payments %}
+        <div class="installment-card">
+            <div class="installment-header">
+                <span class="installment-number">
+                    <i class="fas fa-hashtag"></i> Installment #{{ installment.installment_plan.installment_number }}
+                </span>
+                <span class="installment-badge badge-{{ installment.status }}">
+                    {{ installment.status|upper }}
+                </span>
+            </div>
+            <div class="installment-body">
+                <div class="installment-row">
+                    <span class="installment-label">Required Amount:</span>
+                    <span class="installment-amount">TSh {{ installment.required_amount|floatformat:2|intcomma }}</span>
+                </div>
+                <div class="installment-row">
+                    <span class="installment-label">Paid Amount:</span>
+                    <span class="installment-amount text-success">TSh {{ installment.total_paid|floatformat:2|intcomma }}</span>
+                </div>
+                <div class="installment-row">
+                    <span class="installment-label">Remaining:</span>
+                    <span class="installment-amount {% if installment.remaining_amount > 0 %}text-danger{% else %}text-success{% endif %}">
+                        TSh {{ installment.remaining_amount|floatformat:2|intcomma }}
+                    </span>
+                </div>
+                
+                <div class="installment-progress">
+                    <div class="installment-progress-bar" style="width: {{ installment.paid_percentage|floatformat:0 }}%"></div>
+                </div>
+                
+                <div class="installment-row small">
+                    <span>Payment Period:</span>
+                    <span>{{ installment.installment_plan.start_day }}/{{ installment.installment_plan.start_month }} - 
+                          {{ installment.installment_plan.end_day }}/{{ installment.installment_plan.end_month }}</span>
+                </div>
+            </div>
+            <div class="installment-footer">
+                <i class="fas fa-info-circle text-primary mr-1"></i>
+                Progress: {{ installment.paid_percentage|floatformat:1 }}% complete
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Upcoming Payment Reminders -->
+    {% if upcoming_installments %}
+    <div class="reminder-card">
+        <div class="reminder-title">
+            <i class="fas fa-bell mr-2"></i> Upcoming Payments
+        </div>
+        {% for reminder in upcoming_installments %}
+        <div class="reminder-text">
+            Installment #{{ reminder.installment.installment_plan.installment_number }}: 
+            TSh {{ reminder.amount_due|floatformat:2|intcomma }} due in {{ reminder.days_until }} days
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Payment Transactions Timeline -->
+    <div class="timeline-container">
+        <div class="timeline-header">
+            <h5 class="timeline-title">
+                <i class="fas fa-history mr-2"></i> Payment History Timeline
+            </h5>
+            <span class="transaction-count">
+                <i class="fas fa-list"></i> {{ transactions|length }} transactions
+            </span>
+        </div>
+
+        {% if transactions %}
+        <div class="timeline">
+            {% for transaction in transactions %}
+            <div class="timeline-item">
+                <div class="timeline-date">
+                    <i class="far fa-calendar-alt"></i> {{ transaction.payment_date|date:"l, d F Y" }}
+                    <span class="ml-3 text-muted">
+                        <i class="far fa-clock"></i> {{ transaction.created_at|time:"H:i" }}
+                    </span>
+                </div>
+                
+                <div class="row">
+                    <div class="col-md-2">
+                        <span class="transaction-type type-{{ transaction.payment_type }}">
+                            {{ transaction.get_payment_type_display }}
+                        </span>
+                    </div>
+                    
+                    <div class="col-md-2">
+                        <span class="method-badge">
+                            <i class="fas fa-money-check-alt"></i> {{ transaction.get_payment_method_display }}
+                        </span>
+                    </div>
+                    
+                    <div class="col-md-3">
+                        {% if transaction.installment_payment %}
+                            <i class="fas fa-list-ol text-primary mr-1"></i>
+                            <strong>Installment #{{ transaction.installment_payment.installment_plan.installment_number }}</strong>
+                        {% elif transaction.month %}
+                            <i class="fas fa-calendar-alt text-info mr-1"></i>
+                            <strong>Month {{ transaction.month }}/{{ transaction.year }}</strong>
+                        {% else %}
+                            <i class="fas fa-calendar-check text-success mr-1"></i>
+                            <strong>Yearly Payment</strong>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="col-md-2">
+                        <span class="transaction-amount">
+                            TSh {{ transaction.amount|floatformat:2|intcomma }}
+                        </span>
+                    </div>
+                    
+                    <div class="col-md-3 text-right">
+                        {% if transaction.transaction_number %}
+                        <span class="text-muted mr-2 small">
+                            <i class="fas fa-hashtag"></i> {{ transaction.transaction_number|truncatechars:12 }}
+                        </span>
+                        {% endif %}
+                        
+                        <a href="{% url 'admin_hostel_payment_detail' transaction.id %}" 
+                           class="btn btn-sm btn-primary" title="View Details">
+                            <i class="fas fa-eye"></i>
+                        </a>
+                        <a href="{% url 'admin_single_allocation_transaction_payments_export_pdf' transaction.id %}" 
+                           class="btn btn-sm btn-info" title="Print Receipt">
+                            <i class="fas fa-print"></i>
+                        </a>                       
+                       
+                        
+                        <span class="receipt-link ml-2">
+                            <i class="fas fa-receipt"></i> {{ transaction.receipt_number }}
+                        </span>
+                    </div>
+                </div>
+                
+                {% if transaction.notes %}
+                <div class="mt-2 small text-muted">
+                    <i class="fas fa-comment"></i> {{ transaction.notes }}
+                </div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <i class="fas fa-credit-card"></i>
+            <h5>No Payment Transactions</h5>
+            <p class="text-muted">This allocation has no payment records yet.</p>
+            <a href="{% url 'admin_hostel_payment_create' %}?allocation={{ allocation.id }}" class="btn btn-primary">
+                <i class="fas fa-plus"></i> Record First Payment
+            </a>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Payment Statistics -->
+    {% if transactions %}
+    <div class="stats-section">
+        <!-- By Payment Type -->
+        <div class="stats-card">
+            <h6><i class="fas fa-chart-pie mr-2"></i> Payment by Type</h6>
+            <table class="stats-table">
+                {% for stat in stats_by_type %}
+                <tr>
+                    <td>{{ stat.payment_type|title }}</td>
+                    <td>{{ stat.count }} transactions</td>
+                    <td>TSh {{ stat.total|floatformat:2|intcomma }}</td>
+                </tr>
+                {% endfor %}
+            </table>
+        </div>
+
+        <!-- By Payment Method -->
+        <div class="stats-card">
+            <h6><i class="fas fa-money-bill-wave mr-2"></i> Payment by Method</h6>
+            <table class="stats-table">
+                {% for stat in stats_by_method %}
+                <tr>
+                    <td>{{ stat.payment_method|title }}</td>
+                    <td>{{ stat.count }} transactions</td>
+                    <td>TSh {{ stat.total|floatformat:2|intcomma }}</td>
+                </tr>
+                {% endfor %}
+            </table>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    
+
+    // Export payments function
+    function exportPayments() {
+        const params = new URLSearchParams(window.location.search);
+        window.location.href = `{% url 'admin_allocation_payments_export_pdf' allocation.id %}?${params.toString()}`;
+    }
+
+    // Initialize tooltips
+    $(function () {
+        $('[data-toggle="tooltip"]').tooltip();
+    });
+
+    // Auto-hide alerts after 5 seconds
+    setTimeout(function() {
+        $('.alert').fadeOut();
+    }, 5000);
+
+    // Keyboard shortcuts
+    $(document).keydown(function(e) {
+        // Ctrl+P for print
+        if (e.ctrlKey && e.key === 'p') {
+            e.preventDefault();
+            window.print();
+        }
+        
+        // Ctrl+F for filter focus
+        if (e.ctrlKey && e.key === 'f') {
+            e.preventDefault();
+            $('input[name="date_from"]').focus();
+        }
+    });
+
+    // Date range validation
+    $('input[name="date_from"], input[name="date_to"]').change(function() {
+        const dateFrom = $('input[name="date_from"]').val();
+        const dateTo = $('input[name="date_to"]').val();
+        
+        if (dateFrom && dateTo && dateFrom > dateTo) {
+            alert('Start date cannot be after end date');
+            $(this).val('');
+        }
+    });
+</script>
+{% endblock %}

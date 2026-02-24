@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+  {% load humanize %}
+  {% load math_filters %}
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hostel Payments Report</title>
+    <style>
+        @page {
+            size: A4 landscape;
+            margin: 1.5cm;
+            
+            @top-center {
+                content: "Hostel Payments Report";
+                font-family: Arial, sans-serif;
+                font-size: 10pt;
+                color: #4e73df;
+            }
+            
+            @bottom-center {
+                content: "Page " counter(page) " of " counter(pages);
+                font-family: Arial, sans-serif;
+                font-size: 8pt;
+                color: #666;
+            }
+        }
+        
+        body {
+            font-family: Arial, sans-serif;
+            font-size: 9pt;
+            line-height: 1.4;
+            color: #333;
+        }
+        
+        .header {
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #4e73df;
+        }
+        
+        .header h1 {
+            color: #4e73df;
+            font-size: 18pt;
+            margin: 0 0 5px 0;
+        }
+        
+        .header .subtitle {
+            color: #666;
+            font-size: 10pt;
+        }
+        
+        .summary-section {
+            margin-bottom: 20px;
+            padding: 10px;
+            background-color: #f8f9fc;
+            border: 1px solid #e3e6f0;
+            border-radius: 5px;
+        }
+        
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+        }
+        
+        .summary-item {
+            text-align: center;
+        }
+        
+        .summary-item .label {
+            font-size: 8pt;
+            color: #4e73df;
+            text-transform: uppercase;
+            margin-bottom: 5px;
+        }
+        
+        .summary-item .value {
+            font-size: 14pt;
+            font-weight: bold;
+            color: #333;
+        }
+        
+        .summary-item .value small {
+            font-size: 8pt;
+            font-weight: normal;
+            color: #666;
+        }
+        
+        .filters-section {
+            margin-bottom: 15px;
+            padding: 8px;
+            background-color: #fff3cd;
+            border: 1px solid #ffeeba;
+            border-radius: 5px;
+            font-size: 8pt;
+        }
+        
+        .filters-section strong {
+            color: #856404;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+            font-size: 8pt;
+        }
+        
+        th {
+            background-color: #4e73df;
+            color: white;
+            font-weight: bold;
+            padding: 8px 4px;
+            text-align: left;
+            border: 1px solid #224abe;
+            white-space: nowrap;
+        }
+        
+        td {
+            padding: 6px 4px;
+            border: 1px solid #d1d3e2;
+            vertical-align: top;
+        }
+        
+        tr:nth-child(even) {
+            background-color: #f8f9fc;
+        }
+        
+        .amount {
+            text-align: right;
+            font-weight: 500;
+        }
+        
+        .balance-positive {
+            color: #e74a3b;
+            font-weight: 600;
+        }
+        
+        .balance-zero {
+            color: #1cc88a;
+            font-weight: 600;
+        }
+        
+        .payment-type {
+            padding: 2px 4px;
+            border-radius: 3px;
+            font-size: 7pt;
+            font-weight: 600;
+            display: inline-block;
+        }
+        
+        .type-installment {
+            background-color: #4e73df;
+            color: white;
+        }
+        
+        .type-monthly {
+            background-color: #1cc88a;
+            color: white;
+        }
+        
+        .type-yearly {
+            background-color: #f6c23e;
+            color: #2c3e50;
+        }
+        
+        .method-badge {
+            padding: 2px 4px;
+            border-radius: 3px;
+            font-size: 7pt;
+            font-weight: 600;
+            display: inline-block;
+        }
+        
+        .method-cash {
+            background-color: #28a745;
+            color: white;
+        }
+        
+        .method-bank {
+            background-color: #17a2b8;
+            color: white;
+        }
+        
+        .method-mobile {
+            background-color: #fd7e14;
+            color: white;
+        }
+        
+        .method-cheque {
+            background-color: #6c757d;
+            color: white;
+        }
+        
+        .footer {
+            margin-top: 20px;
+            padding-top: 10px;
+            border-top: 1px solid #e3e6f0;
+            font-size: 7pt;
+            color: #666;
+            text-align: right;
+        }
+        
+        .watermark {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) rotate(-45deg);
+            font-size: 60pt;
+            color: rgba(78, 115, 223, 0.1);
+            z-index: -1;
+            white-space: nowrap;
+        }
+    </style>
+</head>
+<body>
+    <div class="watermark">HOSTEL PAYMENTS</div>
+    
+    <div class="header">
+        <h1>Hostel Payments Report</h1>
+        <div class="subtitle">Generated on: {{ generated_at }}</div>
+    </div>
+    
+    <div class="summary-section">
+        <div class="summary-grid">
+            <div class="summary-item">
+                <div class="label">Total Transactions</div>
+                <div class="value">{{ total_transactions }}</div>
+            </div>
+            <div class="summary-item">
+                <div class="label">Total Amount</div>
+                <div class="value">TSh {{ total_amount|floatformat:2|intcomma }}</div>
+            </div>
+            <div class="summary-item">
+                <div class="label">Hostels</div>
+                <div class="value">{{ hostels_count }}</div>
+            </div>
+            <div class="summary-item">
+                <div class="label">Average Payment</div>
+                <div class="value">
+                    TSh {% if total_transactions > 0 %}{{ total_amount|div:total_transactions|floatformat:2|intcomma }}{% else %}0.00{% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    {% if filters %}
+    <div class="filters-section">
+        <strong>Applied Filters:</strong>
+        {% if filters.hostel_id %} Hostel ID: {{ filters.hostel_id }} |{% endif %}
+        {% if filters.payment_type %} Payment Type: {{ filters.payment_type }} |{% endif %}
+        {% if filters.payment_method %} Payment Method: {{ filters.payment_method }} |{% endif %}
+        {% if filters.balance_status %} Balance Status: {{ filters.balance_status }} |{% endif %}
+        {% if filters.date_from %} From: {{ filters.date_from }} |{% endif %}
+        {% if filters.date_to %} To: {{ filters.date_to }} |{% endif %}
+        {% if filters.min_amount %} Min Amount: {{ filters.min_amount }} |{% endif %}
+        {% if filters.max_amount %} Max Amount: {{ filters.max_amount }} |{% endif %}
+        {% if not filters %} None {% endif %}
+    </div>
+    {% endif %}
+    
+    <table>
+        <thead>
+            <tr>
+                <th>Receipt #</th>
+                <th>Student</th>
+                <th>Reg No</th>
+                <th>Class</th>
+                <th>Stream</th>
+                <th>Hostel</th>
+                <th>Amount Paid</th>
+                <th>Remaining</th>
+                <th>Type</th>
+                <th>Method</th>
+                <th>Reference</th>
+                <th>Date</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for payment in payments %}
+            <tr>
+                <td>{{ payment.receipt_number }}</td>
+                <td>{{ payment.student_name }}</td>
+                <td>{{ payment.registration_number }}</td>
+                <td>{{ payment.class_name }}</td>
+                <td>{{ payment.stream }}</td>
+                <td>{{ payment.hostel_code }}</td>
+                <td class="amount">TSh {{ payment.amount|floatformat:2|intcomma }}</td>
+                <td class="amount {% if payment.remaining <= 0 %}balance-zero{% else %}balance-positive{% endif %}">
+                    TSh {{ payment.remaining|floatformat:2|intcomma }}
+                </td>
+                <td>
+                    <span class="payment-type type-{{ payment.payment_type|lower }}">
+                        {{ payment.payment_type }}
+                    </span>
+                </td>
+                <td>
+                    <span class="method-badge method-{{ payment.payment_method|lower }}">
+                        {{ payment.payment_method }}
+                    </span>
+                </td>
+                <td>{{ payment.transaction_number }}</td>
+                <td>{{ payment.payment_date }}</td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="12" style="text-align: center; padding: 20px;">
+                    No payment transactions found.
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+        <tfoot>
+            <tr style="background-color: #f8f9fc; font-weight: bold;">
+                <td colspan="6" style="text-align: right;">TOTAL:</td>
+                <td class="amount">TSh {{ total_amount|floatformat:2|intcomma }}</td>
+                <td colspan="5"></td>
+            </tr>
+        </tfoot>
+    </table>
+    
+    <div class="footer">
+        <p>This report was generated automatically by the School Management System.</p>
+        <p>Total records: {{ payments|length }} | Generated by: {{ request.user.get_full_name|default:request.user.username }}</p>
+    </div>
+</body>
+</html>

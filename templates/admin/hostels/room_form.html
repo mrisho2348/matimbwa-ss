@@ -1,0 +1,1769 @@
+{% extends 'admin/base.html' %}
+{% load static %}
+
+{% block title %}{{ form_title }}{% endblock %}
+
+{% block breadcrumb %}
+<div class="breadcrumb-wrapper">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb bg-transparent p-0 mb-0">
+            <li class="breadcrumb-item"><a href="{% url 'admin_dashboard' %}"><i class="fas fa-home"></i> Dashboard</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'admin_hostels_list' %}">Hostels</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'admin_hostel_students' hostel.id %}">{{ hostel.name }}</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'admin_single_hostel_rooms_list' %}?hostel={{ hostel.id }}">Rooms</a></li>
+            <li class="breadcrumb-item active" aria-current="page">{{ form_title }}</li>
+        </ol>
+    </nav>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* ===== VARIABLES ===== */
+    :root {
+        --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        --primary-color: #4e73df;
+        --success-color: #1cc88a;
+        --info-color: #36b9cc;
+        --warning-color: #f6c23e;
+        --danger-color: #e74a3b;
+        --dark-color: #5a5c69;
+        --light-bg: #f8f9fc;
+        --border-color: #e3e6f0;
+        --card-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        --hover-shadow: 0 15px 40px rgba(78, 115, 223, 0.2);
+        --transition: all 0.3s ease;
+    }
+
+    /* ===== PAGE HEADER ===== */
+    .page-header {
+        background: var(--primary-gradient);
+        border-radius: 20px;
+        padding: 30px 40px;
+        margin-bottom: 30px;
+        color: white;
+        position: relative;
+        overflow: hidden;
+        box-shadow: 0 15px 40px rgba(102, 126, 234, 0.4);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        backdrop-filter: blur(10px);
+        width: 100%;
+    }
+
+    .page-header::before {
+        content: '';
+        position: absolute;
+        top: -50px;
+        right: -50px;
+        width: 250px;
+        height: 250px;
+        background: rgba(255, 255, 255, 0.15);
+        border-radius: 50%;
+        animation: float 6s ease-in-out infinite;
+    }
+
+    .page-header::after {
+        content: '';
+        position: absolute;
+        bottom: -50px;
+        left: -50px;
+        width: 200px;
+        height: 200px;
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 50%;
+        animation: float 8s ease-in-out infinite reverse;
+    }
+
+    @keyframes float {
+        0%, 100% { transform: translate(0, 0) rotate(0deg); }
+        25% { transform: translate(10px, 10px) rotate(5deg); }
+        50% { transform: translate(0, 20px) rotate(0deg); }
+        75% { transform: translate(-10px, 10px) rotate(-5deg); }
+    }
+
+    .header-content {
+        display: flex;
+        align-items: center;
+        gap: 25px;
+        position: relative;
+        z-index: 1;
+        flex-wrap: wrap;
+    }
+
+    .header-icon {
+        width: 80px;
+        height: 80px;
+        background: rgba(255, 255, 255, 0.25);
+        backdrop-filter: blur(5px);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 2.5rem;
+        border: 3px solid white;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+        animation: pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+        0%, 100% { transform: scale(1); }
+        50% { transform: scale(1.05); }
+    }
+
+    .header-text {
+        flex: 1;
+    }
+
+    .header-text h1 {
+        font-size: 2.2rem;
+        font-weight: 700;
+        margin-bottom: 10px;
+        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
+        letter-spacing: 1px;
+    }
+
+    .header-text p {
+        font-size: 1.1rem;
+        opacity: 0.95;
+        margin: 0;
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        flex-wrap: wrap;
+    }
+
+    .header-text p span {
+        background: rgba(255, 255, 255, 0.2);
+        padding: 5px 15px;
+        border-radius: 30px;
+        font-size: 0.95rem;
+        backdrop-filter: blur(5px);
+    }
+
+    .header-badge {
+        background: rgba(255, 255, 255, 0.25);
+        padding: 15px 25px;
+        border-radius: 50px;
+        backdrop-filter: blur(5px);
+        font-size: 1rem;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        border: 2px solid rgba(255, 255, 255, 0.3);
+    }
+
+    /* ===== MAIN CONTAINER ===== */
+    .form-wrapper {
+        width: 100%;
+        padding: 0;
+    }
+
+    .form-card {
+        background: white;
+        border-radius: 20px;
+        box-shadow: 0 5px 30px rgba(0, 0, 0, 0.05);
+        border: 1px solid var(--border-color);
+        overflow: hidden;
+        width: 100%;
+        margin-bottom: 30px;
+    }
+
+    .form-card-header {
+        background: linear-gradient(135deg, #f8f9fc, #ffffff);
+        padding: 25px 30px;
+        border-bottom: 1px solid var(--border-color);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 15px;
+    }
+
+    .form-card-header h3 {
+        margin: 0;
+        font-size: 1.5rem;
+        font-weight: 600;
+        color: var(--primary-color);
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .form-card-header h3 i {
+        font-size: 1.8rem;
+        background: var(--primary-gradient);
+        color: white;
+        padding: 10px;
+        border-radius: 12px;
+        box-shadow: 0 5px 15px rgba(78, 115, 223, 0.3);
+    }
+
+    .header-stats {
+        display: flex;
+        gap: 20px;
+        flex-wrap: wrap;
+    }
+
+    .stat-pill {
+        background: white;
+        border: 1px solid var(--border-color);
+        border-radius: 30px;
+        padding: 8px 20px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 0.95rem;
+        color: #2c3e50;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.03);
+    }
+
+    .stat-pill i {
+        color: var(--primary-color);
+        font-size: 1rem;
+    }
+
+    .stat-pill .badge {
+        background: var(--primary-gradient);
+        color: white;
+        padding: 3px 8px;
+        border-radius: 20px;
+        font-size: 0.8rem;
+    }
+
+    .form-card-body {
+        padding: 30px;
+        background: white;
+    }
+
+    /* ===== INFO GRID ===== */
+    .info-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 20px;
+        margin-bottom: 30px;
+        background: var(--light-bg);
+        border-radius: 15px;
+        padding: 20px;
+        border: 1px solid var(--border-color);
+    }
+
+    .info-grid-item {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        padding: 15px;
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.02);
+        transition: var(--transition);
+    }
+
+    .info-grid-item:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 5px 20px rgba(0, 0, 0, 0.05);
+    }
+
+    .info-grid-icon {
+        width: 50px;
+        height: 50px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+        color: white;
+    }
+
+    .icon-hostel { background: linear-gradient(135deg, #4e73df, #224abe); }
+    .icon-capacity { background: linear-gradient(135deg, #1cc88a, #169b6b); }
+    .icon-beds { background: linear-gradient(135deg, #36b9cc, #1e8a9e); }
+    .icon-students { background: linear-gradient(135deg, #f6c23e, #dda20a); }
+
+    .info-grid-content {
+        flex: 1;
+    }
+
+    .info-grid-label {
+        font-size: 0.8rem;
+        color: #6c757d;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 3px;
+    }
+
+    .info-grid-value {
+        font-size: 1.3rem;
+        font-weight: 700;
+        color: #2c3e50;
+        line-height: 1.2;
+        margin-bottom: 3px;
+    }
+
+    .info-grid-sub {
+        font-size: 0.8rem;
+        color: #6c757d;
+    }
+
+    /* ===== PROGRESS BAR ===== */
+    .progress-sm {
+        width: 100%;
+        height: 4px;
+        background: var(--border-color);
+        border-radius: 2px;
+        overflow: hidden;
+        margin-top: 8px;
+    }
+
+    .progress-sm-bar {
+        height: 100%;
+        background: linear-gradient(90deg, var(--success-color), var(--info-color));
+        border-radius: 2px;
+        transition: width 0.5s ease;
+    }
+
+    /* ===== FORM SECTIONS ===== */
+    .form-section {
+        background: white;
+        border: 1px solid var(--border-color);
+        border-radius: 15px;
+        padding: 25px;
+        margin-bottom: 25px;
+    }
+
+    .form-section-title {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 20px;
+        padding-bottom: 10px;
+        border-bottom: 2px solid var(--border-color);
+    }
+
+    .form-section-title i {
+        width: 35px;
+        height: 35px;
+        background: var(--primary-gradient);
+        color: white;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.1rem;
+    }
+
+    .form-section-title h4 {
+        margin: 0;
+        font-size: 1.2rem;
+        font-weight: 600;
+        color: #2c3e50;
+    }
+
+    .form-section-title .required-badge {
+        background: #e74a3b20;
+        color: #e74a3b;
+        padding: 3px 10px;
+        border-radius: 30px;
+        font-size: 0.7rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    /* ===== FORM FIELDS ===== */
+    .form-row {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 20px;
+        margin-bottom: 20px;
+    }
+
+    .form-group {
+        margin-bottom: 0;
+    }
+
+    .form-group label {
+        font-weight: 600;
+        color: #2c3e50;
+        margin-bottom: 8px;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        font-size: 0.95rem;
+    }
+
+    .form-group label i {
+        color: var(--primary-color);
+        font-size: 1rem;
+    }
+
+    .form-group label .text-danger {
+        font-size: 1.2rem;
+        line-height: 1;
+    }
+
+    .input-wrapper {
+        position: relative;
+    }
+
+    .input-icon {
+        position: absolute;
+        left: 15px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #a0a0a0;
+        font-size: 1rem;
+        transition: var(--transition);
+    }
+
+    .form-control {
+        width: 100%;
+        padding: 12px 15px 12px 45px;
+        border: 2px solid var(--border-color);
+        border-radius: 12px;
+        font-size: 1rem;
+        transition: var(--transition);
+        background: white;
+    }
+
+    .form-control:focus {
+        border-color: var(--primary-color);
+        box-shadow: 0 0 0 4px rgba(78, 115, 223, 0.1);
+        outline: none;
+    }
+
+    .form-control.error {
+        border-color: var(--danger-color);
+    }
+
+    .form-text {
+        font-size: 0.85rem;
+        color: #6c757d;
+        margin-top: 8px;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+    }
+
+    .form-text i {
+        color: var(--info-color);
+        font-size: 0.9rem;
+    }
+
+    /* ===== CHECKBOX STYLES ===== */
+    .checkbox-wrapper {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 15px;
+        background: var(--light-bg);
+        border-radius: 12px;
+        border: 1px solid var(--border-color);
+        cursor: pointer;
+        transition: var(--transition);
+    }
+
+    .checkbox-wrapper:hover {
+        background: white;
+        border-color: var(--primary-color);
+    }
+
+    .checkbox-wrapper input[type="checkbox"] {
+        width: 20px;
+        height: 20px;
+        cursor: pointer;
+        accent-color: var(--success-color);
+    }
+
+    .checkbox-content {
+        flex: 1;
+    }
+
+    .checkbox-title {
+        font-weight: 600;
+        color: #2c3e50;
+        margin-bottom: 3px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .checkbox-title i {
+        color: var(--success-color);
+    }
+
+    .checkbox-description {
+        font-size: 0.85rem;
+        color: #6c757d;
+    }
+
+    /* ===== WARNING CARD ===== */
+    .warning-card {
+        background: #fff3cd;
+        border: 1px solid #ffeeba;
+        border-radius: 12px;
+        padding: 15px 20px;
+        margin-bottom: 25px;
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        flex-wrap: wrap;
+    }
+
+    .warning-icon {
+        width: 40px;
+        height: 40px;
+        background: #856404;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 1.2rem;
+    }
+
+    .warning-content {
+        flex: 1;
+    }
+
+    .warning-title {
+        font-weight: 600;
+        color: #856404;
+        margin-bottom: 3px;
+    }
+
+    .warning-text {
+        color: #856404;
+        font-size: 0.9rem;
+        margin: 0;
+    }
+
+    /* ===== ACTION BUTTONS ===== */
+    .form-actions {
+        margin-top: 30px;
+        padding-top: 25px;
+        border-top: 2px solid var(--border-color);
+        display: flex;
+        gap: 15px;
+        justify-content: flex-end;
+        flex-wrap: wrap;
+    }
+
+    .btn {
+        padding: 14px 35px;
+        border-radius: 12px;
+        font-weight: 600;
+        font-size: 1rem;
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        transition: var(--transition);
+        border: none;
+        cursor: pointer;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .btn::before {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 0;
+        height: 0;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.3);
+        transform: translate(-50%, -50%);
+        transition: width 0.5s, height 0.5s;
+    }
+
+    .btn:hover::before {
+        width: 300px;
+        height: 300px;
+    }
+
+    .btn i, .btn span {
+        position: relative;
+        z-index: 1;
+    }
+
+    .btn-primary {
+        background: linear-gradient(135deg, #4e73df, #224abe);
+        color: white;
+        box-shadow: 0 5px 15px rgba(78, 115, 223, 0.3);
+    }
+
+    .btn-primary:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 25px rgba(78, 115, 223, 0.4);
+    }
+
+    .btn-secondary {
+        background: #e3e6f0;
+        color: #2c3e50;
+    }
+
+    .btn-secondary:hover {
+        background: #d1d3e2;
+        transform: translateY(-3px);
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+    }
+
+    .btn-danger {
+        background: linear-gradient(135deg, #e74a3b, #c13a2d);
+        color: white;
+        box-shadow: 0 5px 15px rgba(231, 74, 59, 0.3);
+    }
+
+    .btn-danger:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 25px rgba(231, 74, 59, 0.4);
+    }
+
+    /* ===== MESSAGE ALERTS ===== */
+    .alert-container {
+        margin-bottom: 20px;
+        width: 100%;
+    }
+
+    .alert {
+        border-radius: 12px;
+        padding: 15px 20px;
+        margin-bottom: 15px;
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        border: none;
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+        animation: slideDown 0.3s ease;
+    }
+
+    @keyframes slideDown {
+        from {
+            opacity: 0;
+            transform: translateY(-20px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .alert-success {
+        background: linear-gradient(135deg, #1cc88a20, #169b6b20);
+        border-left: 4px solid var(--success-color);
+        color: #169b6b;
+    }
+
+    .alert-danger {
+        background: linear-gradient(135deg, #e74a3b20, #c13a2d20);
+        border-left: 4px solid var(--danger-color);
+        color: #c13a2d;
+    }
+
+    .alert-warning {
+        background: linear-gradient(135deg, #f6c23e20, #dda20a20);
+        border-left: 4px solid var(--warning-color);
+        color: #dda20a;
+    }
+
+    .alert-info {
+        background: linear-gradient(135deg, #36b9cc20, #1e8a9e20);
+        border-left: 4px solid var(--info-color);
+        color: #1e8a9e;
+    }
+
+    .alert-icon {
+        width: 30px;
+        height: 30px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1rem;
+        color: white;
+    }
+
+    .alert-success .alert-icon {
+        background: var(--success-color);
+    }
+
+    .alert-danger .alert-icon {
+        background: var(--danger-color);
+    }
+
+    .alert-warning .alert-icon {
+        background: var(--warning-color);
+    }
+
+    .alert-info .alert-icon {
+        background: var(--info-color);
+    }
+
+    .alert-content {
+        flex: 1;
+        font-size: 0.95rem;
+        font-weight: 500;
+    }
+
+    .alert-close {
+        color: inherit;
+        opacity: 0.5;
+        cursor: pointer;
+        transition: var(--transition);
+    }
+
+    .alert-close:hover {
+        opacity: 1;
+    }
+
+    /* ===== TOAST NOTIFICATIONS ===== */
+    .toast-container {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 9999;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        max-width: 400px;
+        width: 100%;
+    }
+
+    .toast {
+        background: white;
+        border-radius: 12px;
+        padding: 15px 20px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        animation: slideIn 0.3s ease;
+        border-left: 4px solid;
+    }
+
+    .toast-success {
+        border-left-color: var(--success-color);
+    }
+
+    .toast-error {
+        border-left-color: var(--danger-color);
+    }
+
+    .toast-warning {
+        border-left-color: var(--warning-color);
+    }
+
+    .toast-info {
+        border-left-color: var(--info-color);
+    }
+
+    .toast-icon {
+        width: 30px;
+        height: 30px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1rem;
+        color: white;
+    }
+
+    .toast-success .toast-icon {
+        background: var(--success-color);
+    }
+
+    .toast-error .toast-icon {
+        background: var(--danger-color);
+    }
+
+    .toast-warning .toast-icon {
+        background: var(--warning-color);
+    }
+
+    .toast-info .toast-icon {
+        background: var(--info-color);
+    }
+
+    .toast-content {
+        flex: 1;
+    }
+
+    .toast-title {
+        font-weight: 600;
+        color: #2c3e50;
+        margin-bottom: 3px;
+    }
+
+    .toast-message {
+        font-size: 0.9rem;
+        color: #6c757d;
+    }
+
+    .toast-close {
+        color: #a0a0a0;
+        cursor: pointer;
+        transition: var(--transition);
+    }
+
+    .toast-close:hover {
+        color: #2c3e50;
+    }
+
+    @keyframes slideIn {
+        from {
+            transform: translateX(100%);
+            opacity: 0;
+        }
+        to {
+            transform: translateX(0);
+            opacity: 1;
+        }
+    }
+
+    /* ===== LOADING OVERLAY ===== */
+    .loading-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(255, 255, 255, 0.9);
+        backdrop-filter: blur(3px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 10000;
+        visibility: hidden;
+        opacity: 0;
+        transition: all 0.3s;
+    }
+
+    .loading-overlay.show {
+        visibility: visible;
+        opacity: 1;
+    }
+
+    .loading-content {
+        text-align: center;
+    }
+
+    .loading-spinner {
+        width: 60px;
+        height: 60px;
+        border: 4px solid var(--border-color);
+        border-top-color: var(--primary-color);
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin: 0 auto 15px;
+    }
+
+    .loading-text {
+        color: #2c3e50;
+        font-weight: 600;
+        font-size: 1.1rem;
+    }
+
+    .loading-subtext {
+        color: #6c757d;
+        font-size: 0.9rem;
+        margin-top: 5px;
+    }
+
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+
+    /* ===== RESPONSIVE ===== */
+    @media (max-width: 992px) {
+        .page-header {
+            padding: 25px;
+        }
+
+        .header-content {
+            flex-direction: column;
+            text-align: center;
+        }
+
+        .header-text h1 {
+            font-size: 1.8rem;
+        }
+
+        .header-text p {
+            justify-content: center;
+        }
+
+        .form-card-header {
+            flex-direction: column;
+            align-items: flex-start;
+        }
+
+        .header-stats {
+            width: 100%;
+        }
+
+        .stat-pill {
+            flex: 1;
+            justify-content: center;
+        }
+    }
+
+    @media (max-width: 768px) {
+        .info-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .form-row {
+            grid-template-columns: 1fr;
+        }
+
+        .form-actions {
+            flex-direction: column;
+        }
+
+        .btn {
+            width: 100%;
+            justify-content: center;
+        }
+
+        .toast-container {
+            max-width: 90%;
+            right: 5%;
+        }
+
+        .warning-card {
+            flex-direction: column;
+            text-align: center;
+        }
+    }
+
+    /* ===== ANIMATIONS ===== */
+    @keyframes fadeInUp {
+        from {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .animate-fadeInUp {
+        animation: fadeInUp 0.5s ease forwards;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-0">
+    <!-- Page Header -->
+    <div class="page-header">
+        <div class="header-content">
+            <div class="header-icon">
+                <i class="fas fa-door-open"></i>
+            </div>
+            <div class="header-text">
+                <h1>{{ form_title }}</h1>
+                <p>
+                    <span><i class="fas fa-building"></i> {{ hostel.name }}</span>
+                    <span><i class="fas fa-code"></i> {{ hostel.code }}</span>
+                    <span><i class="fas fa-{{ hostel.hostel_type }}"></i> {{ hostel.get_hostel_type_display }}</span>
+                </p>
+            </div>
+            <div class="header-badge">
+                <i class="fas fa-calendar-alt"></i>
+                <span>{{ current_date|date:"d M, Y" }}</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Django Messages Display -->
+    {% if messages %}
+    <div class="alert-container">
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags }}" role="alert">
+            <div class="alert-icon">
+                {% if message.tags == 'success' %}
+                    <i class="fas fa-check-circle"></i>
+                {% elif message.tags == 'error' %}
+                    <i class="fas fa-exclamation-circle"></i>
+                {% elif message.tags == 'warning' %}
+                    <i class="fas fa-exclamation-triangle"></i>
+                {% elif message.tags == 'info' %}
+                    <i class="fas fa-info-circle"></i>
+                {% endif %}
+            </div>
+            <div class="alert-content">
+                {{ message }}
+            </div>
+            <div class="alert-close" onclick="this.parentElement.remove()">
+                <i class="fas fa-times"></i>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Form Wrapper -->
+    <div class="form-wrapper">
+        <div class="form-card animate-fadeInUp">
+            <div class="form-card-header">
+                <h3>
+                    <i class="fas {% if room %}fa-edit{% else %}fa-plus-circle{% endif %}"></i>
+                    {% if room %}Edit Room Details{% else %}Create New Room{% endif %}
+                </h3>
+                <div class="header-stats">
+                    <div class="stat-pill">
+                        <i class="fas fa-door-open"></i>
+                        <span>Total Rooms: <strong>{{ total_rooms|default:"0" }}</strong></span>
+                    </div>
+                    <div class="stat-pill">
+                        <i class="fas fa-bed"></i>
+                        <span>Total Beds: <strong>{{ total_beds|default:"0" }}</strong></span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-card-body">
+                <!-- Information Grid -->
+                <div class="info-grid">
+                    <div class="info-grid-item">
+                        <div class="info-grid-icon icon-hostel">
+                            <i class="fas fa-hotel"></i>
+                        </div>
+                        <div class="info-grid-content">
+                            <div class="info-grid-label">Hostel</div>
+                            <div class="info-grid-value">{{ hostel.name }}</div>
+                            <div class="info-grid-sub">Capacity: {{ hostel.max_students }} students</div>
+                        </div>
+                    </div>
+
+                    <div class="info-grid-item">
+                        <div class="info-grid-icon icon-capacity">
+                            <i class="fas fa-chart-line"></i>
+                        </div>
+                        <div class="info-grid-content">
+                            <div class="info-grid-label">Hostel Capacity</div>
+                            <div class="info-grid-value">{{ current_total_capacity|default:"0" }}/{{ hostel.max_students }}</div>
+                            <div class="info-grid-sub">
+                                <span class="text-success">{{ available_hostel_capacity|default:"0" }} available</span>
+                                <div class="progress-sm">
+                                    <div class="progress-sm-bar" style="width: {% widthratio current_total_capacity hostel.max_students 100 %}%"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {% if room %}
+                    <div class="info-grid-item">
+                        <div class="info-grid-icon icon-beds">
+                            <i class="fas fa-bed"></i>
+                        </div>
+                        <div class="info-grid-content">
+                            <div class="info-grid-label">Beds Status</div>
+                            <div class="info-grid-value">{{ occupied_beds|default:"0" }}/{{ total_beds|default:"0" }}</div>
+                            <div class="info-grid-sub">
+                                <span class="text-success">{{ available_beds|default:"0" }} available</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="info-grid-item">
+                        <div class="info-grid-icon icon-students">
+                            <i class="fas fa-user-graduate"></i>
+                        </div>
+                        <div class="info-grid-content">
+                            <div class="info-grid-label">Active Allocations</div>
+                            <div class="info-grid-value">{{ active_allocations|default:"0" }}</div>
+                            <div class="info-grid-sub">students currently in this room</div>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <!-- Warning Messages -->
+                {% if room and room.total_beds > 0 %}
+                <div class="warning-card">
+                    <div class="warning-icon">
+                        <i class="fas fa-exclamation-triangle"></i>
+                    </div>
+                    <div class="warning-content">
+                        <div class="warning-title">Important: Beds Installed</div>
+                        <div class="warning-text">
+                            This room has {{ room.total_beds }} bed(s) installed. 
+                            Room capacity cannot be reduced below the number of installed beds ({{ room.total_beds }}).
+                            {% if active_allocations > 0 %}
+                            Also, there are {{ active_allocations }} active student(s) in this room.
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
+                {% if room and active_allocations > 0 and not room.is_active %}
+                <div class="warning-card" style="background: #f8d7da; border-color: #f5c6cb;">
+                    <div class="warning-icon" style="background: #721c24;">
+                        <i class="fas fa-exclamation-circle"></i>
+                    </div>
+                    <div class="warning-content">
+                        <div class="warning-title" style="color: #721c24;">Cannot Deactivate Room</div>
+                        <div class="warning-text" style="color: #721c24;">
+                            This room has {{ active_allocations }} active student allocation(s). 
+                            You must relocate these students before deactivating the room.
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Main Form -->
+                <form method="POST" id="roomForm">
+                    {% csrf_token %}
+                    
+                    <div class="form-section">
+                        <div class="form-section-title">
+                            <i class="fas fa-info-circle"></i>
+                            <h4>Basic Information</h4>
+                            <span class="required-badge">Required Fields</span>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>
+                                    <i class="fas fa-door-open"></i>
+                                    Room Number <span class="text-danger">*</span>
+                                </label>
+                                <div class="input-wrapper">
+                                    <i class="fas fa-hashtag input-icon"></i>
+                                    <input type="text" 
+                                           name="room_number" 
+                                           class="form-control" 
+                                           value="{{ room.room_number|default:'' }}"
+                                           placeholder="e.g., 101, A1, Ground Floor"
+                                           required
+                                           maxlength="20"
+                                           pattern="[A-Za-z0-9\s\-]+"
+                                           title="Only letters, numbers, spaces, and hyphens allowed"
+                                           id="roomNumber">
+                                </div>
+                                <div class="form-text">
+                                    <i class="fas fa-info-circle"></i>
+                                    Enter a unique room number. Only letters, numbers, spaces, and hyphens are allowed.
+                                </div>
+                                <div id="roomNumberFeedback" class="invalid-feedback"></div>
+                            </div>
+
+                            <div class="form-group">
+                                <label>
+                                    <i class="fas fa-users"></i>
+                                    Capacity <span class="text-danger">*</span>
+                                </label>
+                                <div class="input-wrapper">
+                                    <i class="fas fa-user-plus input-icon"></i>
+                                    <input type="number" 
+                                           name="capacity" 
+                                           class="form-control" 
+                                           value="{{ room.capacity|default:'' }}"
+                                           placeholder="e.g., 4"
+                                           required
+                                           min="1"
+                                           max="20"
+                                           step="1"
+                                           id="capacity">
+                                </div>
+                                <div class="form-text">
+                                    <i class="fas fa-info-circle"></i>
+                                    Maximum number of students that can be allocated to this room (1-20).
+                                </div>
+                                <div id="capacityFeedback" class="invalid-feedback"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-section">
+                        <div class="form-section-title">
+                            <i class="fas fa-toggle-on"></i>
+                            <h4>Room Status</h4>
+                        </div>
+
+                        <label class="checkbox-wrapper">
+                            <input type="checkbox" 
+                                   name="is_active" 
+                                   id="isActive"
+                                   {% if room.is_active or not room %}checked{% endif %}
+                                   {% if room and active_allocations > 0 and not room.is_active %}disabled{% endif %}>
+                            <div class="checkbox-content">
+                                <div class="checkbox-title">
+                                    <i class="fas fa-check-circle"></i>
+                                    Active Room
+                                </div>
+                                <div class="checkbox-description">
+                                    Inactive rooms cannot have new students allocated and won't appear in most lists.
+                                </div>
+                            </div>
+                        </label>
+
+                        {% if room and active_allocations > 0 %}
+                        <div class="form-text text-warning mt-2">
+                            <i class="fas fa-exclamation-triangle"></i>
+                            This room has {{ active_allocations }} active student allocation(s).
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <!-- Form Actions -->
+                    <div class="form-actions">
+                        <a href="{{ cancel_url }}" class="btn btn-secondary">
+                            <i class="fas fa-times"></i>
+                            <span>Cancel</span>
+                        </a>
+                        {% if room %}
+                        <button type="button" class="btn btn-danger" onclick="confirmDelete()">
+                            <i class="fas fa-trash"></i>
+                            <span>Delete Room</span>
+                        </button>
+                        {% endif %}
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save"></i>
+                            <span>{{ submit_text }}</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Toast Container -->
+<div class="toast-container" id="toastContainer"></div>
+
+<!-- Loading Overlay -->
+<div class="loading-overlay" id="loadingOverlay">
+    <div class="loading-content">
+        <div class="loading-spinner"></div>
+        <div class="loading-text">Processing...</div>
+        <div class="loading-subtext">Please wait</div>
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+{% if room %}
+<div class="modal fade" id="deleteModal" tabindex="-1" role="dialog">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title">
+                    <i class="fas fa-exclamation-triangle mr-2"></i>
+                    Confirm Delete
+                </h5>
+                <button type="button" class="close text-white" data-dismiss="modal">
+                    <span>&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete Room <strong>{{ room.room_number }}</strong>?</p>
+                {% if total_beds > 0 %}
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-circle"></i>
+                    This room has {{ total_beds }} bed(s) that will also be deleted.
+                </div>
+                {% endif %}
+                {% if active_allocations > 0 %}
+                <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    This room has {{ active_allocations }} active student allocation(s). 
+                    Please relocate these students first.
+                </div>
+                {% endif %}
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" onclick="deleteRoom()" {% if active_allocations > 0 %}disabled{% endif %}>
+                    <i class="fas fa-trash"></i> Delete Room
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// ============================================
+// URL CONSTANTS (Generated from Django URLs)
+//============================================
+const URLS = {
+    checkRoomNumber: "{% url 'api_check_room_number' %}",
+    deleteRoom: "{% url 'api_delete_room' 0 %}".replace('0', '{{ room.id|default:0 }}'),
+    redirectToList: "{% url 'admin_single_hostel_rooms_list' %}?hostel={{ hostel.id }}",
+    csrfToken: "{{ csrf_token }}"
+};
+
+$(document).ready(function() {
+    // Initialize tooltips
+    $('[data-toggle="tooltip"]').tooltip();
+    
+    // Add animation to info grid items
+    $('.info-grid-item').each(function(index) {
+        $(this).css('animation', `fadeInUp 0.5s ${index * 0.1}s both`);
+    });
+
+    // Auto dismiss Django messages after 5 seconds
+    setTimeout(function() {
+        $('.alert').fadeOut(500, function() {
+            $(this).remove();
+        });
+    }, 5000);
+
+    // Form submission handling
+    $('#roomForm').on('submit', function(e) {
+        e.preventDefault();
+        
+        // Validate form
+        if (!validateForm()) {
+            return;
+        }
+        
+        showLoading('Saving room...');
+        
+        $.ajax({
+            url: window.location.href,
+            method: 'POST',
+            data: $(this).serialize(),
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRFToken': URLS.csrfToken
+            },
+            success: function(response) {
+                hideLoading();
+                
+                // Check if response is a string (sometimes Django returns string errors)
+                if (typeof response === 'string') {
+                    try {
+                        response = JSON.parse(response);
+                    } catch (e) {
+                        showToast('error', 'Error!', 'An unexpected error occurred.');
+                        return;
+                    }
+                }
+                
+                if (response && response.success === true) {
+                    // Show success message
+                    showToast('success', 'Success!', response.message || 'Room saved successfully!');
+                    
+                    // Redirect to rooms list after a short delay
+                    setTimeout(function() {
+                        window.location.href = URLS.redirectToList;
+                    }, 1500);
+                } else {
+                    // Show error message from response
+                    const errorMessage = response && response.message ? response.message : 'An error occurred.';
+                    showToast('error', 'Error!', errorMessage);
+                    
+                    // Also show as Django-style alert at the top
+                    showPageAlert('error', errorMessage);
+                    
+                    // Scroll to top to show error
+                    $('html, body').animate({
+                        scrollTop: 0
+                    }, 500);
+                }
+            },
+            error: function(xhr) {
+                hideLoading();
+                
+                let message = 'An error occurred. Please try again.';
+                let response = null;
+                
+                // Try to parse error response
+                if (xhr.responseJSON) {
+                    response = xhr.responseJSON;
+                    message = response.message || message;
+                } else if (xhr.responseText) {
+                    try {
+                        response = JSON.parse(xhr.responseText);
+                        message = response.message || message;
+                    } catch (e) {
+                        // Not JSON, use status text
+                        message = xhr.statusText || message;
+                    }
+                }
+                
+                // Handle specific HTTP status codes
+                if (xhr.status === 403) {
+                    message = 'You do not have permission to perform this action.';
+                } else if (xhr.status === 404) {
+                    message = 'The requested resource was not found.';
+                } else if (xhr.status === 500) {
+                    message = 'A server error occurred. Please try again later.';
+                }
+                
+                showToast('error', 'Error!', message);
+                showPageAlert('error', message);
+                
+                // Scroll to top to show error
+                $('html, body').animate({
+                    scrollTop: 0
+                }, 500);
+            }
+        });
+    });
+
+    // Real-time validation
+    $('#roomNumber').on('input', function() {
+        validateRoomNumber();
+    });
+
+    $('#capacity').on('input', function() {
+        validateCapacity();
+    });
+
+    // Check for duplicate room number (debounced)
+    let roomNumberTimeout;
+    $('#roomNumber').on('blur', function() {
+        clearTimeout(roomNumberTimeout);
+        roomNumberTimeout = setTimeout(checkDuplicateRoom, 500);
+    });
+});
+
+// ============================================
+// PAGE ALERT FUNCTIONS
+// ============================================
+
+function showPageAlert(type, message) {
+    // Remove any existing alerts
+    $('.alert-container .alert').remove();
+    
+    // Create new alert
+    const icon = {
+        'success': 'fa-check-circle',
+        'error': 'fa-exclamation-circle',
+        'warning': 'fa-exclamation-triangle',
+        'info': 'fa-info-circle'
+    }[type] || 'fa-info-circle';
+    
+    const alertHtml = `
+        <div class="alert alert-${type === 'error' ? 'danger' : type}" role="alert" style="animation: slideDown 0.3s ease;">
+            <div class="alert-icon">
+                <i class="fas ${icon}"></i>
+            </div>
+            <div class="alert-content">
+                ${message}
+            </div>
+            <div class="alert-close" onclick="this.parentElement.remove()">
+                <i class="fas fa-times"></i>
+            </div>
+        </div>
+    `;
+    
+    // Append to alert container
+    if ($('.alert-container').length) {
+        $('.alert-container').append(alertHtml);
+    } else {
+        // Create alert container if it doesn't exist
+        const container = $('<div class="alert-container"></div>');
+        $('.form-wrapper').before(container);
+        container.append(alertHtml);
+    }
+    
+    // Auto dismiss after 5 seconds
+    setTimeout(function() {
+        $('.alert-container .alert').fadeOut(500, function() {
+            $(this).remove();
+        });
+    }, 5000);
+}
+
+// ============================================
+// VALIDATION FUNCTIONS
+// ============================================
+
+function validateForm() {
+    let isValid = true;
+    
+    if (!validateRoomNumber()) {
+        isValid = false;
+    }
+    
+    if (!validateCapacity()) {
+        isValid = false;
+    }
+    
+    return isValid;
+}
+
+function validateRoomNumber() {
+    const input = $('#roomNumber');
+    const value = input.val();
+    const pattern = /^[A-Za-z0-9\s\-]+$/;
+    
+    input.removeClass('error is-valid is-invalid');
+    $('#roomNumberFeedback').removeClass('invalid-feedback').addClass('form-text');
+    
+    if (!value) {
+        input.addClass('error is-invalid');
+        $('#roomNumberFeedback').addClass('invalid-feedback').removeClass('form-text').text('Room number is required.');
+        return false;
+    }
+    
+    if (value.length < 1 || value.length > 20) {
+        input.addClass('error is-invalid');
+        $('#roomNumberFeedback').addClass('invalid-feedback').removeClass('form-text').text('Room number must be between 1 and 20 characters.');
+        return false;
+    }
+    
+    if (!pattern.test(value)) {
+        input.addClass('error is-invalid');
+        $('#roomNumberFeedback').addClass('invalid-feedback').removeClass('form-text').text('Only letters, numbers, spaces, and hyphens are allowed.');
+        return false;
+    }
+    
+    input.addClass('is-valid');
+    $('#roomNumberFeedback').removeClass('invalid-feedback').addClass('form-text').text('Room number looks good!');
+    return true;
+}
+
+function validateCapacity() {
+    const input = $('#capacity');
+    const value = parseInt(input.val());
+    const min = parseInt(input.attr('min'));
+    const max = parseInt(input.attr('max'));
+    
+    input.removeClass('error is-valid is-invalid');
+    $('#capacityFeedback').removeClass('invalid-feedback').addClass('form-text');
+    
+    if (!value) {
+        input.addClass('error is-invalid');
+        $('#capacityFeedback').addClass('invalid-feedback').removeClass('form-text').text('Capacity is required.');
+        return false;
+    }
+    
+    if (isNaN(value) || value < min || value > max) {
+        input.addClass('error is-invalid');
+        $('#capacityFeedback').addClass('invalid-feedback').removeClass('form-text').text(`Capacity must be between ${min} and ${max}.`);
+        return false;
+    }
+    
+    // Check against installed beds if editing
+    {% if room and room.total_beds %}
+    if (value < {{ room.total_beds }}) {
+        input.addClass('error is-invalid');
+        $('#capacityFeedback').addClass('invalid-feedback').removeClass('form-text').text(`Capacity cannot be less than installed beds ({{ room.total_beds }}).`);
+        return false;
+    }
+    {% endif %}
+    
+    input.addClass('is-valid');
+    $('#capacityFeedback').removeClass('invalid-feedback').addClass('form-text').text('Valid capacity!');
+    return true;
+}
+
+function checkDuplicateRoom() {
+    const roomNumber = $('#roomNumber').val();
+    const hostelId = {{ hostel.id }};
+    const roomId = {% if room %}{{ room.id }}{% else %}null{% endif %};
+    
+    if (!roomNumber) return;
+    
+    $.ajax({
+        url: URLS.checkRoomNumber,
+        method: 'GET',
+        data: {
+            hostel_id: hostelId,
+            room_number: roomNumber,
+            exclude_id: roomId
+        },
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        success: function(response) {
+            if (response && response.exists) {
+                $('#roomNumber').addClass('is-invalid');
+                $('#roomNumberFeedback').addClass('invalid-feedback').removeClass('form-text').text('This room number already exists in this hostel.');
+            } else {
+                $('#roomNumber').removeClass('is-invalid').addClass('is-valid');
+                $('#roomNumberFeedback').removeClass('invalid-feedback').addClass('form-text').text('Room number is available!');
+            }
+        },
+        error: function(xhr) {
+            console.error('Failed to check duplicate room number', xhr);
+            // Don't show error to user, just log it
+        }
+    });
+}
+
+// ============================================
+// DELETE FUNCTIONS
+// ============================================
+
+function confirmDelete() {
+    {% if active_allocations == 0 %}
+    $('#deleteModal').modal('show');
+    {% else %}
+    showToast('error', 'Cannot Delete', 'Please relocate students before deleting this room.');
+    showPageAlert('error', 'Please relocate students before deleting this room.');
+    {% endif %}
+}
+
+function deleteRoom() {
+    $('#deleteModal').modal('hide');
+    showLoading('Deleting room...');
+    
+    $.ajax({
+        url: URLS.deleteRoom,
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': URLS.csrfToken,
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        success: function(response) {
+            hideLoading();
+            
+            // Check if response is a string
+            if (typeof response === 'string') {
+                try {
+                    response = JSON.parse(response);
+                } catch (e) {
+                    showToast('error', 'Error!', 'An unexpected error occurred.');
+                    return;
+                }
+            }
+            
+            if (response && response.success === true) {
+                showToast('success', 'Deleted!', response.message || 'Room deleted successfully!');
+                showPageAlert('success', response.message || 'Room deleted successfully!');
+                
+                // Redirect to rooms list after a short delay
+                setTimeout(function() {
+                    window.location.href = URLS.redirectToList;
+                }, 1500);
+            } else {
+                const errorMessage = response && response.message ? response.message : 'Failed to delete room.';
+                showToast('error', 'Error!', errorMessage);
+                showPageAlert('error', errorMessage);
+            }
+        },
+        error: function(xhr) {
+            hideLoading();
+            
+            let message = 'Failed to delete room.';
+            if (xhr.responseJSON && xhr.responseJSON.message) {
+                message = xhr.responseJSON.message;
+            } else if (xhr.responseText) {
+                try {
+                    const response = JSON.parse(xhr.responseText);
+                    message = response.message || message;
+                } catch (e) {}
+            }
+            
+            showToast('error', 'Error!', message);
+            showPageAlert('error', message);
+        }
+    });
+}
+
+// ============================================
+// UTILITY FUNCTIONS
+// ============================================
+
+function showLoading(message = 'Processing...') {
+    $('.loading-text').text(message);
+    $('#loadingOverlay').addClass('show');
+}
+
+function hideLoading() {
+    $('#loadingOverlay').removeClass('show');
+}
+
+function showToast(type, title, message) {
+    const icon = {
+        'success': 'fas fa-check-circle',
+        'error': 'fas fa-exclamation-circle',
+        'warning': 'fas fa-exclamation-triangle',
+        'info': 'fas fa-info-circle'
+    }[type];
+    
+    const bgColor = {
+        'success': 'toast-success',
+        'error': 'toast-error',
+        'warning': 'toast-warning',
+        'info': 'toast-info'
+    }[type];
+    
+    const toast = $(`
+        <div class="toast ${bgColor}">
+            <div class="toast-icon">
+                <i class="${icon}"></i>
+            </div>
+            <div class="toast-content">
+                <div class="toast-title">${title}</div>
+                <div class="toast-message">${message}</div>
+            </div>
+            <div class="toast-close" onclick="this.parentElement.remove()">
+                <i class="fas fa-times"></i>
+            </div>
+        </div>
+    `);
+    
+    $('#toastContainer').append(toast);
+    
+    setTimeout(() => {
+        toast.fadeOut(300, function() {
+            $(this).remove();
+        });
+    }, 5000);
+}
+
+function showWarning(message) {
+    showToast('warning', 'Warning!', message);
+    showPageAlert('warning', message);
+}
+
+// ============================================
+// KEYBOARD SHORTCUTS
+// ============================================
+
+$(document).keydown(function(e) {
+    // Ctrl+S to save
+    if (e.ctrlKey && e.key === 's') {
+        e.preventDefault();
+        $('#roomForm').submit();
+    }
+    
+    // Escape to close modals
+    if (e.key === 'Escape') {
+        $('.modal').modal('hide');
+    }
+});
+
+// ============================================
+// UNSAVED CHANGES WARNING
+// ============================================
+
+let formChanged = false;
+
+$('#roomForm input, #roomForm textarea, #roomForm select, #roomForm .form-control').on('change keyup', function() {
+    formChanged = true;
+});
+
+window.addEventListener('beforeunload', function(e) {
+    if (formChanged) {
+        e.preventDefault();
+        e.returnValue = 'You have unsaved changes. Are you sure you want to leave?';
+    }
+});
+
+$('#roomForm').on('submit', function() {
+    formChanged = false;
+});
+
+$('.btn-cancel, .btn-secondary').on('click', function() {
+    formChanged = false;
+});
+
+// Reset form changed flag when modal is hidden
+$('#deleteModal').on('hidden.bs.modal', function() {
+    formChanged = false;
+});
+</script>
+{% endblock %}

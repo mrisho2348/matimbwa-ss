@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Payment Receipt - {{ transaction.receipt_number }}</title>
+    {% load humanize %}
+    <style>
+        /* ============================================
+           PDF Page Configuration
+           ============================================ */
+        @page {
+            size: A4 portrait;
+            margin: 1.5cm 1.5cm 1.5cm 1.5cm;
+            
+            @top-center {
+                content: "OFFICIAL PAYMENT RECEIPT";
+                font-family: 'Arial', sans-serif;
+                font-size: 9pt;
+                color: #4e73df;
+                font-weight: bold;
+            }
+            
+            @top-left {
+                content: "{{ hostel.code }}";
+                font-family: 'Arial', sans-serif;
+                font-size: 9pt;
+                color: #4e73df;
+            }
+            
+            @top-right {
+                content: "Page " counter(page) " of " counter(pages);
+                font-family: 'Arial', sans-serif;
+                font-size: 8pt;
+                color: #666;
+            }
+            
+            @bottom-center {
+                content: "Thank you for your payment";
+                font-family: 'Arial', sans-serif;
+                font-size: 7pt;
+                color: #999;
+            }
+            
+            @bottom-left {
+                content: "Receipt: {{ transaction.receipt_number }}";
+                font-family: 'Arial', sans-serif;
+                font-size: 7pt;
+                color: #999;
+            }
+            
+            @bottom-right {
+                content: "Generated: {{ generated_at|date:'d/m/Y H:i' }}";
+                font-family: 'Arial', sans-serif;
+                font-size: 7pt;
+                color: #999;
+            }
+        }
+        
+        /* ============================================
+           Global Styles
+           ============================================ */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Arial', sans-serif;
+            font-size: 10pt;
+            line-height: 1.5;
+            color: #2c3e50;
+            background: white;
+        }
+        
+        /* ============================================
+           Watermark
+           ============================================ */
+        .watermark {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) rotate(-45deg);
+            font-size: 60pt;
+            font-weight: bold;
+            color: rgba(78, 115, 223, 0.03);
+            white-space: nowrap;
+            z-index: -1;
+            font-family: 'Arial', sans-serif;
+            text-transform: uppercase;
+        }
+        
+        /* ============================================
+           Header Section
+           ============================================ */
+        .header {
+            text-align: center;
+            margin-bottom: 20pt;
+            padding-bottom: 10pt;
+            border-bottom: 2px solid #4e73df;
+        }
+        
+        .school-name {
+            font-size: 18pt;
+            font-weight: 700;
+            color: #4e73df;
+            margin-bottom: 3pt;
+        }
+        
+        .school-motto {
+            font-size: 8pt;
+            color: #666;
+            margin-bottom: 5pt;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .school-contact {
+            font-size: 7pt;
+            color: #999;
+            margin-bottom: 5pt;
+        }
+        
+        .receipt-title {
+            font-size: 14pt;
+            font-weight: 700;
+            color: #2c3e50;
+            margin: 10pt 0;
+        }
+        
+        .receipt-number-box {
+            background: #f8f9fc;
+            border: 1px solid #e3e6f0;
+            border-radius: 5pt;
+            padding: 5pt 10pt;
+            display: inline-block;
+            margin-top: 5pt;
+        }
+        
+        .receipt-number {
+            font-family: 'Courier New', monospace;
+            font-size: 12pt;
+            font-weight: 700;
+            color: #4e73df;
+        }
+        
+        /* ============================================
+           Meta Information
+           ============================================ */
+        .meta-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10pt;
+            margin-bottom: 20pt;
+            background: #f8f9fc;
+            border: 1px solid #e3e6f0;
+            border-radius: 5pt;
+            padding: 10pt;
+        }
+        
+        .meta-item {
+            text-align: center;
+            border-right: 1px solid #e3e6f0;
+            padding-right: 10pt;
+        }
+        
+        .meta-item:last-child {
+            border-right: none;
+        }
+        
+        .meta-label {
+            font-size: 7pt;
+            color: #6c757d;
+            text-transform: uppercase;
+            margin-bottom: 2pt;
+        }
+        
+        .meta-value {
+            font-size: 10pt;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+        
+        /* ============================================
+           Info Cards
+           ============================================ */
+        .info-section {
+            margin-bottom: 20pt;
+        }
+        
+        .section-title {
+            color: #4e73df;
+            font-size: 11pt;
+            font-weight: 600;
+            margin-bottom: 8pt;
+            padding-bottom: 3pt;
+            border-bottom: 1px solid #e3e6f0;
+        }
+        
+        .info-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15pt;
+        }
+        
+        .info-card {
+            border: 1px solid #e3e6f0;
+            border-radius: 5pt;
+            padding: 12pt;
+            background: white;
+        }
+        
+        .info-row {
+            display: flex;
+            margin-bottom: 8pt;
+            font-size: 9pt;
+        }
+        
+        .info-label {
+            width: 40%;
+            color: #6c757d;
+        }
+        
+        .info-value {
+            width: 60%;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+        
+        .info-value.highlight {
+            color: #4e73df;
+        }
+        
+        /* ============================================
+           Amount Display
+           ============================================ */
+        .amount-box {
+            background: linear-gradient(135deg, #f8f9fc, #ffffff);
+            border: 2px solid #1cc88a;
+            border-radius: 8pt;
+            padding: 15pt;
+            margin-bottom: 20pt;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .amount-box.warning {
+            border-color: #e74a3b;
+        }
+        
+        .amount-label {
+            font-size: 9pt;
+            color: #6c757d;
+            text-transform: uppercase;
+        }
+        
+        .amount-value {
+            font-size: 22pt;
+            font-weight: 700;
+            color: #1cc88a;
+            line-height: 1.2;
+        }
+        
+        .amount-value.warning {
+            color: #e74a3b;
+        }
+        
+        .amount-inwords {
+            font-size: 8pt;
+            color: #999;
+            margin-top: 3pt;
+        }
+        
+        /* ============================================
+           Status Badges
+           ============================================ */
+        .status-badge {
+            display: inline-block;
+            padding: 4pt 10pt;
+            border-radius: 20pt;
+            font-size: 9pt;
+            font-weight: 600;
+        }
+        
+        .badge-success {
+            background: #1cc88a;
+            color: white;
+        }
+        
+        .badge-warning {
+            background: #f6c23e;
+            color: white;
+        }
+        
+        .badge-danger {
+            background: #e74a3b;
+            color: white;
+        }
+        
+        .badge-info {
+            background: #4e73df;
+            color: white;
+        }
+        
+        /* ============================================
+           Payment Details Table
+           ============================================ */
+        .details-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20pt;
+            font-size: 9pt;
+        }
+        
+        .details-table td {
+            padding: 6pt 4pt;
+            border-bottom: 1px solid #e3e6f0;
+        }
+        
+        .details-table td.label {
+            width: 30%;
+            color: #6c757d;
+        }
+        
+        .details-table td.value {
+            width: 70%;
+            font-weight: 600;
+        }
+        
+        /* ============================================
+           Installment Info
+           ============================================ */
+        .installment-info {
+            background: #f8f9fc;
+            border-left: 4px solid #4e73df;
+            padding: 10pt;
+            margin-bottom: 20pt;
+            border-radius: 0 5pt 5pt 0;
+        }
+        
+        .installment-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10pt;
+            margin-top: 8pt;
+        }
+        
+        .installment-item {
+            text-align: center;
+        }
+        
+        .installment-item .label {
+            font-size: 7pt;
+            color: #6c757d;
+            margin-bottom: 2pt;
+        }
+        
+        .installment-item .value {
+            font-weight: 600;
+            font-size: 9pt;
+        }
+        
+        /* ============================================
+           Financial Summary
+           ============================================ */
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10pt;
+            margin-bottom: 20pt;
+        }
+        
+        .summary-item {
+            text-align: center;
+            padding: 8pt;
+            border: 1px solid #e3e6f0;
+            border-radius: 5pt;
+            background: #f8f9fc;
+        }
+        
+        .summary-label {
+            font-size: 7pt;
+            color: #6c757d;
+            text-transform: uppercase;
+        }
+        
+        .summary-amount {
+            font-size: 12pt;
+            font-weight: 700;
+            color: #2c3e50;
+        }
+        
+        /* ============================================
+           Related Transactions
+           ============================================ */
+        .related-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 10pt 0;
+            font-size: 8pt;
+        }
+        
+        .related-table th {
+            background: #f8f9fc;
+            color: #4e73df;
+            font-weight: 600;
+            padding: 5pt;
+            border-bottom: 1px solid #e3e6f0;
+        }
+        
+        .related-table td {
+            padding: 4pt;
+            border-bottom: 1px solid #e3e6f0;
+        }
+        
+        /* ============================================
+           Footer
+           ============================================ */
+        .footer {
+            margin-top: 30pt;
+            padding-top: 15pt;
+            border-top: 2px dashed #e3e6f0;
+        }
+        
+        .signature-area {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 15pt;
+        }
+        
+        .signature-box {
+            text-align: center;
+            width: 200px;
+        }
+        
+        .signature-line {
+            border-top: 1px solid #4e73df;
+            margin: 5pt 0 3pt 0;
+            width: 100%;
+        }
+        
+        .signature-label {
+            font-size: 7pt;
+            color: #6c757d;
+        }
+        
+        .signature-name {
+            font-size: 8pt;
+            color: #4e73df;
+            font-weight: 600;
+        }
+        
+        .terms {
+            text-align: center;
+            font-size: 7pt;
+            color: #999;
+            margin-top: 10pt;
+        }
+        
+        .verification {
+            text-align: center;
+            font-size: 6pt;
+            color: #ccc;
+            margin-top: 5pt;
+            font-family: 'Courier New', monospace;
+        }
+        
+        /* ============================================
+           Print Optimization
+           ============================================ */
+        @media print {
+            .status-badge, .amount-box, .info-card {
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="watermark">PAID</div>
+    
+    <!-- Header -->
+    <div class="header">
+        <div class="school-name">MOUNT KILIMANJARO UNIVERSITY</div>
+        <div class="school-motto">EXCELLENCE • INTEGRITY • SERVICE</div>
+        <div class="school-contact">P.O. Box 1234, Moshi, Tanzania | Tel: +255 123 456 789</div>
+        <div class="receipt-title">OFFICIAL PAYMENT RECEIPT</div>
+        <div class="receipt-number-box">
+            <span class="receipt-number">{{ transaction.receipt_number }}</span>
+        </div>
+    </div>
+    
+    <!-- Meta Information -->
+    <div class="meta-grid">
+        <div class="meta-item">
+            <div class="meta-label">Date</div>
+            <div class="meta-value">{{ transaction.payment_date|date:"l, d F Y" }}</div>
+        </div>
+        <div class="meta-item">
+            <div class="meta-label">Time</div>
+            <div class="meta-value">{{ transaction.created_at|time:"H:i:s" }}</div>
+        </div>
+        <div class="meta-item">
+            <div class="meta-label">Generated By</div>
+            <div class="meta-value">{{ generated_by }}</div>
+        </div>
+    </div>
+    
+    <!-- Information Grid -->
+    <div class="info-grid">
+        <!-- Student Information -->
+        <div class="info-card">
+            <div class="section-title" style="margin-top: 0;">STUDENT INFORMATION</div>
+            <div class="info-row">
+                <span class="info-label">Full Name:</span>
+                <span class="info-value highlight">{{ student.full_name }}</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Registration No:</span>
+                <span class="info-value">{{ student.registration_number|default:"N/A" }}</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Class/Stream:</span>
+                <span class="info-value">
+                    {{ student.class_level.name|default:"N/A" }}
+                    {% if student.stream_class %} - {{ student.stream_class.stream_letter }}{% endif %}
+                </span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Gender:</span>
+                <span class="info-value">{{ student.get_gender_display|default:"N/A" }}</span>
+            </div>
+        </div>
+        
+        <!-- Hostel Information -->
+        <div class="info-card">
+            <div class="section-title" style="margin-top: 0;">HOSTEL INFORMATION</div>
+            <div class="info-row">
+                <span class="info-label">Hostel:</span>
+                <span class="info-value highlight">{{ hostel.name }} ({{ hostel.code }})</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Room:</span>
+                <span class="info-value">{{ allocation.room.room_number|default:"Not Assigned" }}</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Bed:</span>
+                <span class="info-value">{{ allocation.bed.bed_number|default:"Not Assigned" }}</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Academic Year:</span>
+                <span class="info-value">{{ allocation.academic_year }}</span>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Payment Details -->
+    <div class="info-card" style="margin-top: 15pt;">
+        <div class="section-title">PAYMENT DETAILS</div>
+        <table class="details-table">
+            <tr>
+                <td class="label">Payment Type:</td>
+                <td class="value">
+                    <span class="status-badge 
+                        {% if transaction.payment_type == 'installment' %}badge-info
+                        {% elif transaction.payment_type == 'monthly' %}badge-success
+                        {% else %}badge-warning{% endif %}">
+                        {{ payment_type_display }}
+                    </span>
+                </td>
+            </tr>
+            <tr>
+                <td class="label">Payment Method:</td>
+                <td class="value">{{ payment_method_display }}</td>
+            </tr>
+            {% if transaction.transaction_number %}
+            <tr>
+                <td class="label">Reference/Transaction No:</td>
+                <td class="value">{{ transaction.transaction_number }}</td>
+            </tr>
+            {% endif %}
+            {% if transaction.installment_payment %}
+            <tr>
+                <td class="label">Installment:</td>
+                <td class="value">#{{ transaction.installment_payment.installment_plan.installment_number }}</td>
+            </tr>
+            <tr>
+                <td class="label">Installment Period:</td>
+                <td class="value">
+                    {{ transaction.installment_payment.installment_plan.start_day }}/{{ transaction.installment_payment.installment_plan.start_month }} - 
+                    {{ transaction.installment_payment.installment_plan.end_day }}/{{ transaction.installment_payment.installment_plan.end_month }}
+                </td>
+            </tr>
+            {% elif transaction.month %}
+            <tr>
+                <td class="label">Payment Period:</td>
+                <td class="value">Month {{ transaction.month }}/{{ transaction.year }}</td>
+            </tr>
+            {% endif %}
+        </table>
+    </div>
+    
+    <!-- Amount Display -->
+    <div class="amount-box {% if remaining_balance > 0 %}warning{% endif %}">
+        <div>
+            <div class="amount-label">Amount Paid</div>
+            <div class="amount-value {% if remaining_balance > 0 %}warning{% endif %}">
+                TSh {{ transaction.amount|floatformat:2|intcomma }}
+            </div>
+            <div class="amount-inwords">
+                Tanzania Shillings {{ transaction.amount|floatformat:2 }} only
+            </div>
+        </div>
+        <div>
+            <div class="amount-label">Payment Status</div>
+            {% if is_fully_paid %}
+                <span class="status-badge badge-success">FULLY PAID</span>
+            {% elif total_paid_to_date > 0 %}
+                <span class="status-badge badge-warning">PARTIAL</span>
+            {% else %}
+                <span class="status-badge badge-danger">UNPAID</span>
+            {% endif %}
+        </div>
+    </div>
+    
+    <!-- Financial Summary -->
+    <div class="summary-grid">
+        <div class="summary-item">
+            <div class="summary-label">Total Fee</div>
+            <div class="summary-amount">TSh {{ allocation.total_fee|floatformat:2|intcomma }}</div>
+        </div>
+        <div class="summary-item">
+            <div class="summary-label">Total Paid to Date</div>
+            <div class="summary-amount">TSh {{ total_paid_to_date|floatformat:2|intcomma }}</div>
+        </div>
+        <div class="summary-item">
+            <div class="summary-label">Remaining Balance</div>
+            <div class="summary-amount" style="color: {% if remaining_balance > 0 %}#e74a3b{% else %}#1cc88a{% endif %};">
+                TSh {{ remaining_balance|floatformat:2|intcomma }}
+            </div>
+        </div>
+    </div>
+    
+    <!-- Related Transactions -->
+    {% if related_transactions %}
+    <div style="margin-top: 20pt;">
+        <div class="section-title">RECENT PAYMENT HISTORY</div>
+        <table class="related-table">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Receipt #</th>
+                    <th>Type</th>
+                    <th class="amount-cell">Amount</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for trans in related_transactions %}
+                <tr>
+                    <td>{{ trans.payment_date|date:"d/m/Y" }}</td>
+                    <td>{{ trans.receipt_number }}</td>
+                    <td>{{ trans.get_payment_type_display }}</td>
+                    <td class="amount-cell">TSh {{ trans.amount|floatformat:2|intcomma }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+    
+    <!-- Installment Information -->
+    {% if transaction.installment_payment %}
+    <div class="installment-info">
+        <strong>Installment Status:</strong>
+        <div class="installment-grid">
+            <div class="installment-item">
+                <div class="label">Required</div>
+                <div class="value">TSh {{ transaction.installment_payment.required_amount|floatformat:2|intcomma }}</div>
+            </div>
+            <div class="installment-item">
+                <div class="label">Paid</div>
+                <div class="value">TSh {{ transaction.installment_payment.total_paid|floatformat:2|intcomma }}</div>
+            </div>
+            <div class="installment-item">
+                <div class="label">Remaining</div>
+                <div class="value" style="color: {% if transaction.installment_payment.remaining_amount > 0 %}#e74a3b{% else %}#1cc88a{% endif %};">
+                    TSh {{ transaction.installment_payment.remaining_amount|floatformat:2|intcomma }}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- Footer -->
+    <div class="footer">
+        <div class="signature-area">
+            <div class="signature-box">
+                <div class="signature-line"></div>
+                <div class="signature-label">RECEIVED BY</div>
+                <div class="signature-name">{{ generated_by }}</div>
+            </div>
+            <div class="signature-box">
+                <div class="signature-line"></div>
+                <div class="signature-label">STUDENT/PARENT</div>
+            </div>
+            <div class="signature-box">
+                <div class="signature-line"></div>
+                <div class="signature-label">DATE</div>
+                <div class="signature-name">{{ generated_at|date:"d/m/Y" }}</div>
+            </div>
+        </div>
+        
+        <div class="terms">
+            This is a computer-generated receipt. Valid without signature.<br>
+            For any queries, please contact the Finance Department.
+        </div>
+        
+        <div class="verification">
+            Receipt: {{ transaction.receipt_number }} | Transaction ID: {{ transaction.id }} | 
+            Generated: {{ generated_at|date:"Y-m-d H:i:s" }}
+        </div>
+    </div>
+</body>
+</html>

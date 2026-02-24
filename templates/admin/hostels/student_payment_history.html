@@ -1,0 +1,400 @@
+{% extends 'admin/base.html' %}
+{% load static %}
+
+{% block title %}Payment History - {{ student.full_name }}{% endblock %}
+
+{% block breadcrumb %}
+    <div class="btn-group">
+        <a href="javascript:history.back()" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i> Back
+        </a>
+        <a href="{% url 'admin_hostel_payment_create' %}" class="btn btn-primary">
+            <i class="fas fa-plus"></i> New Payment
+        </a>
+    </div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* Student profile card */
+    .profile-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 10px;
+        padding: 2rem;
+        color: white;
+        margin-bottom: 2rem;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .profile-card::before {
+        content: '';
+        position: absolute;
+        top: -50%;
+        right: -50%;
+        width: 200%;
+        height: 200%;
+        background: rgba(255, 255, 255, 0.1);
+        transform: rotate(45deg);
+        pointer-events: none;
+    }
+    
+    .profile-avatar {
+        width: 80px;
+        height: 80px;
+        background: rgba(255, 255, 255, 0.2);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 2rem;
+        font-weight: 700;
+        border: 3px solid white;
+    }
+    
+    /* Summary cards */
+    .summary-card {
+        background: white;
+        border-radius: 10px;
+        padding: 1.5rem;
+        box-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.1);
+        margin-bottom: 1rem;
+        border-left: 4px solid #4e73df;
+        transition: transform 0.2s;
+    }
+    
+    .summary-card:hover {
+        transform: translateY(-5px);
+    }
+    
+    .summary-card.total-paid {
+        border-left-color: #1cc88a;
+    }
+    
+    .summary-card.balance {
+        border-left-color: #f6c23e;
+    }
+    
+    .summary-label {
+        font-size: 0.9rem;
+        color: #6c757d;
+        text-transform: uppercase;
+    }
+    
+    .summary-value {
+        font-size: 1.8rem;
+        font-weight: 700;
+    }
+    
+    /* Allocation card */
+    .allocation-card {
+        border: none;
+        border-radius: 10px;
+        margin-bottom: 1.5rem;
+        box-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.1);
+    }
+    
+    .allocation-card .card-header {
+        background: #f8f9fc;
+        border-bottom: 1px solid #e3e6f0;
+        padding: 1rem 1.5rem;
+    }
+    
+    .allocation-card.active {
+        border-left: 4px solid #1cc88a;
+    }
+    
+    .allocation-card.inactive {
+        border-left: 4px solid #e74a3b;
+    }
+    
+    /* Timeline for payments */
+    .timeline {
+        position: relative;
+        padding: 20px 0;
+    }
+    
+    .timeline::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 20px;
+        height: 100%;
+        width: 2px;
+        background: #4e73df;
+    }
+    
+    .timeline-item {
+        position: relative;
+        padding-left: 50px;
+        margin-bottom: 20px;
+    }
+    
+    .timeline-item::before {
+        content: '';
+        position: absolute;
+        left: 13px;
+        top: 5px;
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        background: #4e73df;
+        border: 3px solid white;
+        box-shadow: 0 0 0 2px #4e73df;
+    }
+    
+    .timeline-item.paid::before {
+        background: #1cc88a;
+        box-shadow: 0 0 0 2px #1cc88a;
+    }
+    
+    .timeline-item.partial::before {
+        background: #f6c23e;
+        box-shadow: 0 0 0 2px #f6c23e;
+    }
+    
+    .timeline-content {
+        background: #f8f9fc;
+        border-radius: 8px;
+        padding: 1rem;
+    }
+    
+    /* Progress bar */
+    .fee-progress {
+        height: 10px;
+        border-radius: 5px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Profile Card -->
+    <div class="profile-card">
+        <div class="row align-items-center">
+            <div class="col-auto">
+                <div class="profile-avatar">
+                    {{ student.first_name|first|upper }}{{ student.last_name|first|upper }}
+                </div>
+            </div>
+            <div class="col">
+                <h3 class="mb-1">{{ student.full_name }}</h3>
+                <p class="mb-2">
+                    <i class="fas fa-id-card mr-2"></i> {{ student.registration_number }} |
+                    <i class="fas fa-graduation-cap ml-2 mr-1"></i> 
+                    {% if student.class_level %}
+                        {{ student.class_level.name }}
+                        {% if student.stream_class %}- {{ student.stream_class.stream_letter }}{% endif %}
+                    {% else %}
+                        No Class Assigned
+                    {% endif %}
+                </p>
+                <div>
+                    <span class="badge badge-light mr-2">
+                        <i class="fas fa-venus-mars mr-1"></i> {{ student.get_gender_display|default:"N/A" }}
+                    </span>
+                    <span class="badge badge-light">
+                        <i class="fas fa-calendar mr-1"></i> Age: {{ student.age|default:"N/A" }}
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Summary Cards -->
+    <div class="row">
+        <div class="col-md-4">
+            <div class="summary-card">
+                <div class="summary-label">Total Paid</div>
+                <div class="summary-value text-success">TSh {{ total_paid|floatformat:2 }}</div>
+                <small class="text-muted">Lifetime payments</small>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="summary-card total-paid">
+                <div class="summary-label">Active Allocation</div>
+                {% if current_allocation %}
+                    <div class="summary-value">{{ current_allocation.hostel.name }}</div>
+                    <small class="text-muted">Since {{ current_allocation.start_date|date:"M Y" }}</small>
+                {% else %}
+                    <div class="summary-value text-muted">No Active Allocation</div>
+                {% endif %}
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="summary-card balance">
+                <div class="summary-label">Current Balance</div>
+                <div class="summary-value {% if current_balance > 0 %}text-warning{% else %}text-success{% endif %}">
+                    TSh {{ current_balance|floatformat:2 }}
+                </div>
+                <small class="text-muted">On active allocation</small>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Active Allocation Details -->
+    {% if current_allocation %}
+    <div class="allocation-card active">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h6 class="mb-0 text-primary">
+                <i class="fas fa-hotel mr-2"></i> Current Allocation - {{ current_allocation.hostel.name }}
+            </h6>
+            <span class="badge badge-success">Active</span>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-3">
+                    <small class="text-muted d-block">Room</small>
+                    <strong>{{ current_allocation.room.room_number|default:"Not Assigned" }}</strong>
+                </div>
+                <div class="col-md-3">
+                    <small class="text-muted d-block">Bed</small>
+                    <strong>{{ current_allocation.bed.bed_number|default:"Not Assigned" }}</strong>
+                </div>
+                <div class="col-md-3">
+                    <small class="text-muted d-block">Payment Mode</small>
+                    <strong>{{ current_allocation.hostel.get_payment_mode_display }}</strong>
+                </div>
+                <div class="col-md-3">
+                    <small class="text-muted d-block">Academic Year</small>
+                    <strong>{{ current_allocation.academic_year }}</strong>
+                </div>
+            </div>
+            
+            <div class="row mt-3">
+                <div class="col-md-12">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span>Total Fee: <strong>TSh {{ current_allocation.total_fee|floatformat:2 }}</strong></span>
+                        <span>Paid: <strong class="text-success">TSh {{ current_allocation.total_paid|floatformat:2 }}</strong></span>
+                        <span>Balance: <strong class="{% if current_allocation.balance > 0 %}text-warning{% else %}text-success{% endif %}">
+                            TSh {{ current_allocation.balance|floatformat:2 }}
+                        </strong></span>
+                    </div>
+                    {% with percentage=current_allocation.total_paid|divisibleby:current_allocation.total_fee|multiply:100 %}
+                    <div class="progress fee-progress mt-2">
+                        <div class="progress-bar bg-success" role="progressbar" 
+                             style="width: {{ percentage|floatformat:0 }}%"></div>
+                    </div>
+                    <small class="text-muted">{{ percentage|floatformat:1 }}% Paid</small>
+                    {% endwith %}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- Payment History -->
+    <div class="row mt-4">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h6 class="mb-0"><i class="fas fa-history mr-2"></i> Payment History</h6>
+                </div>
+                <div class="card-body">
+                    {% if transactions %}
+                        <div class="timeline">
+                            {% for transaction in transactions %}
+                            <div class="timeline-item {% if transaction.installment_payment %}{% if transaction.installment_payment.status == 'paid' %}paid{% else %}partial{% endif %}{% endif %}">
+                                <div class="timeline-content">
+                                    <div class="row">
+                                        <div class="col-md-3">
+                                            <strong class="text-primary">{{ transaction.payment_date|date:"d M Y" }}</strong>
+                                        </div>
+                                        <div class="col-md-2">
+                                            <span class="badge badge-info">{{ transaction.get_payment_type_display }}</span>
+                                        </div>
+                                        <div class="col-md-3">
+                                            {% if transaction.installment_payment %}
+                                                Installment #{{ transaction.installment_payment.installment_plan.installment_number }}
+                                            {% elif transaction.month %}
+                                                Month {{ transaction.month }}/{{ transaction.year }}
+                                            {% else %}
+                                                Yearly Payment
+                                            {% endif %}
+                                        </div>
+                                        <div class="col-md-2">
+                                            <strong class="text-success">TSh {{ transaction.amount|floatformat:2 }}</strong>
+                                        </div>
+                                        <div class="col-md-2 text-right">
+                                            <a href="{% url 'admin_hostel_payment_detail' transaction.id %}" 
+                                               class="btn btn-sm btn-primary">
+                                                <i class="fas fa-receipt"></i> Receipt
+                                            </a>
+                                        </div>
+                                    </div>
+                                    <div class="row mt-2">
+                                        <div class="col-md-12">
+                                            <small class="text-muted">
+                                                <i class="fas fa-hotel mr-1"></i> {{ transaction.allocation.hostel.name }} |
+                                                <i class="fas fa-receipt mr-1"></i> Receipt: {{ transaction.receipt_number }}
+                                            </small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="text-center py-5">
+                            <i class="fas fa-credit-card fa-3x mb-3 text-muted"></i>
+                            <p class="text-muted">No payment history found for this student.</p>
+                            <a href="{% url 'admin_hostel_payment_create' %}" class="btn btn-primary">
+                                <i class="fas fa-plus"></i> Record Payment
+                            </a>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Previous Allocations -->
+    {% if allocations.count > 1 %}
+    <div class="row mt-4">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header bg-secondary text-white">
+                    <h6 class="mb-0"><i class="fas fa-history mr-2"></i> Previous Allocations</h6>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm table-bordered">
+                            <thead class="bg-light">
+                                <tr>
+                                    <th>Hostel</th>
+                                    <th>Academic Year</th>
+                                    <th>Period</th>
+                                    <th>Total Fee</th>
+                                    <th>Paid</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for allocation in allocations %}
+                                    {% if allocation.id != current_allocation.id %}
+                                    <tr>
+                                        <td>{{ allocation.hostel.name }}</td>
+                                        <td>{{ allocation.academic_year }}</td>
+                                        <td>{{ allocation.start_date|date:"M Y" }} - {{ allocation.end_date|date:"M Y"|default:"Present" }}</td>
+                                        <td>TSh {{ allocation.total_fee|floatformat:2 }}</td>
+                                        <td>TSh {{ allocation.total_paid|floatformat:2 }}</td>
+                                        <td>
+                                            {% if allocation.is_active %}
+                                                <span class="badge badge-success">Active</span>
+                                            {% else %}
+                                                <span class="badge badge-secondary">Inactive</span>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    {% endif %}
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

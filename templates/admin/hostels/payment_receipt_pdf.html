@@ -1,0 +1,941 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Payment Receipt - {{ transaction.receipt_number }}</title>
+    {% load humanize %}
+    <style>
+        /* ============================================
+           PDF Page Configuration
+           ============================================ */
+        @page {
+            size: A4 portrait;
+            margin: 2cm 1.5cm 2cm 1.5cm;
+            
+            @top-center {
+                content: "OFFICIAL PAYMENT RECEIPT";
+                font-family: 'Arial', sans-serif;
+                font-size: 9pt;
+                color: #4e73df;
+                font-weight: bold;
+            }
+            
+            @top-left {
+                content: "MKU";
+                font-family: 'Arial', sans-serif;
+                font-size: 9pt;
+                color: #4e73df;
+            }
+            
+            @top-right {
+                content: "Page " counter(page) " of " counter(pages);
+                font-family: 'Arial', sans-serif;
+                font-size: 8pt;
+                color: #666;
+            }
+            
+            @bottom-center {
+                content: "This is a computer-generated receipt. Valid without signature.";
+                font-family: 'Arial', sans-serif;
+                font-size: 7pt;
+                color: #999;
+            }
+            
+            @bottom-left {
+                content: "Generated: " var(generated_date);
+                font-family: 'Arial', sans-serif;
+                font-size: 7pt;
+                color: #999;
+            }
+            
+            @bottom-right {
+                content: "Receipt: " var(receipt_number);
+                font-family: 'Arial', sans-serif;
+                font-size: 7pt;
+                color: #999;
+            }
+        }
+        
+        /* ============================================
+           Global Styles
+           ============================================ */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Arial', sans-serif;
+            font-size: 10pt;
+            line-height: 1.5;
+            color: #2c3e50;
+            background: white;
+        }
+        
+        /* ============================================
+           Main Container
+           ============================================ */
+        .receipt-container {
+            max-width: 100%;
+            margin: 0 auto;
+            position: relative;
+            background: white;
+        }
+        
+        /* Watermark */
+        .watermark {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) rotate(-45deg);
+            font-size: 60pt;
+            font-weight: bold;
+            color: rgba(78, 115, 223, 0.03);
+            white-space: nowrap;
+            z-index: -1;
+            font-family: 'Arial', sans-serif;
+            text-transform: uppercase;
+            letter-spacing: 10px;
+        }
+        
+        /* ============================================
+           Header Section
+           ============================================ */
+        .header {
+            text-align: center;
+            margin-bottom: 20pt;
+            padding-bottom: 15pt;
+            border-bottom: 3px solid #4e73df;
+        }
+        
+        .school-logo {
+            width: 70px;
+            height: 70px;
+            background: #4e73df;
+            border-radius: 50%;
+            margin: 0 auto 10pt;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 24pt;
+            font-weight: bold;
+        }
+        
+        .school-name {
+            font-size: 22pt;
+            font-weight: 700;
+            color: #4e73df;
+            letter-spacing: 1px;
+            margin-bottom: 3pt;
+        }
+        
+        .school-motto {
+            font-size: 9pt;
+            color: #6c757d;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 8pt;
+        }
+        
+        .school-contact {
+            font-size: 8pt;
+            color: #666;
+            display: flex;
+            justify-content: center;
+            gap: 15pt;
+            flex-wrap: wrap;
+        }
+        
+        .school-contact span {
+            white-space: nowrap;
+        }
+        
+        /* ============================================
+           Receipt Title
+           ============================================ */
+        .receipt-title {
+            background: linear-gradient(135deg, #4e73df 0%, #224abe 100%);
+            color: white;
+            padding: 12pt 15pt;
+            border-radius: 5pt;
+            margin-bottom: 20pt;
+            text-align: center;
+            page-break-inside: avoid;
+        }
+        
+        .receipt-title h2 {
+            font-size: 16pt;
+            font-weight: 700;
+            margin: 0 0 5pt 0;
+            letter-spacing: 1px;
+        }
+        
+        .receipt-number {
+            font-size: 11pt;
+            opacity: 0.9;
+            font-family: 'Courier New', monospace;
+            background: rgba(255,255,255,0.2);
+            display: inline-block;
+            padding: 3pt 10pt;
+            border-radius: 20pt;
+            margin-top: 5pt;
+        }
+        
+        /* ============================================
+           Meta Information
+           ============================================ */
+        .meta-info {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20pt;
+            font-size: 9pt;
+            background: #f8f9fc;
+            padding: 10pt 15pt;
+            border-radius: 5pt;
+            border: 1px solid #e3e6f0;
+            page-break-inside: avoid;
+        }
+        
+        .meta-item {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .meta-label {
+            color: #6c757d;
+            font-size: 7pt;
+            text-transform: uppercase;
+            margin-bottom: 2pt;
+        }
+        
+        .meta-value {
+            font-weight: bold;
+            color: #2c3e50;
+            font-size: 10pt;
+        }
+        
+        /* ============================================
+           Info Grid
+           ============================================ */
+        .info-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15pt;
+            margin-bottom: 20pt;
+            page-break-inside: avoid;
+        }
+        
+        .info-card {
+            background: #f8f9fc;
+            border: 1px solid #e3e6f0;
+            border-radius: 5pt;
+            padding: 12pt;
+            border-left: 4px solid #4e73df;
+        }
+        
+        .info-card h3 {
+            color: #4e73df;
+            font-size: 11pt;
+            font-weight: 600;
+            margin: 0 0 10pt 0;
+            padding-bottom: 5pt;
+            border-bottom: 1px solid #e3e6f0;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .info-row {
+            display: flex;
+            margin-bottom: 6pt;
+            font-size: 9pt;
+        }
+        
+        .info-label {
+            width: 40%;
+            color: #6c757d;
+            font-weight: 500;
+        }
+        
+        .info-value {
+            width: 60%;
+            color: #2c3e50;
+            font-weight: 500;
+        }
+        
+        .info-value strong {
+            color: #4e73df;
+            font-weight: 700;
+        }
+        
+        /* ============================================
+           Payment Details Card
+           ============================================ */
+        .payment-details {
+            background: #f8f9fc;
+            border: 1px solid #e3e6f0;
+            border-radius: 5pt;
+            padding: 15pt;
+            margin-bottom: 20pt;
+            border-left: 4px solid #1cc88a;
+            page-break-inside: avoid;
+        }
+        
+        .payment-details h3 {
+            color: #1cc88a;
+            font-size: 11pt;
+            font-weight: 600;
+            margin: 0 0 12pt 0;
+            padding-bottom: 5pt;
+            border-bottom: 1px solid #e3e6f0;
+            text-transform: uppercase;
+        }
+        
+        .payment-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10pt;
+        }
+        
+        .payment-item {
+            background: white;
+            padding: 8pt;
+            border-radius: 3pt;
+            border: 1px solid #e3e6f0;
+        }
+        
+        .payment-item .label {
+            color: #6c757d;
+            font-size: 7pt;
+            text-transform: uppercase;
+            margin-bottom: 3pt;
+        }
+        
+        .payment-item .value {
+            font-weight: bold;
+            font-size: 10pt;
+            color: #2c3e50;
+        }
+        
+        .installment-info {
+            margin-top: 12pt;
+            padding-top: 10pt;
+            border-top: 1px dashed #e3e6f0;
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10pt;
+        }
+        
+        /* ============================================
+           Amount Display
+           ============================================ */
+        .amount-display {
+            background: white;
+            border: 2px solid #1cc88a;
+            border-radius: 5pt;
+            padding: 15pt;
+            margin-bottom: 20pt;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            page-break-inside: avoid;
+        }
+        
+        .amount-display.warning {
+            border-color: #e74a3b;
+        }
+        
+        .amount-label {
+            font-size: 8pt;
+            color: #6c757d;
+            text-transform: uppercase;
+        }
+        
+        .amount-value {
+            font-size: 22pt;
+            font-weight: 700;
+            color: #1cc88a;
+            line-height: 1.2;
+        }
+        
+        .amount-value.warning {
+            color: #e74a3b;
+        }
+        
+        /* ============================================
+           Financial Summary
+           ============================================ */
+        .financial-summary {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12pt;
+            margin-bottom: 20pt;
+            page-break-inside: avoid;
+        }
+        
+        .summary-card {
+            background: white;
+            border: 1px solid #e3e6f0;
+            border-radius: 5pt;
+            padding: 10pt;
+            text-align: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        
+        .summary-card.total-fee {
+            border-top: 3px solid #4e73df;
+        }
+        
+        .summary-card.total-paid {
+            border-top: 3px solid #1cc88a;
+        }
+        
+        .summary-card.balance {
+            border-top: 3px solid #f6c23e;
+        }
+        
+        .summary-icon {
+            font-size: 16pt;
+            margin-bottom: 5pt;
+            color: #4e73df;
+        }
+        
+        .summary-label {
+            font-size: 7pt;
+            color: #6c757d;
+            text-transform: uppercase;
+            margin-bottom: 3pt;
+        }
+        
+        .summary-amount {
+            font-size: 14pt;
+            font-weight: 700;
+            color: #2c3e50;
+        }
+        
+        .summary-amount.positive {
+            color: #e74a3b;
+        }
+        
+        .summary-amount.zero {
+            color: #1cc88a;
+        }
+        
+        /* ============================================
+           Status Badges
+           ============================================ */
+        .status-badge {
+            display: inline-block;
+            padding: 3pt 8pt;
+            border-radius: 20pt;
+            font-size: 7pt;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .status-paid {
+            background: #1cc88a;
+            color: white;
+        }
+        
+        .status-partial {
+            background: #f6c23e;
+            color: white;
+        }
+        
+        .status-active {
+            background: #4e73df;
+            color: white;
+        }
+        
+        .status-inactive {
+            background: #858796;
+            color: white;
+        }
+        
+        /* ============================================
+           Table Styles
+           ============================================ */
+        .transactions-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15pt 0;
+            font-size: 8pt;
+            page-break-inside: auto;
+        }
+        
+        .transactions-table th {
+            background: #4e73df;
+            color: white;
+            font-weight: 600;
+            padding: 6pt 4pt;
+            text-align: left;
+            border: 1px solid #224abe;
+            font-size: 8pt;
+            white-space: nowrap;
+        }
+        
+        .transactions-table td {
+            padding: 5pt 4pt;
+            border: 1px solid #d1d3e2;
+            vertical-align: middle;
+        }
+        
+        .transactions-table tr:nth-child(even) {
+            background: #f8f9fc;
+        }
+        
+        .transactions-table tr {
+            page-break-inside: avoid;
+            page-break-after: auto;
+        }
+        
+        /* ============================================
+           Footer Section
+           ============================================ */
+        .footer {
+            margin-top: 30pt;
+            padding-top: 15pt;
+            border-top: 2px dashed #e3e6f0;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            page-break-inside: avoid;
+        }
+        
+        .signature-box {
+            text-align: center;
+            width: 200px;
+        }
+        
+        .signature-line {
+            border-top: 2px solid #4e73df;
+            margin: 5pt 0 3pt 0;
+            width: 100%;
+        }
+        
+        .signature-label {
+            font-size: 7pt;
+            color: #6c757d;
+        }
+        
+        .signature-name {
+            font-size: 8pt;
+            color: #4e73df;
+            font-weight: bold;
+            margin-top: 2pt;
+        }
+        
+        .qr-placeholder {
+            width: 60px;
+            height: 60px;
+            background: #f8f9fc;
+            border: 2px solid #4e73df;
+            border-radius: 5pt;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20pt;
+            color: #4e73df;
+        }
+        
+        /* ============================================
+           Terms & Conditions
+           ============================================ */
+        .terms {
+            margin-top: 15pt;
+            font-size: 7pt;
+            color: #999;
+            text-align: center;
+            border-top: 1px solid #e3e6f0;
+            padding-top: 8pt;
+        }
+        
+        .verification {
+            margin-top: 8pt;
+            font-size: 6pt;
+            color: #ccc;
+            text-align: center;
+            font-family: 'Courier New', monospace;
+        }
+        
+        /* ============================================
+           Utility Classes
+           ============================================ */
+        .text-right {
+            text-align: right;
+        }
+        
+        .text-center {
+            text-align: center;
+        }
+        
+        .text-primary {
+            color: #4e73df;
+        }
+        
+        .text-success {
+            color: #1cc88a;
+        }
+        
+        .text-warning {
+            color: #f6c23e;
+        }
+        
+        .text-danger {
+            color: #e74a3b;
+        }
+        
+        .bold {
+            font-weight: 700;
+        }
+        
+        .mt-10 {
+            margin-top: 10pt;
+        }
+        
+        .mb-10 {
+            margin-bottom: 10pt;
+        }
+        
+        /* ============================================
+           Print Optimization
+           ============================================ */
+        @media print {
+            body {
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+            
+            .status-badge,
+            .summary-card,
+            .info-card,
+            .payment-details,
+            .amount-display,
+            .transactions-table th {
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+            
+            .school-logo {
+                background: #4e73df !important;
+            }
+            
+            .receipt-title {
+                background: #4e73df !important;
+            }
+            
+            .transactions-table th {
+                background: #4e73df !important;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Set CSS variables for footer -->
+    <div style="display: none;">
+        <span id="generated-date">{{ generated_at|date:"Y-m-d H:i:s" }}</span>
+        <span id="receipt-number">{{ transaction.receipt_number }}</span>
+    </div>
+    
+    <div class="receipt-container">
+        <!-- Watermark -->
+        <div class="watermark">PAID</div>
+        
+        <!-- Header Section -->
+        <div class="header">
+            <div class="school-logo">MKU</div>
+            <h1 class="school-name">MOUNT KILIMANJARO UNIVERSITY</h1>
+            <div class="school-motto">EXCELLENCE • INTEGRITY • SERVICE</div>
+            <div class="school-contact">
+                <span>P.O. Box 1234, Moshi, Tanzania</span>
+                <span>Tel: +255 123 456 789</span>
+                <span>Email: finance@mkuniversity.ac.tz</span>
+            </div>
+        </div>
+        
+        <!-- Receipt Title -->
+        <div class="receipt-title">
+            <h2>OFFICIAL PAYMENT RECEIPT</h2>
+            <div class="receipt-number">{{ transaction.receipt_number }}</div>
+        </div>
+        
+        <!-- Meta Information -->
+        <div class="meta-info">
+            <div class="meta-item">
+                <span class="meta-label">Date Issued</span>
+                <span class="meta-value">{{ transaction.payment_date|date:"l, d F Y" }}</span>
+            </div>
+            <div class="meta-item">
+                <span class="meta-label">Time</span>
+                <span class="meta-value">{{ transaction.created_at|time:"H:i:s" }}</span>
+            </div>
+            <div class="meta-item">
+                <span class="meta-label">Generated By</span>
+                <span class="meta-value">{{ request.user.get_full_name|default:request.user.username }}</span>
+            </div>
+            <div class="meta-item">
+                <span class="meta-label">Academic Year</span>
+                <span class="meta-value">{{ transaction.allocation.academic_year }}</span>
+            </div>
+        </div>
+        
+        <!-- Information Grid -->
+        <div class="info-grid">
+            <!-- Student Information -->
+            <div class="info-card">
+                <h3>STUDENT INFORMATION</h3>
+                <div class="info-row">
+                    <span class="info-label">Full Name:</span>
+                    <span class="info-value"><strong>{{ transaction.allocation.student.full_name }}</strong></span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Registration No:</span>
+                    <span class="info-value">{{ transaction.allocation.student.registration_number|default:"N/A" }}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Examination No:</span>
+                    <span class="info-value">{{ transaction.allocation.student.examination_number|default:"N/A" }}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Class/Stream:</span>
+                    <span class="info-value">
+                        {% if transaction.allocation.student.class_level %}
+                            {{ transaction.allocation.student.class_level.name }}
+                            {% if transaction.allocation.student.stream_class %}
+                                - {{ transaction.allocation.student.stream_class.stream_letter }}
+                            {% endif %}
+                        {% else %}
+                            N/A
+                        {% endif %}
+                    </span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Gender:</span>
+                    <span class="info-value">{{ transaction.allocation.student.gender|title|default:"N/A" }}</span>
+                </div>
+            </div>
+            
+            <!-- Hostel Information -->
+            <div class="info-card">
+                <h3>HOSTEL INFORMATION</h3>
+                <div class="info-row">
+                    <span class="info-label">Hostel:</span>
+                    <span class="info-value"><strong>{{ transaction.allocation.hostel.name }}</strong></span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Hostel Code:</span>
+                    <span class="info-value">{{ transaction.allocation.hostel.code }}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Room:</span>
+                    <span class="info-value">
+                        {% if transaction.allocation.room %}
+                            {{ transaction.allocation.room.room_number }}
+                        {% else %}
+                            <span style="color: #999;">Not Assigned</span>
+                        {% endif %}
+                    </span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Bed:</span>
+                    <span class="info-value">
+                        {% if transaction.allocation.bed %}
+                            {{ transaction.allocation.bed.bed_number }} ({{ transaction.allocation.bed.get_bed_type_display }})
+                        {% else %}
+                            <span style="color: #999;">Not Assigned</span>
+                        {% endif %}
+                    </span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Allocation Status:</span>
+                    <span class="info-value">
+                        {% if transaction.allocation.is_active %}
+                            <span class="status-badge status-active">ACTIVE</span>
+                        {% else %}
+                            <span class="status-badge status-inactive">INACTIVE</span>
+                        {% endif %}
+                    </span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Payment Details -->
+        <div class="payment-details">
+            <h3>PAYMENT DETAILS</h3>
+            <div class="payment-grid">
+                <div class="payment-item">
+                    <div class="label">Payment Type</div>
+                    <div class="value">{{ transaction.get_payment_type_display }}</div>
+                </div>
+                <div class="payment-item">
+                    <div class="label">Payment Method</div>
+                    <div class="value">{{ transaction.get_payment_method_display }}</div>
+                </div>
+                <div class="payment-item">
+                    <div class="label">Reference</div>
+                    <div class="value">{{ transaction.transaction_number|default:"N/A" }}</div>
+                </div>
+                <div class="payment-item">
+                    <div class="label">Receipt No</div>
+                    <div class="value">{{ transaction.receipt_number }}</div>
+                </div>
+            </div>
+            
+            {% if transaction.installment_payment %}
+            <div class="installment-info">
+                <div class="payment-item">
+                    <div class="label">Installment #</div>
+                    <div class="value">{{ transaction.installment_payment.installment_plan.installment_number }}</div>
+                </div>
+                <div class="payment-item">
+                    <div class="label">Due Period</div>
+                    <div class="value">{{ transaction.installment_payment.installment_plan.start_day }}/{{ transaction.installment_payment.installment_plan.start_month }} - {{ transaction.installment_payment.installment_plan.end_day }}/{{ transaction.installment_payment.installment_plan.end_month }}</div>
+                </div>
+                <div class="payment-item">
+                    <div class="label">Installment Status</div>
+                    <div class="value">
+                        {% if transaction.installment_payment.remaining_amount <= 0 %}
+                            <span class="status-badge status-paid">PAID</span>
+                        {% else %}
+                            <span class="status-badge status-partial">PARTIAL</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+            
+            {% if transaction.month %}
+            <div style="margin-top: 10pt;">
+                <div class="payment-item" style="display: inline-block; width: auto;">
+                    <div class="label">Payment Period</div>
+                    <div class="value">Month {{ transaction.month }}/{{ transaction.year }}</div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+        
+        <!-- Amount Display -->
+        <div class="amount-display {% if transaction.allocation.balance > 0 %}warning{% endif %}">
+            <div>
+                <div class="amount-label">Amount Paid</div>
+                <div class="amount-value {% if transaction.allocation.balance > 0 %}warning{% endif %}">
+                    TSh {{ transaction.amount|floatformat:2|intcomma }}
+                </div>
+                <div style="font-size: 7pt; color: #999; margin-top: 3pt;">
+                    In words: TSh {{ transaction.amount|floatformat:2 }} Only
+                </div>
+            </div>
+            <div class="text-right">
+                <div class="amount-label">Payment Status</div>
+                {% if transaction.allocation.balance <= 0 %}
+                    <div class="status-badge status-paid" style="font-size: 9pt; padding: 4pt 12pt;">FULLY PAID</div>
+                {% else %}
+                    <div class="status-badge status-partial" style="font-size: 9pt; padding: 4pt 12pt;">PARTIAL PAYMENT</div>
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- Financial Summary -->
+        <div class="financial-summary">
+            <div class="summary-card total-fee">
+                <div class="summary-icon">💰</div>
+                <div class="summary-label">Total Fee</div>
+                <div class="summary-amount">TSh {{ transaction.allocation.total_fee|floatformat:2|intcomma }}</div>
+            </div>
+            
+            <div class="summary-card total-paid">
+                <div class="summary-icon">✅</div>
+                <div class="summary-label">Total Paid</div>
+                <div class="summary-amount">TSh {{ transaction.allocation.total_paid|floatformat:2|intcomma }}</div>
+            </div>
+            
+            <div class="summary-card balance">
+                <div class="summary-icon">⚖️</div>
+                <div class="summary-label">Balance</div>
+                <div class="summary-amount {% if transaction.allocation.balance > 0 %}positive{% else %}zero{% endif %}">
+                    TSh {{ transaction.allocation.balance|floatformat:2|intcomma }}
+                </div>
+            </div>
+        </div>
+        
+        <!-- Related Transactions -->
+        {% if related_transactions %}
+        <div style="margin-top: 20pt;">
+            <h3 style="color: #4e73df; font-size: 11pt; margin-bottom: 8pt; border-bottom: 1px solid #e3e6f0; padding-bottom: 4pt;">
+                PAYMENT HISTORY
+            </h3>
+            <table class="transactions-table">
+                <thead>
+                    <tr>
+                        <th>Receipt #</th>
+                        <th>Date</th>
+                        <th>Amount</th>
+                        <th>Type</th>
+                        <th>Method</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for trans in related_transactions %}
+                    <tr>
+                        <td><strong>{{ trans.receipt_number }}</strong></td>
+                        <td>{{ trans.payment_date|date:"d/m/Y" }}</td>
+                        <td style="text-align: right;">TSh {{ trans.amount|floatformat:2|intcomma }}</td>
+                        <td>{{ trans.get_payment_type_display }}</td>
+                        <td>{{ trans.get_payment_method_display }}</td>
+                        <td>
+                            {% if trans.installment_payment %}
+                                {% if trans.installment_payment.remaining_amount <= 0 %}
+                                    <span class="status-badge status-paid">PAID</span>
+                                {% else %}
+                                    <span class="status-badge status-partial">PARTIAL</span>
+                                {% endif %}
+                            {% else %}
+                                <span class="status-badge status-active">COMPLETED</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+        
+        <!-- Footer with Signatures -->
+        <div class="footer">
+            <div class="signature-box">
+                <div class="signature-line"></div>
+                <div class="signature-label">RECEIVED BY (Finance Officer)</div>
+                <div class="signature-name">{{ request.user.get_full_name|default:request.user.username }}</div>
+            </div>
+            
+            <div class="signature-box">
+                <div class="signature-line"></div>
+                <div class="signature-label">STUDENT/PARENT SIGNATURE</div>
+            </div>
+            
+            <div class="qr-placeholder">
+                <span>📱</span>
+            </div>
+        </div>
+        
+        <!-- Terms and Conditions -->
+        <div class="terms">
+            <p>This receipt confirms payment of hostel fees as indicated above.</p>
+            <p>For any queries, please contact the Finance Department within 30 days of issue.</p>
+        </div>
+        
+        <!-- Verification Information -->
+        <div class="verification">
+            <span>Receipt: {{ transaction.receipt_number }}</span> | 
+            <span>Transaction ID: {{ transaction.id }}</span> | 
+            <span>Generated: {{ generated_at|date:"Y-m-d H:i:s" }}</span> | 
+            <span>IP: {{ request.META.REMOTE_ADDR }}</span>
+        </div>
+    </div>
+</body>
+</html>

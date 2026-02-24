@@ -1,0 +1,825 @@
+{% extends 'admin/base.html' %}
+{% load static %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block breadcrumb %}
+    <div class="btn-group">
+        <a href="{% url 'admin_hostel_installment_plans_list' %}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i> Back to Plans
+        </a>
+    </div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .form-card {
+        border: none;
+        box-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.15);
+    }
+    .form-card .card-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-bottom: none;
+        padding: 1.25rem;
+    }
+    .form-card .card-header h5 {
+        margin: 0;
+        font-weight: 600;
+        color: white;
+    }
+    
+    /* Form group styling */
+    .form-group {
+        margin-bottom: 1.5rem;
+    }
+    .form-group label {
+        font-weight: 600;
+        color: #4e73df;
+        margin-bottom: 0.5rem;
+        display: block;
+    }
+    .form-group label .text-danger {
+        color: #e74a3b;
+        margin-left: 2px;
+    }
+    
+    /* Form control styling */
+    .form-control, .custom-select {
+        border: 1px solid #d1d3e2;
+        border-radius: 0.35rem;
+        height: 38px;
+        transition: all 0.2s;
+    }
+    .form-control:focus, .custom-select:focus {
+        border-color: #4e73df;
+        box-shadow: 0 0 0 0.2rem rgba(78, 115, 223, 0.25);
+    }
+    
+    /* Select2 customization */
+    .select2-container--bootstrap4 .select2-selection {
+        border: 1px solid #d1d3e2;
+        border-radius: 0.35rem;
+        height: 38px;
+    }
+    .select2-container--bootstrap4 .select2-selection__rendered {
+        line-height: 36px;
+        color: #495057;
+    }
+    .select2-container--bootstrap4 .select2-selection__arrow {
+        height: 36px;
+    }
+    .select2-dropdown {
+        border: 1px solid #d1d3e2;
+        border-radius: 0.35rem;
+        box-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.15);
+    }
+    .select2-results__option {
+        padding: 8px 12px;
+    }
+    .select2-results__option--highlighted {
+        background: #4e73df !important;
+    }
+    
+    /* Hostel info styling */
+    .hostel-info-card {
+        background: linear-gradient(135deg, #f8f9fc 0%, #e9ecef 100%);
+        border-left: 4px solid #4e73df;
+        padding: 1.25rem;
+        margin-bottom: 2rem;
+        border-radius: 0.35rem;
+    }
+    
+    /* Financial summary card */
+    .financial-summary {
+        background: linear-gradient(135deg, #e8f4f8 0%, #d1e7f5 100%);
+        border-left: 4px solid #1cc88a;
+        padding: 1rem;
+        margin-bottom: 1.5rem;
+        border-radius: 0.35rem;
+    }
+    .financial-summary .summary-item {
+        text-align: center;
+        padding: 0.5rem;
+    }
+    .summary-item .label {
+        font-size: 0.85rem;
+        color: #6c757d;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    .summary-item .value {
+        font-size: 1.2rem;
+        font-weight: 700;
+        color: #1cc88a;
+    }
+    .summary-item .value.warning {
+        color: #e74a3b;
+    }
+    .summary-item .value.info {
+        color: #4e73df;
+    }
+    
+    /* Date select row */
+    .date-select {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+    }
+    .date-select select {
+        flex: 1;
+    }
+    .date-separator {
+        font-size: 1.2rem;
+        font-weight: bold;
+        color: #4e73df;
+    }
+    
+    /* Button styling */
+    .btn {
+        padding: 0.5rem 1.5rem;
+        font-weight: 600;
+        border-radius: 0.35rem;
+        transition: all 0.2s;
+    }
+    .btn-primary {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border: none;
+    }
+    .btn-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+    }
+    
+    /* Loading indicator */
+    .loading-spinner {
+        display: inline-block;
+        width: 1rem;
+        height: 1rem;
+        border: 2px solid rgba(255,255,255,0.3);
+        border-radius: 50%;
+        border-top-color: white;
+        animation: spin 0.6s linear infinite;
+        margin-right: 5px;
+    }
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+    
+    /* Amount input */
+    .amount-input {
+        position: relative;
+    }
+    .amount-input:before {
+        content: "TSh";
+        position: absolute;
+        left: 10px;
+        top: 8px;
+        color: #6c757d;
+        z-index: 1;
+        font-weight: 600;
+    }
+    .amount-input input {
+        padding-left: 60px;
+    }
+    
+    /* Validation alert animations */
+    #validation-info {
+        transition: all 0.3s ease;
+        animation: slideDown 0.3s ease;
+    }
+    @keyframes slideDown {
+        from {
+            opacity: 0;
+            transform: translateY(-10px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+    
+    /* Installment number badge */
+    .installment-badge {
+        display: inline-block;
+        padding: 0.25rem 0.75rem;
+        border-radius: 20px;
+        font-size: 0.85rem;
+        font-weight: 600;
+        margin-right: 0.5rem;
+    }
+    .installment-badge-1 { background: #4e73df; color: white; }
+    .installment-badge-2 { background: #1cc88a; color: white; }
+    .installment-badge-3 { background: #36b9cc; color: white; }
+    .installment-badge-4 { background: #f6c23e; color: white; }
+    
+    /* Amount progress bar */
+    .amount-progress {
+        height: 6px;
+        border-radius: 3px;
+        margin-top: 5px;
+    }
+    
+    /* Existing plans list */
+    .existing-plans-list {
+        max-height: 300px;
+        overflow-y: auto;
+    }
+    .plan-item {
+        transition: all 0.2s;
+    }
+    .plan-item:hover {
+        transform: translateX(5px);
+        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+    .plan-item.current {
+        border-left: 4px solid #4e73df !important;
+        background: #e8f0fe;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="card form-card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">
+                <i class="fas fa-edit mr-2"></i> {{ title }}
+            </h5>
+            <span class="installment-badge installment-badge-{{ installment_plan.installment_number }}">
+                Installment #{{ installment_plan.installment_number }}
+            </span>
+        </div>
+        <div class="card-body p-4">
+            <!-- Hostel Info Card -->
+            <div class="hostel-info-card">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6 class="text-primary mb-3">
+                            <i class="fas fa-hotel mr-2"></i> Hostel Information
+                        </h6>
+                        <table class="table table-sm table-borderless">
+                            <tr>
+                                <td width="120"><strong>Name:</strong></td>
+                                <td>{{ hostel.name }}</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Code:</strong></td>
+                                <td>{{ hostel.code }}</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Type:</strong></td>
+                                <td>{{ hostel.get_hostel_type_display }}</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Payment Mode:</strong></td>
+                                <td>{{ hostel.get_payment_mode_display }}</td>
+                            </tr>
+                        </table>
+                    </div>
+                    <div class="col-md-6">
+                        <h6 class="text-primary mb-3">
+                            <i class="fas fa-chart-line mr-2"></i> Fee Information
+                        </h6>
+                        <table class="table table-sm table-borderless">
+                            <tr>
+                                <td width="120"><strong>Total Fee:</strong></td>
+                                <td><span class="text-primary font-weight-bold">TSh {{ hostel.total_fee|floatformat:2 }}</span></td>
+                            </tr>
+                            <tr>
+                                <td><strong>Installments:</strong></td>
+                                <td>{{ hostel.installments_count }} total</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Max Students:</strong></td>
+                                <td>{{ hostel.max_students }}</td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Financial Summary Card -->
+            <div class="financial-summary" id="financial-summary">
+                <div class="row">
+                    <div class="col-md-3 summary-item">
+                        <div class="label">Hostel Fee</div>
+                        <div class="value info" id="hostel-fee-display">TSh {{ hostel.total_fee|floatformat:2 }}</div>
+                    </div>
+                    <div class="col-md-3 summary-item">
+                        <div class="label">Other Plans Total</div>
+                        <div class="value" id="other-total-display">TSh {{ total_installment_amount|add:"-"|add:installment_plan.amount|floatformat:2 }}</div>
+                    </div>
+                    <div class="col-md-3 summary-item">
+                        <div class="label">Current Amount</div>
+                        <div class="value" id="current-amount-display">TSh {{ installment_plan.amount|floatformat:2 }}</div>
+                    </div>
+                    <div class="col-md-3 summary-item">
+                        <div class="label">New Total</div>
+                        <div class="value" id="new-total-display">TSh {{ total_installment_amount|floatformat:2 }}</div>
+                    </div>
+                </div>
+                <div class="row mt-2">
+                    <div class="col-md-3 summary-item">
+                        <div class="label">Remaining</div>
+                        <div class="value {% if remaining_amount < 0 %}warning{% elif remaining_amount == 0 %}success{% else %}info{% endif %}" id="remaining-display">
+                            TSh {{ remaining_amount|default:0|floatformat:2 }}
+                        </div>
+                    </div>
+                    <div class="col-md-9">
+                        <div class="progress amount-progress mt-2">
+                            <div class="progress-bar bg-success" id="amount-progress-bar" role="progressbar" 
+                                 style="width: {% widthratio total_installment_amount hostel.total_fee 100 %}%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Existing Plans List -->
+            {% if all_plans.count > 1 %}
+            <div class="card bg-light mb-4">
+                <div class="card-body">
+                    <h6 class="text-primary mb-3">
+                        <i class="fas fa-list mr-2"></i> All Installment Plans for {{ hostel.name }}
+                    </h6>
+                    <div class="existing-plans-list">
+                        <div class="row">
+                            {% for plan in all_plans %}
+                            <div class="col-md-6 mb-2">
+                                <div class="card plan-item {% if plan.id == installment_plan.id %}current{% endif %}">
+                                    <div class="card-body p-2">
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <div>
+                                                <span class="badge {% if plan.id == installment_plan.id %}badge-primary{% else %}badge-secondary{% endif %} badge-pill">
+                                                    Installment {{ plan.installment_number }}
+                                                </span>
+                                                {% if plan.id == installment_plan.id %}
+                                                    <span class="badge badge-info ml-1">Current</span>
+                                                {% endif %}
+                                            </div>
+                                            <span class="font-weight-bold {% if plan.id == installment_plan.id %}text-primary{% endif %}">
+                                                TSh {{ plan.amount|floatformat:2 }}
+                                            </span>
+                                        </div>
+                                        <small class="text-muted">
+                                            <i class="fas fa-calendar"></i> 
+                                            {{ plan.start_day|stringformat:"02d" }}/{{ plan.start_month|stringformat:"02d" }} - 
+                                            {{ plan.end_day|stringformat:"02d" }}/{{ plan.end_month|stringformat:"02d" }}
+                                        </small>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <form method="post" id="plan-form" class="needs-validation" novalidate>
+                {% csrf_token %}
+                
+                <!-- Hidden fields -->
+                <input type="hidden" name="hostel" value="{{ hostel.id }}">
+                <input type="hidden" name="installment_number" value="{{ installment_plan.installment_number }}">
+
+                <!-- Amount -->
+                <div class="form-group">
+                    <label for="amount">
+                        <i class="fas fa-money-bill-wave mr-1"></i> Amount 
+                        <span class="text-danger">*</span>
+                    </label>
+                    <div class="amount-input">
+                        <input type="number" class="form-control" id="amount" name="amount" 
+                               step="0.01" min="0.01" max="9999999.99"
+                               value="{{ installment_plan.amount|floatformat:2 }}" 
+                               placeholder="0.00" required>
+                    </div>
+                    <small class="form-text text-muted" id="amount-info"></small>
+                    <div id="amount-validation-message" class="mt-1 small"></div>
+                </div>
+
+                <!-- Date Range -->
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="start_month">
+                                <i class="fas fa-play-circle mr-1"></i> Start Date 
+                                <span class="text-danger">*</span>
+                            </label>
+                            <div class="date-select">
+                                <select class="form-control select2-date" id="start_month" name="start_month" required>
+                                    <option value="" disabled>Month</option>
+                                    <option value="1" {% if installment_plan.start_month == 1 %}selected{% endif %}>01 - January</option>
+                                    <option value="2" {% if installment_plan.start_month == 2 %}selected{% endif %}>02 - February</option>
+                                    <option value="3" {% if installment_plan.start_month == 3 %}selected{% endif %}>03 - March</option>
+                                    <option value="4" {% if installment_plan.start_month == 4 %}selected{% endif %}>04 - April</option>
+                                    <option value="5" {% if installment_plan.start_month == 5 %}selected{% endif %}>05 - May</option>
+                                    <option value="6" {% if installment_plan.start_month == 6 %}selected{% endif %}>06 - June</option>
+                                    <option value="7" {% if installment_plan.start_month == 7 %}selected{% endif %}>07 - July</option>
+                                    <option value="8" {% if installment_plan.start_month == 8 %}selected{% endif %}>08 - August</option>
+                                    <option value="9" {% if installment_plan.start_month == 9 %}selected{% endif %}>09 - September</option>
+                                    <option value="10" {% if installment_plan.start_month == 10 %}selected{% endif %}>10 - October</option>
+                                    <option value="11" {% if installment_plan.start_month == 11 %}selected{% endif %}>11 - November</option>
+                                    <option value="12" {% if installment_plan.start_month == 12 %}selected{% endif %}>12 - December</option>
+                                </select>
+                                <span class="date-separator">/</span>
+                                <select class="form-control select2-date" id="start_day" name="start_day" required>
+                                    <option value="" disabled>Day</option>
+                                    {% for day in days %}
+                                        <option value="{{ day }}"
+                                                {% if installment_plan.start_day == day %}selected{% endif %}>
+                                            {{ day|stringformat:"02d" }}
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="end_month">
+                                <i class="fas fa-stop-circle mr-1"></i> End Date 
+                                <span class="text-danger">*</span>
+                            </label>
+                            <div class="date-select">
+                                <select class="form-control select2-date" id="end_month" name="end_month" required>
+                                    <option value="" disabled>Month</option>
+                                    <option value="1" {% if installment_plan.end_month == 1 %}selected{% endif %}>01 - January</option>
+                                    <option value="2" {% if installment_plan.end_month == 2 %}selected{% endif %}>02 - February</option>
+                                    <option value="3" {% if installment_plan.end_month == 3 %}selected{% endif %}>03 - March</option>
+                                    <option value="4" {% if installment_plan.end_month == 4 %}selected{% endif %}>04 - April</option>
+                                    <option value="5" {% if installment_plan.end_month == 5 %}selected{% endif %}>05 - May</option>
+                                    <option value="6" {% if installment_plan.end_month == 6 %}selected{% endif %}>06 - June</option>
+                                    <option value="7" {% if installment_plan.end_month == 7 %}selected{% endif %}>07 - July</option>
+                                    <option value="8" {% if installment_plan.end_month == 8 %}selected{% endif %}>08 - August</option>
+                                    <option value="9" {% if installment_plan.end_month == 9 %}selected{% endif %}>09 - September</option>
+                                    <option value="10" {% if installment_plan.end_month == 10 %}selected{% endif %}>10 - October</option>
+                                    <option value="11" {% if installment_plan.end_month == 11 %}selected{% endif %}>11 - November</option>
+                                    <option value="12" {% if installment_plan.end_month == 12 %}selected{% endif %}>12 - December</option>
+                                </select>
+                                <span class="date-separator">/</span>
+                                <select class="form-control select2-date" id="end_day" name="end_day" required>
+                                    <option value="" disabled>Day</option>
+                                    {% for day in days %}
+                                        <option value="{{ day }}"
+                                                {% if installment_plan.end_day == day %}selected{% endif %}>
+                                            {{ day|stringformat:"02d" }}
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Date Range Preview -->
+                <div class="alert alert-info" id="date-preview">
+                    <i class="fas fa-calendar-alt mr-2"></i>
+                    <span id="date-preview-text">
+                        <strong>Selected period:</strong> 
+                        {{ installment_plan.start_day|stringformat:"02d" }}/{{ installment_plan.start_month|stringformat:"02d" }} - 
+                        {{ installment_plan.end_day|stringformat:"02d" }}/{{ installment_plan.end_month|stringformat:"02d" }} 
+                        (recurring annually)
+                    </span>
+                </div>
+
+                <!-- Validation Alert -->
+                <div id="validation-info" class="alert alert-success" style="display: none;">
+                    <i class="fas fa-check-circle"></i>
+                    <span id="validation-message"></span>
+                </div>
+
+                <!-- Form Actions -->
+                <div class="form-group text-right mt-4">
+                    <a href="{% url 'admin_hostel_installment_plans_list' %}" class="btn btn-secondary mr-2">
+                        <i class="fas fa-times mr-1"></i> Cancel
+                    </a>
+                    <button type="submit" class="btn btn-primary" id="save-btn">
+                        <i class="fas fa-save mr-1"></i> Update Plan
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // ============================================
+    // Global variables for amount validation
+    // ============================================
+    const hostelFee = parseFloat({{ hostel.total_fee|default:0 }});
+    const otherPlansTotal = parseFloat({{ total_installment_amount|add:"-"|add:installment_plan.amount|default:0 }});
+    const currentAmount = parseFloat({{ installment_plan.amount|default:0 }});
+    let existingPlans = [];
+
+    // ============================================
+    // Initialize Select2
+    // ============================================
+    
+    // Initialize date selects
+    $('.select2-date').select2({
+        theme: 'bootstrap4',
+        minimumResultsForSearch: -1, // Disable search for small selects
+        width: '100%'
+    });
+
+    // ============================================
+    // CSRF Token
+    // ============================================
+    function getCSRFToken() {
+        const csrfInput = document.querySelector('input[name="csrfmiddlewaretoken"]');
+        return csrfInput ? csrfInput.value : '';
+    }
+
+    // ============================================
+    // Toast Notification Function
+    // ============================================
+    function showToast(message, type = 'success') {
+        const toastId = 'toast-' + Date.now();
+        const icon = type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle';
+        
+        let bgColor = '#28a745';
+        if (type === 'error') bgColor = '#dc3545';
+        else if (type === 'info') bgColor = '#17a2b8';
+        else if (type === 'warning') bgColor = '#ffc107';
+        
+        const toast = `
+            <div id="${toastId}" class="toast-notification alert alert-${type} alert-dismissible fade show" role="alert" 
+                 style="background: ${bgColor}; color: white; border: none; box-shadow: 0 4px 12px rgba(0,0,0,0.15); position: fixed; top: 20px; right: 20px; z-index: 9999; min-width: 300px;">
+                <strong><i class="fas ${icon} mr-2"></i> ${type === 'success' ? 'Success' : type === 'error' ? 'Error' : type === 'warning' ? 'Warning' : 'Info'}</strong>
+                <span class="ml-2">${message}</span>
+                <button type="button" class="close" onclick="$('#${toastId}').fadeOut()" style="color: white; opacity: 0.8;">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+        `;
+        
+        $('body').append(toast);
+        
+        setTimeout(function() {
+            $('#' + toastId).fadeOut(function() {
+                $(this).remove();
+            });
+        }, 3000);
+    }
+
+    // ============================================
+    // Update Financial Summary
+    // ============================================
+    function updateFinancialSummary() {
+        const newAmount = parseFloat($('#amount').val()) || 0;
+        const newTotal = otherPlansTotal + newAmount;
+        const remaining = hostelFee - newTotal;
+        const percentage = (newTotal / hostelFee) * 100;
+        
+        // Update displays
+        $('#current-amount-display').text(`TSh ${newAmount.toLocaleString()}`);
+        $('#new-total-display').text(`TSh ${newTotal.toLocaleString()}`);
+        
+        // Color code remaining amount
+        const remainingElement = $('#remaining-display');
+        if (remaining < 0) {
+            remainingElement.text(`TSh ${Math.abs(remaining).toLocaleString()} (Exceeded)`);
+            remainingElement.removeClass('info success').addClass('warning');
+        } else if (remaining === 0) {
+            remainingElement.text(`TSh 0 (Completed)`);
+            remainingElement.removeClass('warning info').addClass('success');
+        } else {
+            remainingElement.text(`TSh ${remaining.toLocaleString()}`);
+            remainingElement.removeClass('warning success').addClass('info');
+        }
+        
+        // Update progress bar
+        const progressBar = $('#amount-progress-bar');
+        if (percentage <= 100) {
+            progressBar.css('width', percentage + '%').removeClass('bg-danger').addClass('bg-success');
+        } else {
+            progressBar.css('width', '100%').removeClass('bg-success').addClass('bg-danger');
+        }
+        
+        // Show warning if exceeding
+        if (newTotal > hostelFee) {
+            $('#amount-validation-message').html(`
+                <span class="text-danger">
+                    <i class="fas fa-exclamation-circle"></i> 
+                    Total will exceed hostel fee by TSh ${(newTotal - hostelFee).toLocaleString()}
+                </span>
+            `);
+        } else if (newTotal === hostelFee) {
+            $('#amount-validation-message').html(`
+                <span class="text-success">
+                    <i class="fas fa-check-circle"></i> 
+                    Total will exactly match hostel fee
+                </span>
+            `);
+        } else {
+            $('#amount-validation-message').html('');
+        }
+    }
+
+    // ============================================
+    // Validate Date Range
+    // ============================================
+    function validateDateRange() {
+        const startMonth = parseInt($('#start_month').val());
+        const startDay = parseInt($('#start_day').val());
+        const endMonth = parseInt($('#end_month').val());
+        const endDay = parseInt($('#end_day').val());
+        
+        if (!startMonth || !startDay || !endMonth || !endDay) {
+            return true;
+        }
+        
+        // Convert to comparable values (month * 100 + day)
+        const startValue = startMonth * 100 + startDay;
+        const endValue = endMonth * 100 + endDay;
+        
+        const $info = $('#validation-info');
+        const $message = $('#validation-message');
+        
+        // Check if end date is after start date
+        if (endValue < startValue) {
+            $info.removeClass('alert-success alert-info').addClass('alert-danger');
+            $message.html('<i class="fas fa-exclamation-circle mr-1"></i> End date must be after start date');
+            $info.show();
+            return false;
+        } else {
+            $info.removeClass('alert-danger').addClass('alert-success');
+            $message.html('<i class="fas fa-check-circle mr-1"></i> Valid date range');
+            $info.show();
+            return true;
+        }
+    }
+
+    // ============================================
+    // Update day options based on month
+    // ============================================
+    function updateDayOptions(monthSelect, daySelect) {
+        const month = parseInt($(monthSelect).val());
+        const $daySelect = $(daySelect);
+        const currentDay = $daySelect.val();
+        
+        if (!month) return;
+        
+        // Days in month
+        const daysInMonth = {
+            1: 31, 2: 29, 3: 31, 4: 30, 5: 31, 6: 30,
+            7: 31, 8: 31, 9: 30, 10: 31, 11: 30, 12: 31
+        };
+        
+        const maxDays = daysInMonth[month] || 31;
+        
+        // Save current selection if valid
+        const currentValue = parseInt(currentDay);
+        const isValidCurrent = currentValue && currentValue <= maxDays;
+        
+        // Update day options
+        $daySelect.empty().append('<option value="" disabled>Day</option>');
+        for (let i = 1; i <= maxDays; i++) {
+            $daySelect.append(`<option value="${i}" ${isValidCurrent && currentValue === i ? 'selected' : ''}>${i.toString().padStart(2, '0')}</option>`);
+        }
+        
+        // If previous selection was invalid, clear it
+        if (!isValidCurrent) {
+            $daySelect.val('');
+        }
+        
+        // Reinitialize Select2
+        $daySelect.select2({
+            theme: 'bootstrap4',
+            minimumResultsForSearch: -1,
+            width: '100%'
+        });
+        
+        validateDateRange();
+    }
+
+    // ============================================
+    // Event Handlers
+    // ============================================
+    
+    // Month changes
+    $('#start_month').on('change', function() {
+        updateDayOptions(this, '#start_day');
+    });
+
+    $('#end_month').on('change', function() {
+        updateDayOptions(this, '#end_day');
+    });
+
+    // Day changes
+    $('#start_day, #end_day').on('change', validateDateRange);
+
+    // Amount input with real-time validation
+    $('#amount').on('input', function() {
+        const val = parseFloat($(this).val()) || 0;
+        const newTotal = otherPlansTotal + val;
+        
+        // Update financial summary
+        updateFinancialSummary();
+        
+        // Show info about remaining
+        if (newTotal < hostelFee) {
+            const remaining = hostelFee - newTotal;
+            $('#amount-info').html(`
+                <span class="text-info">
+                    <i class="fas fa-info-circle"></i> 
+                    Remaining after this installment: TSh ${remaining.toLocaleString()}
+                </span>
+            `);
+        } else if (newTotal === hostelFee) {
+            $('#amount-info').html(`
+                <span class="text-success">
+                    <i class="fas fa-check-circle"></i> 
+                    Total will exactly match hostel fee
+                </span>
+            `);
+        } else {
+            $('#amount-info').html(`
+                <span class="text-danger">
+                    <i class="fas fa-exclamation-circle"></i> 
+                    Total will exceed hostel fee by TSh ${(newTotal - hostelFee).toLocaleString()}
+                </span>
+            `);
+        }
+    });
+
+    // ============================================
+    // Form Submission
+    // ============================================
+    $('#plan-form').on('submit', function(e) {
+        e.preventDefault();
+        
+        // Validate date range
+        if (!validateDateRange()) {
+            showToast('Please fix the date range', 'error');
+            return;
+        }
+        
+        // Validate amount
+        const amount = parseFloat($('#amount').val()) || 0;
+        
+        if (amount <= 0) {
+            showToast('Please enter a valid amount greater than 0', 'error');
+            return;
+        }
+        
+        // Check total amount
+        const newTotal = otherPlansTotal + amount;
+        
+        if (newTotal > hostelFee) {
+            showToast(
+                `Total amount (TSh ${newTotal.toLocaleString()}) exceeds hostel fee ` +
+                `(TSh ${hostelFee.toLocaleString()}) by TSh ${(newTotal - hostelFee).toLocaleString()}`,
+                'error'
+            );
+            return;
+        }
+        
+        const $btn = $('#save-btn');
+        const originalText = $btn.html();
+        
+        $btn.prop('disabled', true).html('<span class="loading-spinner"></span> Updating...');
+        
+        $.ajax({
+            url: window.location.href,
+            method: 'POST',
+            data: $(this).serialize(),
+            headers: {
+                'X-CSRFToken': getCSRFToken(),
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            success: function(response) {
+                if (response.success) {
+                    showToast('Installment plan updated successfully', 'success');
+                    setTimeout(function() {
+                        window.location.href = '{% url "admin_hostel_installment_plans_list" %}';
+                    }, 1500);
+                } else {
+                    showToast(response.message || 'Error updating plan', 'error');
+                    $btn.prop('disabled', false).html(originalText);
+                }
+            },
+            error: function(xhr) {
+                let errorMsg = 'An error occurred. Please try again.';
+                if (xhr.responseJSON && xhr.responseJSON.message) {
+                    errorMsg = xhr.responseJSON.message;
+                }
+                showToast(errorMsg, 'error');
+                $btn.prop('disabled', false).html(originalText);
+            }
+        });
+    });
+
+    // ============================================
+    // Initial validation
+    // ============================================
+    validateDateRange();
+    updateFinancialSummary();
+});
+</script>
+{% endblock %}

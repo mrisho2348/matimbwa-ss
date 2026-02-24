@@ -1,0 +1,999 @@
+{% extends 'admin/base.html' %}
+{% load static %}
+
+{% block title %}Record Hostel Payment{% endblock %}
+
+{% block breadcrumb %}
+    <div class="btn-group">
+        <a href="{% url 'admin_hostel_payments_list' %}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i> Back to Payments
+        </a>
+    </div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .form-card {
+        border: none;
+        box-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.15);
+    }
+    .form-card .card-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-bottom: none;
+        padding: 1.25rem;
+    }
+    .form-card .card-header h5 {
+        margin: 0;
+        font-weight: 600;
+        color: white;
+    }
+    
+    /* Student info card */
+    .student-info-card {
+        background: linear-gradient(135deg, #f8f9fc 0%, #e9ecef 100%);
+        border-left: 4px solid #4e73df;
+        padding: 1.25rem;
+        margin-bottom: 2rem;
+        border-radius: 0.35rem;
+    }
+    
+    /* Balance card */
+    .balance-card {
+        background: linear-gradient(135deg, #e8f4f8 0%, #d1e7f5 100%);
+        border-left: 4px solid #1cc88a;
+        padding: 1rem;
+        margin-bottom: 1.5rem;
+        border-radius: 0.35rem;
+    }
+    .balance-item {
+        text-align: center;
+        padding: 0.5rem;
+    }
+    .balance-item .label {
+        font-size: 0.85rem;
+        color: #6c757d;
+        text-transform: uppercase;
+    }
+    .balance-item .value {
+        font-size: 1.2rem;
+        font-weight: 700;
+        color: #1cc88a;
+    }
+    .balance-item .value.warning {
+        color: #e74a3b;
+    }
+    
+    /* Payment mode badge */
+    .payment-mode-badge {
+        padding: 0.5rem 1rem;
+        border-radius: 20px;
+        font-weight: 600;
+        display: inline-block;
+        background: #4e73df;
+        color: white;
+    }
+    .payment-mode-badge.installments { background: #4e73df; }
+    .payment-mode-badge.monthly { background: #1cc88a; }
+    .payment-mode-badge.yearly { background: #f6c23e; color: #2c3e50; }
+    
+    /* Installment list */
+    .installment-list {
+        max-height: 300px;
+        overflow-y: auto;
+        margin-bottom: 1rem;
+    }
+    .installment-item {
+        padding: 0.75rem;
+        border-left: 4px solid #4e73df;
+        margin-bottom: 0.5rem;
+        background: #f8f9fc;
+        transition: all 0.2s;
+    }
+    .installment-item.paid {
+        border-left-color: #1cc88a;
+        background: #e8f4e8;
+    }
+    .installment-item.partial {
+        border-left-color: #f6c23e;
+    }
+    .installment-item:hover {
+        transform: translateX(5px);
+        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+    
+    /* Amount input */
+    .amount-input {
+        position: relative;
+    }
+    .amount-input:before {
+        content: "TSh";
+        position: absolute;
+        left: 10px;
+        top: 8px;
+        color: #6c757d;
+        z-index: 1;
+        font-weight: 600;
+    }
+    .amount-input input {
+        padding-left: 60px;
+    }
+    
+    /* Button styling */
+    .btn {
+        padding: 0.5rem 1.5rem;
+        font-weight: 600;
+        border-radius: 0.35rem;
+        transition: all 0.2s;
+    }
+    .btn-primary {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border: none;
+    }
+    .btn-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+    }
+    
+    /* Loading spinner */
+    .loading-spinner {
+        display: inline-block;
+        width: 1rem;
+        height: 1rem;
+        border: 2px solid rgba(255,255,255,0.3);
+        border-radius: 50%;
+        border-top-color: white;
+        animation: spin 0.6s linear infinite;
+        margin-right: 5px;
+    }
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+    
+    /* Select2 customization */
+    .select2-container--bootstrap4 .select2-selection {
+        border: 1px solid #d1d3e2;
+        height: 38px;
+    }
+    
+    /* Payment method icons */
+    .method-icon {
+        width: 30px;
+        text-align: center;
+        color: #4e73df;
+    }
+    
+    /* Distribution table */
+    .distribution-table {
+        font-size: 0.9rem;
+    }
+    .distribution-table th {
+        background: #f8f9fc;
+        font-weight: 600;
+    }
+    .status-badge-paid {
+        background: #1cc88a;
+        color: white;
+        padding: 3px 8px;
+        border-radius: 12px;
+        font-size: 0.75rem;
+    }
+    .status-badge-partial {
+        background: #f6c23e;
+        color: white;
+        padding: 3px 8px;
+        border-radius: 12px;
+        font-size: 0.75rem;
+    }
+    
+    /* Summary pre */
+    pre {
+        font-family: inherit;
+        font-size: 0.9rem;
+        color: #2c3e50;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="card form-card">
+        <div class="card-header">
+            <h5 class="mb-0">
+                <i class="fas fa-credit-card mr-2"></i> Record Hostel Payment
+            </h5>
+        </div>
+        <div class="card-body p-4">
+            <!-- Student Selection -->
+            <div class="form-group">
+                <label for="student-select" class="font-weight-bold">
+                    <i class="fas fa-user-graduate mr-1"></i> Select Student 
+                    <span class="text-danger">*</span>
+                </label>
+                <select class="form-control select2" id="student-select" style="width: 100%;">
+                    <option value="" disabled selected>-- Choose a student with active allocation --</option>
+                    {% for allocation in allocations %}
+                    <option value="{{ allocation.id }}" 
+                            data-student-id="{{ allocation.student.id }}"
+                            data-student="{{ allocation.student.full_name }}"
+                            data-reg="{{ allocation.student.registration_number }}"
+                            data-hostel="{{ allocation.hostel.name }}"
+                            data-fee="{{ allocation.hostel.total_fee }}"
+                            data-payment-mode="{{ allocation.hostel.payment_mode }}">
+                        {{ allocation.student.full_name }} ({{ allocation.student.registration_number }}) - {{ allocation.hostel.name }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Student Info Card (Hidden initially) -->
+            <div id="student-info-card" class="student-info-card" style="display: none;">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6 class="text-primary mb-3">
+                            <i class="fas fa-user mr-2"></i> Student Information
+                        </h6>
+                        <table class="table table-sm table-borderless">
+                            <tr>
+                                <td width="120"><strong>Name:</strong></td>
+                                <td id="student-name-display"></td>
+                            </tr>
+                            <tr>
+                                <td><strong>Reg No:</strong></td>
+                                <td id="student-reg-display"></td>
+                            </tr>
+                            <tr>
+                                <td><strong>Hostel:</strong></td>
+                                <td id="hostel-name-display"></td>
+                            </tr>
+                            <tr>
+                                <td><strong>Payment Mode:</strong></td>
+                                <td>
+                                    <span class="payment-mode-badge" id="payment-mode-display"></span>
+                                </td>
+                            </tr>
+                        </table>
+                    </div>
+                    <div class="col-md-6">
+                        <h6 class="text-primary mb-3">
+                            <i class="fas fa-info-circle mr-2"></i> Fee Information
+                        </h6>
+                        <table class="table table-sm table-borderless">
+                            <tr>
+                                <td width="120"><strong>Total Fee:</strong></td>
+                                <td><span class="text-primary font-weight-bold" id="total-fee-display"></span></td>
+                            </tr>
+                            <tr>
+                                <td><strong>Academic Year:</strong></td>
+                                <td id="academic-year-display"></td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Balance Card (Hidden initially) -->
+            <div id="balance-card" class="balance-card" style="display: none;">
+                <div class="row">
+                    <div class="col-md-4 balance-item">
+                        <div class="label">Total Fee</div>
+                        <div class="value info" id="balance-total-fee">TSh 0</div>
+                    </div>
+                    <div class="col-md-4 balance-item">
+                        <div class="label">Total Paid</div>
+                        <div class="value" id="balance-total-paid">TSh 0</div>
+                    </div>
+                    <div class="col-md-4 balance-item">
+                        <div class="label">Balance</div>
+                        <div class="value" id="balance-remaining">TSh 0</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Payment Mode Info -->
+            <div id="payment-mode-info" class="alert alert-info" style="display: none;">
+                <i class="fas fa-info-circle mr-2"></i>
+                <span id="payment-mode-text"></span>
+            </div>
+
+            <!-- Installment Plans (Hidden initially) -->
+            <div id="installment-section" style="display: none;">
+                <h6 class="text-primary mb-3">
+                    <i class="fas fa-list mr-2"></i> Installment Status
+                </h6>
+                <div id="installment-list" class="installment-list">
+                    <!-- Installments will be loaded here -->
+                </div>
+            </div>
+
+            <!-- Payment Form -->
+            <form id="payment-form" method="post">
+                {% csrf_token %}
+                <input type="hidden" name="allocation_id" id="allocation-id">
+                <input type="hidden" name="payment_type" id="payment-type-hidden">
+
+                <div class="row">
+                    <!-- Amount (Now full width) -->
+                    <div class="col-md-12">
+                        <div class="form-group">
+                            <label for="amount" class="font-weight-bold">
+                                <i class="fas fa-money-bill-wave mr-1"></i> Amount 
+                                <span class="text-danger">*</span>
+                            </label>
+                            <div class="amount-input">
+                                <input type="number" class="form-control" id="amount" name="amount" 
+                                       step="0.01" min="0.01" placeholder="0.00" required>
+                            </div>
+                            <small class="form-text text-muted" id="amount-hint"></small>
+                        </div>
+                    </div>
+
+                    <!-- Payment Method -->
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="payment-method" class="font-weight-bold">
+                                <i class="fas fa-credit-card mr-1"></i> Payment Method 
+                                <span class="text-danger">*</span>
+                            </label>
+                            <select class="form-control" id="payment-method" name="payment_method" required>
+                                <option value="" disabled>-- Select payment method --</option>
+                                <option value="cash" selected>Cash</option>
+                                <option value="bank">Bank Transfer</option>
+                                <option value="mobile">Mobile Money</option>
+                                <option value="cheque">Cheque</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Transaction Number (Optional) -->
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="transaction-number">
+                                <i class="fas fa-hashtag mr-1"></i> Transaction Reference 
+                                <small class="text-muted">(Optional)</small>
+                            </label>
+                            <input type="text" class="form-control" id="transaction-number" name="transaction_number" 
+                                   placeholder="Bank ref / Mobile ID / Cheque No.">
+                            <small class="form-text text-muted transaction-hint" id="transaction-hint" style="display: none;">
+                                <i class="fas fa-info-circle"></i> Required for non-cash payments
+                            </small>
+                        </div>
+                    </div>
+
+                    <!-- Month (for monthly payments - hidden initially) -->
+                    <div class="col-md-6" id="month-field" style="display: none;">
+                        <div class="form-group">
+                            <label for="month" class="font-weight-bold">Month</label>
+                            <select class="form-control" id="month" name="month">
+                                <option value="" disabled selected>-- Select month --</option>
+                                <option value="1">January</option>
+                                <option value="2">February</option>
+                                <option value="3">March</option>
+                                <option value="4">April</option>
+                                <option value="5">May</option>
+                                <option value="6">June</option>
+                                <option value="7">July</option>
+                                <option value="8">August</option>
+                                <option value="9">September</option>
+                                <option value="10">October</option>
+                                <option value="11">November</option>
+                                <option value="12">December</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Year (for monthly payments - hidden initially) -->
+                    <div class="col-md-6" id="year-field" style="display: none;">
+                        <div class="form-group">
+                            <label for="year" class="font-weight-bold">Year</label>
+                            <input type="number" class="form-control" id="year" name="year" 
+                                   value="{{ today|slice:":4" }}" min="2020" max="2030">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Validation Messages -->
+                <div id="validation-message" class="alert" style="display: none;">
+                    <i class="fas fa-info-circle"></i>
+                    <span id="validation-text"></span>
+                </div>
+
+                <!-- Payment Distribution Preview -->
+                <div id="distribution-preview" class="card bg-light mt-3" style="display: none;">
+                    <div class="card-body">
+                        <h6 class="text-primary">
+                            <i class="fas fa-chart-pie mr-2"></i> Payment Distribution
+                        </h6>
+                        <div id="distribution-content" class="mt-2"></div>
+                    </div>
+                </div>
+
+                <!-- Form Actions -->
+                <div class="form-group text-right mt-4">
+                    <a href="{% url 'admin_hostel_payments_list' %}" class="btn btn-secondary mr-2">
+                        <i class="fas fa-times mr-1"></i> Cancel
+                    </a>
+                    <button type="submit" class="btn btn-primary" id="submit-btn">
+                        <i class="fas fa-save mr-1"></i> Process Payment
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Payment Result Modal -->
+<div class="modal fade" id="resultModal" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title">
+                    <i class="fas fa-check-circle mr-2"></i> Payment Processed Successfully
+                </h5>
+                <button type="button" class="close text-white" data-dismiss="modal">
+                    <span>&times;</span>
+                </button>
+            </div>
+            <div class="modal-body" id="result-modal-body">
+                <!-- Result content will be inserted here -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">
+                    <i class="fas fa-times"></i> Close
+                </button>
+                <button type="button" class="btn btn-primary" onclick="window.print()">
+                    <i class="fas fa-print"></i> Print Receipt
+                </button>
+                <a href="{% url 'admin_hostel_payments_list' %}" class="btn btn-info">
+                    <i class="fas fa-list"></i> View All Payments
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Toast Notifications -->
+<div id="toast-container" style="position: fixed; top: 20px; right: 20px; z-index: 9999;"></div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // ============================================
+    // Initialize Select2
+    // ============================================
+    $('#student-select').select2({
+        theme: 'bootstrap4',
+        placeholder: '-- Choose a student with active allocation --',
+        width: '100%'
+    });
+
+    // ============================================
+    // CSRF Token
+    // ============================================
+    function getCSRFToken() {
+        return document.querySelector('input[name="csrfmiddlewaretoken"]').value;
+    }
+
+    // ============================================
+    // Toast Notification
+    // ============================================
+    function showToast(message, type = 'success') {
+        const toastId = 'toast-' + Date.now();
+        const icon = type === 'success' ? 'fa-check-circle' : (type === 'error' ? 'fa-exclamation-circle' : 'fa-info-circle');
+        
+        let bgColor = type === 'success' ? '#28a745' : (type === 'error' ? '#dc3545' : '#17a2b8');
+        
+        const toast = `
+            <div id="${toastId}" class="toast-notification alert alert-${type} alert-dismissible fade show" role="alert" 
+                 style="background: ${bgColor}; color: white; border: none; position: fixed; top: 20px; right: 20px; z-index: 9999; min-width: 300px;">
+                <strong><i class="fas ${icon} mr-2"></i> ${type === 'success' ? 'Success' : type === 'error' ? 'Error' : 'Info'}</strong>
+                <span class="ml-2">${message}</span>
+                <button type="button" class="close" onclick="$('#${toastId}').fadeOut()" style="color: white;">
+                    <span>&times;</span>
+                </button>
+            </div>
+        `;
+        
+        $('body').append(toast);
+        
+        setTimeout(function() {
+            $('#' + toastId).fadeOut(function() {
+                $(this).remove();
+            });
+        }, 3000);
+    }
+
+    // ============================================
+    // Payment Method Change Handler
+    // ============================================
+    $('#payment-method').on('change', function() {
+        const method = $(this).val();
+        
+        if (method && method !== 'cash') {
+            $('#transaction-hint').show();
+            if (method === 'bank') {
+                $('#transaction-number').attr('placeholder', 'Bank reference number');
+            } else if (method === 'mobile') {
+                $('#transaction-number').attr('placeholder', 'Mobile transaction ID');
+            } else if (method === 'cheque') {
+                $('#transaction-number').attr('placeholder', 'Cheque number');
+            }
+        } else {
+            $('#transaction-hint').hide();
+            $('#transaction-number').attr('placeholder', 'Bank ref / Mobile ID / Cheque No.');
+        }
+    });
+
+    // ============================================
+    // Load Student Balance Information
+    // ============================================
+    function loadStudentBalance(allocationId, studentId) {
+        if (!studentId) {
+            console.error('Student ID is missing');
+            showToast('Student ID is missing', 'error');
+            return;
+        }
+        
+        // Construct the URL properly
+        const url = '{% url "admin_student_balance_info" 0 %}'.replace('0', studentId);
+        console.log('Loading balance for student ID:', studentId);
+        console.log('Request URL:', url);
+        
+        $.ajax({
+            url: url,
+            method: 'GET',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            success: function(response) {
+                console.log('Balance response:', response);
+                if (response.success) {
+                    const data = response.data;
+                    
+                    // Update balance card
+                    $('#balance-total-fee').text(`TSh ${data.total_fee.toLocaleString()}`);
+                    $('#balance-total-paid').text(`TSh ${data.total_paid.toLocaleString()}`);
+                    
+                    const balanceElem = $('#balance-remaining');
+                    balanceElem.text(`TSh ${data.balance.toLocaleString()}`);
+                    
+                    if (data.balance <= 0) {
+                        balanceElem.removeClass('warning').addClass('success');
+                    } else {
+                        balanceElem.removeClass('success').addClass('warning');
+                    }
+                    
+                    $('#balance-card').show();
+                    
+                    // Set payment type hidden field
+                    $('#payment-type-hidden').val(data.payment_mode);
+                    
+                    // Update payment mode info
+                    let paymentModeText = '';
+                    if (data.payment_mode === 'installments') {
+                        paymentModeText = 'This hostel uses installment payments. Your payment will be automatically distributed to clear outstanding installments in order.';
+                        $('#installment-section').show();
+                        $('#month-field').hide();
+                        $('#year-field').hide();
+                    } else if (data.payment_mode === 'monthly') {
+                        paymentModeText = 'This hostel uses monthly payments. Please specify the month and year for this payment.';
+                        $('#month-field').show();
+                        $('#year-field').show();
+                        $('#installment-section').hide();
+                    } else {
+                        paymentModeText = 'This hostel uses yearly payments.';
+                        $('#month-field').hide();
+                        $('#year-field').hide();
+                        $('#installment-section').hide();
+                    }
+                    
+                    $('#payment-mode-text').text(paymentModeText);
+                    $('#payment-mode-info').show();
+                    
+                    // Update amount hint based on payment mode
+                    const totalFee = data.total_fee;
+                    if (data.payment_mode === 'yearly') {
+                        $('#amount-hint').text(`Total yearly fee: TSh ${totalFee.toLocaleString()}`);
+                    } else if (data.payment_mode === 'monthly') {
+                        const monthly = totalFee / 12;
+                        $('#amount-hint').text(`Monthly fee: TSh ${monthly.toFixed(2).toLocaleString()}`);
+                    } else {
+                        $('#amount-hint').text('');
+                    }
+                    
+                    // Show installment section if applicable
+                    if (data.payment_mode === 'installments' && data.installments && data.installments.length > 0) {
+                        let html = '';
+                        data.installments.forEach(function(inst) {
+                            let statusClass = 'installment-item';
+                            if (inst.status === 'paid') statusClass += ' paid';
+                            else if (inst.status === 'partial') statusClass += ' partial';
+                            
+                            html += `
+                                <div class="${statusClass}">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <span class="font-weight-bold">Installment #${inst.number}</span>
+                                        <span class="badge badge-${inst.status === 'paid' ? 'success' : (inst.status === 'partial' ? 'warning' : 'secondary')}">
+                                            ${inst.status}
+                                        </span>
+                                    </div>
+                                    <div class="row mt-2">
+                                        <div class="col-4">
+                                            <small class="text-muted">Required:</small><br>
+                                            <strong>TSh ${inst.required.toLocaleString()}</strong>
+                                        </div>
+                                        <div class="col-4">
+                                            <small class="text-muted">Paid:</small><br>
+                                            <strong>TSh ${inst.paid.toLocaleString()}</strong>
+                                        </div>
+                                        <div class="col-4">
+                                            <small class="text-muted">Remaining:</small><br>
+                                            <strong class="${inst.remaining > 0 ? 'text-danger' : 'text-success'}">
+                                                TSh ${inst.remaining.toLocaleString()}
+                                            </strong>
+                                        </div>
+                                    </div>
+                                </div>
+                            `;
+                        });
+                        
+                        $('#installment-list').html(html);
+                        $('#installment-section').show();
+                    } else {
+                        $('#installment-section').hide();
+                    }
+                } else {
+                    showToast(response.message || 'Error loading balance information', 'error');
+                }
+            },
+            error: function(xhr, status, error) {
+                console.error('AJAX Error:', {
+                    status: status,
+                    error: error,
+                    response: xhr.responseText,
+                    url: url
+                });
+                showToast('Error loading balance information. Please check console for details.', 'error');
+            }
+        });
+    }
+  // Handle modal close/cancel buttons
+        $(document).on('click', '[data-dismiss="modal"]', function(e) {
+            e.preventDefault();
+            $(this).closest('.modal').modal('hide');
+        });
+
+    // ============================================
+    // Student Selection Change
+    // ============================================
+    $('#student-select').on('change', function() {
+        const selected = $(this).find('option:selected');
+        const allocationId = $(this).val();
+        
+        if (allocationId) {
+            // Get student data from data attributes
+            const studentId = selected.data('student-id');
+            const studentName = selected.data('student');
+            const studentReg = selected.data('reg');
+            const hostelName = selected.data('hostel');
+            const totalFee = selected.data('fee');
+            const paymentMode = selected.data('payment-mode');
+            
+            console.log('Selected student:', {
+                id: studentId,
+                name: studentName,
+                reg: studentReg,
+                allocationId: allocationId
+            });
+            
+            // Validate that we have a student ID
+            if (!studentId) {
+                console.error('Student ID is missing from data attributes');
+                showToast('Student ID is missing. Please check the data attributes.', 'error');
+                return;
+            }
+            
+            // Update student info
+            $('#student-name-display').text(studentName);
+            $('#student-reg-display').text(studentReg);
+            $('#hostel-name-display').text(hostelName);
+            $('#total-fee-display').text(`TSh ${Number(totalFee).toLocaleString()}`);
+            
+            // Set payment mode display with appropriate class
+            const modeDisplay = $('#payment-mode-display');
+            modeDisplay.text(paymentMode.charAt(0).toUpperCase() + paymentMode.slice(1));
+            modeDisplay.removeClass().addClass(`payment-mode-badge ${paymentMode}`);
+            
+            $('#student-info-card').show();
+            $('#allocation-id').val(allocationId);
+            
+            // Reset form fields
+            $('#amount').val('');
+            $('#month-field').hide();
+            $('#year-field').hide();
+            $('#month').val('');
+            $('#payment-mode-info').hide();
+            $('#distribution-preview').hide();
+            $('#installment-section').hide();
+            $('#balance-card').hide();
+            
+            // Load balance information using the student ID
+            loadStudentBalance(allocationId, studentId);
+        }
+    });
+
+    // ============================================
+    // Amount Input - Show Distribution Preview
+    // ============================================
+    $('#amount').on('input', function() {
+        const amount = parseFloat($(this).val()) || 0;
+        const totalFeeText = $('#total-fee-display').text().replace('TSh ', '').replace(/,/g, '');
+        const totalFee = parseFloat(totalFeeText) || 0;
+        const paymentMode = $('#payment-type-hidden').val();
+        
+        if (amount > 0 && paymentMode) {
+            $('#distribution-preview').show();
+            
+            let html = '';
+            if (paymentMode === 'yearly') {
+                if (amount > totalFee) {
+                    const excess = amount - totalFee;
+                    html = `
+                        <div class="alert alert-warning">
+                            <i class="fas fa-exclamation-triangle"></i>
+                            Payment exceeds yearly fee by TSh ${excess.toLocaleString()}. 
+                            Excess amount will be handled based on student's academic level.
+                        </div>
+                    `;
+                } else if (amount < totalFee) {
+                    const remaining = totalFee - amount;
+                    html = `
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle"></i>
+                            Remaining balance after payment: TSh ${remaining.toLocaleString()}
+                        </div>
+                    `;
+                } else {
+                    html = `
+                        <div class="alert alert-success">
+                            <i class="fas fa-check-circle"></i>
+                            Payment exactly matches yearly fee. Full payment completed.
+                        </div>
+                    `;
+                }
+            } else if (paymentMode === 'monthly') {
+                const monthlyFee = totalFee / 12;
+                if (amount > monthlyFee) {
+                    const excess = amount - monthlyFee;
+                    html = `
+                        <div class="alert alert-warning">
+                            <i class="fas fa-exclamation-triangle"></i>
+                            Payment exceeds monthly fee by TSh ${excess.toLocaleString()}. 
+                            Excess will be handled appropriately.
+                        </div>
+                    `;
+                } else if (amount < monthlyFee) {
+                    const remaining = monthlyFee - amount;
+                    html = `
+                        <div class="alert alert-warning">
+                            <i class="fas fa-exclamation-triangle"></i>
+                            Payment is less than monthly fee by TSh ${remaining.toLocaleString()}. 
+                            This will be recorded as partial payment.
+                        </div>
+                    `;
+                } else {
+                    html = `
+                        <div class="alert alert-success">
+                            <i class="fas fa-check-circle"></i>
+                            Payment exactly matches monthly fee.
+                        </div>
+                    `;
+                }
+            }
+            
+            $('#distribution-content').html(html);
+        } else {
+            $('#distribution-preview').hide();
+        }
+    });
+
+    // ============================================
+    // Form Submission with Enhanced Success Handler
+    // ============================================
+    $('#payment-form').on('submit', function(e) {
+        e.preventDefault();
+        
+        const allocationId = $('#allocation-id').val();
+        const amount = $('#amount').val();
+        const paymentMethod = $('#payment-method').val();
+        const paymentMode = $('#payment-type-hidden').val();
+        
+        if (!allocationId) {
+            showToast('Please select a student', 'error');
+            return;
+        }
+        
+        if (!amount || parseFloat(amount) <= 0) {
+            showToast('Please enter a valid amount', 'error');
+            return;
+        }
+        
+        if (!paymentMethod) {
+            showToast('Please select payment method', 'error');
+            return;
+        }
+        
+        // Validate transaction number for non-cash payments
+        if (paymentMethod !== 'cash') {
+            const transactionNumber = $('#transaction-number').val();
+            if (!transactionNumber || transactionNumber.trim() === '') {
+                showToast('Transaction number is required for non-cash payments', 'error');
+                return;
+            }
+        }
+        
+        if (paymentMode === 'monthly' && !$('#month').val()) {
+            showToast('Please select month for monthly payment', 'error');
+            return;
+        }
+        
+        const $btn = $('#submit-btn');
+        const originalText = $btn.html();
+        
+        $btn.prop('disabled', true).html('<span class="loading-spinner"></span> Processing...');
+        
+        $.ajax({
+            url: '{% url "admin_process_payment" %}',
+            method: 'POST',
+            data: $(this).serialize(),
+            headers: {
+                'X-CSRFToken': getCSRFToken(),
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            success: function(response) {
+                if (response.success) {
+                    // Show result modal with detailed distribution
+                    let modalHtml = `
+                        <div class="alert alert-success">
+                            <i class="fas fa-check-circle"></i> 
+                            ${response.message.replace(/\n/g, '<br>')}
+                        </div>
+                    `;
+                    
+                    // Show distribution details if available
+                    if (response.data.distribution && response.data.distribution.length > 0) {
+                        modalHtml += `
+                            <h6 class="mt-3 text-primary">
+                                <i class="fas fa-chart-pie mr-2"></i> Payment Distribution
+                            </h6>
+                            <div class="table-responsive">
+                                <table class="table table-sm table-bordered distribution-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Installment</th>
+                                            <th class="text-right">Amount Paid</th>
+                                            <th class="text-right">Previous Balance</th>
+                                            <th class="text-right">New Balance</th>
+                                            <th class="text-center">Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                        `;
+                        
+                        response.data.distribution.forEach(function(dist) {
+                            const statusClass = dist.status === 'Fully Paid' ? 'success' : 'warning';
+                            const statusText = dist.status === 'Fully Paid' ? '✅ Paid' : '⚠️ Partial';
+                            
+                            modalHtml += `
+                                <tr>
+                                    <td><strong>#${dist.installment_number}</strong></td>
+                                    <td class="text-right">TSh ${dist.amount_paid.toLocaleString()}</td>
+                                    <td class="text-right">TSh ${dist.previous_remaining.toLocaleString()}</td>
+                                    <td class="text-right">TSh ${dist.new_remaining.toLocaleString()}</td>
+                                    <td class="text-center">
+                                        <span class="badge badge-${statusClass}">${dist.status}</span>
+                                    </td>
+                                </tr>
+                            `;
+                        });
+                        
+                        modalHtml += `
+                                    </tbody>
+                                </table>
+                            </div>
+                        `;
+                    }
+                    
+                    // Show summary if available
+                    if (response.data.summary) {
+                        modalHtml += `
+                            <div class="alert alert-info mt-3">
+                                <i class="fas fa-info-circle mr-2"></i>
+                                <pre style="white-space: pre-wrap; margin: 0; background: transparent; border: none; font-family: inherit;">
+                                    ${response.data.summary}
+                                </pre>
+                            </div>
+                        `;
+                    }
+                    
+                    // Show transaction details
+                    if (response.data.transactions) {
+                        modalHtml += `
+                            <h6 class="mt-3 text-primary">
+                                <i class="fas fa-receipt mr-2"></i> Transaction Details
+                            </h6>
+                            <table class="table table-sm">
+                        `;
+                        
+                        response.data.transactions.forEach(function(t, index) {
+                            modalHtml += `
+                                <tr>
+                                    <td>Receipt #${t.receipt_number}</td>
+                                    <td class="text-right">TSh ${t.amount.toLocaleString()}</td>
+                                </tr>
+                            `;
+                        });
+                        
+                        modalHtml += `
+                                <tr class="font-weight-bold bg-light">
+                                    <td>Total Paid:</td>
+                                    <td class="text-right">TSh ${parseFloat(amount).toLocaleString()}</td>
+                                </tr>
+                            </table>
+                        `;
+                    }
+                    
+                    // Show refund if any
+                    if (response.data.refund) {
+                        modalHtml += `
+                            <div class="alert alert-warning mt-3">
+                                <i class="fas fa-undo mr-2"></i>
+                                <strong>Refund Issued:</strong> TSh ${response.data.refund.amount.toLocaleString()}<br>
+                                <small class="text-muted">Reason: ${response.data.refund.reason}</small>
+                            </div>
+                        `;
+                    }
+                    
+                    // Show balance if any
+                    if (response.data.balance) {
+                        modalHtml += `
+                            <div class="alert alert-success mt-3">
+                                <i class="fas fa-piggy-bank mr-2"></i>
+                                <strong>Balance Stored:</strong> TSh ${response.data.balance.amount.toLocaleString()}<br>
+                                <small class="text-muted">For future payments</small>
+                            </div>
+                        `;
+                    }
+                    
+                    $('#result-modal-body').html(modalHtml);
+                    $('#resultModal').modal('show');
+                    
+                    // Reset form
+                    $('#student-select').val('').trigger('change');
+                    $('#payment-form')[0].reset();
+                    $('#student-info-card').hide();
+                    $('#balance-card').hide();
+                    $('#installment-section').hide();
+                    $('#payment-mode-info').hide();
+                    $('#distribution-preview').hide();
+                    
+                    // Reset payment method to default
+                    $('#payment-method').val('cash');
+                } else {
+                    showToast(response.message, 'error');
+                }
+                $btn.prop('disabled', false).html(originalText);
+            },
+            error: function(xhr) {
+                let errorMsg = 'Error processing payment';
+                if (xhr.responseJSON && xhr.responseJSON.message) {
+                    errorMsg = xhr.responseJSON.message;
+                }
+                showToast(errorMsg, 'error');
+                $btn.prop('disabled', false).html(originalText);
+            }
+        });
+    });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,779 @@
+{% extends 'admin/base.html' %}
+{% load static %}
+{% load humanize %}
+  {% load math_filters %}
+{% block title %}Installment Plan #{{ installment_plan.installment_number }} - {{ installment_plan.hostel.name }}{% endblock %}
+
+{% block breadcrumb %}
+    <div class="btn-group">
+        <a href="{% url 'admin_hostel_installment_plans_list' %}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i> Back to Plans
+        </a>
+        <a href="{% url 'admin_hostel_installment_plan_edit' installment_plan.id %}" class="btn btn-primary">
+            <i class="fas fa-edit"></i> Edit Plan
+        </a>     
+     
+    </div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* ============================================
+       Main Container
+       ============================================ */
+    .plan-container {
+        padding: 20px 0;
+    }
+    
+    /* ============================================
+       Header Card
+       ============================================ */
+    .header-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 15px;
+        padding: 25px;
+        color: white;
+        margin-bottom: 25px;
+        position: relative;
+        overflow: hidden;
+        box-shadow: 0 10px 30px rgba(102, 126, 234, 0.3);
+    }
+    
+    .header-card::before {
+        content: '';
+        position: absolute;
+        top: -50px;
+        right: -50px;
+        width: 200px;
+        height: 200px;
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 50%;
+    }
+    
+    .header-card::after {
+        content: '';
+        position: absolute;
+        bottom: -50px;
+        left: -50px;
+        width: 150px;
+        height: 150px;
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 50%;
+    }
+    
+    .hostel-icon {
+        width: 60px;
+        height: 60px;
+        background: rgba(255, 255, 255, 0.2);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.8rem;
+        margin-right: 20px;
+        border: 2px solid white;
+    }
+    
+    .plan-number {
+        font-size: 1.8rem;
+        font-weight: 700;
+        margin-bottom: 5px;
+    }
+    
+    .hostel-meta {
+        display: flex;
+        gap: 20px;
+        flex-wrap: wrap;
+        font-size: 0.9rem;
+        opacity: 0.9;
+    }
+    
+    .hostel-meta i {
+        margin-right: 5px;
+    }
+    
+    .amount-badge {
+        background: rgba(255, 255, 255, 0.2);
+        padding: 10px 20px;
+        border-radius: 30px;
+        font-size: 1.2rem;
+        font-weight: 700;
+    }
+    
+    /* ============================================
+       Stats Grid
+       ============================================ */
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 20px;
+        margin-bottom: 25px;
+    }
+    
+    .stat-card {
+        background: white;
+        border-radius: 12px;
+        padding: 20px;
+        box-shadow: 0 5px 20px rgba(0, 0, 0, 0.05);
+        transition: transform 0.3s, box-shadow 0.3s;
+        position: relative;
+        overflow: hidden;
+        border-left: 4px solid transparent;
+    }
+    
+    .stat-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+    }
+    
+    .stat-card.primary {
+        border-left-color: #4e73df;
+    }
+    
+    .stat-card.success {
+        border-left-color: #1cc88a;
+    }
+    
+    .stat-card.info {
+        border-left-color: #36b9cc;
+    }
+    
+    .stat-card.warning {
+        border-left-color: #f6c23e;
+    }
+    
+    .stat-icon {
+        position: absolute;
+        right: 15px;
+        top: 15px;
+        font-size: 2.5rem;
+        opacity: 0.2;
+    }
+    
+    .stat-label {
+        font-size: 0.8rem;
+        color: #6c757d;
+        text-transform: uppercase;
+        margin-bottom: 5px;
+    }
+    
+    .stat-value {
+        font-size: 1.8rem;
+        font-weight: 700;
+        color: #2c3e50;
+    }
+    
+    .stat-value.small {
+        font-size: 1.2rem;
+    }
+    
+    .stat-trend {
+        margin-top: 8px;
+        font-size: 0.8rem;
+    }
+    
+    .trend-up {
+        color: #1cc88a;
+    }
+    
+    .trend-down {
+        color: #e74a3b;
+    }
+    
+    /* ============================================
+       Detail Cards
+       ============================================ */
+    .detail-card {
+        background: white;
+        border-radius: 12px;
+        margin-bottom: 25px;
+        box-shadow: 0 5px 20px rgba(0, 0, 0, 0.05);
+        overflow: hidden;
+    }
+    
+    .detail-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 15px 20px;
+        font-weight: 600;
+        font-size: 1rem;
+        border-bottom: none;
+    }
+    
+    .detail-header i {
+        margin-right: 10px;
+    }
+    
+    .detail-body {
+        padding: 20px;
+    }
+    
+    .info-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 20px;
+    }
+    
+    .info-item {
+        background: #f8f9fc;
+        border-radius: 8px;
+        padding: 15px;
+        border: 1px solid #e3e6f0;
+    }
+    
+    .info-label {
+        font-size: 0.8rem;
+        color: #6c757d;
+        text-transform: uppercase;
+        margin-bottom: 5px;
+    }
+    
+    .info-label i {
+        color: #4e73df;
+        margin-right: 5px;
+    }
+    
+    .info-value {
+        font-size: 1.2rem;
+        font-weight: 600;
+        color: #2c3e50;
+    }
+    
+    .info-value.small {
+        font-size: 1rem;
+    }
+    
+    .info-value.highlight {
+        color: #4e73df;
+        font-size: 1.5rem;
+    }
+    
+    /* ============================================
+       Progress Bar
+       ============================================ */
+    .progress-card {
+        background: #f8f9fc;
+        border-radius: 8px;
+        padding: 15px;
+        margin-top: 15px;
+    }
+    
+    .progress-header {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 8px;
+    }
+    
+    .progress-title {
+        font-weight: 600;
+        color: #4e73df;
+    }
+    
+    .progress-percentage {
+        font-weight: 700;
+        color: #1cc88a;
+    }
+    
+    .progress {
+        height: 8px;
+        border-radius: 4px;
+        background: #e3e6f0;
+        overflow: hidden;
+    }
+    
+    .progress-bar {
+        background: linear-gradient(90deg, #1cc88a, #36b9cc);
+        border-radius: 4px;
+    }
+    
+    /* ============================================
+       Status Badges
+       ============================================ */
+    .status-badge {
+        padding: 4px 8px;
+        border-radius: 12px;
+        font-size: 0.7rem;
+        font-weight: 600;
+        display: inline-block;
+    }
+    
+    .badge-paid {
+        background: #1cc88a;
+        color: white;
+    }
+    
+    .badge-partial {
+        background: #f6c23e;
+        color: white;
+    }
+    
+    .badge-unpaid {
+        background: #e74a3b;
+        color: white;
+    }
+    
+    .badge-primary {
+        background: #4e73df;
+        color: white;
+    }
+    
+    /* ============================================
+       Tables
+       ============================================ */
+    .table-responsive {
+        border-radius: 8px;
+    }
+    
+    .table {
+        margin-bottom: 0;
+    }
+    
+    .table thead th {
+        background: #f8f9fc;
+        color: #4e73df;
+        font-weight: 600;
+        font-size: 0.85rem;
+        border-bottom: 2px solid #e3e6f0;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    .table tbody tr:hover {
+        background: #f8f9fc;
+    }
+    
+    .table td {
+        vertical-align: middle;
+        padding: 12px 8px;
+    }
+    
+    .amount-cell {
+        text-align: right;
+        font-weight: 600;
+    }
+    
+    .receipt-code {
+        font-family: monospace;
+        color: #4e73df;
+        font-weight: 600;
+    }
+    
+    /* ============================================
+       Student Cards
+       ============================================ */
+    .student-card {
+        background: #f8f9fc;
+        border: 1px solid #e3e6f0;
+        border-radius: 8px;
+        padding: 12px;
+        margin-bottom: 10px;
+        transition: all 0.3s;
+    }
+    
+    .student-card:hover {
+        background: white;
+        border-color: #4e73df;
+        box-shadow: 0 5px 15px rgba(78, 115, 223, 0.1);
+    }
+    
+    .student-name {
+        font-weight: 600;
+        color: #2c3e50;
+    }
+    
+    .student-reg {
+        font-size: 0.8rem;
+        color: #6c757d;
+    }
+    
+    .student-amount {
+        font-weight: 600;
+        color: #1cc88a;
+    }
+    
+    /* ============================================
+       Empty State
+       ============================================ */
+    .empty-state {
+        text-align: center;
+        padding: 40px 20px;
+    }
+    
+    .empty-state i {
+        font-size: 3rem;
+        color: #e3e6f0;
+        margin-bottom: 15px;
+    }
+    
+    .empty-state h6 {
+        color: #4e73df;
+        margin-bottom: 5px;
+    }
+    
+    .empty-state p {
+        color: #6c757d;
+        margin-bottom: 15px;
+    }
+    
+    /* ============================================
+       Print Styles
+       ============================================ */
+    @media print {
+        .btn-group, .sidebar, footer, .navbar {
+            display: none !important;
+        }
+        
+        .header-card {
+            background: #4e73df !important;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+        
+        .stat-card, .detail-card {
+            break-inside: avoid;
+            border: 1px solid #ddd !important;
+        }
+    }
+    
+    /* ============================================
+       Responsive Design
+       ============================================ */
+    @media (max-width: 1200px) {
+        .stats-grid {
+            grid-template-columns: repeat(2, 1fr);
+        }
+    }
+    
+    @media (max-width: 768px) {
+        .stats-grid {
+            grid-template-columns: 1fr;
+        }
+        
+        .info-grid {
+            grid-template-columns: 1fr;
+        }
+        
+        .hostel-meta {
+            flex-direction: column;
+            gap: 5px;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid plan-container">
+    <!-- Header Card -->
+    <div class="header-card">
+        <div class="d-flex align-items-center">
+            <div class="hostel-icon">
+                <i class="fas fa-hotel"></i>
+            </div>
+            <div class="flex-grow-1">
+                <div class="plan-number">Installment Plan #{{ installment_plan.installment_number }}</div>
+                <div class="hostel-meta">
+                    <span><i class="fas fa-hotel"></i> {{ installment_plan.hostel.name }} ({{ installment_plan.hostel.code }})</span>
+                    <span><i class="fas fa-money-bill-wave"></i> {{ installment_plan.hostel.get_payment_mode_display }}</span>
+                    <span><i class="fas fa-users"></i> {{ installment_plan.hostel.max_students }} capacity</span>
+                </div>
+            </div>
+            <div class="amount-badge">
+                TSh {{ installment_plan.amount|floatformat:2|intcomma }}
+            </div>
+        </div>
+    </div>
+
+    <!-- Statistics Cards -->
+    <div class="stats-grid">
+        <div class="stat-card primary">
+            <div class="stat-icon">
+                <i class="fas fa-users"></i>
+            </div>
+            <div class="stat-label">Students with Plan</div>
+            <div class="stat-value">{{ students_with_plan }}</div>
+            <div class="stat-trend">
+                <i class="fas fa-user-graduate"></i> Assigned students
+            </div>
+        </div>
+
+        <div class="stat-card success">
+            <div class="stat-icon">
+                <i class="fas fa-check-circle"></i>
+            </div>
+            <div class="stat-label">Fully Paid</div>
+            <div class="stat-value">{{ fully_paid_count }}</div>
+            <div class="stat-trend">
+                <span class="trend-up">{{ fully_paid_count|add:partial_paid_count }} total allocations</span>
+            </div>
+        </div>
+
+        <div class="stat-card info">
+            <div class="stat-icon">
+                <i class="fas fa-credit-card"></i>
+            </div>
+            <div class="stat-label">Total Payments</div>
+            <div class="stat-value">{{ total_transactions }}</div>
+            <div class="stat-trend">
+                <span class="trend-up">{{ payment_transactions|length }} recent</span>
+            </div>
+        </div>
+
+        <div class="stat-card warning">
+            <div class="stat-icon">
+                <i class="fas fa-chart-line"></i>
+            </div>
+            <div class="stat-label">Collection Efficiency</div>
+            <div class="stat-value">{{ collection_efficiency|floatformat:1 }}%</div>
+            <div class="stat-progress mt-2">
+                <div class="progress" style="height: 5px;">
+                    <div class="progress-bar" style="width: {{ collection_efficiency|floatformat:0 }}%"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Plan Details -->
+    <div class="detail-card">
+        <div class="detail-header">
+            <i class="fas fa-info-circle"></i> Plan Details
+        </div>
+        <div class="detail-body">
+            <div class="info-grid">
+                <div class="info-item">
+                    <div class="info-label"><i class="fas fa-hotel"></i> Hostel</div>
+                    <div class="info-value">{{ installment_plan.hostel.name }}</div>
+                    <div class="small text-muted">Code: {{ installment_plan.hostel.code }}</div>
+                </div>
+                
+                <div class="info-item">
+                    <div class="info-label"><i class="fas fa-hashtag"></i> Installment Number</div>
+                    <div class="info-value highlight">{{ installment_plan.installment_number }}</div>
+                    <div class="small text-muted">of {{ installment_plan.hostel.installments_count }} total</div>
+                </div>
+                
+                <div class="info-item">
+                    <div class="info-label"><i class="fas fa-money-bill"></i> Amount</div>
+                    <div class="info-value highlight">TSh {{ installment_plan.amount|floatformat:2|intcomma }}</div>
+                </div>
+                
+                <div class="info-item">
+                    <div class="info-label"><i class="fas fa-calendar"></i> Payment Period</div>
+                    <div class="info-value">
+                        {{ installment_plan.start_day|stringformat:"02d" }}/{{ installment_plan.start_month|stringformat:"02d" }} 
+                        <i class="fas fa-arrow-right mx-2"></i> 
+                        {{ installment_plan.end_day|stringformat:"02d" }}/{{ installment_plan.end_month|stringformat:"02d" }}
+                    </div>
+                    <div class="small text-muted">Annual recurring period</div>
+                </div>
+            </div>
+            
+            <!-- Collection Progress -->
+            <div class="progress-card">
+                <div class="progress-header">
+                    <span class="progress-title">Total Collection Progress</span>
+                    <span class="progress-percentage">{{ collection_efficiency|floatformat:1 }}%</span>
+                </div>
+                <div class="progress">
+                    <div class="progress-bar" style="width: {{ collection_efficiency|floatformat:0 }}%"></div>
+                </div>
+                <div class="d-flex justify-content-between mt-2 small">
+                    <span>Collected: TSh {{ total_paid_amount|floatformat:2|intcomma }}</span>
+                    <span>Expected: TSh {{ expected_total|floatformat:2|intcomma }}</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Top Students -->
+    {% if top_students %}
+    <div class="detail-card">
+        <div class="detail-header">
+            <i class="fas fa-star"></i> Top Paying Students
+        </div>
+        <div class="detail-body">
+            <div class="row">
+                {% for student in top_students %}
+                <div class="col-md-6">
+                    <div class="student-card d-flex justify-content-between align-items-center">
+                        <div>
+                            <div class="student-name">{{ student.allocation__student__full_name }}</div>
+                            <div class="student-reg">{{ student.allocation__student__registration_number|default:"No Reg No" }}</div>
+                        </div>
+                        <div class="text-right">
+                            <div class="student-amount">TSh {{ student.total_paid|floatformat:2|intcomma }}</div>
+                            <small class="text-muted">{{ student.payment_count }} payments</small>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Recent Payment Transactions -->
+    <div class="detail-card">
+        <div class="detail-header d-flex justify-content-between align-items-center">
+            <span><i class="fas fa-history"></i> Recent Payment Transactions</span>
+            <span class="badge badge-light">{{ payment_transactions|length }} transactions</span>
+        </div>
+        <div class="detail-body">
+            {% if payment_transactions %}
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Receipt #</th>
+                            <th>Student</th>
+                            <th>Payment Type</th>
+                            <th>Method</th>
+                            <th class="amount-cell">Amount</th>
+                            <th>Status</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for transaction in payment_transactions %}
+                        <tr>
+                            <td>{{ transaction.payment_date|date:"d/m/Y" }}</td>
+                            <td><span class="receipt-code">{{ transaction.receipt_number }}</span></td>
+                            <td>
+                                {{ transaction.allocation.student.full_name }}
+                                <small class="d-block text-muted">{{ transaction.allocation.student.registration_number }}</small>
+                            </td>
+                            <td>
+                                <span class="badge badge-primary">{{ transaction.get_payment_type_display }}</span>
+                            </td>
+                            <td>
+                                <span class="badge badge-info">{{ transaction.get_payment_method_display }}</span>
+                            </td>
+                            <td class="amount-cell">TSh {{ transaction.amount|floatformat:2|intcomma }}</td>
+                            <td>
+                                {% if transaction.installment_payment %}
+                                    {% if transaction.installment_payment.status == 'paid' %}
+                                        <span class="status-badge badge-paid">PAID</span>
+                                    {% else %}
+                                        <span class="status-badge badge-partial">PARTIAL</span>
+                                    {% endif %}
+                                {% else %}
+                                    <span class="status-badge badge-paid">COMPLETED</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <a href="{% url 'admin_hostel_payment_detail' transaction.id %}" 
+                                   class="btn btn-sm btn-primary" title="View Details">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="empty-state">
+                <i class="fas fa-credit-card"></i>
+                <h6>No Payment Transactions</h6>
+                <p class="text-muted">No payments have been recorded for this installment plan yet.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Installment Payments List -->
+    <div class="detail-card">
+        <div class="detail-header d-flex justify-content-between align-items-center">
+            <span><i class="fas fa-list"></i> Student Installments</span>
+            <span class="badge badge-light">{{ installment_payments|length }} records</span>
+        </div>
+        <div class="detail-body">
+            {% if installment_payments %}
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Student</th>
+                            <th>Reg No</th>
+                            <th>Required</th>
+                            <th>Paid</th>
+                            <th>Remaining</th>
+                            <th>Progress</th>
+                            <th>Status</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for payment in installment_payments %}
+                        <tr>
+                            <td>
+                                <strong>{{ payment.allocation.student.full_name }}</strong>
+                                <small class="d-block text-muted">{{ payment.allocation.student.class_level.name }} {{ payment.allocation.student.stream_class.stream_letter }}</small>
+                            </td>
+                            <td>{{ payment.allocation.student.registration_number|default:"-" }}</td>
+                            <td class="amount-cell">TSh {{ payment.required_amount|floatformat:2|intcomma }}</td>
+                            <td class="amount-cell text-success">TSh {{ payment.total_paid|floatformat:2|intcomma }}</td>
+                            <td class="amount-cell {% if payment.remaining_amount > 0 %}text-danger{% else %}text-success{% endif %}">
+                                TSh {{ payment.remaining_amount|floatformat:2|intcomma }}
+                            </td>
+                            <td style="width: 150px;">
+                                {% with percentage=payment.total_paid|div:payment.required_amount|floatformat:0 %}
+                                <div class="progress" style="height: 6px;">
+                                    <div class="progress-bar bg-success" style="width: {{ percentage }}%"></div>
+                                </div>
+                                <small class="text-muted">{{ percentage }}%</small>
+                                {% endwith %}
+                            </td>
+                            <td>
+                                {% if payment.status == 'paid' %}
+                                    <span class="status-badge badge-paid">PAID</span>
+                                {% else %}
+                                    <span class="status-badge badge-partial">PARTIAL</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <a href="{% url 'admin_student_allocation_detail' payment.allocation.id %}" 
+                                   class="btn btn-sm btn-info" title="View Allocation">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="empty-state">
+                <i class="fas fa-users"></i>
+                <h6>No Student Assignments</h6>
+                <p class="text-muted">No students have been assigned to this installment plan yet.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+ 
+
+    // Initialize tooltips
+    $(function () {
+        $('[data-toggle="tooltip"]').tooltip();
+    });
+
+    // Auto-hide alerts after 5 seconds
+    setTimeout(function() {
+        $('.alert').fadeOut();
+    }, 5000);
+
+    // Keyboard shortcut for print
+    $(document).keydown(function(e) {
+        if (e.ctrlKey && e.key === 'p') {
+            e.preventDefault();
+            window.print();
+        }
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,763 @@
+{% extends 'admin/base.html' %}
+{% load static %}
+
+{% block title %}Hostel Payments{% endblock %}
+
+{% block breadcrumb %}
+    <div class="btn-group">
+        <a href="{% url 'admin_hostel_payment_create' %}" class="btn btn-primary">
+            <i class="fas fa-plus"></i> Record Payment
+        </a>
+    </div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* Stats cards */
+    .stat-card {
+        background: linear-gradient(45deg, #4e73df 0%, #224abe 100%);
+        color: white;
+        border-radius: 10px;
+        padding: 20px;
+        margin-bottom: 20px;
+        position: relative;
+        overflow: hidden;
+    }
+    .stat-card.amount {
+        background: linear-gradient(45deg, #1cc88a 0%, #13855c 100%);
+    }
+    .stat-card.transactions {
+        background: linear-gradient(45deg, #36b9cc 0%, #258391 100%);
+    }
+    .stat-icon {
+        font-size: 3rem;
+        opacity: 0.3;
+        position: absolute;
+        right: 20px;
+        top: 20px;
+    }
+    
+    /* Filter section */
+    .filter-section {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 10px;
+        padding: 20px;
+        margin-bottom: 20px;
+        color: white;
+    }
+    .filter-section label {
+        color: white;
+        font-weight: 500;
+    }
+    .filter-section .form-control-sm, 
+    .filter-section .form-control {
+        background: rgba(255,255,255,0.9);
+        border: none;
+        height: 38px;
+    }
+    .filter-section .btn-light {
+        background: white;
+        border: none;
+        color: #4e73df;
+        font-weight: 600;
+    }
+    .filter-section .btn-light:hover {
+        background: #f8f9fc;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+    
+    /* Payment badges */
+    .payment-badge {
+        padding: 5px 12px;
+        border-radius: 20px;
+        font-size: 0.85rem;
+        font-weight: 500;
+        display: inline-block;
+    }
+    .badge-installment {
+        background: #4e73df;
+        color: white;
+    }
+    .badge-monthly {
+        background: #1cc88a;
+        color: white;
+    }
+    .badge-yearly {
+        background: #f6c23e;
+        color: #2c3e50;
+    }
+    
+    /* Payment method badges */
+    .method-badge {
+        padding: 3px 10px;
+        border-radius: 15px;
+        font-size: 0.8rem;
+        font-weight: 500;
+        display: inline-block;
+    }
+    .method-cash {
+        background: #28a745;
+        color: white;
+    }
+    .method-bank {
+        background: #17a2b8;
+        color: white;
+    }
+    .method-mobile {
+        background: #fd7e14;
+        color: white;
+    }
+    .method-cheque {
+        background: #6c757d;
+        color: white;
+    }
+    
+    /* Receipt number */
+    .receipt-number {
+        font-family: monospace;
+        font-weight: 600;
+        color: #4e73df;
+        font-size: 0.9rem;
+    }
+    
+    /* Balance indicators */
+    .balance-positive {
+        color: #e74a3b;
+        font-weight: 600;
+    }
+    .balance-zero {
+        color: #1cc88a;
+        font-weight: 600;
+    }
+    
+    /* Quick action buttons */
+    .quick-actions {
+        display: flex;
+        gap: 4px;
+        justify-content: center;
+        align-items: center;
+    }
+    .quick-action-btn {
+        width: 32px;
+        height: 32px;
+        padding: 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        border: none;
+        transition: all 0.2s ease;
+    }
+    .quick-action-btn i {
+        font-size: 0.9rem;
+    }
+    .quick-action-btn:hover {
+        transform: scale(1.1);
+    }
+    
+    /* DataTable customization */
+    .dataTables_wrapper .dataTables_filter {
+        float: right;
+        text-align: right;
+        margin-bottom: 15px;
+    }
+    .dataTables_wrapper .dataTables_filter input {
+        border: 1px solid #d1d3e2;
+        border-radius: 0.35rem;
+        padding: 0.375rem 0.75rem;
+        margin-left: 0.5rem;
+    }
+    .dataTables_wrapper .dataTables_length {
+        float: left;
+        margin-bottom: 15px;
+    }
+    .dataTables_wrapper .dataTables_length select {
+        border: 1px solid #d1d3e2;
+        border-radius: 0.35rem;
+        padding: 0.375rem 0.75rem;
+        margin: 0 0.5rem;
+    }
+    .dataTables_wrapper .dataTables_paginate {
+        float: right;
+        margin-top: 10px;
+    }
+    .dataTables_wrapper .dataTables_paginate .paginate_button {
+        padding: 0.5rem 0.75rem;
+        margin: 0 2px;
+        border-radius: 0.35rem;
+        border: 1px solid #d1d3e2;
+        background: white;
+        color: #4e73df !important;
+    }
+    .dataTables_wrapper .dataTables_paginate .paginate_button.current {
+        background: #4e73df;
+        color: white !important;
+        border-color: #4e73df;
+    }
+    .dataTables_wrapper .dataTables_paginate .paginate_button:hover {
+        background: #e3e6f0;
+        border-color: #b7b9cc;
+    }
+    
+    /* Table styling */
+    .table thead th {
+        background: #f8f9fc;
+        color: #4e73df;
+        font-weight: 600;
+        border-bottom: 2px solid #e3e6f0;
+    }
+    .table tbody tr:hover {
+        background: #f8f9fc;
+    }
+    
+    /* Toast notifications */
+    .toast-notification {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 9999;
+        min-width: 300px;
+        animation: slideIn 0.3s ease;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+    @keyframes slideIn {
+        from {
+            transform: translateX(100%);
+            opacity: 0;
+        }
+        to {
+            transform: translateX(0);
+            opacity: 1;
+        }
+    }
+    
+    /* Export buttons */
+    .export-buttons {
+        display: inline-flex;
+        gap: 5px;
+        margin-left: 10px;
+    }
+    .export-btn {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.75rem;
+        border-radius: 0.35rem;
+        background: white;
+        border: 1px solid #d1d3e2;
+        color: #4e73df;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    .export-btn:hover {
+        background: #4e73df;
+        color: white;
+        border-color: #4e73df;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Statistics Cards -->
+    <div class="row">
+        <div class="col-xl-4 col-md-6">
+            <div class="stat-card">
+                <div class="stat-icon">
+                    <i class="fas fa-credit-card"></i>
+                </div>
+                <h6 class="text-uppercase font-weight-bold">Total Transactions</h6>
+                <h2 class="font-weight-bold mb-0">{{ total_transactions }}</h2>
+                <small>All time payments</small>
+            </div>
+        </div>
+        <div class="col-xl-4 col-md-6">
+            <div class="stat-card amount">
+                <div class="stat-icon">
+                    <i class="fas fa-money-bill-wave"></i>
+                </div>
+                <h6 class="text-uppercase font-weight-bold">Total Amount</h6>
+                <h2 class="font-weight-bold mb-0">TSh {{ total_amount|floatformat:2 }}</h2>
+                <small>Sum of all payments</small>
+            </div>
+        </div>
+        <div class="col-xl-4 col-md-6">
+            <div class="stat-card transactions">
+                <div class="stat-icon">
+                    <i class="fas fa-users"></i>
+                </div>
+                <h6 class="text-uppercase font-weight-bold">Active Allocations</h6>
+                <h2 class="font-weight-bold mb-0">{{ allocations.count }}</h2>
+                <small>Students with hostel</small>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filter Section -->
+    <div class="row">
+        <div class="col-lg-12">
+            <div class="filter-section">
+                <form id="filter-form" class="row align-items-end">
+                    <div class="col-md-3 mb-2">
+                        <label for="filter-hostel" class="mb-1"><i class="fas fa-hotel mr-1"></i> Hostel</label>
+                        <select class="form-control" id="filter-hostel">
+                            <option value="">All Hostels</option>
+                            {% for hostel in hostels %}
+                            <option value="{{ hostel.id }}">{{ hostel.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-3 mb-2">
+                        <label for="filter-payment-type" class="mb-1"><i class="fas fa-credit-card mr-1"></i> Payment Type</label>
+                        <select class="form-control" id="filter-payment-type">
+                            <option value="">All Types</option>
+                            {% for type in payment_types %}
+                            <option value="{{ type.0 }}">{{ type.1 }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-3 mb-2">
+                        <label for="filter-payment-method" class="mb-1"><i class="fas fa-money-check-alt mr-1"></i> Payment Method</label>
+                        <select class="form-control" id="filter-payment-method">
+                            <option value="">All Methods</option>
+                            <option value="cash">Cash</option>
+                            <option value="bank">Bank Transfer</option>
+                            <option value="mobile">Mobile Money</option>
+                            <option value="cheque">Cheque</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3 mb-2">
+                        <label for="filter-balance-status" class="mb-1"><i class="fas fa-balance-scale mr-1"></i> Balance Status</label>
+                        <select class="form-control" id="filter-balance-status">
+                            <option value="">All</option>
+                            <option value="paid">Fully Paid (Balance = 0)</option>
+                            <option value="partial">Partial Payment (Balance > 0)</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3 mb-2">
+                        <label for="filter-date-from" class="mb-1"><i class="fas fa-calendar-alt mr-1"></i> From Date</label>
+                        <input type="date" class="form-control" id="filter-date-from">
+                    </div>
+                    <div class="col-md-3 mb-2">
+                        <label for="filter-date-to" class="mb-1"><i class="fas fa-calendar-alt mr-1"></i> To Date</label>
+                        <input type="date" class="form-control" id="filter-date-to">
+                    </div>
+                    <div class="col-md-3 mb-2">
+                        <label for="filter-min-amount" class="mb-1"><i class="fas fa-money-bill mr-1"></i> Min Amount</label>
+                        <input type="number" class="form-control" id="filter-min-amount" placeholder="TSh 0" step="1000">
+                    </div>
+                    <div class="col-md-3 mb-2">
+                        <label for="filter-max-amount" class="mb-1"><i class="fas fa-money-bill mr-1"></i> Max Amount</label>
+                        <input type="number" class="form-control" id="filter-max-amount" placeholder="TSh 1,000,000" step="1000">
+                    </div>
+                    <div class="col-12 text-right mt-3">
+                        <button type="button" class="btn btn-light mr-2" id="apply-filters">
+                            <i class="fas fa-filter"></i> Apply Filters
+                        </button>
+                        <button type="button" class="btn btn-light" id="reset-filters">
+                            <i class="fas fa-undo"></i> Reset
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Card -->
+    <div class="row">
+        <div class="col-lg-12">
+            <div class="card shadow-lg">
+                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center py-3">
+                    <h6 class="header-title mb-0 text-uppercase font-weight-bold">
+                        <i class="fas fa-credit-card mr-2"></i> Hostel Payment Transactions
+                    </h6>
+                    <div class="d-flex align-items-center">
+                        <div class="export-buttons mr-3">
+                            <a href="{% url 'admin_hostel_payments_export_excel' %}{% if request.GET %}?{{ request.GET.urlencode }}{% endif %}" 
+                               class="export-btn" id="export-excel">
+                                <i class="fas fa-file-excel"></i> Excel
+                            </a>
+                            <a href="{% url 'admin_hostel_payments_export_pdf' %}{% if request.GET %}?{{ request.GET.urlencode }}{% endif %}" 
+                               class="export-btn" id="export-pdf">
+                                <i class="fas fa-file-pdf"></i> PDF
+                            </a>
+                        </div>
+                        <span class="badge badge-light p-2 mr-2">
+                            <i class="fas fa-list"></i> Showing <span id="showing-count">{{ transactions|length }}</span> of <span id="total-count">{{ total_transactions }}</span>
+                        </span>
+                        <a href="{% url 'admin_hostel_payment_create' %}" class="btn btn-sm btn-light">
+                            <i class="fas fa-plus"></i> New Payment
+                        </a>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover text-nowrap table-responsive-sm table-bordered table-striped table-sm display" id="payments-table" style="width:100%">
+                            <thead class="bg-light">
+                                <tr>
+                                    <th>Receipt #</th>
+                                    <th>Student</th>
+                                    <th>Reg No</th>
+                                    <th>Hostel</th>
+                                    <th>Amount Paid</th>
+                                    <th>Remaining Amount</th>
+                                    <th>Payment Type</th>
+                                    <th>Payment Method</th>
+                                    <th>Reference</th>
+                                    <th>Date</th>
+                                    <th class="text-center">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for transaction in transactions %}
+                                <tr id="row-{{ transaction.id }}" 
+                                    data-hostel="{{ transaction.allocation.hostel.id }}"
+                                    data-payment-type="{{ transaction.payment_type }}"
+                                    data-payment-method="{{ transaction.payment_method }}"
+                                    data-balance="{{ transaction.allocation.balance }}"
+                                    data-amount="{{ transaction.amount }}"
+                                    data-date="{{ transaction.payment_date|date:'Y-m-d' }}">
+                                    <td>
+                                        <span class="receipt-number">{{ transaction.receipt_number }}</span>
+                                    </td>
+                                    <td>
+                                        <div class="d-flex flex-column">
+                                            <span class="font-weight-bold">{{ transaction.allocation.student.full_name }}</span>
+                                            <small class="text-muted">{{ transaction.allocation.student.class_level.name|default:'' }} {{ transaction.allocation.student.stream_class.stream_letter|default:'' }}</small>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <small class="text-muted">{{ transaction.allocation.student.registration_number }}</small>
+                                    </td>
+                                    <td>
+                                        <span>{{ transaction.allocation.hostel.name }}</span>
+                                        <small class="d-block text-muted">{{ transaction.allocation.hostel.code }}</small>
+                                    </td>
+                                    <td>
+                                        <strong>TSh {{ transaction.amount|floatformat:2 }}</strong>
+                                    </td>
+                                    <td>
+                                        {% if transaction.payment_type == 'installments' and transaction.installment_payment %}
+                                            {% if transaction.installment_payment.remaining_amount <= 0 %}
+                                                <span class="balance-zero">
+                                                    <i class="fas fa-check-circle"></i> TSh 0
+                                                </span>
+                                            {% else %}
+                                                <span class="balance-positive">
+                                                    <i class="fas fa-exclamation-triangle"></i> TSh {{ transaction.installment_payment.remaining_amount|floatformat:2 }}
+                                                </span>
+                                            {% endif %}
+                                        {% else %}
+                                            {% with balance=transaction.allocation.balance %}
+                                                {% if balance <= 0 %}
+                                                    <span class="balance-zero">
+                                                        <i class="fas fa-check-circle"></i> TSh 0
+                                                    </span>
+                                                {% else %}
+                                                    <span class="balance-positive">
+                                                        <i class="fas fa-exclamation-triangle"></i> TSh {{ balance|floatformat:2 }}
+                                                    </span>
+                                                {% endif %}
+                                            {% endwith %}
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <span class="payment-badge badge-{{ transaction.payment_type }}">
+                                            {{ transaction.get_payment_type_display }}
+                                            {% if transaction.installment_payment %}
+                                                <br><small>#{{ transaction.installment_payment.installment_plan.installment_number }}</small>
+                                            {% endif %}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <span class="method-badge method-{{ transaction.payment_method }}">
+                                            {{ transaction.get_payment_method_display }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        {% if transaction.transaction_number %}
+                                            <small class="text-muted">{{ transaction.transaction_number }}</small>
+                                        {% else %}
+                                            <small class="text-muted">-</small>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <span class="badge badge-info">
+                                            <i class="fas fa-calendar mr-1"></i> {{ transaction.payment_date|date:"d/m/Y" }}
+                                        </span>
+                                        <small class="d-block text-muted">{{ transaction.created_at|time:"H:i" }}</small>
+                                    </td>
+                                    <td class="text-center">
+                                        <div class="quick-actions">
+                                            <a href="{% url 'admin_hostel_payment_detail' transaction.id %}" 
+                                               class="btn btn-sm btn-info quick-action-btn" 
+                                               title="View Details">
+                                                <i class="fas fa-eye"></i>
+                                            </a>                                          
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                            <tfoot>
+                                <tr class="bg-light font-weight-bold">
+                                    <td colspan="4" class="text-right">Totals:</td>
+                                    <td id="total-amount-display">TSh {{ total_amount|floatformat:2 }}</td>
+                                    <td colspan="6"></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+
+<!-- Toast Notifications -->
+<div id="toast-container" style="position: fixed; top: 20px; right: 20px; z-index: 9999;"></div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // ============================================
+    // Initialize DataTable with enhanced configuration
+    // ============================================
+    var table = $('#payments-table').DataTable({
+        "dom": "<'row'<'col-sm-12 col-md-6'l><'col-sm-12 col-md-6'f>>" +
+               "<'row'<'col-sm-12'tr>>" +
+               "<'row'<'col-sm-12 col-md-5'i><'col-sm-12 col-md-7'p>>",
+        "lengthMenu": [[10, 25, 50, 100, -1], [10, 25, 50, 100, "All"]],
+        "pageLength": 10,
+        "responsive": true,
+        "order": [[9, 'desc']],
+        "columnDefs": [
+            { 
+                "targets": [2, 8],
+                "orderable": false,
+                "searchable": true
+            },
+            { 
+                "targets": 10,
+                "orderable": false,
+                "searchable": false
+            }
+        ],
+        "language": {
+            "emptyTable": "No payment transactions found",
+            "search": "<i class='fas fa-search mr-2'></i>Search:",
+            "lengthMenu": "Show _MENU_ entries",
+            "info": "Showing _START_ to _END_ of _TOTAL_ entries",
+            "infoEmpty": "Showing 0 to 0 of 0 entries",
+            "infoFiltered": "(filtered from _MAX_ total entries)",
+            "paginate": {
+                "first": "<i class='fas fa-angle-double-left'></i>",
+                "last": "<i class='fas fa-angle-double-right'></i>",
+                "next": "<i class='fas fa-angle-right'></i>",
+                "previous": "<i class='fas fa-angle-left'></i>"
+            }
+        },
+        "footerCallback": function(row, data, start, end, display) {
+            var api = this.api();
+            
+            var total = api
+                .column(4, { page: 'current' })
+                .data()
+                .reduce(function(a, b) {
+                    var amount = parseFloat(b.toString().replace('TSh ', '').replace(/,/g, ''));
+                    return a + (isNaN(amount) ? 0 : amount);
+                }, 0);
+            
+            $(api.column(4).footer()).html('TSh ' + total.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}));
+        },
+        "drawCallback": function(settings) {
+            var api = this.api();
+            var showing = api.rows({ page: 'current' }).count();
+            var total = api.rows().count();
+            $('#showing-count').text(showing);
+            $('#total-count').text(total);
+        }
+    });
+
+    // ============================================
+    // Enhanced Filter Functionality
+    // ============================================
+    function applyFilters() {
+        var hostel = $('#filter-hostel').val();
+        var paymentType = $('#filter-payment-type').val();
+        var paymentMethod = $('#filter-payment-method').val();
+        var balanceStatus = $('#filter-balance-status').val();
+        var dateFrom = $('#filter-date-from').val();
+        var dateTo = $('#filter-date-to').val();
+        var minAmount = parseFloat($('#filter-min-amount').val()) || 0;
+        var maxAmount = parseFloat($('#filter-max-amount').val()) || Infinity;
+        
+        $.fn.dataTable.ext.search = [];
+        
+        $.fn.dataTable.ext.search.push(
+            function(settings, data, dataIndex) {
+                var row = table.row(dataIndex).node();
+                
+                if (hostel) {
+                    var rowHostel = $(row).data('hostel');
+                    if (rowHostel != hostel) return false;
+                }
+                
+                if (paymentType) {
+                    var rowPaymentType = $(row).data('payment-type');
+                    if (rowPaymentType != paymentType) return false;
+                }
+                
+                if (paymentMethod) {
+                    var rowPaymentMethod = $(row).data('payment-method');
+                    if (rowPaymentMethod != paymentMethod) return false;
+                }
+                
+                if (balanceStatus) {
+                    var rowBalance = parseFloat($(row).data('balance'));
+                    if (balanceStatus === 'paid' && rowBalance > 0) return false;
+                    if (balanceStatus === 'partial' && rowBalance <= 0) return false;
+                }
+                
+                var rowAmount = parseFloat($(row).data('amount'));
+                if (rowAmount < minAmount || rowAmount > maxAmount) return false;
+                
+                if (dateFrom || dateTo) {
+                    var rowDate = new Date($(row).data('date'));
+                    
+                    if (dateFrom) {
+                        var fromDate = new Date(dateFrom);
+                        fromDate.setHours(0, 0, 0, 0);
+                        if (rowDate < fromDate) return false;
+                    }
+                    
+                    if (dateTo) {
+                        var toDate = new Date(dateTo);
+                        toDate.setHours(23, 59, 59, 999);
+                        if (rowDate > toDate) return false;
+                    }
+                }
+                
+                return true;
+            }
+        );
+        
+        table.draw();
+        
+        var visibleRows = table.rows({ search: 'applied' }).count();
+        showToast(`${visibleRows} transactions match filters`, 'info');
+        
+        // Update export URLs with current filters
+        updateExportUrls();
+    }
+
+    function updateExportUrls() {
+        var params = new URLSearchParams();
+        
+        var hostel = $('#filter-hostel').val();
+        var paymentType = $('#filter-payment-type').val();
+        var paymentMethod = $('#filter-payment-method').val();
+        var balanceStatus = $('#filter-balance-status').val();
+        var dateFrom = $('#filter-date-from').val();
+        var dateTo = $('#filter-date-to').val();
+        var minAmount = $('#filter-min-amount').val();
+        var maxAmount = $('#filter-max-amount').val();
+        
+        if (hostel) params.append('hostel', hostel);
+        if (paymentType) params.append('payment_type', paymentType);
+        if (paymentMethod) params.append('payment_method', paymentMethod);
+        if (balanceStatus) params.append('balance_status', balanceStatus);
+        if (dateFrom) params.append('date_from', dateFrom);
+        if (dateTo) params.append('date_to', dateTo);
+        if (minAmount) params.append('min_amount', minAmount);
+        if (maxAmount) params.append('max_amount', maxAmount);
+        
+        var queryString = params.toString();
+        var baseExcelUrl = "{% url 'admin_hostel_payments_export_excel' %}";
+        var basePdfUrl = "{% url 'admin_hostel_payments_export_pdf' %}";
+        
+        $('#export-excel').attr('href', baseExcelUrl + (queryString ? '?' + queryString : ''));
+        $('#export-pdf').attr('href', basePdfUrl + (queryString ? '?' + queryString : ''));
+    }
+
+    $('#apply-filters').on('click', applyFilters);
+
+    $('#reset-filters').on('click', function() {
+        $('#filter-hostel').val('');
+        $('#filter-payment-type').val('');
+        $('#filter-payment-method').val('');
+        $('#filter-balance-status').val('');
+        $('#filter-date-from').val('');
+        $('#filter-date-to').val('');
+        $('#filter-min-amount').val('');
+        $('#filter-max-amount').val('');
+        
+        $.fn.dataTable.ext.search = [];
+        table.draw();
+        showToast('All filters cleared', 'info');
+        updateExportUrls();
+    });
+
+   
+
+    // ============================================
+    // Toast Notification Function
+    // ============================================
+    function showToast(message, type = 'success') {
+        const toastId = 'toast-' + Date.now();
+        const icon = type === 'success' ? 'fa-check-circle' : (type === 'error' ? 'fa-exclamation-circle' : 'fa-info-circle');
+        
+        let bgColor = type === 'success' ? '#28a745' : (type === 'error' ? '#dc3545' : '#17a2b8');
+        
+        const toast = `
+            <div id="${toastId}" class="toast-notification alert alert-${type} alert-dismissible fade show" role="alert" 
+                 style="background: ${bgColor}; color: white; border: none;">
+                <strong><i class="fas ${icon} mr-2"></i> ${type === 'success' ? 'Success' : type === 'error' ? 'Error' : 'Info'}</strong>
+                <span class="ml-2">${message}</span>
+                <button type="button" class="close" onclick="$('#${toastId}').fadeOut()" style="color: white;">
+                    <span>&times;</span>
+                </button>
+            </div>
+        `;
+        
+        $('#toast-container').append(toast);
+        
+        setTimeout(function() {
+            $('#' + toastId).fadeOut(function() {
+                $(this).remove();
+            });
+        }, 3000);
+    }
+
+    // ============================================
+    // Modal close handler
+    // ============================================
+    $(document).on('click', '[data-dismiss="modal"]', function(e) {
+        e.preventDefault();
+        $(this).closest('.modal').modal('hide');
+    });
+
+    // ============================================
+    // Keyboard shortcuts
+    // ============================================
+    $(document).on('keydown', function(e) {
+        if (e.ctrlKey && e.key === 'f') {
+            e.preventDefault();
+            $('.dataTables_filter input').focus();
+        }
+        
+        if (e.altKey && e.key === 'a') {
+            e.preventDefault();
+            applyFilters();
+        }
+        
+        if (e.altKey && e.key === 'r') {
+            e.preventDefault();
+            $('#reset-filters').click();
+        }
+    });
+});
+</script>
+{% endblock %}

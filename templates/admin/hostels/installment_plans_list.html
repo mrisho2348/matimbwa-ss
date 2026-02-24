@@ -1,0 +1,603 @@
+{% extends 'admin/base.html' %}
+{% load static %}
+
+{% block title %}Hostel Installment Plans{% endblock %}
+
+{% block breadcrumb %}
+    <div class="btn-group">
+        <a href="{% url 'admin_hostel_installment_plan_create' %}" class="btn btn-primary">
+            <i class="fas fa-plus"></i> New Installment Plan
+        </a>
+    </div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* Stats cards */
+    .stat-card {
+        background: linear-gradient(45deg, #4e73df 0%, #224abe 100%);
+        color: white;
+        border-radius: 10px;
+        padding: 20px;
+        margin-bottom: 20px;
+        position: relative;
+        overflow: hidden;
+    }
+    .stat-card.plans {
+        background: linear-gradient(45deg, #1cc88a 0%, #13855c 100%);
+    }
+    .stat-card.hostels {
+        background: linear-gradient(45deg, #36b9cc 0%, #258391 100%);
+    }
+    .stat-icon {
+        font-size: 3rem;
+        opacity: 0.3;
+        position: absolute;
+        right: 20px;
+        top: 20px;
+    }
+    
+    /* Quick action buttons */
+    .quick-actions {
+        display: flex;
+        gap: 4px;
+        justify-content: center;
+        align-items: center;
+    }
+    .quick-action-btn {
+        width: 32px;
+        height: 32px;
+        padding: 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        border: none;
+        transition: all 0.2s ease;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    }
+    .quick-action-btn i {
+        font-size: 0.9rem;
+    }
+    .quick-action-btn:hover {
+        transform: scale(1.1);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+    }
+    
+    /* Payment period badge */
+    .payment-period-badge {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 5px 12px;
+        border-radius: 20px;
+        font-size: 0.85rem;
+        display: inline-block;
+        font-weight: 500;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+    
+    /* Hostel card */
+    .hostel-card {
+        border-left: 4px solid #4e73df;
+        transition: transform 0.2s;
+        margin-bottom: 20px;
+    }
+    .hostel-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+    }
+    
+    /* Filter section */
+    .filter-section {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 10px;
+        padding: 20px;
+        margin-bottom: 20px;
+        color: white;
+    }
+    .filter-section label {
+        color: white;
+        font-weight: 500;
+    }
+    .filter-section .form-control-sm {
+        background: rgba(255,255,255,0.9);
+        border: none;
+    }
+    
+    /* DataTable customization */
+    .dataTables_wrapper .dataTables_filter {
+        float: right;
+        text-align: right;
+    }
+    .dataTables_wrapper .dataTables_length {
+        float: left;
+    }
+    .dataTables_wrapper .dataTables_paginate {
+        float: right;
+        margin-top: 10px;
+    }
+    
+    /* Toast notifications */
+    .toast-notification {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 9999;
+        min-width: 300px;
+        animation: slideIn 0.3s ease;
+    }
+    @keyframes slideIn {
+        from {
+            transform: translateX(100%);
+            opacity: 0;
+        }
+        to {
+            transform: translateX(0);
+            opacity: 1;
+        }
+    }
+    
+    /* Installment badge */
+    .installment-badge {
+        background: #4e73df;
+        color: white;
+        padding: 3px 10px;
+        border-radius: 15px;
+        font-size: 0.85rem;
+        display: inline-block;
+    }
+    
+    /* Month name style */
+    .month-name {
+        text-transform: capitalize;
+        font-weight: 500;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Statistics Cards -->
+    <div class="row">
+        <div class="col-xl-4 col-md-6">
+            <div class="stat-card">
+                <div class="stat-icon">
+                    <i class="fas fa-calendar-alt"></i>
+                </div>
+                <h6 class="text-uppercase font-weight-bold">Total Installment Plans</h6>
+                <h2 class="font-weight-bold mb-0">{{ total_plans }}</h2>
+                <small>Across all hostels</small>
+            </div>
+        </div>
+        <div class="col-xl-4 col-md-6">
+            <div class="stat-card plans">
+                <div class="stat-icon">
+                    <i class="fas fa-hotel"></i>
+                </div>
+                <h6 class="text-uppercase font-weight-bold">Hostels with Plans</h6>
+                <h2 class="font-weight-bold mb-0">{{ total_hostels_with_plans }}</h2>
+                <small>Active hostels</small>
+            </div>
+        </div>
+        <div class="col-xl-4 col-md-6">
+            <div class="stat-card hostels">
+                <div class="stat-icon">
+                    <i class="fas fa-money-bill-wave"></i>
+                </div>
+                <h6 class="text-uppercase font-weight-bold">Total Hostels</h6>
+                <h2 class="font-weight-bold mb-0">{{ hostels.count }}</h2>
+                <small>In the system</small>
+            </div>
+        </div>
+    </div>
+
+    <!-- Plans by Hostel Overview -->
+    <div class="row mb-4">
+        <div class="col-lg-12">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h6 class="mb-0"><i class="fas fa-chart-pie mr-2"></i> Installment Plans by Hostel</h6>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        {% for data in plans_per_hostel %}
+                        <div class="col-xl-4 col-lg-6 mb-3">
+                            <div class="card hostel-card">
+                                <div class="card-body">
+                                    <h6 class="card-title text-primary font-weight-bold">{{ data.hostel.name }}</h6>
+                                    <div class="d-flex justify-content-between mb-2">
+                                        <span>Plans:</span>
+                                        <span class="font-weight-bold">{{ data.plan_count }}</span>
+                                    </div>
+                                    <div class="d-flex justify-content-between mb-2">
+                                        <span>Total Amount:</span>
+                                        <span class="font-weight-bold">TSh {{ data.total_amount|floatformat:2 }}</span>
+                                    </div>
+                                    <div class="mt-2">
+                                        {% for plan in data.installments %}
+                                            <span class="installment-badge mr-1 mb-1">#{{ plan.installment_number }}</span>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% empty %}
+                        <div class="col-12 text-center py-4">
+                            <i class="fas fa-calendar-times fa-3x mb-3 text-muted"></i>
+                            <p class="text-muted">No installment plans found.</p>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filter Section -->
+    <div class="row">
+        <div class="col-lg-12">
+            <div class="filter-section">
+                <form id="filter-form" class="form-inline justify-content-between align-items-center">
+                    <div class="form-group mb-2 mr-3">
+                        <label for="filter-hostel" class="mr-2 font-weight-bold">Hostel:</label>
+                        <select class="form-control form-control-sm" id="filter-hostel" style="min-width: 200px;">
+                            <option value="">All Hostels</option>
+                            {% for hostel in hostels %}
+                            <option value="{{ hostel.id }}">{{ hostel.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group mb-2">
+                        <button type="button" class="btn btn-sm btn-light mr-2" id="apply-filters">
+                            <i class="fas fa-filter"></i> Apply
+                        </button>
+                        <button type="button" class="btn btn-sm btn-light" id="reset-filters">
+                            <i class="fas fa-undo"></i> Reset
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Card -->
+    <div class="row">
+        <div class="col-lg-12">
+            <div class="card shadow-lg">
+                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center py-3">
+                    <h6 class="header-title mb-0 text-uppercase font-weight-bold">
+                        <i class="fas fa-calendar-alt mr-2"></i> Hostel Installment Plans
+                    </h6>
+                    <div class="d-flex align-items-center">
+                        <span class="badge badge-light p-2">
+                            <i class="fas fa-list"></i> Total: <span id="total-count">{{ total_plans }}</span>
+                        </span>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover text-nowrap table-responsive-sm table-bordered table-striped table-sm display" id="plans-table" style="width:100%">
+                            <thead class="bg-light">
+                                <tr>
+                                    <th>Hostel</th>
+                                    <th>Installment #</th>
+                                    <th>Amount</th>
+                                    <th>Payment Period</th>
+                                    <th class="text-center" style="width: 100px;">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for plan in installment_plans %}
+                                <tr id="row-{{ plan.id }}">
+                                    <td>
+                                        <div class="d-flex flex-column">
+                                            <span class="font-weight-bold">{{ plan.hostel.name }}</span>
+                                            <small class="text-muted">{{ plan.hostel.code }}</small>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <span class="installment-badge">#{{ plan.installment_number }}</span>
+                                    </td>
+                                    <td>
+                                        <strong>TSh {{ plan.amount|floatformat:2 }}</strong>
+                                    </td>
+                                    <td>
+                                        {% with start_month=plan.start_month|stringformat:"02d" start_day=plan.start_day|stringformat:"02d" end_month=plan.end_month|stringformat:"02d" end_day=plan.end_day|stringformat:"02d" %}
+                                            {% with month_names="January February March April May June July August September October November December" %}
+                                                {% with month_list=month_names.split %}
+                                                    <span class="payment-period-badge">
+                                                        <i class="fas fa-calendar-alt mr-1"></i>
+                                                        {{ start_day }}/{{ month_list|slice:plan.start_month|last }} - 
+                                                        {{ end_day }}/{{ month_list|slice:plan.end_month|last }}
+                                                    </span>
+                                                {% endwith %}
+                                            {% endwith %}
+                                        {% endwith %}
+                                    </td>
+                                    <td class="text-center">
+                                        <div class="quick-actions">
+                                            <!-- View Details -->
+                                            <a href="{% url 'admin_hostel_installment_plan_detail' plan.id %}" 
+                                               class="btn btn-sm btn-info quick-action-btn" 
+                                               title="View Details">
+                                                <i class="fas fa-eye"></i>
+                                            </a>
+                                            
+                                            <!-- Edit -->
+                                            <a href="{% url 'admin_hostel_installment_plan_edit' plan.id %}" 
+                                               class="btn btn-sm btn-primary quick-action-btn" 
+                                               title="Edit Plan">
+                                                <i class="fas fa-edit"></i>
+                                            </a>
+                                            
+                                            <!-- Delete -->
+                                            <button class="btn btn-sm btn-danger quick-action-btn delete-btn" 
+                                                    data-id="{{ plan.id }}"
+                                                    data-plan="Installment {{ plan.installment_number }}"
+                                                    data-hostel="{{ plan.hostel.name }}"
+                                                    title="Delete Plan">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="deleteModal" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title">
+                    <i class="fas fa-exclamation-triangle mr-2"></i> Confirm Deletion
+                </h5>
+                <button type="button" class="close text-white" data-dismiss="modal">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-2">Are you sure you want to delete:</p>
+                <p class="font-weight-bold text-danger" id="delete-plan-info"></p>
+                <p class="text-muted small mt-3">
+                    <i class="fas fa-info-circle mr-1"></i>
+                    This action cannot be undone. Plans with existing payments cannot be deleted.
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">
+                    <i class="fas fa-times mr-1"></i> Cancel
+                </button>
+                <button type="button" class="btn btn-danger" id="confirm-delete-btn">
+                    <span class="spinner-border spinner-border-sm mr-1" role="status" style="display: none;"></span>
+                    <i class="fas fa-trash mr-1"></i> Delete
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Toast Notifications -->
+<div id="toast-container" style="position: fixed; top: 20px; right: 20px; z-index: 9999;"></div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // ============================================
+    // CSRF Token
+    // ============================================
+    function getCSRFToken() {
+        const csrfInput = document.querySelector('input[name="csrfmiddlewaretoken"]');
+        return csrfInput ? csrfInput.value : '';
+    }
+
+    // ============================================
+    // Toast Notification Function
+    // ============================================
+    function showToast(message, type = 'success') {
+        const toastId = 'toast-' + Date.now();
+        const icon = type === 'success' ? 'fa-check-circle' : (type === 'error' ? 'fa-exclamation-circle' : 'fa-info-circle');
+        
+        let bgColor = '#28a745';
+        if (type === 'error') bgColor = '#dc3545';
+        else if (type === 'info') bgColor = '#17a2b8';
+        else if (type === 'warning') bgColor = '#ffc107';
+        
+        const toast = `
+            <div id="${toastId}" class="toast-notification alert alert-${type} alert-dismissible fade show" role="alert" 
+                 style="background: ${bgColor}; color: white; border: none; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
+                <strong><i class="fas ${icon} mr-2"></i> ${type === 'success' ? 'Success' : type === 'error' ? 'Error' : type === 'warning' ? 'Warning' : 'Info'}</strong>
+                <span class="ml-2">${message}</span>
+                <button type="button" class="close" onclick="$('#${toastId}').fadeOut()" style="color: white; opacity: 0.8;">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+        `;
+        
+        $('#toast-container').append(toast);
+        
+        setTimeout(function() {
+            $('#' + toastId).fadeOut(function() {
+                $(this).remove();
+            });
+        }, 3000);
+    }
+
+    // ============================================
+    // Button Loading State
+    // ============================================
+    function setButtonLoading(btn, isLoading) {
+        const spinner = btn.find('.spinner-border');
+        const icon = btn.find('i:not(.spinner-border)');
+        
+        if (isLoading) {
+            btn.data('original-text', btn.html());
+            btn.prop('disabled', true);
+            spinner.show();
+            icon.hide();
+        } else {
+            btn.prop('disabled', false);
+            spinner.hide();
+            icon.show();
+        }
+    }
+
+    // ============================================
+    // Initialize DataTable
+    // ============================================
+    var table = $('#plans-table').DataTable({
+        "dom": "<'row'<'col-sm-12 col-md-6'l><'col-sm-12 col-md-6'f>>" +
+               "<'row'<'col-sm-12'tr>>" +
+               "<'row'<'col-sm-12 col-md-5'i><'col-sm-12 col-md-7'p>>",
+        "lengthMenu": [[10, 25, 50, -1], [10, 25, 50, "All"]],
+        "pageLength": 10,
+        "responsive": true,
+        "autoWidth": false,
+        "ordering": true,
+        "order": [[0, 'asc'], [1, 'asc']],
+        "columnDefs": [
+            { 
+                "targets": 4,
+                "orderable": false,
+                "searchable": false
+            }
+        ],
+        "language": {
+            "emptyTable": "No installment plans found",
+            "search": "<i class='fas fa-search mr-2'></i>Search:",
+            "lengthMenu": "Show _MENU_ entries",
+            "info": "Showing _START_ to _END_ of _TOTAL_ entries",
+            "infoEmpty": "Showing 0 to 0 of 0 entries",
+            "infoFiltered": "(filtered from _MAX_ total entries)",
+            "paginate": {
+                "first": "First",
+                "last": "Last",
+                "next": "<i class='fas fa-chevron-right'></i>",
+                "previous": "<i class='fas fa-chevron-left'></i>"
+            }
+        },
+        "drawCallback": function(settings) {
+            var api = this.api();
+            var total = api.rows().count();
+            $('#total-count').text(total);
+        }
+    });
+
+    // ============================================
+    // Filter Functionality
+    // ============================================
+    function applyFilters() {
+        $.fn.dataTable.ext.search = [];
+        
+        $.fn.dataTable.ext.search.push(
+            function(settings, data, dataIndex) {
+                var hostel = $('#filter-hostel').val();
+                
+                if (hostel) {
+                    var selectedHostel = $('#filter-hostel option:selected').text();
+                    var hostelName = data[0];
+                    if (!hostelName.includes(selectedHostel)) {
+                        return false;
+                    }
+                }
+                
+                return true;
+            }
+        );
+        
+        table.draw();
+    }
+
+    $('#apply-filters').on('click', function() {
+        applyFilters();
+        showToast('Filters applied', 'success');
+    });
+
+    $('#reset-filters').on('click', function() {
+        $('#filter-hostel').val('');
+        $.fn.dataTable.ext.search = [];
+        table.draw();
+        showToast('Filters cleared', 'info');
+    });
+
+    // ============================================
+    // Delete Functionality
+    // ============================================
+    let planToDelete = null;
+    
+    $(document).on('click', '.delete-btn', function() {
+        planToDelete = {
+            id: $(this).data('id'),
+            plan: $(this).data('plan'),
+            hostel: $(this).data('hostel')
+        };
+        
+        $('#delete-plan-info').text(`${planToDelete.plan} - ${planToDelete.hostel}`);
+        $('#deleteModal').modal('show');
+    });
+
+    $('#confirm-delete-btn').on('click', function() {
+        if (!planToDelete) return;
+        
+        const deleteBtn = $(this);
+        setButtonLoading(deleteBtn, true);
+        
+        $.ajax({
+            url: '{% url "admin_hostel_installment_plan_delete" %}',
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': getCSRFToken(),
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            data: { 
+                id: planToDelete.id
+            },
+            success: function(response) {
+                if (response.success) {
+                    $('#deleteModal').modal('hide');
+                    showToast(response.message, 'success');
+                    setTimeout(function() {
+                        location.reload();
+                    }, 1500);
+                } else {
+                    showToast(response.message || 'Error deleting plan', 'error');
+                    setButtonLoading(deleteBtn, false);
+                }
+            },
+            error: function(xhr) {
+                let errorMsg = 'An error occurred while deleting';
+                if (xhr.responseJSON && xhr.responseJSON.message) {
+                    errorMsg = xhr.responseJSON.message;
+                }
+                showToast(errorMsg, 'error');
+                setButtonLoading(deleteBtn, false);
+            }
+        });
+    });
+
+    // ============================================
+    // Modal Cleanup
+    // ============================================
+    $('#deleteModal').on('hidden.bs.modal', function() {
+        planToDelete = null;
+        setButtonLoading($('#confirm-delete-btn'), false);
+    });
+
+    // ============================================
+    // Modal close handler
+    // ============================================
+    $(document).on('click', '[data-dismiss="modal"]', function(e) {
+        e.preventDefault();
+        $(this).closest('.modal').modal('hide');
+    });
+});
+</script>
+{% endblock %}

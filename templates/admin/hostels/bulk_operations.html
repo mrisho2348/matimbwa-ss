@@ -1,0 +1,1210 @@
+{% extends 'admin/base.html' %}
+{% load static %}
+
+{% block title %}Bulk Student Allocation{% endblock %}
+
+{% block breadcrumb %}
+<div class="breadcrumb-wrapper">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb bg-transparent p-0 mb-0">
+            <li class="breadcrumb-item"><a href="{% url 'admin_dashboard' %}"><i class="fas fa-home"></i> Dashboard</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'admin_hostels_list' %}">Hostels</a></li>
+            
+            <!-- Hostel breadcrumb item - show if hostel_id is in URL -->
+            {% if request.GET.hostel %}
+                {% for h in hostels %}
+                    {% if h.id|stringformat:"s" == request.GET.hostel %}
+                        <li class="breadcrumb-item">
+                            <a href="{% url 'admin_hostel_students' h.id %}">
+                                {{ h.name }}
+                            </a>
+                        </li>
+                    {% endif %}
+                {% endfor %}
+            {% endif %}
+            
+            <li class="breadcrumb-item active" aria-current="page">Bulk Allocation</li>
+        </ol>
+    </nav>
+    
+    <!-- Back button - dynamic based on context -->
+    <a href="{% if request.GET.hostel %}{% url 'admin_hostel_students' request.GET.hostel %}{% else %}{% url 'admin_student_allocations_list' %}{% endif %}" class="btn btn-secondary">
+        <i class="fas fa-arrow-left"></i> 
+        {% if request.GET.hostel %}Back to Students{% else %}Back to Allocations{% endif %}
+    </a>
+</div>
+
+<style>
+    .breadcrumb-wrapper {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 15px;
+        margin-bottom: 20px;
+        padding: 10px 0;
+    }
+    
+    .breadcrumb {
+        margin-bottom: 0;
+        padding: 0;
+        background: transparent;
+    }
+    
+    .breadcrumb-item a {
+        color: #4e73df;
+        text-decoration: none;
+        font-weight: 500;
+    }
+    
+    .breadcrumb-item a:hover {
+        text-decoration: underline;
+        color: #224abe;
+    }
+    
+    .btn-secondary {
+        background: linear-gradient(135deg, #6c757d, #5a5c69);
+        color: white;
+        border: none;
+        padding: 8px 20px;
+        border-radius: 30px;
+        font-size: 0.9rem;
+        font-weight: 500;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        transition: all 0.3s;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+    
+    .btn-secondary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        background: linear-gradient(135deg, #5a5c69, #4a4b55);
+    }
+    
+    @media (max-width: 768px) {
+        .breadcrumb-wrapper {
+            flex-direction: column;
+            align-items: flex-start;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    :root {
+        --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        --primary-color: #4e73df;
+        --success-color: #1cc88a;
+        --info-color: #36b9cc;
+        --warning-color: #f6c23e;
+        --danger-color: #e74a3b;
+        --dark-color: #5a5c69;
+        --light-bg: #f8f9fc;
+        --border-color: #e3e6f0;
+        --card-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        --hover-shadow: 0 15px 40px rgba(78, 115, 223, 0.2);
+        --transition: all 0.3s ease;
+    }
+
+    /* Page Header */
+    .page-header {
+        background: var(--primary-gradient);
+        border-radius: 15px;
+        padding: 25px 30px;
+        margin-bottom: 25px;
+        color: white;
+        position: relative;
+        overflow: hidden;
+        box-shadow: 0 10px 30px rgba(102, 126, 234, 0.3);
+    }
+
+    .page-header::before {
+        content: '';
+        position: absolute;
+        top: -30px;
+        right: -30px;
+        width: 150px;
+        height: 150px;
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 50%;
+    }
+
+    .page-header::after {
+        content: '';
+        position: absolute;
+        bottom: -30px;
+        left: -30px;
+        width: 100px;
+        height: 100px;
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 50%;
+    }
+
+    .header-content {
+        display: flex;
+        align-items: center;
+        gap: 20px;
+        position: relative;
+        z-index: 1;
+        flex-wrap: wrap;
+    }
+
+    .header-icon {
+        width: 60px;
+        height: 60px;
+        background: rgba(255, 255, 255, 0.2);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 2rem;
+        border: 2px solid white;
+    }
+
+    .header-text {
+        flex: 1;
+    }
+
+    .header-text h1 {
+        font-size: 1.8rem;
+        font-weight: 700;
+        margin-bottom: 5px;
+    }
+
+    .header-text p {
+        margin: 0;
+        opacity: 0.9;
+        font-size: 1rem;
+    }
+
+    .header-badge {
+        background: rgba(255, 255, 255, 0.2);
+        padding: 8px 20px;
+        border-radius: 30px;
+        font-size: 0.9rem;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        border: 1px solid rgba(255, 255, 255, 0.3);
+    }
+
+    /* Stats Cards */
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 20px;
+        margin-bottom: 25px;
+    }
+
+    .stat-card {
+        background: white;
+        border-radius: 12px;
+        padding: 20px;
+        box-shadow: 0 5px 20px rgba(0, 0, 0, 0.03);
+        position: relative;
+        overflow: hidden;
+        border-left: 4px solid transparent;
+        transition: var(--transition);
+        border: 1px solid var(--border-color);
+    }
+
+    .stat-card:hover {
+        transform: translateY(-3px);
+        box-shadow: var(--hover-shadow);
+    }
+
+    .stat-card.available { border-left-color: var(--primary-color); }
+    .stat-card.hostels { border-left-color: var(--success-color); }
+    .stat-card.years { border-left-color: var(--info-color); }
+    .stat-card.classes { border-left-color: var(--warning-color); }
+
+    .stat-icon {
+        position: absolute;
+        right: 15px;
+        top: 15px;
+        font-size: 2rem;
+        opacity: 0.15;
+    }
+
+    .stat-label {
+        font-size: 0.8rem;
+        color: #6c757d;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 5px;
+        font-weight: 600;
+    }
+
+    .stat-value {
+        font-size: 1.8rem;
+        font-weight: 700;
+        color: #2c3e50;
+        line-height: 1.2;
+    }
+
+    /* Student Cards */
+    .student-card {
+        border: 1px solid var(--border-color);
+        border-radius: 10px;
+        padding: 12px 15px;
+        margin-bottom: 10px;
+        cursor: pointer;
+        transition: var(--transition);
+        display: flex;
+        align-items: center;
+        background: white;
+    }
+    
+    .student-card:hover {
+        background-color: var(--light-bg);
+        border-color: var(--primary-color);
+        transform: translateX(5px);
+        box-shadow: 0 2px 10px rgba(78, 115, 223, 0.1);
+    }
+    
+    .student-card.selected {
+        background-color: #e3f2fd;
+        border-color: var(--primary-color);
+        border-width: 2px;
+    }
+    
+    .student-checkbox {
+        margin-right: 15px;
+        width: 18px;
+        height: 18px;
+        cursor: pointer;
+        accent-color: var(--primary-color);
+    }
+    
+    .student-avatar {
+        width: 40px;
+        height: 40px;
+        background: var(--primary-gradient);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-weight: 600;
+        font-size: 1rem;
+        margin-right: 15px;
+        box-shadow: 0 3px 8px rgba(78, 115, 223, 0.3);
+    }
+    
+    .student-info {
+        flex: 1;
+    }
+    
+    .student-info strong {
+        font-size: 1rem;
+        color: #2c3e50;
+        display: block;
+        margin-bottom: 3px;
+    }
+    
+    .student-info small {
+        color: #6c757d;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 15px;
+        font-size: 0.8rem;
+    }
+    
+    .student-info small i {
+        margin-right: 3px;
+        color: var(--primary-color);
+    }
+    
+    /* Filter Section */
+    .filter-section {
+        background-color: var(--light-bg);
+        border-radius: 10px;
+        padding: 20px;
+        margin-bottom: 20px;
+        border: 1px solid var(--border-color);
+    }
+    
+    .filter-label {
+        font-size: 0.8rem;
+        font-weight: 600;
+        color: #6c757d;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 5px;
+        display: block;
+    }
+    
+    .form-control, .form-select {
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        padding: 8px 12px;
+        font-size: 0.9rem;
+        transition: var(--transition);
+    }
+    
+    .form-control:focus, .form-select:focus {
+        border-color: var(--primary-color);
+        box-shadow: 0 0 0 3px rgba(78, 115, 223, 0.1);
+        outline: none;
+    }
+    
+    /* Summary Alert */
+    .summary-alert {
+        background: var(--primary-gradient);
+        color: white;
+        border: none;
+        border-radius: 10px;
+        padding: 15px 20px;
+        margin-top: 20px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        box-shadow: 0 5px 15px rgba(78, 115, 223, 0.3);
+    }
+    
+    .summary-alert i {
+        font-size: 1.2rem;
+        margin-right: 10px;
+    }
+    
+    .summary-alert .selected-count {
+        background: rgba(255,255,255,0.2);
+        padding: 5px 15px;
+        border-radius: 30px;
+        font-weight: 600;
+        font-size: 1.1rem;
+    }
+    
+    .clear-selection {
+        background: rgba(255,255,255,0.2);
+        border: 1px solid rgba(255,255,255,0.3);
+        color: white;
+        border-radius: 30px;
+        padding: 5px 15px;
+        font-size: 0.85rem;
+        transition: var(--transition);
+    }
+    
+    .clear-selection:hover {
+        background: rgba(255,255,255,0.3);
+        border-color: white;
+    }
+    
+    /* Loading Spinner */
+    .spinner-container {
+        text-align: center;
+        padding: 40px 0;
+    }
+    
+    .spinner-container i {
+        font-size: 3rem;
+        color: var(--primary-color);
+        margin-bottom: 15px;
+    }
+    
+    /* Action Cards */
+    .action-card {
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.03);
+        transition: var(--transition);
+    }
+    
+    .action-card:hover {
+        box-shadow: var(--hover-shadow);
+    }
+    
+    .action-card-header {
+        background: linear-gradient(135deg, #f8f9fc, #ffffff);
+        padding: 15px 20px;
+        border-bottom: 1px solid var(--border-color);
+    }
+    
+    .action-card-header h6 {
+        margin: 0;
+        font-weight: 600;
+        color: var(--primary-color);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    
+    .action-card-body {
+        padding: 20px;
+    }
+    
+    .capacity-info {
+        background: var(--light-bg);
+        border-radius: 8px;
+        padding: 10px;
+        margin-top: 10px;
+        font-size: 0.85rem;
+    }
+    
+    .capacity-bar {
+        height: 5px;
+        background: var(--border-color);
+        border-radius: 3px;
+        overflow: hidden;
+        margin: 8px 0;
+    }
+    
+    .capacity-fill {
+        height: 100%;
+        background: linear-gradient(90deg, var(--success-color), var(--info-color));
+        border-radius: 3px;
+        transition: width 0.5s ease;
+    }
+    
+    .btn-allocate {
+        background: linear-gradient(135deg, #28a745, #1e7e34);
+        color: white;
+        border: none;
+        padding: 12px;
+        border-radius: 8px;
+        font-weight: 600;
+        width: 100%;
+        transition: var(--transition);
+    }
+    
+    .btn-allocate:hover:not(:disabled) {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(40, 167, 69, 0.3);
+    }
+    
+    .btn-allocate:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+    
+    /* Info Alert */
+    .info-alert {
+        background: linear-gradient(135deg, #36b9cc20, #1e8a9e20);
+        border-left: 4px solid var(--info-color);
+        border-radius: 8px;
+        padding: 15px;
+        margin-top: 20px;
+        color: #1e8a9e;
+    }
+    
+    /* Modal Styles */
+    .modal-confirm .icon-box-success {
+        width: 80px;
+        height: 80px;
+        margin: 0 auto;
+        border-radius: 50%;
+        border: 3px solid #28a745;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    .modal-confirm .icon-box-success i {
+        color: #28a745;
+        font-size: 46px;
+    }
+    
+    .modal-confirm .icon-box {
+        width: 80px;
+        height: 80px;
+        margin: 0 auto;
+        border-radius: 50%;
+        border: 3px solid #e74a3b;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    .modal-confirm .icon-box i {
+        color: #e74a3b;
+        font-size: 46px;
+    }
+    
+    /* Toast Notifications */
+    .toast-container {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 9999;
+        max-width: 400px;
+    }
+    
+    .toast-notification {
+        animation: slideIn 0.3s ease;
+        margin-bottom: 10px;
+        border-radius: 8px;
+        box-shadow: 0 5px 20px rgba(0,0,0,0.15);
+    }
+    
+    @keyframes slideIn {
+        from {
+            transform: translateX(100%);
+            opacity: 0;
+        }
+        to {
+            transform: translateX(0);
+            opacity: 1;
+        }
+    }
+    
+    /* Responsive */
+    @media (max-width: 1200px) {
+        .stats-grid {
+            grid-template-columns: repeat(2, 1fr);
+        }
+    }
+    
+    @media (max-width: 768px) {
+        .stats-grid {
+            grid-template-columns: 1fr;
+        }
+        
+        .student-info small {
+            flex-direction: column;
+            gap: 5px;
+        }
+        
+        .header-content {
+            flex-direction: column;
+            text-align: center;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-0">
+    <!-- Page Header -->
+    <div class="page-header">
+        <div class="header-content">
+            <div class="header-icon">
+                <i class="fas fa-users"></i>
+            </div>
+            <div class="header-text">
+                <h1>Bulk Student Allocation</h1>
+                <p>
+                    <i class="fas fa-check-circle mr-1"></i> Select multiple students and allocate them to a hostel in one go
+                </p>
+            </div>
+            <div class="header-badge">
+                <i class="fas fa-calendar-alt"></i>
+                <span>{% now "d M, Y" %}</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Statistics Cards -->
+    <div class="stats-grid">
+        <div class="stat-card available">
+            <div class="stat-icon">
+                <i class="fas fa-user-graduate"></i>
+            </div>
+            <div class="stat-label">Available Students</div>
+            <div class="stat-value" id="availableCount">0</div>
+        </div>
+
+        <div class="stat-card hostels">
+            <div class="stat-icon">
+                <i class="fas fa-building"></i>
+            </div>
+            <div class="stat-label">Active Hostels</div>
+            <div class="stat-value">{{ hostels.count }}</div>
+        </div>
+
+        <div class="stat-card years">
+            <div class="stat-icon">
+                <i class="fas fa-calendar"></i>
+            </div>
+            <div class="stat-label">Academic Years</div>
+            <div class="stat-value">{{ academic_years.count }}</div>
+        </div>
+
+        <div class="stat-card classes">
+            <div class="stat-icon">
+                <i class="fas fa-layer-group"></i>
+            </div>
+            <div class="stat-label">Class Levels</div>
+            <div class="stat-value">{{ classes.count }}</div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Left Panel - Student Selection -->
+        <div class="col-lg-8">
+            <div class="card shadow mb-4">
+                <div class="card-header bg-success text-white py-3">
+                    <h5 class="mb-0"><i class="fas fa-users mr-2"></i> Select Students for Bulk Allocation</h5>
+                </div>
+                <div class="card-body">
+                    <!-- Search and Filters -->
+                    <div class="filter-section">
+                        <div class="row g-3">
+                            <div class="col-md-7">
+                                <label class="filter-label">Search Students</label>
+                                <div class="input-group">
+                                    <span class="input-group-text bg-white border-end-0">
+                                        <i class="fas fa-search text-muted"></i>
+                                    </span>
+                                    <input type="text" class="form-control border-start-0" id="student-search" 
+                                           placeholder="Name or registration number...">
+                                </div>
+                            </div>
+                            <div class="col-md-5">
+                                <label class="filter-label">Filter by Class</label>
+                                <select class="form-select" id="class-filter">
+                                    <option value="">All Classes</option>
+                                    {% for class in classes %}
+                                        <option value="{{ class.id }}">{{ class.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Student List -->
+                    <div id="student-list" style="max-height: 500px; overflow-y: auto; padding-right: 5px;">
+                        <div class="spinner-container">
+                            <i class="fas fa-spinner fa-spin"></i>
+                            <p class="text-muted">Loading available students...</p>
+                        </div>
+                    </div>
+
+                    <!-- Selection Summary -->
+                    <div class="summary-alert mt-4">
+                        <div>
+                            <i class="fas fa-check-circle"></i>
+                            <span class="fw-bold">Selected Students</span>
+                        </div>
+                        <div class="d-flex align-items-center gap-3">
+                            <span class="selected-count" id="selected-count">0</span>
+                            <button class="btn clear-selection" id="clear-selection">
+                                <i class="fas fa-times mr-1"></i> Clear
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Panel - Allocation Settings -->
+        <div class="col-lg-4">
+            <div class="card shadow mb-4">
+                <div class="card-header bg-primary text-white py-3">
+                    <h5 class="mb-0"><i class="fas fa-cog mr-2"></i> Allocation Settings</h5>
+                </div>
+                <div class="card-body">
+                    <!-- Hostel Selection -->
+                    <div class="action-card mb-4">
+                        <div class="action-card-header">
+                            <h6><i class="fas fa-hotel"></i> Hostel Details</h6>
+                        </div>
+                        <div class="action-card-body">
+                            <div class="mb-3">
+                                <label class="filter-label">Select Hostel</label>
+                                <select class="form-select" id="bulk-hostel">
+                                    <option value="" selected disabled>-- Choose a hostel --</option>
+                                    {% for hostel in hostels %}
+                                        <option value="{{ hostel.id }}" 
+                                                data-capacity="{{ hostel.max_students }}"
+                                                {% if request.GET.hostel == hostel.id|stringformat:"s" %}selected{% endif %}>
+                                            {{ hostel.name }} ({{ hostel.code }}) - {{ hostel.get_hostel_type_display }}
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+
+                            <!-- Capacity Info -->
+                            <div id="hostel-capacity-info" class="capacity-info" style="display: none;">
+                                <div class="d-flex justify-content-between">
+                                    <span>Selected:</span>
+                                    <span id="selected-count-display">0</span>/<span id="hostel-capacity">0</span>
+                                </div>
+                                <div class="capacity-bar">
+                                    <div id="capacity-bar-fill" class="capacity-fill" style="width: 0%"></div>
+                                </div>
+                                <div id="capacity-message" class="mt-2 small"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Academic Details -->
+                    <div class="action-card mb-4">
+                        <div class="action-card-header">
+                            <h6><i class="fas fa-calendar-alt"></i> Academic Details</h6>
+                        </div>
+                        <div class="action-card-body">
+                            <div class="mb-3">
+                                <label class="filter-label">Academic Year</label>
+                                <select class="form-select" id="bulk-academic-year">
+                                    {% for year in academic_years %}
+                                        <option value="{{ year.id }}" {% if year.is_active %}selected{% endif %}>
+                                            {{ year.name }} {% if year.is_active %}(Current){% endif %}
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="filter-label">Start Date</label>
+                                <input type="date" class="form-control" id="bulk-start-date" 
+                                       value="{% now 'Y-m-d' %}">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Allocate Button -->
+                    <button class="btn-allocate" id="bulk-allocate" disabled>
+                        <i class="fas fa-plus-circle mr-2"></i> 
+                        Allocate <span id="selected-count-btn">0</span> Student(s)
+                    </button>
+
+                    <!-- Info Alert -->
+                    <div class="info-alert mt-4">
+                        <i class="fas fa-info-circle mr-2"></i>
+                        <small>
+                            Selected students will be allocated to the chosen hostel. 
+                            Room and bed assignments can be done later from the edit page.
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Toast Container -->
+<div class="toast-container" id="toastContainer"></div>
+
+<!-- Confirmation Modal -->
+<div class="modal fade" id="confirmModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header border-0">
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body text-center">
+                <div class="icon-box-success mb-4">
+                    <i class="fas fa-check"></i>
+                </div>
+                <h4 class="mb-3">Confirm Allocation</h4>
+                <p class="mb-2">You are about to allocate <strong id="confirm-count">0</strong> student(s)</p>
+                <div class="bg-light p-3 rounded mt-3 text-start" id="confirm-details"></div>
+            </div>
+            <div class="modal-footer border-0 justify-content-center">
+                <button type="button" class="btn btn-secondary px-4" data-bs-dismiss="modal">
+                    <i class="fas fa-times mr-1"></i> Cancel
+                </button>
+                <button type="button" class="btn btn-success px-4" id="confirm-allocate-btn">
+                    <span class="spinner-border spinner-border-sm mr-1" role="status" style="display: none;"></span>
+                    <i class="fas fa-check mr-1"></i> Confirm
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Success Modal -->
+<div class="modal fade" id="successModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header border-0">
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body text-center">
+                <div class="icon-box-success mb-4">
+                    <i class="fas fa-check"></i>
+                </div>
+                <h4 class="mb-3">Success!</h4>
+                <p id="success-message" class="text-muted">Allocations created successfully.</p>
+            </div>
+            <div class="modal-footer border-0 justify-content-center">
+                <button type="button" class="btn btn-primary px-4" id="success-ok-btn">
+                    <i class="fas fa-check mr-1"></i> OK
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Error Modal -->
+<div class="modal fade" id="errorModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header border-0">
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body text-center">
+                <div class="icon-box mb-4">
+                    <i class="fas fa-exclamation-triangle"></i>
+                </div>
+                <h4 class="mb-3 text-danger">Error</h4>
+                <p id="error-message" class="text-muted">An error occurred.</p>
+            </div>
+            <div class="modal-footer border-0 justify-content-center">
+                <button type="button" class="btn btn-danger px-4" data-bs-dismiss="modal">
+                    <i class="fas fa-times mr-1"></i> Close
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // ============================================
+    // State Management
+    // ============================================
+    let selectedStudents = new Set();
+    let students = [];
+
+    // ============================================
+    // CSRF Token
+    // ============================================
+    function getCSRFToken() {
+        const csrfInput = document.querySelector('[name=csrfmiddlewaretoken]');
+        if (csrfInput) return csrfInput.value;
+        
+        const cookieValue = document.cookie
+            .split('; ')
+            .find(row => row.startsWith('csrftoken='))
+            ?.split('=')[1];
+        return cookieValue || '';
+    }
+
+    // ============================================
+    // Toast Notification Function
+    // ============================================
+    function showToast(message, type = 'success') {
+        const icon = type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle';
+        const bgColor = type === 'success' ? '#28a745' : '#dc3545';
+        
+        const toast = $(`
+            <div class="toast-notification alert alert-${type}" role="alert" style="background: ${bgColor}; color: white;">
+                <div class="d-flex align-items-center">
+                    <i class="fas ${icon} mr-2"></i>
+                    <strong>${type === 'success' ? 'Success!' : 'Error!'}</strong>
+                    <span class="ml-2">${message}</span>
+                    <button type="button" class="close ml-auto" style="color: white;" onclick="$(this).closest('.toast-notification').remove()">
+                        <span>&times;</span>
+                    </button>
+                </div>
+            </div>
+        `);
+        
+        $('#toastContainer').append(toast);
+        
+        setTimeout(() => {
+            toast.fadeOut(() => toast.remove());
+        }, 3000);
+    }
+
+    // ============================================
+    // Load Available Students
+    // ============================================
+    function loadStudents(search = '', classId = '') {
+        $('#student-list').html(`
+            <div class="spinner-container">
+                <i class="fas fa-spinner fa-spin"></i>
+                <p class="text-muted">Loading available students...</p>
+            </div>
+        `);
+        
+        $.ajax({
+            url: '{% url "admin_get_available_students" %}',
+            method: 'GET',
+            data: {
+                search: search,
+                class_level: classId,
+                source: 'bulk',
+                include_stats: 'true'
+            },
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            success: function(data) {
+                if (data.results && data.results.length > 0) {
+                    students = data.results;
+                    $('#availableCount').text(data.pagination.total || students.length);
+                    
+                    // Filter selected students
+                    const availableIds = new Set(students.map(s => s.id.toString()));
+                    const validSelected = new Set();
+                    selectedStudents.forEach(id => {
+                        if (availableIds.has(id)) validSelected.add(id);
+                    });
+                    selectedStudents = validSelected;
+                    
+                    displayStudents(students);
+                } else {
+                    $('#student-list').html(`
+                        <div class="text-center py-5">
+                            <i class="fas fa-user-slash fa-3x text-muted mb-3"></i>
+                            <p class="text-muted">No available students found</p>
+                        </div>
+                    `);
+                    selectedStudents.clear();
+                    updateSelection();
+                }
+            },
+            error: function() {
+                $('#student-list').html(`
+                    <div class="text-center py-5">
+                        <i class="fas fa-exclamation-circle fa-3x text-danger mb-3"></i>
+                        <p class="text-danger">Error loading students. Please try again.</p>
+                        <button class="btn btn-sm btn-primary mt-2" onclick="location.reload()">
+                            <i class="fas fa-redo mr-1"></i> Retry
+                        </button>
+                    </div>
+                `);
+            }
+        });
+    }
+
+    // ============================================
+    // Display Students
+    // ============================================
+    function displayStudents(students) {
+        let html = '';
+        students.forEach(student => {
+            const isSelected = selectedStudents.has(student.id.toString());
+            const initials = student.full_name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+            
+            html += `
+                <div class="student-card ${isSelected ? 'selected' : ''}" data-id="${student.id}">
+                    <input type="checkbox" class="student-checkbox" value="${student.id}" ${isSelected ? 'checked' : ''}>
+                    <div class="student-avatar">${initials}</div>
+                    <div class="student-info">
+                        <strong>${student.full_name}</strong>
+                        <small>
+                            <span><i class="fas fa-id-card"></i> ${student.registration_number || 'N/A'}</span>
+                            <span><i class="fas fa-${student.gender_code === 'male' ? 'mars' : 'venus'}"></i> ${student.gender}</span>
+                            <span><i class="fas fa-graduation-cap"></i> ${student.class_level}</span>
+                            ${student.stream ? `<span><i class="fas fa-users"></i> Stream ${student.stream}</span>` : ''}
+                        </small>
+                    </div>
+                </div>
+            `;
+        });
+        $('#student-list').html(html);
+        updateSelection();
+    }
+
+    // ============================================
+    // Update Selection Summary
+    // ============================================
+    function updateSelection() {
+        const count = selectedStudents.size;
+        $('#selected-count, #selected-count-btn, #selected-count-display').text(count);
+        $('#bulk-allocate').prop('disabled', count === 0);
+        updateHostelCapacity();
+    }
+
+    // ============================================
+    // Update Hostel Capacity
+    // ============================================
+    function updateHostelCapacity() {
+        const $hostel = $('#bulk-hostel');
+        const selectedOption = $hostel.find('option:selected');
+        const capacity = parseInt(selectedOption.data('capacity') || 0);
+        const selectedCount = selectedStudents.size;
+        
+        if ($hostel.val()) {
+            $('#hostel-capacity').text(capacity);
+            
+            if (selectedCount > 0) {
+                const percentage = Math.min((selectedCount / capacity) * 100, 100);
+                $('#capacity-bar-fill').css('width', percentage + '%');
+                
+                if (selectedCount > capacity) {
+                    $('#capacity-message').html(`
+                        <span class="text-danger">
+                            <i class="fas fa-exclamation-triangle"></i> Exceeds capacity by ${selectedCount - capacity}
+                        </span>
+                    `);
+                } else {
+                    $('#capacity-message').html(`
+                        <span class="text-success">
+                            <i class="fas fa-check-circle"></i> ${capacity - selectedCount} spaces remaining
+                        </span>
+                    `);
+                }
+                
+                $('#hostel-capacity-info').slideDown();
+            } else {
+                $('#hostel-capacity-info').slideUp();
+            }
+        } else {
+            $('#hostel-capacity-info').slideUp();
+        }
+    }
+
+    // ============================================
+    // Event Handlers
+    // ============================================
+    
+    // Search with debounce
+    let searchTimeout;
+    $('#student-search').on('input', function() {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(() => {
+            loadStudents($(this).val(), $('#class-filter').val());
+        }, 300);
+    });
+
+    // Class filter change
+    $('#class-filter').on('change', function() {
+        loadStudents($('#student-search').val(), $(this).val());
+    });
+
+    // Student card click
+    $(document).on('click', '.student-card', function(e) {
+        if ($(e.target).is('input[type="checkbox"]')) return;
+        
+        const $checkbox = $(this).find('.student-checkbox');
+        $checkbox.prop('checked', !$checkbox.prop('checked')).trigger('change');
+    });
+
+    // Checkbox change
+    $(document).on('change', '.student-checkbox', function() {
+        const $card = $(this).closest('.student-card');
+        const studentId = $(this).val().toString();
+        
+        if ($(this).is(':checked')) {
+            selectedStudents.add(studentId);
+            $card.addClass('selected');
+        } else {
+            selectedStudents.delete(studentId);
+            $card.removeClass('selected');
+        }
+        
+        updateSelection();
+    });
+
+    // Hostel selection
+    $('#bulk-hostel').on('change', updateHostelCapacity);
+
+    // Clear selection
+    $('#clear-selection').on('click', function() {
+        selectedStudents.clear();
+        $('.student-checkbox').prop('checked', false);
+        $('.student-card').removeClass('selected');
+        updateSelection();
+        showToast('Selection cleared', 'info');
+    });
+
+    // Bulk allocate
+    $('#bulk-allocate').on('click', function() {
+        const hostelId = $('#bulk-hostel').val();
+        const hostelName = $('#bulk-hostel option:selected').text().split('(')[0].trim();
+        const selectedCount = selectedStudents.size;
+        
+        if (!hostelId) {
+            $('#error-message').text('Please select a hostel');
+            $('#errorModal').modal('show');
+            return;
+        }
+        
+        const capacity = $('#bulk-hostel option:selected').data('capacity') || 0;
+        if (selectedCount > capacity) {
+            $('#error-message').text(`Selected ${selectedCount} students exceeds hostel capacity of ${capacity}`);
+            $('#errorModal').modal('show');
+            return;
+        }
+        
+        if (selectedCount === 0) {
+            $('#error-message').text('Please select at least one student');
+            $('#errorModal').modal('show');
+            return;
+        }
+        
+        $('#confirm-count').text(selectedCount);
+        $('#confirm-details').html(`
+            <strong>Hostel:</strong> ${hostelName}<br>
+            <strong>Students:</strong> ${selectedCount}<br>
+            <strong>Academic Year:</strong> ${$('#bulk-academic-year option:selected').text()}<br>
+            <strong>Start Date:</strong> ${$('#bulk-start-date').val()}
+        `);
+        $('#confirmModal').modal('show');
+    });
+
+    // Confirm allocation
+    $('#confirm-allocate-btn').on('click', function() {
+        const $btn = $(this);
+        $btn.prop('disabled', true);
+        $btn.find('.spinner-border').show();
+        $btn.find('i:not(.spinner-border)').hide();
+        
+        $.ajax({
+            url: '{% url "admin_student_allocation_bulk_create" %}',
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': getCSRFToken(),
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            data: {
+                'students[]': Array.from(selectedStudents),
+                'hostel': $('#bulk-hostel').val(),
+                'academic_year': $('#bulk-academic-year').val(),
+                'start_date': $('#bulk-start-date').val()
+            },
+            success: function(response) {
+                $('#confirmModal').modal('hide');
+                
+                if (response.success) {
+                    $('#success-message').text(response.message || 'Allocations created successfully');
+                    $('#successModal').modal('show');
+                    setTimeout(() => {
+                        window.location.href = '{% if request.GET.hostel %}{% url "admin_hostel_students" request.GET.hostel %}{% else %}{% url "admin_student_allocations_list" %}{% endif %}';
+                    }, 2000);
+                } else {
+                    $('#error-message').text(response.message || 'Error creating allocations');
+                    $('#errorModal').modal('show');
+                }
+            },
+            error: function(xhr) {
+                $('#confirmModal').modal('hide');
+                const message = xhr.responseJSON?.message || 'An error occurred';
+                $('#error-message').text(message);
+                $('#errorModal').modal('show');
+            },
+            complete: function() {
+                $btn.prop('disabled', false);
+                $btn.find('.spinner-border').hide();
+                $btn.find('i:not(.spinner-border)').show();
+            }
+        });
+    });
+
+    // Success modal OK
+    $('#success-ok-btn').on('click', function() {
+        window.location.href = '{% if request.GET.hostel %}{% url "admin_hostel_students" request.GET.hostel %}{% else %}{% url "admin_student_allocations_list" %}{% endif %}';
+    });
+
+    // Modal cleanup
+    $('#confirmModal').on('hidden.bs.modal', function() {
+        $('#confirm-allocate-btn').prop('disabled', false)
+            .find('.spinner-border').hide()
+            .find('i:not(.spinner-border)').show();
+    });
+
+    // ============================================
+    // Initial Load
+    // ============================================
+    selectedStudents.clear();
+    loadStudents();
+    
+    // Check for preselected hostel
+    const urlParams = new URLSearchParams(window.location.search);
+    const preselectedHostel = urlParams.get('hostel');
+    if (preselectedHostel) {
+        $('#bulk-hostel').val(preselectedHostel).trigger('change');
+    }
+});
+</script>
+{% endblock %}

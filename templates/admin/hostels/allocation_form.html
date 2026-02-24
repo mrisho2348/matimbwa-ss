@@ -1,0 +1,604 @@
+{% extends 'admin/base.html' %}
+{% load static %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block breadcrumb %}
+    <a href="{% url 'admin_student_allocations_list' %}" class="btn btn-secondary">
+        <i class="fas fa-arrow-left"></i> Back to Allocations
+    </a>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .form-card {
+        border: none;
+        box-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.15);
+    }
+    .form-card .card-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-bottom: none;
+        padding: 1.25rem;
+    }
+    .form-card .card-header h5 {
+        margin: 0;
+        font-weight: 600;
+    }
+    
+    /* Student Select Styling */
+    .student-select-wrapper {
+        position: relative;
+    }
+    .student-select-wrapper .select2-container {
+        width: 100% !important;
+    }
+    .select2-container--default .select2-selection--single {
+        height: 38px;
+        border: 1px solid #d1d3e2;
+        border-radius: 0.35rem;
+    }
+    .select2-container--default .select2-selection--single .select2-selection__rendered {
+        line-height: 36px;
+        padding-left: 12px;
+    }
+    .select2-container--default .select2-selection--single .select2-selection__arrow {
+        height: 36px;
+    }
+    .select2-dropdown {
+        border: 1px solid #d1d3e2;
+        border-radius: 0.35rem;
+        box-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.15);
+    }
+    .select2-results__option {
+        padding: 8px 12px;
+    }
+    .select2-results__option--highlighted {
+        background: #4e73df !important;
+    }
+    
+    /* Student option styling */
+    .student-option {
+        display: flex;
+        flex-direction: column;
+    }
+    .student-option strong {
+        color: #2c3e50;
+        font-size: 14px;
+    }
+    .student-option small {
+        color: #6c757d;
+        font-size: 12px;
+        margin-top: 2px;
+    }
+    .select2-results__option--highlighted .student-option strong,
+    .select2-results__option--highlighted .student-option small {
+        color: white;
+    }
+    
+    /* Form group styling */
+    .form-group {
+        margin-bottom: 1.5rem;
+    }
+    .form-group label {
+        font-weight: 600;
+        color: #4e73df;
+        margin-bottom: 0.5rem;
+        display: block;
+    }
+    .form-group label span.text-danger {
+        color: #e74a3b;
+        margin-left: 2px;
+    }
+    
+    /* Form control styling */
+    .form-control, .custom-select {
+        border: 1px solid #d1d3e2;
+        border-radius: 0.35rem;
+        height: 38px;
+        transition: all 0.2s;
+    }
+    .form-control:focus, .custom-select:focus {
+        border-color: #4e73df;
+        box-shadow: 0 0 0 0.2rem rgba(78, 115, 223, 0.25);
+    }
+    
+    /* Availability info box */
+    #availability-info {
+        border-radius: 0.35rem;
+        padding: 1rem;
+        margin: 1.5rem 0;
+        display: flex;
+        align-items: center;
+        animation: slideDown 0.3s ease;
+    }
+    @keyframes slideDown {
+        from {
+            opacity: 0;
+            transform: translateY(-10px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+    #availability-info i {
+        font-size: 1.2rem;
+        margin-right: 10px;
+    }
+    #availability-info.alert-success {
+        background: #d4edda;
+        border-left: 4px solid #28a745;
+    }
+    #availability-info.alert-danger {
+        background: #f8d7da;
+        border-left: 4px solid #dc3545;
+    }
+    
+    /* Button styling */
+    .btn {
+        padding: 0.5rem 1.5rem;
+        font-weight: 600;
+        border-radius: 0.35rem;
+        transition: all 0.2s;
+    }
+    .btn-primary {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border: none;
+    }
+    .btn-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+    }
+    .btn-secondary {
+        background: #858796;
+        border: none;
+    }
+    .btn-secondary:hover {
+        background: #6c757d;
+        transform: translateY(-2px);
+    }
+    
+    /* Row spacing */
+    .row {
+        margin-left: -10px;
+        margin-right: -10px;
+    }
+    .row > [class*="col-"] {
+        padding-left: 10px;
+        padding-right: 10px;
+    }
+    
+    /* Loading indicator */
+    .loading-spinner {
+        display: inline-block;
+        width: 1rem;
+        height: 1rem;
+        border: 2px solid rgba(0,0,0,0.1);
+        border-radius: 50%;
+        border-top-color: #4e73df;
+        animation: spin 0.6s linear infinite;
+        margin-right: 5px;
+    }
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+    
+    /* Student count badge */
+    .student-count {
+        background: #e3e6f0;
+        color: #4e73df;
+        padding: 2px 8px;
+        border-radius: 12px;
+        font-size: 0.75rem;
+        margin-left: 8px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="card form-card">
+        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">
+                <i class="fas fa-plus-circle mr-2"></i> {{ title }}
+            </h5>
+            <span class="badge badge-light">
+                <i class="fas fa-users mr-1"></i> {{ available_students }} students available
+            </span>
+        </div>
+        <div class="card-body p-4">
+            <form method="post" id="allocation-form" class="needs-validation" novalidate>
+                {% csrf_token %}
+                
+                <!-- Student Selection - Now using context data -->
+                <div class="form-group">
+                    <label for="student">
+                        <i class="fas fa-user-graduate mr-1"></i> Select Student 
+                        <span class="text-danger">*</span>
+                        <span class="student-count">{{ students.count }} available</span>
+                    </label>
+                    <select class="form-control select2-enhanced" id="student" name="student" required style="width: 100%;">
+                        <option value="" disabled selected>-- Choose a student --</option>
+                        {% for student in students %}
+                            <option value="{{ student.id }}" 
+                                    data-gender="{{ student.gender }}"
+                                    data-class="{{ student.class_level.name|default:'N/A' }}"
+                                    data-reg="{{ student.registration_number }}">
+                                {{ student.full_name }} ({{ student.registration_number }}) - 
+                                {% if student.class_level %}{{ student.class_level.name }}{% else %}N/A{% endif %}
+                                {% if student.stream_class %} - {{ student.stream_class.name }}{% endif %}
+                            </option>
+                        {% endfor %}
+                    </select>
+                    <small class="form-text text-muted">
+                        <i class="fas fa-info-circle mr-1"></i> 
+                        Showing {{ students.count }} students without active allocations
+                    </small>
+                </div>
+
+                <!-- Hostel Selection -->
+                <div class="form-group">
+                    <label for="hostel">
+                        <i class="fas fa-hotel mr-1"></i> Select Hostel 
+                        <span class="text-danger">*</span>
+                    </label>
+                    <select class="form-control" id="hostel" name="hostel" required>
+                        <option value="" disabled selected>-- Choose a hostel --</option>
+                        {% for hostel in hostels %}
+                            <option value="{{ hostel.id }}" 
+                                    data-capacity="{{ hostel.max_students }}"
+                                    data-current="{{ hostel.current_allocations|default:0 }}">
+                                {{ hostel.name }} ({{ hostel.code }}) - 
+                                Capacity: {{ hostel.max_students }} | 
+                                Available: {{ hostel.available_spaces|default:hostel.max_students }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Room Selection (Optional) -->
+                <div class="form-group">
+                    <label for="room">
+                        <i class="fas fa-door-open mr-1"></i> Select Room (Optional)
+                    </label>
+                    <select class="form-control" id="room" name="room">
+                        <option value="" selected>-- No specific room --</option>
+                    </select>
+                    <small class="form-text text-muted" id="room-info"></small>
+                </div>
+
+                <!-- Bed Selection (Optional) -->
+                <div class="form-group">
+                    <label for="bed">
+                        <i class="fas fa-bed mr-1"></i> Select Bed (Optional)
+                    </label>
+                    <select class="form-control" id="bed" name="bed">
+                        <option value="" selected>-- No specific bed --</option>
+                    </select>
+                    <small class="form-text text-muted" id="bed-info"></small>
+                </div>
+
+                <!-- Academic Year and Dates -->
+                <div class="row">
+                    <div class="col-md-4">
+                        <div class="form-group">
+                            <label for="academic_year">
+                                <i class="fas fa-calendar-alt mr-1"></i> Academic Year 
+                                <span class="text-danger">*</span>
+                            </label>
+                            <select class="form-control" id="academic_year" name="academic_year" required>
+                                <option value="" disabled>-- Select academic year --</option>
+                                {% for year in academic_years %}
+                                    <option value="{{ year.id }}" {% if year.is_active %}selected{% endif %}>
+                                        {{ year.name }} {% if year.is_active %}(Current){% endif %}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="form-group">
+                            <label for="start_date">
+                                <i class="fas fa-play-circle mr-1"></i> Start Date 
+                                <span class="text-danger">*</span>
+                            </label>
+                            <input type="date" class="form-control" id="start_date" name="start_date" 
+                                   value="{% now 'Y-m-d' %}" required>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="form-group">
+                            <label for="end_date">
+                                <i class="fas fa-stop-circle mr-1"></i> End Date
+                            </label>
+                            <input type="date" class="form-control" id="end_date" name="end_date">
+                            <small class="form-text text-muted">Leave empty for academic year end</small>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Availability Check -->
+                <div id="availability-info" class="alert" style="display: none;">
+                    <i class="fas fa-info-circle"></i>
+                    <span id="availability-message"></span>
+                </div>
+
+                <!-- Form Actions -->
+                <div class="form-group text-right mt-4">
+                    <a href="{% url 'admin_student_allocations_list' %}" class="btn btn-secondary mr-2">
+                        <i class="fas fa-times mr-1"></i> Cancel
+                    </a>
+                    <button type="submit" class="btn btn-primary" id="save-btn">
+                        <i class="fas fa-save mr-1"></i> Create Allocation
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // ============================================
+    // Initialize Select2 for enhanced dropdowns
+    // ============================================
+    $('#student').select2({
+        theme: 'bootstrap4',
+        placeholder: '-- Choose a student --',
+        allowClear: true,
+        width: '100%',
+        templateResult: formatStudentResult,
+        templateSelection: formatStudentSelection
+    });
+
+    // Format student options in dropdown
+    function formatStudentResult(student) {
+        if (!student.id) return student.text;
+        
+        var $student = $(
+            '<div class="student-option">' +
+                '<strong>' + student.text.split(' - ')[0] + '</strong>' +
+                '<small>' + (student.text.split(' - ')[1] || '') + '</small>' +
+            '</div>'
+        );
+        return $student;
+    }
+
+    function formatStudentSelection(student) {
+        return student.text.split(' - ')[0] || student.text;
+    }
+
+    // ============================================
+    // Load Rooms when Hostel Changes
+    // ============================================
+    $('#hostel').change(function() {
+        const hostelId = $(this).val();
+        const $room = $('#room');
+        const $bed = $('#bed');
+        const $roomInfo = $('#room-info');
+        const $bedInfo = $('#bed-info');
+        
+        // Show loading state
+        $room.html('<option value="">Loading rooms...</option>').prop('disabled', true);
+        $bed.html('<option value="">Select room first</option>').prop('disabled', true);
+        $roomInfo.text('');
+        $bedInfo.text('');
+        
+        if (hostelId) {
+            $.ajax({
+                url: '{% url "admin_get_available_rooms" 0 %}'.replace('0', hostelId),
+                method: 'GET',
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                success: function(data) {
+                    $room.empty().append('<option value="" selected>-- No specific room --</option>');
+                    
+                    if (data.success && data.rooms && data.rooms.length > 0) {
+                        data.rooms.forEach(function(room) {
+                            let optionText = room.display;
+                            let disabled = room.available_spaces === 0;
+                            
+                            if (disabled) {
+                                optionText += ' (Full)';
+                            }
+                            
+                            const option = $('<option>', {
+                                value: room.id,
+                                text: optionText,
+                                disabled: disabled
+                            });
+                            
+                            if (room.available_spaces > 0) {
+                                option.attr('data-available-spaces', room.available_spaces);
+                            }
+                            
+                            $room.append(option);
+                        });
+                        
+                        $roomInfo.text(`${data.rooms.length} rooms available`);
+                    } else {
+                        $room.append('<option value="" disabled>No rooms available</option>');
+                        $roomInfo.text('No rooms available in this hostel');
+                    }
+                    
+                    $room.prop('disabled', false);
+                },
+                error: function() {
+                    $room.empty().append('<option value="">Error loading rooms</option>').prop('disabled', false);
+                    $roomInfo.text('Failed to load rooms');
+                }
+            });
+        } else {
+            $room.empty().append('<option value="" selected>-- No specific room --</option>').prop('disabled', false);
+        }
+        
+        checkAvailability();
+    });
+
+    // ============================================
+    // Load Beds when Room Changes
+    // ============================================
+    $('#room').change(function() {
+        const roomId = $(this).val();
+        const $bed = $('#bed');
+        const $bedInfo = $('#bed-info');
+        
+        $bed.html('<option value="">Loading beds...</option>').prop('disabled', true);
+        $bedInfo.text('');
+        
+        if (roomId) {
+            $.ajax({
+                url: '{% url "admin_get_available_beds" 0 %}'.replace('0', roomId),
+                method: 'GET',
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                success: function(data) {
+                    $bed.empty().append('<option value="" selected>-- No specific bed --</option>');
+                    
+                    if (data.success && data.beds && data.beds.length > 0) {
+                        data.beds.forEach(function(bed) {
+                            $bed.append($('<option>', {
+                                value: bed.id,
+                                text: bed.display
+                            }));
+                        });
+                        
+                        $bedInfo.text(`${data.beds.length} beds available`);
+                    } else {
+                        $bed.append('<option value="" disabled>No beds available</option>');
+                        $bedInfo.text('No beds available in this room');
+                    }
+                    
+                    $bed.prop('disabled', false);
+                },
+                error: function() {
+                    $bed.empty().append('<option value="">Error loading beds</option>').prop('disabled', false);
+                    $bedInfo.text('Failed to load beds');
+                }
+            });
+        } else {
+            $bed.empty().append('<option value="" selected>-- No specific bed --</option>').prop('disabled', false);
+        }
+        
+        checkAvailability();
+    });
+
+    // ============================================
+    // Check Availability
+    // ============================================
+    function checkAvailability() {
+        const hostelId = $('#hostel').val();
+        const roomId = $('#room').val();
+        const bedId = $('#bed').val();
+        const $info = $('#availability-info');
+        const $message = $('#availability-message');
+        
+        if (!hostelId) {
+            $info.hide();
+            return;
+        }
+        
+        $.ajax({
+            url: '{% url "admin_check_availability" %}',
+            method: 'GET',
+            data: {
+                hostel_id: hostelId,
+                room_id: roomId,
+                bed_id: bedId
+            },
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            success: function(data) {
+                if (data.success) {
+                    if (data.available) {
+                        $info.removeClass('alert-danger').addClass('alert-success');
+                        $message.html('<i class="fas fa-check-circle mr-1"></i> Selected options are available');
+                        $info.show();
+                    } else {
+                        $info.removeClass('alert-success').addClass('alert-danger');
+                        let messages = data.messages || ['Selected options are not available'];
+                        $message.html('<i class="fas fa-exclamation-circle mr-1"></i> ' + messages.join(', '));
+                        $info.show();
+                    }
+                }
+            },
+            error: function() {
+                $info.hide();
+            }
+        });
+    }
+
+    // ============================================
+    // Form Validation and Submission
+    // ============================================
+    $('#allocation-form').on('submit', function(e) {
+        e.preventDefault();
+        
+        // Basic validation
+        const student = $('#student').val();
+        const hostel = $('#hostel').val();
+        const academicYear = $('#academic_year').val();
+        const startDate = $('#start_date').val();
+        
+        if (!student || !hostel || !academicYear || !startDate) {
+            alert('Please fill in all required fields');
+            return;
+        }
+        
+        const $btn = $('#save-btn');
+        const originalText = $btn.html();
+        
+        // Show loading state
+        $btn.prop('disabled', true).html('<span class="loading-spinner"></span> Creating...');
+        
+        $.ajax({
+            url: window.location.href,
+            method: 'POST',
+            data: $(this).serialize(),
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            success: function(response) {
+                if (response.success) {
+                    window.location.href = '{% url "admin_student_allocations_list" %}';
+                } else {
+                    alert(response.message || 'Error creating allocation');
+                    $btn.prop('disabled', false).html(originalText);
+                }
+            },
+            error: function(xhr) {
+                let errorMsg = 'An error occurred. Please try again.';
+                if (xhr.responseJSON && xhr.responseJSON.message) {
+                    errorMsg = xhr.responseJSON.message;
+                }
+                alert(errorMsg);
+                $btn.prop('disabled', false).html(originalText);
+            }
+        });
+    });
+
+    // ============================================
+    // Real-time validation
+    // ============================================
+    $('#student, #hostel, #academic_year, #start_date').on('change', function() {
+        if ($(this).val()) {
+            $(this).removeClass('is-invalid').addClass('is-valid');
+        }
+    });
+
+    // ============================================
+    // Auto-fill end date based on academic year
+    // ============================================
+    $('#academic_year').change(function() {
+        const selected = $(this).find('option:selected');
+        // You can add logic here to auto-fill end date based on selected academic year
+    });
+
+    // ============================================
+    // Trigger initial availability check if hostel is selected
+    // ============================================
+    if ($('#hostel').val()) {
+        $('#hostel').trigger('change');
+    }
+});
+</script>
+{% endblock %}

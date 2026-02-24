@@ -4,6 +4,8 @@ from django.core.exceptions import ValidationError
 from django.utils import timezone
 from accounts.models import GENDER_CHOICES, CustomUser, Staffs
 from core.models import AcademicYear, ClassLevel, Combination, StreamClass, Subject
+from django.db.models import Sum
+
 
 class PreviousSchool(models.Model):
     SCHOOL_LEVEL_CHOICES = [
@@ -385,12 +387,14 @@ class StudentHostelAllocation(models.Model):
 
     @property
     def total_paid(self):
-        return sum(payment.amount_paid for payment in self.payments.all())
+        return self.payment_transactions.aggregate(
+            total=Sum('amount')
+        )['total'] or 0
 
 
     @property
     def balance(self):
-        return self.total_fee - self.total_paid
+        return self.hostel.total_fee - self.total_paid
     def __str__(self):
         return f"{self.student} - {self.hostel}"
 
@@ -441,64 +445,131 @@ class HostelPayment(models.Model):
     allocation = models.ForeignKey(
         StudentHostelAllocation,
         on_delete=models.CASCADE,
-        related_name='payments'
+        related_name='installment_payments'
     )
 
     installment_plan = models.ForeignKey(
         HostelInstallmentPlan,
         on_delete=models.CASCADE,
-        related_name='student_payments'
+        related_name='payments'
     )
 
-    PAYMENT_STATUS = [
-    ('partial', 'Partial'),
-    ('paid', 'Paid'),
-]
+    @property
+    def total_paid(self):
+        return self.transactions.aggregate(
+            total=Sum('amount')
+        )['total'] or 0
 
-    status = models.CharField(
+    @property
+    def required_amount(self):
+        return self.installment_plan.amount
+
+    @property
+    def remaining_amount(self):
+        return self.required_amount - self.total_paid
+
+    @property
+    def status(self):
+        if self.total_paid >= self.required_amount:
+            return "paid"
+        return "partial"
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('allocation', 'installment_plan')
+
+    def __str__(self):
+        return f"{self.allocation.student} - Installment {self.installment_plan.installment_number}"
+    
+
+
+class HostelPaymentTransaction(models.Model):
+
+    PAYMENT_TYPE = [
+        ('installment', 'Installment'),
+        ('monthly', 'Monthly'),
+        ('yearly', 'Yearly'),
+    ]
+
+    PAYMENT_METHOD = [
+        ('cash', 'Cash'),
+        ('bank', 'Bank Transfer'),
+        ('mobile', 'Mobile Money'),
+        ('cheque', 'Cheque'),
+    ]
+
+    allocation = models.ForeignKey(
+        StudentHostelAllocation,
+        on_delete=models.CASCADE,
+        related_name='payment_transactions'
+    )
+
+    # Used only if payment_type == 'installment'
+    installment_payment = models.ForeignKey(
+        HostelPayment,
+        on_delete=models.CASCADE,
+        related_name='transactions',
+        null=True,
+        blank=True
+    )
+
+    payment_type = models.CharField(
         max_length=20,
-        choices=PAYMENT_STATUS,
-        default='partial'
+        choices=PAYMENT_TYPE
     )
 
+    payment_method = models.CharField(
+        max_length=20,
+        choices=PAYMENT_METHOD
+    )
 
-    amount_paid = models.DecimalField(
+    amount = models.DecimalField(
         max_digits=10,
         decimal_places=2
     )
-
-    payment_date = models.DateField(auto_now_add=True)
 
     receipt_number = models.CharField(
         max_length=50,
         unique=True
     )
 
+    # Optional external reference
+    transaction_number = models.CharField(
+        max_length=100,
+        null=True,
+        blank=True,
+        help_text="Bank reference, mobile transaction ID, or cheque number"
+    )
+
+    # Used only if payment_type == 'monthly'
+    month = models.PositiveIntegerField(null=True, blank=True)
+    year = models.PositiveIntegerField(null=True, blank=True)
+
+    payment_date = models.DateField(auto_now_add=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def clean(self):
-        total_paid_for_installment = sum(
-            payment.amount_paid
-            for payment in HostelPayment.objects.filter(
-                allocation=self.allocation,
-                installment_plan=self.installment_plan
-            )
-        )
 
-        if total_paid_for_installment + self.amount_paid > self.installment_plan.amount:
-            raise ValidationError("Payment exceeds installment required amount.")
-        
+        # 🔹 Installment Validation
+        if self.payment_type == 'installment':
+
+            if not self.installment_payment:
+                raise ValidationError("Installment payment reference required.")
+
+            total_existing = self.installment_payment.total_paid
+
+            if total_existing + self.amount > self.installment_payment.required_amount:
+                raise ValidationError("Payment exceeds required installment amount.")
+
+        # 🔹 Monthly Validation
+        if self.payment_type == 'monthly':
+            if not self.month or not self.year:
+                raise ValidationError("Month and Year required for monthly payment.")
+
+        # 🔹 Optional: Require transaction number for non-cash
+        if self.payment_method in ['bank', 'mobile', 'cheque'] and not self.transaction_number:
+            raise ValidationError("Transaction number required for non-cash payments.")
+
     def __str__(self):
-        return f"{self.receipt_number} - {self.amount_paid}"
-    
-    def save(self, *args, **kwargs):
-        super().save(*args, **kwargs)
-
-        remaining = self.installment_plan.remaining_amount(self.allocation)
-
-        if remaining <= 0:
-            self.status = 'paid'
-        else:
-            self.status = 'partial'
-
-        super().save(update_fields=['status'])
+        return f"{self.receipt_number} - {self.amount}"

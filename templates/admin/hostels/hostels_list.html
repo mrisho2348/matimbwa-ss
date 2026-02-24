@@ -1,5 +1,6 @@
 {% extends 'admin/base.html' %}
 {% load static %}
+{% load hostel_extras %}
 {% block title %} Hostel Management {% endblock title %}
 
 {% block breadcrumb %}
@@ -79,6 +80,8 @@
         border-radius: 10px;
         padding: 20px;
         margin-bottom: 20px;
+        position: relative;
+        overflow: hidden;
     }
     .stat-card.boys {
         background: linear-gradient(45deg, #007bff 0%, #0056b3 100%);
@@ -102,10 +105,11 @@
         gap: 4px;
         justify-content: center;
         align-items: center;
+        flex-wrap: wrap;
     }
     .quick-action-btn {
-        width: 28px;
-        height: 28px;
+        width: 32px;
+        height: 32px;
         padding: 0;
         display: inline-flex;
         align-items: center;
@@ -114,9 +118,10 @@
         border: none;
         transition: all 0.2s ease;
         box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+        margin: 2px;
     }
     .quick-action-btn i {
-        font-size: 0.75rem;
+        font-size: 0.85rem;
         color: #ffffff !important;
     }
     .quick-action-btn:hover {
@@ -127,6 +132,72 @@
     .btn-warning.quick-action-btn i {
         color: #212529 !important;
     }
+    
+    /* More Actions Dropdown */
+    .more-actions-dropdown {
+        position: relative;
+        display: inline-block;
+    }
+    .more-actions-btn {
+        width: 32px;
+        height: 32px;
+        padding: 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        border: none;
+        background: #6c757d;
+        color: white;
+        transition: all 0.2s ease;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+    }
+    .more-actions-btn:hover {
+        background: #5a6268;
+        transform: scale(1.1);
+    }
+    .more-actions-menu {
+        position: absolute;
+        top: 100%;
+        right: 0;
+        z-index: 1000;
+        display: none;
+        min-width: 200px;
+        padding: 8px 0;
+        margin-top: 5px;
+        background: white;
+        border: 1px solid #e3e6f0;
+        border-radius: 8px;
+        box-shadow: 0 5px 20px rgba(0,0,0,0.15);
+    }
+    .more-actions-menu.show {
+        display: block;
+    }
+    .more-actions-item {
+        display: flex;
+        align-items: center;
+        padding: 8px 15px;
+        color: #2c3e50;
+        text-decoration: none;
+        transition: all 0.2s;
+        font-size: 0.9rem;
+    }
+    .more-actions-item:hover {
+        background: #f8f9fc;
+        color: #4e73df;
+        text-decoration: none;
+    }
+    .more-actions-item i {
+        width: 20px;
+        margin-right: 10px;
+        color: #4e73df;
+    }
+    .more-actions-divider {
+        height: 1px;
+        background: #e3e6f0;
+        margin: 5px 0;
+    }
+    
     /* Select2 in modal */
     .select2-container {
         z-index: 1056 !important;
@@ -147,6 +218,16 @@
     }
     .currency-input-group input {
         padding-left: 50px;
+    }
+    
+    /* Quick stats */
+    .quick-stats {
+        font-size: 0.75rem;
+        color: #6c757d;
+        margin-top: 2px;
+    }
+    .quick-stats i {
+        margin-right: 2px;
     }
 </style>
 {% endblock extra_css %}
@@ -239,6 +320,7 @@
                                         <th>Code</th>
                                         <th>Type</th>
                                         <th>Capacity</th>
+                                        <th>Occupancy</th>
                                         <th>Total Fee</th>
                                         <th>Payment Mode</th>
                                         <th>Status</th>
@@ -247,7 +329,7 @@
                                 </thead>
                                 <tbody>
                                     {% for hostel in hostels %}
-                                    <tr id="row-{{ hostel.id }}">
+                                    <tr id="row-{{ hostel.id }}" data-hostel-id="{{ hostel.id }}">
                                         <td>
                                             <strong>{{ hostel.name }}</strong>
                                         </td>
@@ -271,6 +353,21 @@
                                             <span class="badge badge-info">
                                                 <i class="fas fa-users"></i> {{ hostel.max_students }}
                                             </span>
+                                        </td>
+                                        <td>
+                                            {% with allocated=hostel.allocated_count|default:0 %}
+                                            <div class="d-flex align-items-center">
+                                                <span class="mr-2">{{ allocated }}/{{ hostel.max_students }}</span>
+                                                <div class="progress flex-grow-1" style="height: 6px; width: 80px;">
+                                                    <div class="progress-bar bg-success" role="progressbar" 
+                                                         style="width: {% widthratio allocated hostel.max_students 100 %}%"></div>
+                                                </div>
+                                            </div>
+                                            <small class="quick-stats">
+                                                <i class="fas fa-door-open"></i> Rooms: {{ hostel.rooms.count }}
+                                                <i class="fas fa-bed ml-2"></i> Beds: {{ hostel.rooms.all|sum_beds|default:0 }}
+                                            </small>
+                                            {% endwith %}
                                         </td>
                                         <td>
                                             <strong>TSh {{ hostel.total_fee|floatformat:2 }}</strong>
@@ -336,6 +433,33 @@
                                                         title="Edit Hostel">
                                                     <i class="fas fa-edit"></i>
                                                 </button>
+                                                
+                                                <!-- More Actions Dropdown -->
+                                                <div class="more-actions-dropdown">
+                                                    <button class="btn btn-sm btn-secondary more-actions-btn" 
+                                                            onclick="toggleMoreActions(this)"
+                                                            title="More Actions">
+                                                        <i class="fas fa-ellipsis-v"></i>
+                                                    </button>
+                                                    <div class="more-actions-menu">
+                                                        <a href="{% url 'admin_hostel_students' hostel.id %}" class="more-actions-item">
+                                                            <i class="fas fa-user-graduate"></i> View Students
+                                                        </a>
+                                                        <a href="{% url 'admin_hostel_rooms_list' %}?hostel={{ hostel.id }}" class="more-actions-item">
+                                                            <i class="fas fa-door-open"></i> View Rooms
+                                                        </a>
+                                                        <a href="{% url 'admin_hostel_beds_list' %}?hostel={{ hostel.id }}" class="more-actions-item">
+                                                            <i class="fas fa-bed"></i> View Beds
+                                                        </a>
+                                                        <div class="more-actions-divider"></div>
+                                                        <a href="{% url 'admin_hostel_installment_plans_list' %}?hostel={{ hostel.id }}" class="more-actions-item">
+                                                            <i class="fas fa-puzzle-piece"></i> Installment Plans
+                                                        </a>
+                                                        <a href="{% url 'admin_hostel_payments_list' %}?hostel={{ hostel.id }}" class="more-actions-item">
+                                                            <i class="fas fa-credit-card"></i> Payment History
+                                                        </a>                                                                                                           
+                                                    </div>
+                                                </div>
                                                 
                                                 <!-- Delete Button -->
                                                 <button class="btn btn-sm btn-danger quick-action-btn delete-btn" 
@@ -708,7 +832,7 @@
             
             "columnDefs": [
                 { 
-                    "targets": 7, // Actions column
+                    "targets": 8, // Actions column
                     "orderable": false,
                     "searchable": false
                 }
@@ -738,7 +862,7 @@
                 var activeCount = 0;
                 api.rows().every(function() {
                     var data = this.data();
-                    var statusText = $(data[6]).text().toLowerCase();
+                    var statusText = $(data[7]).text().toLowerCase();
                     if (statusText.includes('active')) {
                         activeCount++;
                     }
@@ -1108,6 +1232,18 @@
         $('#code, #edit-code, #name, #edit-name, #max_students, #edit-max_students').on('input', function() {
             $(this).removeClass('is-invalid');
         });
+
+        // Close dropdown when clicking outside
+        $(document).on('click', function(e) {
+            if (!$(e.target).closest('.more-actions-dropdown').length) {
+                $('.more-actions-menu').removeClass('show');
+            }
+        });
     });
+
+    // Function to toggle more actions dropdown
+    function toggleMoreActions(button) {
+        $(button).next('.more-actions-menu').toggleClass('show');
+    }
 </script>
 {% endblock extra_js %}
